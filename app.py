@@ -3,11 +3,67 @@ Architect Lead Dashboard – nurture and generate leads with automation.
 Uses PostgreSQL (set DATABASE_URL). Scrape offline; import architects.json into Postgres.
 Deploy to Vercel with a Postgres database.
 """
+import json
 import os
 from flask import Flask, render_template, request, jsonify, redirect, url_for, abort
 
 from sqlalchemy import or_, func
 from models import db, Practice, Lead, Activity, AutomationRule, LEAD_STATUSES
+
+# Path to architects.json (project root)
+ARCHITECTS_JSON_PATH = os.path.join(os.path.dirname(__file__), 'architects.json')
+
+
+def populate_db_from_json(json_path=None):
+    """
+    Create tables if needed and load practices + leads from architects.json.
+    Skips practices that already exist (by url). Returns (practices_added, total_practices).
+    """
+    json_path = json_path or ARCHITECTS_JSON_PATH
+    if not os.path.exists(json_path):
+        return 0, 0
+    with open(json_path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    db.create_all()
+    existing = {p.url for p in Practice.query.all()}
+    added = 0
+    for row in data:
+        url = (row.get('url') or '').strip()
+        if not url or url in existing:
+            continue
+        socials = row.get('socials')
+        if isinstance(socials, str):
+            try:
+                socials = json.loads(socials) if socials.strip() else []
+            except Exception:
+                socials = []
+        if not isinstance(socials, list):
+            socials = []
+        practice = Practice(
+            url=url,
+            name=(row.get('name') or '').strip() or 'Unknown',
+            website=(row.get('website') or '').strip() or None,
+            socials=socials,
+            email=(row.get('email') or '').strip() or None,
+            address=(row.get('address') or '').strip() or None,
+            contact=(row.get('contact') or '').strip() or None,
+            description=(row.get('description') or '').strip() or None,
+            years_active=(row.get('years_active') or '').strip() or None,
+            staff=(row.get('staff') or '').strip() or None,
+            awards=row.get('awards') if isinstance(row.get('awards'), list) else [],
+            source=row.get('source', 'architect'),
+        )
+        db.session.add(practice)
+        db.session.flush()
+        existing.add(url)
+        added += 1
+        db.session.add(Lead(practice_id=practice.id, status='new'))
+    db.session.commit()
+    for p in Practice.query.all():
+        if Lead.query.filter_by(practice_id=p.id).first() is None:
+            db.session.add(Lead(practice_id=p.id, status='new'))
+    db.session.commit()
+    return added, Practice.query.count()
 
 
 def list_leads_for_n8n(limit=200, status=None, with_email_only=True):
@@ -48,10 +104,14 @@ def list_leads_for_n8n(limit=200, status=None, with_email_only=True):
 def create_app():
     app = Flask(__name__)
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-change-in-production')
-    # PostgreSQL: Vercel Postgres, Neon, Supabase, or any postgresql:// URL
+    # PostgreSQL: set DATABASE_URL on Vercel. Fallback: sqlite (project dir locally, /tmp on Vercel).
+    if os.environ.get('VERCEL'):
+        default_sqlite = 'sqlite:////tmp/architect_leads.db'
+    else:
+        default_sqlite = f"sqlite:///{os.path.join(os.path.dirname(__file__), 'architect_leads.db')}"
     app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
         'DATABASE_URL',
-        os.environ.get('POSTGRES_URL', 'sqlite:///architect_leads.db')
+        os.environ.get('POSTGRES_URL', default_sqlite)
     )
     if app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgres://'):
         app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace(
@@ -66,12 +126,47 @@ def create_app():
     db.init_app(app)
 
     with app.app_context():
-        db.create_all()
+        try:
+            db.create_all()
+        except Exception:
+            pass  # App still loads; first request may fail until DB is reachable
 
     @app.cli.command('create-db')
     def create_db():
+        """Create database tables only."""
         db.create_all()
         print('Database tables created.')
+
+    @app.cli.command('populate-db')
+    def populate_db_cmd():
+        """Load data from architects.json (create tables if needed; skip existing practices by url)."""
+        added, total = populate_db_from_json()
+        if added == 0 and total == 0 and not os.path.exists(ARCHITECTS_JSON_PATH):
+            print(f'Not found: {ARCHITECTS_JSON_PATH}')
+            return
+        print(f'Added {added} new practices. Total practices: {total}')
+
+    @app.cli.command('init-db')
+    def init_db():
+        """Create tables and populate from architects.json if the file exists."""
+        db.create_all()
+        print('Database tables created.')
+        added, total = populate_db_from_json()
+        if os.path.exists(ARCHITECTS_JSON_PATH):
+            print(f'Populated: {added} new practices added. Total practices: {total}')
+        else:
+            print(f'No {ARCHITECTS_JSON_PATH} found; skipping populate.')
+
+    @app.errorhandler(500)
+    def handle_500(e):
+        return (
+            '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Error</title></head><body>'
+            '<h1>Application error</h1><p>If you just deployed, set <strong>DATABASE_URL</strong> '
+            'in Vercel project settings to your PostgreSQL connection string (Neon, Supabase, etc.), '
+            'then redeploy.</p><p>See DEPLOY.md in the repo.</p></body></html>',
+            500,
+            {'Content-Type': 'text/html; charset=utf-8'},
+        )
 
     # ---------- Dashboard pages ----------
     @app.route('/')
