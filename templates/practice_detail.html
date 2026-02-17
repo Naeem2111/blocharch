@@ -1,0 +1,168 @@
+{% extends "base.html" %} {% block title %}{{ practice.name }}{% endblock %} {%
+block content %}
+<div class="max-w-4xl mx-auto">
+	<div class="mb-6">
+		<a
+			href="{{ url_for('practices_list') }}"
+			class="text-slate-400 hover:text-white text-sm"
+			>← Practices</a
+		>
+	</div>
+
+	<div class="flex flex-wrap items-start justify-between gap-4 mb-8">
+		<div>
+			<h1 class="text-2xl font-semibold text-white">{{ practice.name or '—' }}</h1>
+			<p class="text-slate-400 text-sm capitalize">
+				{{ practice.source or '—' }} • Staff: {{ practice.staff or '—' }} • Years active: {{ practice.years_active or '—' }}
+			</p>
+		</div>
+		{% if lead %}
+		<div class="flex items-center gap-3">
+			<span
+				class="px-3 py-1 rounded-full text-sm font-medium {% if lead.status == 'new' %}bg-cyan-500/20 text-cyan-400 {% elif lead.status == 'contacted' or lead.status == 'qualified' %}bg-amber-500/20 text-amber-400 {% elif lead.status == 'won' %}bg-emerald-500/20 text-emerald-400 {% elif lead.status == 'lost' %}bg-slate-500/20 text-slate-400 {% else %}bg-slate-500/20 text-slate-300{% endif %}"
+				>{{ lead.status or 'new' }}</span
+			>
+			<select
+				id="statusSelect"
+				data-lead-id="{{ lead.id }}"
+				class="px-3 py-1.5 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:ring-2 focus:ring-cyan-500/50"
+			>
+				{% for s in lead_statuses %}
+				<option value="{{ s }}" {% if (lead.status or '') == s %}selected{% endif %}>
+					{{ s }}
+				</option>
+				{% endfor %}
+			</select>
+		</div>
+		{% endif %}
+	</div>
+
+	<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+		<div class="space-y-6">
+			<div class="bg-slate-800/60 border border-slate-700 rounded-xl p-5">
+				<h2
+					class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3"
+				>
+					Contact
+				</h2>
+				<p class="text-slate-300">
+					<span class="text-slate-500">Contact:</span> {{ practice.contact or
+					'—' }}
+				</p>
+				<p class="text-slate-300 mt-1">
+					<span class="text-slate-500">Email:</span> {% if practice.email %}<a
+						href="mailto:{{ practice.email }}"
+						class="text-cyan-400 hover:underline"
+						>{{ practice.email }}</a
+					>{% else %}—{% endif %}
+				</p>
+				<p class="text-slate-300 mt-1">
+					<span class="text-slate-500">Website:</span> {% if practice.website
+					%}<a
+						href="{{ practice.website }}"
+						target="_blank"
+						rel="noopener"
+						class="text-cyan-400 hover:underline"
+						>{{ (practice.website or '')[:50] }}{% if (practice.website or '')|length > 50 %}…{% endif %}</a
+					>{% else %}—{% endif %}
+				</p>
+				{% if (practice.socials or []) | length > 0 %}
+				<p class="text-slate-300 mt-1">
+					<span class="text-slate-500">Socials:</span>
+					{% for url in (practice.socials or []) %}
+					<a href="{{ url }}" target="_blank" rel="noopener" class="text-cyan-400 hover:underline mr-2">{{ url.split('/')[2] if url else url }}</a>
+					{% endfor %}
+				</p>
+				{% endif %}
+				<p class="text-slate-300 mt-1">
+					<span class="text-slate-500">Address:</span> {{ practice.address or
+					'—' }}
+				</p>
+			</div>
+			<div class="bg-slate-800/60 border border-slate-700 rounded-xl p-5">
+				<h2
+					class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3"
+				>
+					Description
+				</h2>
+				<p class="text-slate-300 text-sm leading-relaxed">
+					{{ (practice.description or '')[:800] or '—' }}{% if (practice.description or '')|length > 800 %}…{% endif %}
+				</p>
+			</div>
+		</div>
+		<div class="space-y-6">
+			{% if lead %}
+			<div class="bg-slate-800/60 border border-slate-700 rounded-xl p-5">
+				<h2
+					class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3"
+				>
+					Lead notes
+				</h2>
+				<textarea
+					id="notesField"
+					data-lead-id="{{ lead.id }}"
+					rows="4"
+					class="w-full px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500/50 text-sm"
+					placeholder="Add notes…"
+				>
+{{ lead.notes or '' }}</textarea
+				>
+				<p class="text-xs text-slate-500 mt-2">Saved automatically on blur.</p>
+			</div>
+			<div class="bg-slate-800/60 border border-slate-700 rounded-xl p-5">
+				<h2
+					class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3"
+				>
+					Recent activity
+				</h2>
+				<ul class="space-y-2">
+					{% for a in activities %}
+					<li class="text-sm text-slate-300 flex gap-2">
+						<span class="text-slate-500 shrink-0">{{ a.created_at.strftime('%d %b') if a.created_at else '—' }}</span>
+						<span class="capitalize">{{ a.kind or 'note' }}</span>
+						{% if a.title %}<span class="text-slate-400">— {{ a.title }}</span>{% endif %}
+					</li>
+					{% else %}
+					<li class="text-slate-500 text-sm">No activity yet.</li>
+					{% endfor %}
+				</ul>
+			</div>
+			{% endif %}
+		</div>
+	</div>
+
+	{% if practice.url %}
+	<p class="mt-6 text-slate-500 text-sm">
+		<a href="{{ practice.url }}" target="_blank" rel="noopener" class="text-cyan-400 hover:underline">View on Architect Directory →</a>
+	</p>
+	{% endif %}
+</div>
+
+<script>
+	(function () {
+		var statusSelect = document.getElementById("statusSelect");
+		var notesField = document.getElementById("notesField");
+		function patchLead(leadId, data) {
+			fetch("/api/leads/" + leadId, {
+				method: "PATCH",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(data),
+			})
+				.then(function (r) {
+					return r.json();
+				})
+				.catch(console.error);
+		}
+		if (statusSelect) {
+			statusSelect.addEventListener("change", function () {
+				patchLead(statusSelect.dataset.leadId, { status: statusSelect.value });
+			});
+		}
+		if (notesField) {
+			notesField.addEventListener("blur", function () {
+				patchLead(notesField.dataset.leadId, { notes: notesField.value });
+			});
+		}
+	})();
+</script>
+{% endblock %}

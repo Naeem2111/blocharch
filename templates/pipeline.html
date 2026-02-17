@@ -1,0 +1,89 @@
+{% extends "base.html" %} {% block title %}Pipeline{% endblock %} {% block
+content %}
+<div class="max-w-5xl mx-auto">
+	<h1 class="text-2xl font-semibold text-white mb-2">Pipeline</h1>
+	<p class="text-slate-400 text-sm mb-6">
+		Leads by stage. Change status from each practice page.
+	</p>
+
+	<div class="flex flex-wrap gap-2 mb-6">
+		{% for s in lead_statuses %}
+		<a
+			href="{{ url_for('pipeline', status=s) }}"
+			class="px-4 py-2 rounded-lg text-sm font-medium capitalize {% if s == current_status %}bg-cyan-600 text-white{% else %}bg-slate-700/60 text-slate-400 hover:bg-slate-700 hover:text-white{% endif %}"
+			>{{ s }}</a
+		>
+		{% endfor %}
+	</div>
+
+	<div
+		class="bg-slate-800/60 border border-slate-700 rounded-xl overflow-hidden"
+	>
+		<div class="overflow-x-auto">
+			<table class="w-full text-left">
+				<thead class="bg-slate-700/50 text-slate-400 text-sm">
+					<tr>
+						<th class="px-4 py-3 font-medium">Practice</th>
+						<th class="px-4 py-3 font-medium">Contact</th>
+						<th class="px-4 py-3 font-medium">Score</th>
+						<th class="px-4 py-3 font-medium w-24"></th>
+					</tr>
+				</thead>
+				<tbody class="divide-y divide-slate-700">
+					{% for lead in leads %}
+					<tr class="hover:bg-slate-700/30">
+						<td class="px-4 py-3">
+							<a
+								href="{{ url_for('practice_detail', practice_id=lead.practice_id) }}"
+								class="font-medium text-white hover:text-cyan-400"
+								>{{ lead.practice.name if lead.practice else '—' }}</a
+							>
+						</td>
+						<td class="px-4 py-3 text-slate-300">
+							{{ (lead.practice.contact if lead.practice else '') or '—' }}{% if
+							lead.practice and (lead.practice.email or '') %}<span
+								class="text-slate-500"
+							>
+								· </span
+							>{{ lead.practice.email }}{% endif %}
+						</td>
+						<td class="px-4 py-3 text-slate-300">{{ lead.score or 0 }}</td>
+						<td class="px-4 py-3">
+							<a
+								href="{{ url_for('practice_detail', practice_id=lead.practice_id) }}"
+								class="text-cyan-400 text-sm hover:underline"
+								>Open</a
+							>
+						</td>
+					</tr>
+					{% else %}
+					<tr>
+						<td colspan="4" class="px-4 py-8 text-center text-slate-500">
+							No leads in this stage.
+						</td>
+					</tr>
+					{% endfor %}
+				</tbody>
+			</table>
+		</div>
+		{% if pagination.pages > 1 %}
+		<div
+			class="px-4 py-3 border-t border-slate-700 flex items-center justify-between text-sm text-slate-400"
+		>
+			<span>Page {{ pagination.page }} of {{ pagination.pages }}</span>
+			<div class="flex gap-2">
+				{% if pagination.has_prev %}<a
+					href="?status={{ current_status }}&page={{ pagination.prev_num }}"
+					class="text-cyan-400 hover:underline"
+					>Previous</a
+				>{% endif %} {% if pagination.has_next %}<a
+					href="?status={{ current_status }}&page={{ pagination.next_num }}"
+					class="text-cyan-400 hover:underline"
+					>Next</a
+				>{% endif %}
+			</div>
+		</div>
+		{% endif %}
+	</div>
+</div>
+{% endblock %}

@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Practices{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto">
+	<h1 class="text-2xl font-semibold text-white mb-2">Practices</h1>
+	<p class="text-slate-400 text-sm mb-6">Search and filter architect & landscape practices. Open one to add to pipeline or log activity.</p>
+
+	<form method="get" class="flex flex-wrap gap-3 mb-6">
+		<input type="text" name="q" value="{{ q or '' }}" placeholder="Search name, contact, address…" class="px-4 py-2 rounded-lg bg-slate-800 border border-slate-600 text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 w-64" />
+		<select name="source" class="px-4 py-2 rounded-lg bg-slate-800 border border-slate-600 text-white focus:ring-2 focus:ring-cyan-500/50">
+			<option value="">All types</option>
+			<option value="architect" {% if (source or '') == 'architect' %}selected{% endif %}>Architects</option>
+			<option value="landscape" {% if (source or '') == 'landscape' %}selected{% endif %}>Landscape</option>
+		</select>
+		<select name="staff" class="px-4 py-2 rounded-lg bg-slate-800 border border-slate-600 text-white focus:ring-2 focus:ring-cyan-500/50">
+			<option value="">Any size</option>
+			<option value="0 - 4" {% if (staff or '') == '0 - 4' %}selected{% endif %}>0 - 4</option>
+			<option value="5 - 19" {% if (staff or '') == '5 - 19' %}selected{% endif %}>5 - 19</option>
+			<option value="20 - 125" {% if (staff or '') == '20 - 125' %}selected{% endif %}>20 - 125</option>
+			<option value="125 +" {% if (staff or '') == '125 +' %}selected{% endif %}>125 +</option>
+		</select>
+		<button type="submit" class="px-4 py-2 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-500">Apply</button>
+	</form>
+
+	<div class="bg-slate-800/60 border border-slate-700 rounded-xl overflow-hidden">
+		<div class="overflow-x-auto">
+			<table class="w-full text-left">
+				<thead class="bg-slate-700/50 text-slate-400 text-sm">
+					<tr>
+						<th class="px-4 py-3 font-medium">Practice</th>
+						<th class="px-4 py-3 font-medium">Contact</th>
+						<th class="px-4 py-3 font-medium">Staff</th>
+						<th class="px-4 py-3 font-medium">Email</th>
+						<th class="px-4 py-3 font-medium w-24"></th>
+					</tr>
+				</thead>
+				<tbody class="divide-y divide-slate-700">
+					{% for p in practices %}
+					<tr class="hover:bg-slate-700/30">
+						<td class="px-4 py-3">
+							<a href="{{ url_for('practice_detail', practice_id=p.id) }}" class="font-medium text-white hover:text-cyan-400">{{ p.name or '—' }}</a>
+							<p class="text-xs text-slate-500 capitalize">{{ p.source or '—' }}</p>
+						</td>
+						<td class="px-4 py-3 text-slate-300">{{ p.contact or '—' }}</td>
+						<td class="px-4 py-3 text-slate-300">{{ p.staff or '—' }}</td>
+						<td class="px-4 py-3 text-slate-300 text-sm">{{ (p.email or '—')[:40] }}{% if (p.email or '')|length > 40 %}…{% endif %}</td>
+						<td class="px-4 py-3"><a href="{{ url_for('practice_detail', practice_id=p.id) }}" class="text-cyan-400 text-sm hover:underline">View</a></td>
+					</tr>
+					{% else %}
+					<tr><td colspan="5" class="px-4 py-8 text-center text-slate-500">No practices match your filters.</td></tr>
+					{% endfor %}
+				</tbody>
+			</table>
+		</div>
+		{% if pagination and pagination.pages > 1 %}
+		<div class="px-4 py-3 border-t border-slate-700 flex items-center justify-between text-sm text-slate-400">
+			<span>Page {{ pagination.page }} of {{ pagination.pages }}</span>
+			<div class="flex gap-2">
+				{% if pagination.has_prev %}<a href="?page={{ pagination.prev_num }}{% if q %}&q={{ q }}{% endif %}{% if source %}&source={{ source }}{% endif %}{% if staff %}&staff={{ staff }}{% endif %}" class="text-cyan-400 hover:underline">Previous</a>{% endif %}
+				{% if pagination.has_next %}<a href="?page={{ pagination.next_num }}{% if q %}&q={{ q }}{% endif %}{% if source %}&source={{ source }}{% endif %}{% if staff %}&staff={{ staff }}{% endif %}" class="text-cyan-400 hover:underline">Next</a>{% endif %}
+			</div>
+		</div>
+		{% endif %}
+	</div>
+</div>
+{% endblock %}

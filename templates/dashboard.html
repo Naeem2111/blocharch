@@ -1,0 +1,88 @@
+{% extends "base.html" %} {% block title %}Dashboard{% endblock %} {% block
+content %}
+<div class="max-w-6xl mx-auto">
+	<h1 class="text-2xl font-semibold text-white mb-2">Dashboard</h1>
+	<p class="text-slate-400 text-sm mb-8">
+		Overview of your architect lead pipeline and outreach.
+	</p>
+
+	<!-- Stats -->
+	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+		<div class="bg-slate-800/60 border border-slate-700 rounded-xl p-5">
+			<p class="text-slate-400 text-sm font-medium">Total practices</p>
+			<p class="text-3xl font-semibold text-white mt-1">
+				{{ total_practices | int }}
+			</p>
+			<p class="text-xs text-slate-500 mt-1">In directory</p>
+		</div>
+		<div class="bg-slate-800/60 border border-slate-700 rounded-xl p-5">
+			<p class="text-slate-400 text-sm font-medium">With email</p>
+			<p class="text-3xl font-semibold text-white mt-1">
+				{{ with_email | int }}
+			</p>
+			<p class="text-xs text-slate-500 mt-1">Ready for outreach</p>
+		</div>
+		<div class="bg-slate-800/60 border border-slate-700 rounded-xl p-5">
+			<p class="text-slate-400 text-sm font-medium">New leads</p>
+			<p class="text-3xl font-semibold text-cyan-400 mt-1">
+				{{ status_counts.get('new', 0) }}
+			</p>
+			<p class="text-xs text-slate-500 mt-1">Not yet contacted</p>
+		</div>
+		<div class="bg-slate-800/60 border border-slate-700 rounded-xl p-5">
+			<p class="text-slate-400 text-sm font-medium">Contacted</p>
+			<p class="text-3xl font-semibold text-amber-400 mt-1">
+				{{ status_counts.get('contacted', 0) + status_counts.get('qualified', 0)
+				}}
+			</p>
+			<p class="text-xs text-slate-500 mt-1">In nurture</p>
+		</div>
+	</div>
+
+	<!-- Pipeline funnel -->
+	<div class="bg-slate-800/60 border border-slate-700 rounded-xl p-6 mb-10">
+		<h2 class="text-lg font-semibold text-white mb-4">Pipeline by stage</h2>
+		<div class="flex flex-wrap gap-4">
+			{% for status in lead_statuses %}
+			<a
+				href="{{ url_for('pipeline', status=status) }}"
+				class="flex items-center gap-3 px-4 py-3 rounded-lg bg-slate-700/50 hover:bg-slate-700 border border-slate-600 min-w-[140px]"
+			>
+				<span
+					class="pipeline-dot {% if status == 'new' %}bg-cyan-500{% elif status == 'contacted' or status == 'qualified' %}bg-amber-500{% elif status == 'won' %}bg-emerald-500{% elif status == 'lost' %}bg-slate-500{% else %}bg-slate-400{% endif %}"
+				></span>
+				<div>
+					<p class="text-sm font-medium text-white capitalize">{{ status }}</p>
+					<p class="text-xl font-semibold text-slate-200">
+						{{ status_counts.get(status, 0) }}
+					</p>
+				</div>
+			</a>
+			{% endfor %}
+		</div>
+	</div>
+
+	<!-- Quick actions -->
+	<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+		<a
+			href="{{ url_for('practices_list') }}?source=architect"
+			class="block bg-slate-800/60 border border-slate-700 rounded-xl p-5 hover:border-cyan-500/50 transition-colors"
+		>
+			<h3 class="text-white font-semibold mb-1">Browse practices</h3>
+			<p class="text-slate-400 text-sm">
+				Search and filter all architect & landscape practices. Assign to
+				pipeline.
+			</p>
+		</a>
+		<a
+			href="{{ url_for('pipeline', status='new') }}"
+			class="block bg-slate-800/60 border border-slate-700 rounded-xl p-5 hover:border-cyan-500/50 transition-colors"
+		>
+			<h3 class="text-white font-semibold mb-1">Work pipeline</h3>
+			<p class="text-slate-400 text-sm">
+				Move leads through stages: New → Contacted → Qualified → Won.
+			</p>
+		</a>
+	</div>
+</div>
+{% endblock %}

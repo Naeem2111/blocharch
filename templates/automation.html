@@ -1,0 +1,47 @@
+{% extends "base.html" %} {% block title %}Automation{% endblock %} {% block
+content %}
+<div class="max-w-4xl mx-auto">
+	<h1 class="text-2xl font-semibold text-white mb-2">Automation</h1>
+	<p class="text-slate-400 text-sm mb-8">
+		Define rules to segment leads and trigger follow-ups. (Rules are stored; run
+		actions manually or via a scheduler later.)
+	</p>
+
+	<div class="bg-slate-800/60 border border-slate-700 rounded-xl p-6 mb-8">
+		<h2 class="text-lg font-semibold text-white mb-2">Coming soon</h2>
+		<p class="text-slate-400 text-sm mb-4">Planned features:</p>
+		<ul class="list-disc list-inside text-slate-400 text-sm space-y-1">
+			<li>Segment by staff size, location, or tags</li>
+			<li>Auto-tag new practices matching criteria</li>
+			<li>Schedule “next follow-up” for contacted leads</li>
+			<li>Export segments for email campaigns</li>
+		</ul>
+	</div>
+
+	{% if rules %}
+	<h2 class="text-lg font-semibold text-white mb-3">Saved rules</h2>
+	<ul class="space-y-3">
+		{% for r in rules %}
+		<li
+			class="bg-slate-800/60 border border-slate-700 rounded-lg px-4 py-3 flex items-center justify-between"
+		>
+			<div>
+				<p class="font-medium text-white">{{ r.name }}</p>
+				<p class="text-sm text-slate-500">
+					{{ r.description or 'No description' }}
+				</p>
+			</div>
+			<span
+				class="text-xs px-2 py-1 rounded {% if r.is_active %}bg-emerald-500/20 text-emerald-400{% else %}bg-slate-600 text-slate-400{% endif %}"
+				>{{ 'Active' if r.is_active else 'Paused' }}</span
+			>
+		</li>
+		{% endfor %}
+	</ul>
+	{% else %}
+	<p class="text-slate-500 text-sm">
+		No automation rules yet. Add rules via API or a future form.
+	</p>
+	{% endif %}
+</div>
+{% endblock %}
