@@ -2,5 +2,9 @@
   "framework": null,
   "installCommand": "uv pip install --system -r requirements.txt",
   "buildCommand": "mkdir -p public && echo 'Dependencies installed'",
-  "outputDirectory": "public"
+  "outputDirectory": "public",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/api/index/$1" },
+    { "source": "/", "destination": "/api/index/" }
+  ]
 }
