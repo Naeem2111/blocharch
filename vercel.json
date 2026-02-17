@@ -1,5 +1,4 @@
 {
-  "buildCommand": "pip install -r requirements.txt",
   "framework": null,
-  "installCommand": "pip install -r requirements.txt"
+  "installCommand": "uv pip install -r requirements.txt"
 }
