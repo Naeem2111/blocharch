@@ -4,7 +4,7 @@
   "buildCommand": "mkdir -p public && echo 'Dependencies installed'",
   "outputDirectory": "public",
   "rewrites": [
-    { "source": "/(.*)", "destination": "/api/index/$1" },
-    { "source": "/", "destination": "/api/index/" }
+    { "source": "/", "destination": "/api/index" },
+    { "source": "/((?!api/).*)", "destination": "/api/index/$1" }
   ]
 }
