@@ -1,4 +1,5 @@
 {
   "framework": null,
-  "installCommand": "uv pip install --system -r requirements.txt"
+  "installCommand": "uv pip install --system -r requirements.txt",
+  "buildCommand": "echo 'Dependencies installed; no build step'"
 }
