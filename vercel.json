@@ -1,9 +1,5 @@
 {
-  "framework": null,
+  "version": 2,
   "installCommand": "npm install",
-  "buildCommand": "npm run build",
-  "rewrites": [
-    { "source": "/", "destination": "/api/index" },
-    { "source": "/((?!api/).*)", "destination": "/api/index/$1" }
-  ]
+  "buildCommand": "npm run build"
 }
