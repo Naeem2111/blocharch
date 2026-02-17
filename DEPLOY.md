@@ -1,6 +1,6 @@
 # Deploying the architect dashboard
 
-The dashboard uses **PostgreSQL** for data. You scrape **offline** on your machine, push data into Postgres, then deploy the app to **Vercel**.
+The dashboard is a **Node.js (Express)** app using **PostgreSQL**. Scraping stays in **Python** and runs offline; you push data into Postgres, then deploy the app to **Vercel**.
 
 ---
 
@@ -35,12 +35,12 @@ Use any Postgres host that gives you a connection URL. Options:
 **On your machine (offline):**
 
 ```bash
-# Scrape (writes architects.json)
+# Scrape (writes architects.json) — Python
 python scrape_architects.py
 
-# Push data to your Postgres (set DATABASE_URL first)
+# Push data to Postgres — Node (set DATABASE_URL first)
 set DATABASE_URL=postgresql://user:pass@host:5432/dbname
-python import_data.py
+npm run populate-db
 ```
 
 **Deployed app on Vercel** uses the same **`DATABASE_URL`**, so the live site shows the data you imported.
@@ -53,13 +53,12 @@ python import_data.py
 
 1. Push your code to **GitHub** (or GitLab / Bitbucket).
 2. Go to [Vercel](https://vercel.com) → **Add New** → **Project** and import your repo.
-3. **Framework Preset:** leave as detected or set to **Other**.
-4. **Build Command:** (optional) `pip install -r requirements.txt`  
-   **Output Directory:** leave default.  
-   Vercel will detect the Flask app from `app.py`.
+3. **Framework Preset:** leave as detected (Vercel will detect Node).
+4. **Build Command:** `npm run build` (or leave default).  
+   **Install Command:** `npm install`.  
+   **Output Directory:** leave empty or default (app is serverless).
 5. Under **Environment Variables** add:
    - **`DATABASE_URL`** = your PostgreSQL connection string (from Neon, Supabase, or Marketplace).
-   - (optional) **`SECRET_KEY`** = a random string for session security.
 6. Click **Deploy**. Your dashboard will be at `https://your-project.vercel.app`.
 
 ### From the CLI
@@ -76,13 +75,12 @@ vercel --prod
 
 ```bash
 set DATABASE_URL=postgresql://...
-pip install -r requirements.txt
-python import_data.py   # once, to load architects.json
-vercel dev
-# or: python app.py
+npm install
+npm run populate-db   # once, to load architects.json into Postgres
+npm run dev
 ```
 
-Open `http://localhost:3000` (with `vercel dev`) or `http://127.0.0.1:5000` (with `python app.py`).
+Open `http://localhost:5000`.
 
 ---
 
@@ -100,7 +98,7 @@ Open `http://localhost:3000` (with `vercel dev`) or `http://127.0.0.1:5000` (wit
 | Step   | Where     | What |
 |--------|-----------|------|
 | Scrape | Your PC   | `python scrape_architects.py` → `architects.json` |
-| Import | Your PC   | `DATABASE_URL=... python import_data.py` → PostgreSQL |
-| Deploy | Vercel    | Connect repo, set `DATABASE_URL`, deploy. Flask runs as a serverless function. |
+| Import | Your PC   | `DATABASE_URL=... npm run populate-db` → PostgreSQL |
+| Deploy | Vercel    | Connect repo, set `DATABASE_URL`, deploy. Node app runs as serverless. |
 
-All state (practices, leads, notes, status) lives in PostgreSQL; the app on Vercel reads and writes to it.
+All state (practices, leads, notes, status) lives in PostgreSQL; the Node app on Vercel reads and writes to it. Scraping remains in Python and is run locally only.

@@ -1,0 +1,60 @@
+<div class="max-w-6xl mx-auto">
+  <h1 class="text-2xl font-semibold text-white mb-2">Practices</h1>
+  <p class="text-slate-400 text-sm mb-6">Search and filter architect & landscape practices. Open a practice to assign to pipeline.</p>
+
+  <form method="get" action="/practices" class="flex flex-wrap gap-3 mb-6">
+    <input type="hidden" name="page" value="1" />
+    <input type="search" name="q" value="<%= q %>" placeholder="Search name, contact, address…" class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-white placeholder-slate-500 min-w-[200px]" />
+    <input type="text" name="source" value="<%= source %>" placeholder="Source" class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-white placeholder-slate-500 w-32" />
+    <input type="text" name="staff" value="<%= staff %>" placeholder="Staff" class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-white placeholder-slate-500 w-24" />
+    <button type="submit" class="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-medium">Search</button>
+  </form>
+
+  <div class="bg-slate-800/60 border border-slate-700 rounded-xl overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-left">
+        <thead class="bg-slate-700/50 text-slate-300 text-sm">
+          <tr>
+            <th class="px-4 py-3 font-medium">Name</th>
+            <th class="px-4 py-3 font-medium">Contact / Email</th>
+            <th class="px-4 py-3 font-medium">Source</th>
+            <th class="px-4 py-3 font-medium">Staff</th>
+            <th class="px-4 py-3 font-medium"></th>
+          </tr>
+        </thead>
+        <tbody class="text-slate-200">
+          <% (practices || []).forEach(function(p) { %>
+          <tr class="border-t border-slate-700 hover:bg-slate-700/30">
+            <td class="px-4 py-3">
+              <a href="/practices/<%= p.id %>" class="font-medium text-white hover:text-cyan-400"><%= p.name || '—' %></a>
+            </td>
+            <td class="px-4 py-3 text-sm"><%= (p.contact || p.email || '—') %></td>
+            <td class="px-4 py-3 text-sm"><%= p.source || '—' %></td>
+            <td class="px-4 py-3 text-sm"><%= p.staff || '—' %></td>
+            <td class="px-4 py-3">
+              <a href="/practices/<%= p.id %>" class="text-cyan-400 hover:text-cyan-300 text-sm">View →</a>
+            </td>
+          </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+    <% if (!practices || practices.length === 0) { %>
+    <p class="px-4 py-8 text-slate-400 text-center">No practices found. Run <code class="text-slate-300">npm run populate-db</code> to load from architects.json.</p>
+    <% } %>
+  </div>
+
+  <% if (pagination && pagination.pages > 1) { %>
+  <div class="flex items-center justify-between mt-4">
+    <p class="text-slate-400 text-sm">Page <%= pagination.page %> of <%= pagination.pages %> (<%= pagination.total %> total)</p>
+    <div class="flex gap-2">
+      <% if (pagination.has_prev) { %>
+      <a href="/practices?page=<%= pagination.prev_num %><%= q ? '&q=' + encodeURIComponent(q) : '' %><%= source ? '&source=' + encodeURIComponent(source) : '' %><%= staff ? '&staff=' + encodeURIComponent(staff) : '' %>" class="px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-sm">Previous</a>
+      <% } %>
+      <% if (pagination.has_next) { %>
+      <a href="/practices?page=<%= pagination.next_num %><%= q ? '&q=' + encodeURIComponent(q) : '' %><%= source ? '&source=' + encodeURIComponent(source) : '' %><%= staff ? '&staff=' + encodeURIComponent(staff) : '' %>" class="px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-sm">Next</a>
+      <% } %>
+    </div>
+  </div>
+  <% } %>
+</div>

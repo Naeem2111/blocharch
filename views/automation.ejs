@@ -1,0 +1,26 @@
+<div class="max-w-4xl mx-auto">
+  <h1 class="text-2xl font-semibold text-white mb-2">Automation</h1>
+  <p class="text-slate-400 text-sm mb-8">Rules and workflows (e.g. n8n) to automate lead nurture. Configure in n8n using the API below.</p>
+
+  <div class="bg-slate-800/60 border border-slate-700 rounded-xl p-6 mb-8">
+    <h2 class="text-lg font-semibold text-white mb-2">Coming soon</h2>
+    <p class="text-slate-300 text-sm">In-app rule builder and triggers will be added here. For now, use n8n with <strong class="text-white">GET /api/n8n/leads</strong> to pull leads and run workflows.</p>
+  </div>
+
+  <div class="bg-slate-800/60 border border-slate-700 rounded-xl p-6">
+    <h2 class="text-lg font-semibold text-white mb-4">Stored rules</h2>
+    <ul class="space-y-3">
+      <% if (rules && rules.length) { rules.forEach(function(r) { %>
+      <li class="flex items-center justify-between py-2 border-t border-slate-700 first:border-t-0">
+        <div>
+          <span class="font-medium text-white"><%= r.name %></span>
+          <% if (r.description) { %><span class="text-slate-400 text-sm ml-2"><%= r.description %></span><% } %>
+        </div>
+        <span class="text-xs px-2 py-1 rounded <%= r.is_active ? 'bg-emerald-900/50 text-emerald-300' : 'bg-slate-700 text-slate-400' %>"><%= r.is_active ? 'Active' : 'Inactive' %></span>
+      </li>
+      <% }); } else { %>
+      <li class="text-slate-500 text-sm py-2">No automation rules in database yet.</li>
+      <% } %>
+    </ul>
+  </div>
+</div>

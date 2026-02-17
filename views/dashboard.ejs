@@ -1,0 +1,50 @@
+<div class="max-w-6xl mx-auto">
+  <h1 class="text-2xl font-semibold text-white mb-2">Dashboard</h1>
+  <p class="text-slate-400 text-sm mb-8">Overview of your architect lead pipeline and outreach.</p>
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+    <div class="bg-slate-800/60 border border-slate-700 rounded-xl p-5">
+      <p class="text-slate-400 text-sm font-medium">Total practices</p>
+      <p class="text-3xl font-semibold text-white mt-1"><%= total_practices || 0 %></p>
+      <p class="text-xs text-slate-500 mt-1">In directory</p>
+    </div>
+    <div class="bg-slate-800/60 border border-slate-700 rounded-xl p-5">
+      <p class="text-slate-400 text-sm font-medium">With email</p>
+      <p class="text-3xl font-semibold text-white mt-1"><%= with_email || 0 %></p>
+      <p class="text-xs text-slate-500 mt-1">Ready for outreach</p>
+    </div>
+    <div class="bg-slate-800/60 border border-slate-700 rounded-xl p-5">
+      <p class="text-slate-400 text-sm font-medium">New leads</p>
+      <p class="text-3xl font-semibold text-cyan-400 mt-1"><%= (status_counts && status_counts.new) || 0 %></p>
+      <p class="text-xs text-slate-500 mt-1">Not yet contacted</p>
+    </div>
+    <div class="bg-slate-800/60 border border-slate-700 rounded-xl p-5">
+      <p class="text-slate-400 text-sm font-medium">Contacted</p>
+      <p class="text-3xl font-semibold text-amber-400 mt-1"><%= ((status_counts && status_counts.contacted) || 0) + ((status_counts && status_counts.qualified) || 0) %></p>
+      <p class="text-xs text-slate-500 mt-1">In nurture</p>
+    </div>
+  </div>
+  <div class="bg-slate-800/60 border border-slate-700 rounded-xl p-6 mb-10">
+    <h2 class="text-lg font-semibold text-white mb-4">Pipeline by stage</h2>
+    <div class="flex flex-wrap gap-4">
+      <% (lead_statuses || []).forEach(function(s) { %>
+      <a href="/pipeline?status=<%= s %>" class="flex items-center gap-3 px-4 py-3 rounded-lg bg-slate-700/50 hover:bg-slate-700 border border-slate-600 min-w-[140px]">
+        <span class="pipeline-dot <%= s === 'new' ? 'bg-cyan-500' : (s === 'contacted' || s === 'qualified') ? 'bg-amber-500' : s === 'won' ? 'bg-emerald-500' : s === 'lost' ? 'bg-slate-500' : 'bg-slate-400' %>"></span>
+        <div>
+          <p class="text-sm font-medium text-white capitalize"><%= s %></p>
+          <p class="text-xl font-semibold text-slate-200"><%= (status_counts && status_counts[s]) || 0 %></p>
+        </div>
+      </a>
+      <% }); %>
+    </div>
+  </div>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <a href="/practices?source=architect" class="block bg-slate-800/60 border border-slate-700 rounded-xl p-5 hover:border-cyan-500/50 transition-colors">
+      <h3 class="text-white font-semibold mb-1">Browse practices</h3>
+      <p class="text-slate-400 text-sm">Search and filter all architect & landscape practices. Assign to pipeline.</p>
+    </a>
+    <a href="/pipeline?status=new" class="block bg-slate-800/60 border border-slate-700 rounded-xl p-5 hover:border-cyan-500/50 transition-colors">
+      <h3 class="text-white font-semibold mb-1">Work pipeline</h3>
+      <p class="text-slate-400 text-sm">Move leads through stages: New → Contacted → Qualified → Won.</p>
+    </a>
+  </div>
+</div>
