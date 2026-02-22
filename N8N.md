@@ -15,12 +15,12 @@ Cold Email (first contact)
 
 Routing is done by **outreach_stage** on each lead. The dashboard API maps pipeline status to stage by default:
 
-| Pipeline status | outreach_stage      | Email sent        |
-|----------------|---------------------|-------------------|
-| new            | cold                | First cold email  |
-| contacted      | no_reply            | Follow-up         |
-| qualified / proposal / negotiating / won | positive_reply | Book call         |
-| lost           | negative_reply     | Thank you         |
+| outreach_stage | Email sent        |
+|----------------|-------------------|
+| cold           | First cold email  |
+| no_reply       | Follow-up         |
+| positive_reply / follow_up_interested | Book call |
+| negative_reply / follow_up_not_interested | Thank you |
 
 ## Import the workflow
 
@@ -33,12 +33,12 @@ Routing is done by **outreach_stage** on each lead. The dashboard API maps pipel
 **Option A – From your dashboard (recommended)**  
 The **Fetch leads from dashboard** node calls:
 
-- `GET {{ DASHBOARD_URL }}/api/n8n/leads?status=new&limit=200`
+- `GET {{ DASHBOARD_URL }}/api/n8n/leads?status=cold&limit=200`
 
 Set the env variable **DASHBOARD_URL** in n8n to your deployed app (e.g. `https://yourapp.onrender.com`). No trailing slash.
 
-- `?status=new` → only leads that haven’t been contacted (cold email).
-- `?status=contacted` → for follow-up runs.
+- `?status=cold` → only leads that haven’t been contacted (cold email).
+- `?status=no_reply` → for follow-up runs.
 - Omit `status` to get all leads (workflow will route each by its stage).
 
 **Option B – Manual / inject**  
@@ -61,8 +61,8 @@ Set **FROM_EMAIL** in n8n (e.g. `jethro@blocharch.com`) or it will use the defau
 
 ## Running the workflow
 
-1. **Cold run:** Call the API with `?status=new` (or trigger manually with injected “new” leads). Only leads with an email are returned.
-2. **Follow-up run:** After moving leads to “contacted” in the dashboard, call with `?status=contacted` to send follow-ups.
-3. When a lead replies, update their **status** in the dashboard (e.g. to “qualified” or “lost”). On the next run they’ll get the Book Call or Thank You email.
+1. **Cold run:** Call the API with `?status=cold` (or trigger manually with injected leads). Only leads with an email are returned.
+2. **Follow-up run:** After moving leads to `no_reply` in the dashboard, call with `?status=no_reply` to send follow-ups.
+3. When a lead replies, update their **stage** in the dashboard (e.g. to `positive_reply` or `negative_reply`). On the next run they’ll get the Book Call or Thank You email.
 
 You can run the workflow on a **schedule** (e.g. daily) and filter in the HTTP node by `status` so each run only sends one type of email (e.g. cold today, follow-up tomorrow).

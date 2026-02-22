@@ -11,7 +11,7 @@
     },
     {
       "parameters": {
-        "url": "={{ $env.DASHBOARD_URL || 'http://localhost:5000' }}/api/n8n/leads",
+        "url": "={{ $env.DASHBOARD_URL || 'http://localhost:3000' }}/api/n8n/leads",
         "options": {}
       },
       "id": "fetch-leads",
