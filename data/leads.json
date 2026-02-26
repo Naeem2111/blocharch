@@ -1,6 +1,17 @@
 {
-  "https://architectdirectory.co.uk/practice/10-design": {
-    "stage": "new",
-    "rating": 0
+  "https://architectdirectory.co.uk/practice/test-design-on-track": {
+    "stage": "cold",
+    "rating": 4,
+    "notes": "Test client – Design on Track"
+  },
+  "https://architectdirectory.co.uk/practice/test-bloch-studio": {
+    "stage": "cold",
+    "rating": 5,
+    "notes": "Test client – Bloch Studio"
+  },
+  "https://architectdirectory.co.uk/practice/test-designontrack-uk": {
+    "stage": "cold",
+    "rating": 3,
+    "notes": "Test client – Design on Track UK"
   }
 }
