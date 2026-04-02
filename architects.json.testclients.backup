@@ -1,0 +1,75 @@
+[
+  {
+    "url": "https://architectdirectory.co.uk/practice/test-design-on-track",
+    "name": "Design on Track",
+    "website": "https://www.designontrack.co.za/",
+    "socials": [
+      "https://twitter.com/designontrack",
+      "https://linkedin.com/company/design-on-track"
+    ],
+    "email": "jethro@designontrack.co.za",
+    "address": "42 Church Street, Cape Town City Centre, 8001",
+    "contact": "Jethro van der Merwe",
+    "description": "Design on Track is a Cape Town-based practice specialising in residential and small-scale commercial projects. We focus on sustainable design and local materials, with a strong track record in coastal and inland residential work across the Western Cape.",
+    "years_active": "6",
+    "staff": "5 - 19",
+    "awards": []
+  },
+  {
+    "url": "https://architectdirectory.co.uk/practice/test-bloch-studio",
+    "name": "Bloch Studio Architects",
+    "website": "https://blochstudio.com/",
+    "socials": [
+      "https://instagram.com/blochstudio",
+      "https://linkedin.com/in/jethrobloch"
+    ],
+    "email": "jethrobloch123@gmail.com",
+    "address": "15 Bree Street, Cape Town, 8001",
+    "contact": "Jethro Bloch",
+    "description": "Bloch Studio is a design-led practice working across residential, hospitality and mixed-use. We combine technical rigour with a hands-on approach to delivery, and have experience in both UK and South African projects.",
+    "years_active": "4",
+    "staff": "0 - 4",
+    "awards": []
+  },
+  {
+    "url": "https://architectdirectory.co.uk/practice/test-designontrack-uk",
+    "name": "Design on Track UK",
+    "website": "https://designontrack.co.uk/",
+    "socials": [
+      "https://twitter.com/designontrack_uk"
+    ],
+    "email": "designontrack123@gmail.com",
+    "address": "Unit 7, Riverside Studios, 1 Crisp Road, London, W6 9RL",
+    "contact": "Sarah Mitchell",
+    "description": "Design on Track UK works with developers and private clients on residential and small commercial schemes in London and the South East. We offer full architectural services from concept through to completion.",
+    "years_active": "3",
+    "staff": "5 - 19",
+    "awards": []
+  },
+  {
+    "url": "https://architectdirectory.co.uk/practice/test-naeem-gmail",
+    "name": "Naeem Test Practice",
+    "website": "https://example.com/",
+    "socials": [],
+    "email": "naeem2111@gmail.com",
+    "address": "123 Test Lane, London",
+    "contact": "Naeem",
+    "description": "Test practice for Naeem (Gmail).",
+    "years_active": "1",
+    "staff": "0 - 4",
+    "awards": []
+  },
+  {
+    "url": "https://architectdirectory.co.uk/practice/test-eazithenga",
+    "name": "Eazithenga",
+    "website": "https://eazithenga.com/",
+    "socials": [],
+    "email": "naeem@eazithenga.com",
+    "address": "Cape Town",
+    "contact": "Naeem",
+    "description": "Test practice – Eazithenga.",
+    "years_active": "2",
+    "staff": "0 - 4",
+    "awards": []
+  }
+]

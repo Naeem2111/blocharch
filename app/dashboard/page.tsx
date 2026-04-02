@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { loadArchitects } from "@/lib/architects";
+import { PageHeader } from "@/components/PageHeader";
 
 export default async function DashboardPage() {
   const architects = loadArchitects();
@@ -7,54 +8,65 @@ export default async function DashboardPage() {
   const withEmail = architects.filter((a) => a.email?.trim()).length;
 
   return (
-    <div className="max-w-6xl mx-auto">
-      <h1 className="text-2xl font-semibold text-white mb-2">Dashboard</h1>
-      <p className="text-slate-400 text-sm mb-8">
-        Overview of your architect directory data from architects.json.
-      </p>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-        <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-5">
-          <p className="text-slate-400 text-sm font-medium">Total practices</p>
-          <p className="text-3xl font-semibold text-white mt-1">{total}</p>
-          <p className="text-xs text-slate-500 mt-1">In directory</p>
+    <div className="mx-auto max-w-6xl">
+      <PageHeader
+        title="Overview"
+        badge="Live"
+        description="Snapshot of your architect directory from architects.json — same pipeline as the project scraper."
+      />
+      <div className="mb-10 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="card-tool rounded-2xl p-5">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total practices</p>
+          <p className="mt-2 text-3xl font-semibold tabular-nums text-white">{total}</p>
+          <p className="mt-1 text-xs text-slate-500">In directory</p>
         </div>
-        <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-5">
-          <p className="text-slate-400 text-sm font-medium">With email</p>
-          <p className="text-3xl font-semibold text-cyan-400 mt-1">{withEmail}</p>
-          <p className="text-xs text-slate-500 mt-1">Ready for outreach</p>
+        <div className="card-tool rounded-2xl p-5">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">With email</p>
+          <p className="mt-2 text-3xl font-semibold tabular-nums text-brand-400">{withEmail}</p>
+          <p className="mt-1 text-xs text-slate-500">Ready for outreach</p>
         </div>
-        <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-5">
-          <p className="text-slate-400 text-sm font-medium">With website</p>
-          <p className="text-3xl font-semibold text-amber-400 mt-1">
+        <div className="card-tool rounded-2xl p-5">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">With website</p>
+          <p className="mt-2 text-3xl font-semibold tabular-nums text-amber-400/90">
             {architects.filter((a) => a.website?.trim()).length}
           </p>
-          <p className="text-xs text-slate-500 mt-1">Has website URL</p>
+          <p className="mt-1 text-xs text-slate-500">Has website URL</p>
         </div>
-        <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-5">
-          <p className="text-slate-400 text-sm font-medium">Source</p>
-          <p className="text-lg font-semibold text-slate-200 mt-1">architects.json</p>
-          <p className="text-xs text-slate-500 mt-1">Base data</p>
+        <div className="card-tool rounded-2xl p-5">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Source</p>
+          <p className="mt-2 text-lg font-semibold text-slate-200">architects.json</p>
+          <p className="mt-1 text-xs text-slate-500">Base data</p>
         </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Link
           href="/dashboard/practices"
-          className="block bg-slate-800/60 border border-slate-700 rounded-xl p-5 hover:border-cyan-500/50 transition-colors"
+          className="card-tool card-tool-hover group block rounded-2xl p-5 ring-1 ring-white/[0.06]"
         >
-          <h3 className="text-white font-semibold mb-1">Browse practices</h3>
-          <p className="text-slate-400 text-sm">
-            Search and filter all architect & landscape practices from the directory.
+          <h3 className="font-semibold text-white group-hover:text-brand-300">Browse practices</h3>
+          <p className="mt-2 text-sm leading-relaxed text-slate-400">
+            Search and filter architect &amp; landscape practices from the directory.
           </p>
         </Link>
-        <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-5">
-          <h3 className="text-white font-semibold mb-1">Scraper</h3>
-          <p className="text-slate-400 text-sm mb-3">
-            Run <code className="text-cyan-400">python scrape_architects.py</code> to
-            update architects.json.
+        <Link
+          href="/dashboard/map"
+          className="card-tool card-tool-hover group block rounded-2xl p-5 ring-1 ring-white/[0.06]"
+        >
+          <h3 className="font-semibold text-white group-hover:text-brand-300">Map view</h3>
+          <p className="mt-2 text-sm leading-relaxed text-slate-400">
+            Plot practices by address on an interactive map.
           </p>
-          <p className="text-slate-500 text-xs">
-            Data is read directly from architects.json in the project root.
+        </Link>
+        <div className="card-tool rounded-2xl p-5 ring-1 ring-white/[0.06]">
+          <h3 className="font-semibold text-white">Update data</h3>
+          <p className="mt-2 text-sm leading-relaxed text-slate-400">
+            Run{" "}
+            <code className="rounded bg-black/30 px-1.5 py-0.5 font-mono text-xs text-brand-300 ring-1 ring-white/10">
+              python scrape_architects.py
+            </code>{" "}
+            to refresh architects.json.
           </p>
+          <p className="mt-3 text-xs text-slate-500">Data is read from the project root on each request.</p>
         </div>
       </div>
     </div>

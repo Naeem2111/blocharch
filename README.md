@@ -66,6 +66,13 @@ npm run n8n:docker       # run n8n in Docker
 
 Import `n8n-lead-outreach-workflow.json` in n8n, set `DASHBOARD_URL` and SMTP credentials.
 
+### Maps
+
+- **All practices map:** `/dashboard/map`
+- **Practice detail map:** shown on each practice with an address
+
+Geocoding uses OpenStreetMap Nominatim and caches results to `data/geocache.json`.
+
 ### Scripts
 
 | Command      | Description                    |

@@ -2,6 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { BrandMark } from "@/components/BrandMark";
 
 function LoginForm() {
   const router = useRouter();
@@ -37,23 +38,23 @@ function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-900 px-4">
+    <div className="app-login-bg flex min-h-screen flex-col items-center justify-center px-4">
+      <div className="mb-10 flex w-full max-w-sm flex-col items-center">
+        <BrandMark variant="stack" />
+        <p className="mt-4 text-center text-sm text-slate-400">Sign in to open the console</p>
+      </div>
       <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-semibold text-white tracking-tight">Architect Leads</h1>
-          <p className="text-slate-400 text-sm mt-1">Sign in to continue</p>
-        </div>
         <form
           onSubmit={handleSubmit}
-          className="bg-slate-800/60 border border-slate-700 rounded-xl p-6 space-y-4"
+          className="card-tool card-tool-hover rounded-2xl p-6 ring-1 ring-white/[0.06]"
         >
           {error && (
-            <div className="text-rose-400 text-sm bg-rose-500/10 border border-rose-500/30 rounded-lg px-3 py-2">
+            <div className="mb-4 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
               {error}
             </div>
           )}
           <div>
-            <label htmlFor="username" className="block text-sm font-medium text-slate-300 mb-1">
+            <label htmlFor="username" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500">
               Username
             </label>
             <input
@@ -63,12 +64,12 @@ function LoginForm() {
               onChange={(e) => setUsername(e.target.value)}
               autoComplete="username"
               required
-              className="w-full px-4 py-2.5 rounded-lg bg-slate-700/50 border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500"
+              className="w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-4 py-2.5 text-white placeholder-slate-500 ring-1 ring-black/20 transition-colors focus:border-brand-500/50 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
               placeholder="blocharch"
             />
           </div>
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-slate-300 mb-1">
+          <div className="mt-4">
+            <label htmlFor="password" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500">
               Password
             </label>
             <input
@@ -78,19 +79,20 @@ function LoginForm() {
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
               required
-              className="w-full px-4 py-2.5 rounded-lg bg-slate-700/50 border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500"
+              className="w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-4 py-2.5 text-white placeholder-slate-500 ring-1 ring-black/20 transition-colors focus:border-brand-500/50 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
             />
           </div>
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2.5 px-4 rounded-lg bg-cyan-500 hover:bg-cyan-600 text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="mt-6 w-full rounded-lg bg-gradient-to-r from-brand-500 to-brand-600 py-2.5 text-sm font-semibold text-slate-950 shadow-lg shadow-brand/30 transition-opacity hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading ? "Signing in..." : "Sign in"}
+            {loading ? "Signing in…" : "Sign in to Blocharch"}
           </button>
         </form>
-        <p className="text-slate-500 text-xs text-center mt-6">
-          Default: blocharch / blocharch
+        <p className="mt-6 text-center text-xs text-slate-500">
+          Default credentials: <span className="text-slate-400">blocharch</span> /{" "}
+          <span className="text-slate-400">blocharch</span>
         </p>
       </div>
     </div>
@@ -99,11 +101,13 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-slate-900">
-        <p className="text-slate-400">Loading...</p>
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="app-login-bg flex min-h-screen items-center justify-center">
+          <p className="text-slate-400">Loading…</p>
+        </div>
+      }
+    >
       <LoginForm />
     </Suspense>
   );

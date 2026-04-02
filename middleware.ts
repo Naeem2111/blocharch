@@ -52,5 +52,6 @@ export const config = {
     "/api/workflow/:path*",
     "/api/templates",
     "/api/n8n/:path*",
+    "/api/geocode/:path*",
   ],
 };

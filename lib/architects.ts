@@ -1,5 +1,6 @@
 import path from "path";
 import fs from "fs";
+import { getBestAddressFromFields } from "@/lib/address-display";
 
 export interface Architect {
   url: string;
@@ -16,6 +17,10 @@ export interface Architect {
 }
 
 let cachedArchitects: Architect[] | null = null;
+
+export function getBestAddress(a: Architect): string | null {
+  return getBestAddressFromFields(a.address, a.description);
+}
 
 export function getArchitectsFilePath(): string {
   return path.join(process.cwd(), "architects.json");

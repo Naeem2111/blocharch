@@ -99,10 +99,10 @@ flowchart LR
 | Fetch leads from dashboard | HTTP Request | GET `/api/n8n/leads` (use `DASHBOARD_URL` env) |
 | Map lead fields         | Code       | Normalize API response to `email`, `firstName`, `companyName`, `website`, `outreach_stage` |
 | Route by outreach stage | Switch     | 6 branches by `outreach_stage` |
-| Send Cold Email         | Email Send | First contact (Part 1/2 staffing) |
-| Send Book Call Email    | Email Send | Positive / interested → book call |
-| Send Thank You Email    | Email Send | Negative / not interested |
-| Send Follow-Up Email    | Email Send | No reply → follow-up |
+| Send Cold Email         | Gmail (OAuth2) | First contact (Part 1/2 staffing) |
+| Send Book Call Email    | Gmail (OAuth2) | Positive / interested → book call |
+| Send Thank You Email    | Gmail (OAuth2) | Negative / not interested |
+| Send Follow-Up Email    | Gmail (OAuth2) | No reply → follow-up |
 
 ---
 
@@ -110,4 +110,4 @@ flowchart LR
 
 - **DASHBOARD_URL** – Base URL of your dashboard (e.g. `https://yourapp.vercel.app`). Used in “Fetch leads from dashboard”.
 - **FROM_EMAIL** – Sender address (default in workflow: `jethro@blocharch.com`).
-- **SMTP** – Configure credentials for all four “Email Send” nodes.
+- **Gmail OAuth2** – Create one Gmail OAuth2 credential (jethro@blocharch.com) and assign it to all four Send nodes.

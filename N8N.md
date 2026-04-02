@@ -26,7 +26,7 @@ Routing is done by **outreach_stage** on each lead. The dashboard API maps pipel
 
 1. In n8n: **Workflows** → **Import from File** (or **Import from URL** if you host the JSON).
 2. Select `n8n-lead-outreach-workflow.json` from this folder.
-3. Configure the **Send Email** nodes (all four) with your **SMTP** or **Gmail** credentials.
+3. Configure the **Gmail** nodes (all four): create a **Gmail OAuth2** credential for jethro@blocharch.com and assign it to each Send Cold Email, Send Book Call Email, Send Thank You Email, and Send Follow-Up Email node.
 
 ## Where leads come from
 

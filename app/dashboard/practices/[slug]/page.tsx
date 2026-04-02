@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { loadArchitects } from "@/lib/architects";
+import { getBestAddress, loadArchitects } from "@/lib/architects";
 import { LeadStatus } from "@/components/LeadStatus";
+import { PracticeMap } from "@/components/PracticeMap";
 
 function slugFromUrl(url: string): string {
   const m = url.match(/\/practice\/([^/]+)\/?$/);
@@ -25,6 +26,7 @@ export default async function PracticeDetailPage({
   );
 
   if (!practice) notFound();
+  const bestAddress = getBestAddress(practice);
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -36,15 +38,15 @@ export default async function PracticeDetailPage({
       </Link>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <div className="bg-slate-800/60 border border-slate-700 rounded-xl overflow-hidden">
-        <div className="p-6 border-b border-slate-700">
+          <div className="card-tool overflow-hidden rounded-2xl ring-1 ring-white/[0.06]">
+        <div className="border-b border-white/[0.06] p-6">
           <h1 className="text-2xl font-semibold text-white">{practice.name}</h1>
           {practice.website && (
             <a
               href={practice.website}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-cyan-400 hover:underline text-sm mt-1 inline-block"
+              className="text-brand-400 hover:underline text-sm mt-1 inline-block"
             >
               {practice.website}
             </a>
@@ -58,7 +60,7 @@ export default async function PracticeDetailPage({
               </p>
               <a
                 href={`mailto:${practice.email}`}
-                className="text-cyan-400 hover:underline"
+                className="text-brand-400 hover:underline"
               >
                 {practice.email}
               </a>
@@ -122,7 +124,7 @@ export default async function PracticeDetailPage({
                     href={s}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-cyan-400 hover:underline text-sm"
+                    className="text-brand-400 hover:underline text-sm"
                   >
                     {s}
                   </a>
@@ -138,7 +140,7 @@ export default async function PracticeDetailPage({
               href={practice.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-slate-400 hover:text-cyan-400 text-sm"
+              className="text-slate-400 hover:text-brand-400 text-sm"
             >
               {practice.url}
             </a>
@@ -147,9 +149,21 @@ export default async function PracticeDetailPage({
       </div>
         </div>
         <div className="lg:col-span-1">
-          <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-6 sticky top-4">
-            <h2 className="text-lg font-semibold text-white mb-4">Lead status</h2>
-            <LeadStatus slug={decoded} />
+          <div className="space-y-6 sticky top-4">
+            <div className="card-tool rounded-2xl p-6 ring-1 ring-white/[0.06]">
+              <h2 className="text-lg font-semibold text-white mb-4">Lead status</h2>
+              <LeadStatus slug={decoded} />
+            </div>
+            {bestAddress?.trim() && (
+              <div className="card-tool rounded-2xl p-6 ring-1 ring-white/[0.06]">
+                <PracticeMap
+                  name={practice.name}
+                  address={bestAddress}
+                  href={practice.website || practice.url}
+                  heightClassName="h-[260px]"
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>

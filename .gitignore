@@ -34,5 +34,8 @@ node_modules/
 .next/
 out/
 
+# Local data caches
+data/geocache.json
+
 # Vercel
 .vercel

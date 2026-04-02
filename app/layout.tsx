@@ -1,12 +1,22 @@
 import type { Metadata } from "next";
-import { DM_Sans } from "next/font/google";
+import { Plus_Jakarta_Sans } from "next/font/google";
+import { brandAssets } from "@/lib/blocharch-brand";
 import "./globals.css";
+import "leaflet/dist/leaflet.css";
 
-const dmSans = DM_Sans({ subsets: ["latin"], variable: "--font-dm-sans" });
+const sans = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
-  title: "Architect Leads | Blocarch",
-  description: "Architect directory dashboard and lead management",
+  title: "Blocharch Console",
+  description: "Directory, map, and lead tools — Blocharch internal console.",
+  icons: {
+    icon: [{ url: brandAssets.favicon, type: "image/png", sizes: "192x192" }],
+    apple: brandAssets.favicon,
+  },
 };
 
 export default function RootLayout({
@@ -15,10 +25,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={dmSans.variable}>
-      <body className="font-sans bg-slate-900 text-slate-100 min-h-screen antialiased">
-        {children}
-      </body>
+    <html lang="en" className={sans.variable}>
+      <body className="font-sans min-h-screen antialiased">{children}</body>
     </html>
   );
 }

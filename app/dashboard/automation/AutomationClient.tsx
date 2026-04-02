@@ -172,7 +172,7 @@ export function AutomationClient() {
           <select
             value={stage}
             onChange={(e) => { setStage(e.target.value); setPage(1); }}
-            className="px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-white text-sm"
+            className="rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white ring-1 ring-black/20"
           >
             <option value="">All</option>
             {STAGES.map((s) => (
@@ -182,13 +182,13 @@ export function AutomationClient() {
             ))}
           </select>
         </div>
-        <div className="h-6 w-px bg-slate-600" />
+        <div className="h-6 w-px bg-white/[0.08]" />
         <div className="flex items-center gap-2">
           <span className="text-slate-400 text-sm">Template:</span>
           <select
             value={selectedTemplate}
             onChange={(e) => setSelectedTemplate(e.target.value)}
-            className="px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-white text-sm"
+            className="rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white ring-1 ring-black/20"
           >
             {templates.map((t) => (
               <option key={t.id} value={t.id}>
@@ -200,7 +200,7 @@ export function AutomationClient() {
         <button
           onClick={activateWorkflow}
           disabled={activating}
-          className="px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-600 text-white font-medium text-sm disabled:opacity-50"
+          className="rounded-lg bg-gradient-to-r from-brand-500 to-brand-600 px-4 py-2 text-sm font-semibold text-slate-950 shadow-lg shadow-brand/25 transition-opacity hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {activating ? "Processing…" : "Activate workflow"}
         </button>
@@ -211,7 +211,7 @@ export function AutomationClient() {
 
       <p className="text-slate-500 text-sm">
         Select leads to email (or leave unselected to process first 50 with email). Activate will apply the chosen
-        template and mark them as contacted. Set <code className="text-cyan-400">N8N_WEBHOOK_URL</code> in .env to send
+        template and mark them as contacted. Set <code className="text-brand-400">N8N_WEBHOOK_URL</code> in .env to send
         to n8n.
       </p>
 
@@ -223,16 +223,16 @@ export function AutomationClient() {
           <p className="text-slate-500 text-sm">
             {data.total} practice{data.total !== 1 ? "s" : ""} with email
           </p>
-          <div className="overflow-x-auto rounded-xl border border-slate-700">
+          <div className="overflow-x-auto rounded-2xl border border-white/[0.08] bg-white/[0.02] ring-1 ring-white/[0.04]">
             <table className="w-full">
               <thead>
-                <tr className="bg-slate-800/80 text-left text-sm text-slate-400">
+                <tr className="bg-white/[0.04] text-left text-sm text-slate-400">
                   <th className="px-4 py-3 w-10">
                     <input
                       type="checkbox"
                       checked={data.items.length > 0 && selectedUrls.size === data.items.length}
                       onChange={toggleSelectAll}
-                      className="rounded border-slate-600"
+                      className="rounded border-white/20 bg-white/[0.03] accent-brand-500"
                     />
                   </th>
                   <th className="px-4 py-3 font-medium">Name</th>
@@ -242,21 +242,21 @@ export function AutomationClient() {
                   <th className="px-4 py-3 font-medium"></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-700">
+              <tbody className="divide-y divide-white/[0.06]">
                 {data.items.map((item) => (
-                  <tr key={item.url} className="hover:bg-slate-800/40">
+                  <tr key={item.url} className="transition-colors hover:bg-white/[0.03]">
                     <td className="px-4 py-3">
                       <input
                         type="checkbox"
                         checked={selectedUrls.has(item.url)}
                         onChange={() => toggleSelect(item.url)}
-                        className="rounded border-slate-600"
+                        className="rounded border-white/20 bg-white/[0.03] accent-brand-500"
                       />
                     </td>
                     <td className="px-4 py-3">
                       <Link
                         href={`/dashboard/practices/${encodeURIComponent(item.slug)}`}
-                        className="font-medium text-white hover:text-cyan-400"
+                        className="font-medium text-white hover:text-brand-400"
                       >
                         {item.name || "—"}
                       </Link>
@@ -265,7 +265,7 @@ export function AutomationClient() {
                       <select
                         value={item.lead.stage}
                         onChange={(e) => updateLead(item.url, { stage: e.target.value })}
-                        className="px-2 py-1 rounded bg-slate-700 border border-slate-600 text-white text-sm"
+                        className="rounded border border-white/[0.08] bg-white/[0.06] px-2 py-1 text-sm text-white ring-1 ring-white/[0.04]"
                       >
                         {STAGES.map((s) => (
                           <option key={s} value={s}>
@@ -282,7 +282,7 @@ export function AutomationClient() {
                     </td>
                     <td className="px-4 py-3 text-slate-300 text-sm">
                       {item.email ? (
-                        <a href={`mailto:${item.email}`} className="text-cyan-400 hover:underline">
+                        <a href={`mailto:${item.email}`} className="text-brand-400 hover:underline">
                           {item.email}
                         </a>
                       ) : (
@@ -292,7 +292,7 @@ export function AutomationClient() {
                     <td className="px-4 py-3">
                       <Link
                         href={`/dashboard/practices/${encodeURIComponent(item.slug)}`}
-                        className="text-cyan-400 hover:text-cyan-300 text-sm"
+                        className="text-brand-400 hover:text-brand-300 text-sm"
                       >
                         View
                       </Link>
@@ -307,7 +307,7 @@ export function AutomationClient() {
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
-                className="px-3 py-1.5 rounded bg-slate-700 text-slate-300 hover:bg-slate-600 disabled:opacity-50 text-sm"
+                className="rounded border border-white/[0.08] bg-white/[0.06] px-3 py-1.5 text-sm text-slate-300 ring-1 ring-white/[0.04] transition-colors hover:bg-white/[0.09] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Previous
               </button>
@@ -317,7 +317,7 @@ export function AutomationClient() {
               <button
                 onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
                 disabled={page >= data.totalPages}
-                className="px-3 py-1.5 rounded bg-slate-700 text-slate-300 hover:bg-slate-600 disabled:opacity-50 text-sm"
+                className="rounded border border-white/[0.08] bg-white/[0.06] px-3 py-1.5 text-sm text-slate-300 ring-1 ring-white/[0.04] transition-colors hover:bg-white/[0.09] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Next
               </button>
