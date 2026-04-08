@@ -42,10 +42,22 @@ function StarRating({
   );
 }
 
+function formatEmailedAt(iso?: string): string {
+  if (!iso?.trim()) return "";
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  } catch {
+    return iso;
+  }
+}
+
 export function LeadStatus({ slug }: { slug: string }) {
   const [stage, setStage] = useState("");
   const [rating, setRating] = useState(0);
   const [notes, setNotes] = useState("");
+  const [lastEmailedAt, setLastEmailedAt] = useState<string | undefined>();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -56,6 +68,7 @@ export function LeadStatus({ slug }: { slug: string }) {
         setStage(d.stage || "cold");
         setRating(d.rating ?? 0);
         setNotes(d.notes || "");
+        setLastEmailedAt(d.lastEmailedAt || undefined);
       })
       .finally(() => setLoading(false));
   }, [slug]);
@@ -73,6 +86,7 @@ export function LeadStatus({ slug }: { slug: string }) {
         if (d.stage !== undefined) setStage(d.stage);
         if (d.rating !== undefined) setRating(d.rating);
         if (d.notes !== undefined) setNotes(d.notes);
+        if (d.lastEmailedAt !== undefined) setLastEmailedAt(d.lastEmailedAt || undefined);
       }
     } finally {
       setSaving(false);
@@ -83,6 +97,12 @@ export function LeadStatus({ slug }: { slug: string }) {
 
   return (
     <div className="space-y-4">
+      {lastEmailedAt ? (
+        <div>
+          <p className="text-slate-500 text-xs font-medium uppercase tracking-wider mb-1">Last email sent</p>
+          <p className="text-slate-200 text-sm">{formatEmailedAt(lastEmailedAt)}</p>
+        </div>
+      ) : null}
       <div>
         <p className="text-slate-500 text-xs font-medium uppercase tracking-wider mb-1">Pipeline stage</p>
         <select
@@ -103,13 +123,16 @@ export function LeadStatus({ slug }: { slug: string }) {
         <StarRating value={rating} onChange={(v) => update({ rating: v })} disabled={saving} />
       </div>
       <div>
-        <p className="text-slate-500 text-xs font-medium uppercase tracking-wider mb-1">Notes</p>
+        <p className="text-slate-500 text-xs font-medium uppercase tracking-wider mb-1">Notes &amp; automation log</p>
+        <p className="text-slate-500 text-xs mb-1.5">
+          n8n appends timestamped lines here when emails are sent (cold, follow-up, book call, thank you).
+        </p>
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           onBlur={() => update({ notes })}
           disabled={saving}
-          rows={3}
+          rows={5}
           className="w-full px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm resize-none"
           placeholder="Add notes…"
         />

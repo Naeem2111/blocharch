@@ -99,3 +99,21 @@ export function updateLead(
   saveLeads(leads);
   return next;
 }
+
+/** Append a timestamped line from n8n (or other automation) and set lastEmailedAt. */
+export function appendLeadAutomationNote(
+  practiceUrl: string,
+  appendNote: string,
+  options?: { stage?: LeadStage; lastEmailedAt?: string }
+): LeadRecord {
+  const ts = options?.lastEmailedAt || new Date().toISOString();
+  const line = `[${ts}] ${appendNote.trim()}`;
+  const current = getOrCreateLead(practiceUrl);
+  const prev = (current.notes || "").trim();
+  const notes = prev ? `${prev}\n${line}` : line;
+  return updateLead(practiceUrl, {
+    notes,
+    lastEmailedAt: ts,
+    ...(options?.stage && LEAD_STAGES.includes(options.stage) ? { stage: options.stage } : {}),
+  });
+}

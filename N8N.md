@@ -66,3 +66,17 @@ Set **FROM_EMAIL** in n8n (e.g. `jethro@blocharch.com`) or it will use the defau
 3. When a lead replies, update their **stage** in the dashboard (e.g. to `positive_reply` or `negative_reply`). On the next run they’ll get the Book Call or Thank You email.
 
 You can run the workflow on a **schedule** (e.g. daily) and filter in the HTTP node by `status` so each run only sends one type of email (e.g. cold today, follow-up tomorrow).
+
+## After each send: update the dashboard (`/api/n8n/lead-event`)
+
+The bundled workflow wires **Report … → dashboard** HTTP nodes after each Gmail send. They `POST` to your app so **notes** get a timestamped line and **last emailed** is updated.
+
+- **URL:** `{{ DASHBOARD_URL }}/api/n8n/lead-event` (same base as fetch; trailing slashes stripped in the expression).
+- **Header:** `X-Api-Key: {{ $env.N8N_API_KEY }}` — must match **`N8N_API_KEY`** on the dashboard (Vercel env).
+- **Body (JSON):**
+  - **`appendNote`** (required) — e.g. `Cold email sent (n8n)`.
+  - **`stage`** (optional) — cold send sets `no_reply` so the pipeline reflects “first email sent”.
+  - **`lead_id`** — full practice URL from the map step (preferred).
+  - **`email`** or **`to`** — fallback if the Gmail node drops `lead_id` (we match the practice by email).
+
+Re-import `n8n-lead-outreach-workflow.json` after pulling, or add equivalent HTTP Request nodes in n8n. On the **Lead nurturing** page you’ll see **Last emailed** and an **Activity** preview; the practice sidebar shows the full **Notes & automation log**.

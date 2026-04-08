@@ -11,7 +11,13 @@
     },
     {
       "parameters": {
-        "url": "={{ $env.DASHBOARD_URL || 'http://localhost:3000' }}/api/n8n/leads",
+        "url": "={{ ($env.DASHBOARD_URL || 'http://localhost:3000').replace(/\\/+$/, '') + '/api/n8n/leads' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Api-Key", "value": "={{ $env.N8N_API_KEY }}" }
+          ]
+        },
         "options": {}
       },
       "id": "fetch-leads",
@@ -115,6 +121,100 @@
       "typeVersion": 2.1,
       "position": [1140, 560],
       "credentials": { "gmailOAuth2": { "id": "GMAIL_OAUTH2_CREDENTIAL", "name": "Gmail account (jethro@blocharch.com)" } }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.DASHBOARD_URL || 'http://localhost:3000').replace(/\\/+$/, '') + '/api/n8n/lead-event' }}",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Api-Key", "value": "={{ $env.N8N_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ lead_id: $json.lead_id, email: $json.email, to: $json.to, appendNote: 'Cold email sent (n8n)', stage: 'no_reply' }) }}",
+        "options": {}
+      },
+      "id": "http-report-cold",
+      "name": "Report cold → dashboard",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1380, 80],
+      "notesInFlow": true,
+      "notes": "POST /api/n8n/lead-event — set N8N_API_KEY in n8n env to match dashboard."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.DASHBOARD_URL || 'http://localhost:3000').replace(/\\/+$/, '') + '/api/n8n/lead-event' }}",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Api-Key", "value": "={{ $env.N8N_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ lead_id: $json.lead_id, email: $json.email, to: $json.to, appendNote: 'Book call email sent (n8n)' }) }}",
+        "options": {}
+      },
+      "id": "http-report-book",
+      "name": "Report book call → dashboard",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1380, 240]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.DASHBOARD_URL || 'http://localhost:3000').replace(/\\/+$/, '') + '/api/n8n/lead-event' }}",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Api-Key", "value": "={{ $env.N8N_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ lead_id: $json.lead_id, email: $json.email, to: $json.to, appendNote: 'Thank you email sent (n8n)' }) }}",
+        "options": {}
+      },
+      "id": "http-report-thanks",
+      "name": "Report thank you → dashboard",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1380, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.DASHBOARD_URL || 'http://localhost:3000').replace(/\\/+$/, '') + '/api/n8n/lead-event' }}",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Api-Key", "value": "={{ $env.N8N_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ lead_id: $json.lead_id, email: $json.email, to: $json.to, appendNote: 'No-reply follow-up email sent (n8n)' }) }}",
+        "options": {}
+      },
+      "id": "http-report-follow",
+      "name": "Report follow-up → dashboard",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1380, 560]
     }
   ],
   "connections": {
@@ -130,7 +230,11 @@
         [{ "node": "Send Thank You Email", "type": "main", "index": 0 }],
         [{ "node": "Send Follow-Up Email", "type": "main", "index": 0 }]
       ]
-    }
+    },
+    "Send Cold Email": { "main": [[{ "node": "Report cold → dashboard", "type": "main", "index": 0 }]] },
+    "Send Book Call Email": { "main": [[{ "node": "Report book call → dashboard", "type": "main", "index": 0 }]] },
+    "Send Thank You Email": { "main": [[{ "node": "Report thank you → dashboard", "type": "main", "index": 0 }]] },
+    "Send Follow-Up Email": { "main": [[{ "node": "Report follow-up → dashboard", "type": "main", "index": 0 }]] }
   },
   "pinData": {},
   "settings": { "executionOrder": "v1" },

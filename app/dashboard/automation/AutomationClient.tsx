@@ -18,7 +18,7 @@ interface LeadItem {
   email: string;
   contact: string;
   slug: string;
-  lead: { stage: string; rating: number; notes?: string };
+  lead: { stage: string; rating: number; notes?: string; lastEmailedAt?: string };
 }
 
 interface Template {
@@ -31,6 +31,26 @@ interface Template {
 function slugFromUrl(url: string): string {
   const m = url.match(/\/practice\/([^/]+)\/?$/);
   return m ? m[1] : "";
+}
+
+function formatEmailedAt(iso?: string): string {
+  if (!iso?.trim()) return "—";
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    return d.toLocaleString(undefined, {
+      dateStyle: "short",
+      timeStyle: "short",
+    });
+  } catch {
+    return iso;
+  }
+}
+
+function truncateNote(s: string, max: number): string {
+  const t = s.replace(/\s+/g, " ").trim();
+  if (t.length <= max) return t;
+  return t.slice(0, max - 1) + "…";
 }
 
 function StarRating({
@@ -102,14 +122,20 @@ export function AutomationClient() {
       body: JSON.stringify(updates),
     });
     if (!res.ok) return;
-    if (data) {
+    const d = await res.json().catch(() => null);
+    if (data && d) {
       setData({
         ...data,
         items: data.items.map((item) =>
           item.url === practiceUrl
             ? {
                 ...item,
-                lead: { ...item.lead, ...updates, stage: updates.stage ?? item.lead.stage, rating: updates.rating ?? item.lead.rating },
+                lead: {
+                  stage: d.stage ?? item.lead.stage,
+                  rating: d.rating ?? item.lead.rating,
+                  notes: d.notes ?? item.lead.notes,
+                  lastEmailedAt: d.lastEmailedAt ?? item.lead.lastEmailedAt,
+                },
               }
             : item
         ),
@@ -212,7 +238,8 @@ export function AutomationClient() {
       <p className="text-slate-500 text-sm">
         Select leads to email (or leave unselected to process first 50 with email). Activate will apply the chosen
         template and mark them as contacted. Set <code className="text-brand-400">N8N_WEBHOOK_URL</code> in .env to send
-        to n8n.
+        to n8n. When n8n sends mail, it can POST to <code className="text-brand-400">/api/n8n/lead-event</code> so notes
+        and &quot;last emailed&quot; update here (see workflow file).
       </p>
 
       {/* Leads table */}
@@ -239,6 +266,8 @@ export function AutomationClient() {
                   <th className="px-4 py-3 font-medium">Stage</th>
                   <th className="px-4 py-3 font-medium">Rating</th>
                   <th className="px-4 py-3 font-medium">Email</th>
+                  <th className="px-4 py-3 font-medium whitespace-nowrap">Last emailed</th>
+                  <th className="px-4 py-3 font-medium min-w-[10rem]">Activity</th>
                   <th className="px-4 py-3 font-medium"></th>
                 </tr>
               </thead>
@@ -288,6 +317,15 @@ export function AutomationClient() {
                       ) : (
                         "—"
                       )}
+                    </td>
+                    <td className="px-4 py-3 text-slate-400 text-xs whitespace-nowrap" title={item.lead.lastEmailedAt}>
+                      {formatEmailedAt(item.lead.lastEmailedAt)}
+                    </td>
+                    <td
+                      className="px-4 py-3 text-slate-400 text-xs max-w-[14rem]"
+                      title={item.lead.notes || undefined}
+                    >
+                      {item.lead.notes ? truncateNote(item.lead.notes, 120) : "—"}
                     </td>
                     <td className="px-4 py-3">
                       <Link
