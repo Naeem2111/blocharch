@@ -2,6 +2,9 @@ import { NextRequest } from "next/server";
 import { geocodeAddress } from "@/lib/geo/nominatim";
 import { getCachedGeocode } from "@/lib/geo/store";
 
+/** Vercel / long-running: uncached Nominatim calls are sequential (~1.1s each). */
+export const maxDuration = 60;
+
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }

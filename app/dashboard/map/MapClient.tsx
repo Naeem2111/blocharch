@@ -31,34 +31,76 @@ const STAGE_META: Record<Stage, { label: string; color: string }> = {
   follow_up_not_interested: { label: "Follow-up not interested", color: "#f97316" },
 };
 
+/** Per-request size so server stays under typical ~10–60s limits (Nominatim ~1 req/s for misses). */
+const GEOCODE_CHUNK = 6;
+/** How many practices to try geocoding (progressive); avoids endless waits on first paint. */
+const GEOCODE_CAP = 180;
+
 export function MapClient({ practices }: { practices: Practice[] }) {
   const [results, setResults] = useState<Record<string, { lat: number; lng: number; displayName?: string }>>({});
   const [loading, setLoading] = useState(false);
+  const [geocodeError, setGeocodeError] = useState<string | null>(null);
+  const [chunksDone, setChunksDone] = useState(0);
+  const [chunksTotal, setChunksTotal] = useState(0);
+
+  const practiceKey = useMemo(
+    () => practices.map((p) => `${p.slug}\t${p.address}`).join("\n"),
+    [practices]
+  );
 
   useEffect(() => {
     let cancelled = false;
+    const list = practices.slice(0, GEOCODE_CAP);
+    const addresses = list.map((p) => p.address).filter(Boolean);
+    const chunks: string[][] = [];
+    for (let i = 0; i < addresses.length; i += GEOCODE_CHUNK) {
+      chunks.push(addresses.slice(i, i + GEOCODE_CHUNK));
+    }
+
     async function run() {
+      if (!chunks.length) return;
+      setGeocodeError(null);
       setLoading(true);
+      setChunksTotal(chunks.length);
+      setChunksDone(0);
       try {
-        const addresses = practices.map((p) => p.address).slice(0, 75); // avoid bulk; cached will make it faster over time
-        const res = await fetch("/api/geocode/batch", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ addresses, limit: addresses.length }),
-        });
-        const json = await res.json();
-        if (!cancelled && json?.results) {
-          setResults(json.results);
+        for (let i = 0; i < chunks.length; i++) {
+          if (cancelled) break;
+          const slice = chunks[i];
+          const res = await fetch("/api/geocode/batch", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify({ addresses: slice, limit: slice.length }),
+          });
+          const json = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            setGeocodeError(json?.error || `Geocode failed (${res.status})`);
+            break;
+          }
+          if (json?.results && !cancelled) {
+            setResults((prev) => ({ ...prev, ...json.results }));
+          }
+          setChunksDone(i + 1);
         }
+      } catch (e) {
+        if (!cancelled) setGeocodeError(String(e));
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
-    if (practices.length) run();
+
+    setResults({});
+    if (addresses.length) run();
+    else {
+      setChunksTotal(0);
+      setChunksDone(0);
+    }
+
     return () => {
       cancelled = true;
     };
-  }, [practices]);
+  }, [practiceKey]);
 
   const markers = useMemo(() => {
     const out: Array<{
@@ -106,17 +148,24 @@ export function MapClient({ practices }: { practices: Practice[] }) {
     return counts;
   }, [markers]);
 
+  const geocodeProgress =
+    chunksTotal > 0 ? ` — batch ${chunksDone}/${chunksTotal}` : "";
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-slate-500 text-sm">
-          Showing {markers.length} pinned practice{markers.length === 1 ? "" : "s"}{" "}
-          {loading ? "(geocoding…)" : ""}
+          Showing {markers.length} of {practices.length} practice{practices.length === 1 ? "" : "s"} with address
+          {loading ? ` (geocoding…${geocodeProgress})` : ""}
+          {!loading && practices.length > GEOCODE_CAP ? ` — first ${GEOCODE_CAP} queued for geocode` : ""}
         </p>
-        <p className="text-slate-500 text-sm">
-          Tip: open a practice to see its map.
-        </p>
+        <p className="text-slate-500 text-sm">Tip: open a practice to see its map.</p>
       </div>
+      {geocodeError && (
+        <p className="text-amber-400/90 text-sm rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2">
+          {geocodeError}
+        </p>
+      )}
       <LeafletMap markers={markers} center={center} zoom={6} />
       <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
         <p className="text-xs uppercase tracking-wide text-slate-500 mb-2">Automation stage colors</p>
@@ -136,4 +185,3 @@ export function MapClient({ practices }: { practices: Practice[] }) {
     </div>
   );
 }
-

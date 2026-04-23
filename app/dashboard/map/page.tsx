@@ -27,7 +27,9 @@ export default function MapPage() {
         description="Plot practices by address (geocoded via Nominatim and cached locally)."
       />
       <MapClient practices={practices} />
-      <p className="mt-4 text-xs text-slate-500">Map data © OpenStreetMap contributors.</p>
+      <p className="mt-4 text-xs text-slate-500">
+        Map tiles © OpenStreetMap contributors, © CARTO. Pins load in batches so geocoding stays within hosting limits.
+      </p>
     </div>
   );
 }
