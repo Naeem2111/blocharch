@@ -12,11 +12,9 @@ export type SessionPayload = {
 };
 
 function sessionSecret(): string {
-  const s = process.env.BLOCHARCH_SESSION_SECRET;
+  const s = process.env.BLOCHARCH_SESSION_SECRET?.trim();
   if (s && s.length >= 16) return s;
-  if (process.env.NODE_ENV === "production") {
-    return "";
-  }
+  // Insecure default: set BLOCHARCH_SESSION_SECRET (16+ chars) on any shared/hosted deployment.
   return "__blocarch_dev_session_secret__";
 }
 
@@ -64,7 +62,6 @@ function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
 
 export async function signSessionToken(payload: SessionPayload): Promise<string> {
   const secret = sessionSecret();
-  if (!secret) throw new Error("Set BLOCHARCH_SESSION_SECRET (min 16 chars) in production");
   const body = JSON.stringify(payload);
   const bodyBytes = utf8Bytes(body);
   const sig = await signBytes(secret, bodyBytes);
@@ -73,7 +70,6 @@ export async function signSessionToken(payload: SessionPayload): Promise<string>
 
 export async function verifySessionToken(token: string): Promise<SessionPayload | null> {
   const secret = sessionSecret();
-  if (!secret) return null;
   const dot = token.indexOf(".");
   if (dot <= 0) return null;
   const bodyB64 = token.slice(0, dot);

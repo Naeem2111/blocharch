@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AUTH_COOKIE } from "@/lib/auth";
 import { verifyPassword } from "@/lib/password";
+import { requestIsSecure } from "@/lib/request-https";
 import { buildSessionPayload, defaultSessionExpirySeconds, signSessionToken } from "@/lib/session-token";
 import { findUserByUsername } from "@/lib/users-store";
 
@@ -15,23 +16,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid username or password" }, { status: 401 });
     }
 
-    let token: string;
-    try {
-      token = await signSessionToken(buildSessionPayload(user.id, user.role));
-    } catch {
-      return NextResponse.json(
-        {
-          error:
-            "Login is not configured: set BLOCHARCH_SESSION_SECRET (at least 16 characters) in production.",
-        },
-        { status: 503 }
-      );
-    }
+    const token = await signSessionToken(buildSessionPayload(user.id, user.role));
+    const secure = requestIsSecure(request);
 
     const res = NextResponse.json({ ok: true });
     res.cookies.set(AUTH_COOKIE, token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure,
       sameSite: "lax",
       maxAge: defaultSessionExpirySeconds(),
       path: "/",
