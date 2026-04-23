@@ -6,11 +6,23 @@ import { buildSessionPayload, defaultSessionExpirySeconds, signSessionToken } fr
 import { findUserByUsername } from "@/lib/users-store";
 
 export async function POST(request: NextRequest) {
+  let body: unknown;
   try {
-    const body = await request.json();
-    const username = (body.username || "").trim();
-    const password = (body.password || "").trim();
+    body = await request.json();
+  } catch {
+    return NextResponse.json(
+      { error: "Send a JSON body: { \"username\": \"…\", \"password\": \"…\" }" },
+      { status: 400 }
+    );
+  }
+  if (!body || typeof body !== "object") {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+  const o = body as Record<string, unknown>;
+  const username = String(o.username ?? "").trim();
+  const password = String(o.password ?? "").trim();
 
+  try {
     const user = findUserByUsername(username);
     if (!user || user.disabled || !verifyPassword(password, user.passwordHash)) {
       return NextResponse.json({ error: "Invalid username or password" }, { status: 401 });
@@ -28,7 +40,11 @@ export async function POST(request: NextRequest) {
       path: "/",
     });
     return res;
-  } catch {
-    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  } catch (err) {
+    console.error("[auth/login]", err);
+    return NextResponse.json(
+      { error: "Login failed on the server. If this is a new deploy, check Vercel logs and user storage configuration." },
+      { status: 503 }
+    );
   }
 }

@@ -18,12 +18,18 @@ interface UsersFile {
   users: UserRecord[];
 }
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const USERS_FILE = path.join(DATA_DIR, "users.json");
+/** Writable path for users.json. Vercel serverless FS is read-only except /tmp. */
+function getUsersFilePath(): string {
+  const override = process.env.BLOCHARCH_USERS_FILE?.trim();
+  if (override) return path.isAbsolute(override) ? override : path.join(process.cwd(), override);
+  if (process.env.VERCEL) return path.join("/tmp", "blocarch-users.json");
+  return path.join(process.cwd(), "data", "users.json");
+}
 
-function ensureDataDir() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
+function ensureUsersDir(): void {
+  const dir = path.dirname(getUsersFilePath());
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
   }
 }
 
@@ -47,14 +53,15 @@ function bootstrapIfEmpty(): UsersFile {
 }
 
 export function loadUsersFile(): UsersFile {
-  ensureDataDir();
-  if (!fs.existsSync(USERS_FILE)) {
+  const usersFile = getUsersFilePath();
+  ensureUsersDir();
+  if (!fs.existsSync(usersFile)) {
     const initial = bootstrapIfEmpty();
     saveUsersFile(initial);
     return initial;
   }
   try {
-    const raw = fs.readFileSync(USERS_FILE, "utf-8");
+    const raw = fs.readFileSync(usersFile, "utf-8");
     const parsed = JSON.parse(raw) as UsersFile;
     if (!parsed || !Array.isArray(parsed.users)) {
       const initial = bootstrapIfEmpty();
@@ -75,8 +82,8 @@ export function loadUsersFile(): UsersFile {
 }
 
 export function saveUsersFile(data: UsersFile): void {
-  ensureDataDir();
-  fs.writeFileSync(USERS_FILE, JSON.stringify(data, null, 2), "utf-8");
+  ensureUsersDir();
+  fs.writeFileSync(getUsersFilePath(), JSON.stringify(data, null, 2), "utf-8");
 }
 
 export function normalizeUsername(raw: string): string {
