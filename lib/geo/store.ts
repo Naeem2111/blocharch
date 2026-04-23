@@ -15,10 +15,17 @@ type GeoCache = Record<string, GeoCacheEntry>;
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const CACHE_FILE = path.join(DATA_DIR, "geocache.json");
+let memoryCache: GeoCache = {};
+let memoryLoaded = false;
 
 function ensureDataDir() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -27,19 +34,30 @@ export function normalizeAddress(address: string): string {
 }
 
 export function loadGeoCache(): GeoCache {
-  ensureDataDir();
-  if (!fs.existsSync(CACHE_FILE)) return {};
-  try {
-    const raw = fs.readFileSync(CACHE_FILE, "utf-8");
-    return JSON.parse(raw) as GeoCache;
-  } catch {
-    return {};
+  if (!memoryLoaded) {
+    memoryLoaded = true;
+    const ok = ensureDataDir();
+    if (!ok || !fs.existsSync(CACHE_FILE)) return memoryCache;
+    try {
+      const raw = fs.readFileSync(CACHE_FILE, "utf-8");
+      memoryCache = JSON.parse(raw) as GeoCache;
+      return memoryCache;
+    } catch {
+      return memoryCache;
+    }
   }
+  return memoryCache;
 }
 
 export function saveGeoCache(cache: GeoCache) {
-  ensureDataDir();
-  fs.writeFileSync(CACHE_FILE, JSON.stringify(cache, null, 2), "utf-8");
+  memoryCache = cache;
+  try {
+    const ok = ensureDataDir();
+    if (!ok) return;
+    fs.writeFileSync(CACHE_FILE, JSON.stringify(cache, null, 2), "utf-8");
+  } catch {
+    // In serverless/read-only environments disk writes can fail; keep memory cache only.
+  }
 }
 
 export function getCachedGeocode(address: string): GeoPoint | null {
