@@ -12,7 +12,24 @@ const LeafletMap = dynamic(async () => (await import("@/components/LeafletMap"))
   ),
 });
 
-type Practice = { name: string; address: string; slug: string };
+type Stage =
+  | "cold"
+  | "no_reply"
+  | "positive_reply"
+  | "follow_up_interested"
+  | "negative_reply"
+  | "follow_up_not_interested";
+
+type Practice = { name: string; address: string; slug: string; stage: Stage };
+
+const STAGE_META: Record<Stage, { label: string; color: string }> = {
+  cold: { label: "Cold", color: "#0ea5e9" },
+  no_reply: { label: "No reply", color: "#f59e0b" },
+  positive_reply: { label: "Positive reply", color: "#22c55e" },
+  follow_up_interested: { label: "Follow-up interested", color: "#10b981" },
+  negative_reply: { label: "Negative reply", color: "#ef4444" },
+  follow_up_not_interested: { label: "Follow-up not interested", color: "#f97316" },
+};
 
 export function MapClient({ practices }: { practices: Practice[] }) {
   const [results, setResults] = useState<Record<string, { lat: number; lng: number; displayName?: string }>>({});
@@ -49,6 +66,7 @@ export function MapClient({ practices }: { practices: Practice[] }) {
       name: string;
       lat: number;
       lng: number;
+      stage: Stage;
       subtitle?: string;
       href?: string;
     }> = [];
@@ -60,6 +78,7 @@ export function MapClient({ practices }: { practices: Practice[] }) {
         name: p.name,
         lat: r.lat,
         lng: r.lng,
+        stage: p.stage,
         subtitle: r.displayName || p.address,
         href: `/dashboard/practices/${encodeURIComponent(p.slug)}`,
       });
@@ -74,6 +93,19 @@ export function MapClient({ practices }: { practices: Practice[] }) {
     return { lat: avgLat, lng: avgLng };
   }, [markers]);
 
+  const stageCounts = useMemo(() => {
+    const counts: Record<Stage, number> = {
+      cold: 0,
+      no_reply: 0,
+      positive_reply: 0,
+      follow_up_interested: 0,
+      negative_reply: 0,
+      follow_up_not_interested: 0,
+    };
+    for (const m of markers) counts[m.stage] += 1;
+    return counts;
+  }, [markers]);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -86,6 +118,21 @@ export function MapClient({ practices }: { practices: Practice[] }) {
         </p>
       </div>
       <LeafletMap markers={markers} center={center} zoom={6} />
+      <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+        <p className="text-xs uppercase tracking-wide text-slate-500 mb-2">Automation stage colors</p>
+        <div className="flex flex-wrap gap-x-5 gap-y-2">
+          {(Object.keys(STAGE_META) as Stage[]).map((stage) => (
+            <div key={stage} className="flex items-center gap-2 text-xs text-slate-300">
+              <span
+                className="inline-block h-2.5 w-2.5 rounded-full"
+                style={{ backgroundColor: STAGE_META[stage].color }}
+              />
+              <span>{STAGE_META[stage].label}</span>
+              <span className="text-slate-500">({stageCounts[stage]})</span>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

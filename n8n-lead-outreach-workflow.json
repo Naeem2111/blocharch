@@ -11,11 +11,11 @@
     },
     {
       "parameters": {
-        "url": "={{ ($env.DASHBOARD_URL || 'http://localhost:3000').replace(/\\/+$/, '') + '/api/n8n/leads' }}",
+        "url": "https://blocharch.vercel.app/api/n8n/leads",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Api-Key", "value": "={{ $env.N8N_API_KEY }}" }
+            { "name": "X-Api-Key", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwMTdlNmM3OS0yODRmLTQ4OTItOTE3Zi1iOTMyOTBiMWNhZWIiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwianRpIjoiNGUxMTZkMzgtNjJiZC00NjU1LWIxYzAtOGFkNjAzOWNkNjc0IiwiaWF0IjoxNzczNDc0NjQ0fQ.-DsPE1cgphGAyF6tPJxJfSVSzW79HkGqK8X5wbAEYqY" }
           ]
         },
         "options": {}
@@ -26,7 +26,7 @@
       "typeVersion": 4.2,
       "position": [460, 300],
       "notesInFlow": true,
-      "notes": "Set env DASHBOARD_URL. Add header X-Api-Key if N8N_API_KEY is set on dashboard."
+      "notes": "Production: blocharch.vercel.app. Set Vercel N8N_API_KEY to match X-Api-Key header."
     },
     {
       "parameters": {
@@ -125,18 +125,18 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ ($env.DASHBOARD_URL || 'http://localhost:3000').replace(/\\/+$/, '') + '/api/n8n/lead-event' }}",
+        "url": "https://blocharch.vercel.app/api/n8n/lead-event",
         "authentication": "none",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Api-Key", "value": "={{ $env.N8N_API_KEY }}" },
+            { "name": "X-Api-Key", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwMTdlNmM3OS0yODRmLTQ4OTItOTE3Zi1iOTMyOTBiMWNhZWIiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwianRpIjoiNGUxMTZkMzgtNjJiZC00NjU1LWIxYzAtOGFkNjAzOWNkNjc0IiwiaWF0IjoxNzczNDc0NjQ0fQ.-DsPE1cgphGAyF6tPJxJfSVSzW79HkGqK8X5wbAEYqY" },
             { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ lead_id: $json.lead_id, email: $json.email, to: $json.to, appendNote: 'Cold email sent (n8n)', stage: 'no_reply' }) }}",
+        "jsonBody": "={{ JSON.stringify({ lead_id: $json.lead_id || $('Map lead fields').item.json.lead_id, email: $json.email || $('Map lead fields').item.json.email, to: $json.to || $json.To, appendNote: 'Cold email sent (n8n)', stage: 'no_reply' }) }}",
         "options": {}
       },
       "id": "http-report-cold",
@@ -145,23 +145,23 @@
       "typeVersion": 4.2,
       "position": [1380, 80],
       "notesInFlow": true,
-      "notes": "POST /api/n8n/lead-event — set N8N_API_KEY in n8n env to match dashboard."
+      "notes": "POST /api/n8n/lead-event — Vercel N8N_API_KEY must match X-Api-Key."
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ ($env.DASHBOARD_URL || 'http://localhost:3000').replace(/\\/+$/, '') + '/api/n8n/lead-event' }}",
+        "url": "https://blocharch.vercel.app/api/n8n/lead-event",
         "authentication": "none",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Api-Key", "value": "={{ $env.N8N_API_KEY }}" },
+            { "name": "X-Api-Key", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwMTdlNmM3OS0yODRmLTQ4OTItOTE3Zi1iOTMyOTBiMWNhZWIiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwianRpIjoiNGUxMTZkMzgtNjJiZC00NjU1LWIxYzAtOGFkNjAzOWNkNjc0IiwiaWF0IjoxNzczNDc0NjQ0fQ.-DsPE1cgphGAyF6tPJxJfSVSzW79HkGqK8X5wbAEYqY" },
             { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ lead_id: $json.lead_id, email: $json.email, to: $json.to, appendNote: 'Book call email sent (n8n)' }) }}",
+        "jsonBody": "={{ JSON.stringify({ lead_id: $json.lead_id || $('Map lead fields').item.json.lead_id, email: $json.email || $('Map lead fields').item.json.email, to: $json.to || $json.To, appendNote: 'Book call email sent (n8n)' }) }}",
         "options": {}
       },
       "id": "http-report-book",
@@ -173,18 +173,18 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ ($env.DASHBOARD_URL || 'http://localhost:3000').replace(/\\/+$/, '') + '/api/n8n/lead-event' }}",
+        "url": "https://blocharch.vercel.app/api/n8n/lead-event",
         "authentication": "none",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Api-Key", "value": "={{ $env.N8N_API_KEY }}" },
+            { "name": "X-Api-Key", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwMTdlNmM3OS0yODRmLTQ4OTItOTE3Zi1iOTMyOTBiMWNhZWIiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwianRpIjoiNGUxMTZkMzgtNjJiZC00NjU1LWIxYzAtOGFkNjAzOWNkNjc0IiwiaWF0IjoxNzczNDc0NjQ0fQ.-DsPE1cgphGAyF6tPJxJfSVSzW79HkGqK8X5wbAEYqY" },
             { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ lead_id: $json.lead_id, email: $json.email, to: $json.to, appendNote: 'Thank you email sent (n8n)' }) }}",
+        "jsonBody": "={{ JSON.stringify({ lead_id: $json.lead_id || $('Map lead fields').item.json.lead_id, email: $json.email || $('Map lead fields').item.json.email, to: $json.to || $json.To, appendNote: 'Thank you email sent (n8n)' }) }}",
         "options": {}
       },
       "id": "http-report-thanks",
@@ -196,18 +196,18 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ ($env.DASHBOARD_URL || 'http://localhost:3000').replace(/\\/+$/, '') + '/api/n8n/lead-event' }}",
+        "url": "https://blocharch.vercel.app/api/n8n/lead-event",
         "authentication": "none",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Api-Key", "value": "={{ $env.N8N_API_KEY }}" },
+            { "name": "X-Api-Key", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwMTdlNmM3OS0yODRmLTQ4OTItOTE3Zi1iOTMyOTBiMWNhZWIiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwianRpIjoiNGUxMTZkMzgtNjJiZC00NjU1LWIxYzAtOGFkNjAzOWNkNjc0IiwiaWF0IjoxNzczNDc0NjQ0fQ.-DsPE1cgphGAyF6tPJxJfSVSzW79HkGqK8X5wbAEYqY" },
             { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ lead_id: $json.lead_id, email: $json.email, to: $json.to, appendNote: 'No-reply follow-up email sent (n8n)' }) }}",
+        "jsonBody": "={{ JSON.stringify({ lead_id: $json.lead_id || $('Map lead fields').item.json.lead_id, email: $json.email || $('Map lead fields').item.json.email, to: $json.to || $json.To, appendNote: 'No-reply follow-up email sent (n8n)' }) }}",
         "options": {}
       },
       "id": "http-report-follow",

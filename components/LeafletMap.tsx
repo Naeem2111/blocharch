@@ -3,21 +3,49 @@
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 
-// Fix default marker icons in bundlers
-import iconRetinaUrl from "leaflet/dist/images/marker-icon-2x.png";
-import iconUrl from "leaflet/dist/images/marker-icon.png";
-import shadowUrl from "leaflet/dist/images/marker-shadow.png";
+type Stage =
+  | "cold"
+  | "no_reply"
+  | "positive_reply"
+  | "follow_up_interested"
+  | "negative_reply"
+  | "follow_up_not_interested";
 
 type MarkerItem = {
   id: string;
   name: string;
   lat: number;
   lng: number;
+  stage: Stage;
   subtitle?: string;
   href?: string;
 };
+
+const STAGE_COLORS: Record<Stage, string> = {
+  cold: "#0ea5e9",
+  no_reply: "#f59e0b",
+  positive_reply: "#22c55e",
+  follow_up_interested: "#10b981",
+  negative_reply: "#ef4444",
+  follow_up_not_interested: "#f97316",
+};
+
+const iconCache = new Map<Stage, L.DivIcon>();
+
+function markerIcon(stage: Stage): L.DivIcon {
+  const cached = iconCache.get(stage);
+  if (cached) return cached;
+  const icon = L.divIcon({
+    className: "lead-stage-pin-wrap",
+    html: `<span class="lead-stage-pin" style="--pin-color:${STAGE_COLORS[stage]}"></span>`,
+    iconSize: [16, 16],
+    iconAnchor: [8, 8],
+  });
+  iconCache.set(stage, icon);
+  return icon;
+}
 
 export function LeafletMap({
   markers,
@@ -30,15 +58,6 @@ export function LeafletMap({
   zoom?: number;
   heightClassName?: string;
 }) {
-  useEffect(() => {
-    delete (L.Icon.Default.prototype as any)._getIconUrl;
-    L.Icon.Default.mergeOptions({
-      iconRetinaUrl: iconRetinaUrl.src ?? (iconRetinaUrl as any),
-      iconUrl: iconUrl.src ?? (iconUrl as any),
-      shadowUrl: shadowUrl.src ?? (shadowUrl as any),
-    });
-  }, []);
-
   const mapCenter = useMemo(() => [center.lat, center.lng] as [number, number], [center.lat, center.lng]);
 
   return (
@@ -49,7 +68,7 @@ export function LeafletMap({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         {markers.map((m) => (
-          <Marker key={m.id} position={[m.lat, m.lng]}>
+          <Marker key={m.id} position={[m.lat, m.lng]} icon={markerIcon(m.stage)}>
             <Popup>
               <div>
                 <div className="font-semibold">{m.name}</div>
@@ -64,6 +83,21 @@ export function LeafletMap({
           </Marker>
         ))}
       </MapContainer>
+      <style jsx>{`
+        :global(.lead-stage-pin-wrap) {
+          background: transparent;
+          border: none;
+        }
+        :global(.lead-stage-pin) {
+          display: block;
+          width: 16px;
+          height: 16px;
+          border-radius: 9999px;
+          background: var(--pin-color);
+          border: 2px solid #ffffff;
+          box-shadow: 0 0 0 1px rgba(2, 6, 23, 0.35);
+        }
+      `}</style>
     </div>
   );
 }

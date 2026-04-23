@@ -56,6 +56,7 @@ export function PracticeMap({
         name,
         lat: point.lat,
         lng: point.lng,
+        stage: "cold" as const,
         subtitle: point.displayName || address,
         href,
       },

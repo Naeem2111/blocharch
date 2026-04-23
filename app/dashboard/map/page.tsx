@@ -1,4 +1,5 @@
 import { getBestAddress, loadArchitects } from "@/lib/architects";
+import { getOrCreateLead } from "@/lib/leads";
 import { PageHeader } from "@/components/PageHeader";
 import { MapClient } from "./MapClient";
 
@@ -14,6 +15,7 @@ export default function MapPage() {
       name: a.name,
       address: getBestAddress(a) || "",
       slug: slugFromUrl(a.url),
+      stage: getOrCreateLead(a.url).stage,
     }))
     .filter((p) => p.address.trim())
     .slice(0, 500);
