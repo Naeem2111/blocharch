@@ -9,7 +9,7 @@ type Props = {
   variant?: "row" | "stack";
 };
 
-/** Blocharch wordmark (https://www.blocharch.com/) + Console label. */
+/** Blocharch logo + Console label. */
 export function BrandMark({ className = "", compact = false, variant = "row" }: Props) {
   const stack = variant === "stack";
 
@@ -21,15 +21,15 @@ export function BrandMark({ className = "", compact = false, variant = "row" }: 
       } ${className}`}
     >
       <Image
-        src={brandAssets.wordmark}
+        src={brandAssets.logo}
         alt="Blocharch"
-        width={220}
-        height={64}
+        width={100}
+        height={100}
         priority
         className={
           stack
-            ? "h-14 w-auto max-w-[min(100%,300px)] object-contain"
-            : "h-9 w-auto max-w-[210px] object-contain object-left"
+            ? "h-20 w-20 max-h-[5.5rem] max-w-[5.5rem] object-contain"
+            : "h-10 w-10 object-contain object-left"
         }
       />
       {!compact && (

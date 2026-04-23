@@ -5,8 +5,9 @@ import { usePathname } from "next/navigation";
 import { BrandMark } from "@/components/BrandMark";
 import { LogoutButton } from "@/components/LogoutButton";
 import { BLOCHARCH_SITE } from "@/lib/blocharch-brand";
+import type { SessionUser } from "@/lib/auth";
 
-const NAV: { href: string; label: string; icon: React.ReactNode }[] = [
+const NAV: { href: string; label: string; icon: React.ReactNode; adminOnly?: boolean }[] = [
   {
     href: "/dashboard",
     label: "Overview",
@@ -43,6 +44,20 @@ const NAV: { href: string; label: string; icon: React.ReactNode }[] = [
       </svg>
     ),
   },
+  {
+    href: "/dashboard/admin",
+    label: "Users & access",
+    adminOnly: true,
+    icon: (
+      <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"
+        />
+      </svg>
+    ),
+  },
 ];
 
 function navActive(pathname: string, href: string): boolean {
@@ -50,8 +65,9 @@ function navActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function DashboardSidebar() {
+export function DashboardSidebar({ user }: { user: SessionUser }) {
   const pathname = usePathname() || "";
+  const navItems = NAV.filter((item) => !item.adminOnly || user.role === "admin");
 
   return (
     <aside className="flex w-[260px] min-h-screen flex-shrink-0 flex-col border-r border-white/[0.06] bg-[var(--bg-sidebar)]">
@@ -73,7 +89,7 @@ export function DashboardSidebar() {
         </a>
       </div>
       <nav className="flex-1 space-y-0.5 p-3" aria-label="Main">
-        {NAV.map(({ href, label, icon }) => {
+        {navItems.map(({ href, label, icon }) => {
           const active = navActive(pathname, href);
           return (
             <Link
@@ -95,7 +111,14 @@ export function DashboardSidebar() {
         <div className="flex items-center justify-between gap-2 rounded-lg bg-white/[0.03] px-3 py-2.5 ring-1 ring-white/[0.06]">
           <div className="min-w-0">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Signed in</p>
-            <p className="truncate text-xs text-slate-400">Blocharch operator</p>
+            <p className="truncate text-xs text-slate-400" title={user.username}>
+              {user.username}
+              {user.role === "admin" ? (
+                <span className="ml-1.5 rounded bg-brand-500/15 px-1 py-0.5 text-[9px] font-semibold uppercase text-brand-400">
+                  admin
+                </span>
+              ) : null}
+            </p>
           </div>
           <LogoutButton />
         </div>

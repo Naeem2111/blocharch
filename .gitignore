@@ -36,6 +36,7 @@ out/
 
 # Local data caches
 data/geocache.json
+data/users.json
 
 # Vercel
 .vercel
