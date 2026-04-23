@@ -11,10 +11,9 @@ export async function middleware(request: NextRequest) {
   const payload = cookie ? await verifySessionToken(cookie) : null;
   const isAuthenticated = payload !== null;
 
+  // /login: never redirect authenticated users here — RSC flight requests break on 302.
+  // Server `app/login/page.tsx` calls redirect() when a session exists instead.
   if (path === "/login") {
-    if (isAuthenticated) {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
-    }
     return NextResponse.next();
   }
 
