@@ -118,7 +118,7 @@ export function LeafletMap({
       <MapContainer center={mapCenter} zoom={zoom} scrollWheelZoom className="h-full w-full">
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png"
+          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
         />
         {markers.length > 0 ? <MapClusterLayer markers={markers} /> : null}
       </MapContainer>
