@@ -4,8 +4,9 @@
   "private": true,
   "description": "Architect lead dashboard – Next.js app, architects.json data",
   "scripts": {
+    "postinstall": "prisma generate",
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "scrape": "python scrape_architects.py",
     "db:migrate": "prisma migrate deploy",
