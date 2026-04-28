@@ -6,7 +6,7 @@ import { createUser, listUsersPublic, type UserRole } from "@/lib/users-store";
 export async function GET(request: NextRequest) {
   const gate = await requireAdminRequest(request);
   if (gate instanceof NextResponse) return gate;
-  return NextResponse.json({ users: listUsersPublic() });
+  return NextResponse.json({ users: await listUsersPublic() });
 }
 
 export async function POST(request: NextRequest) {
@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     const password = String(body.password || "");
     const role = body.role === "admin" || body.role === "user" ? (body.role as UserRole) : "user";
     const disabled = Boolean(body.disabled);
-    const created = createUser({ username, password, role, disabled });
+    const created = await createUser({ username, password, role, disabled });
     if (!created.ok) {
       return NextResponse.json({ error: created.error }, { status: 400 });
     }

@@ -15,7 +15,7 @@ export default async function PracticeDetailPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const architects = loadArchitects();
+  const architects = await loadArchitects();
   const decoded = decodeURIComponent(slug);
   const practice = architects.find(
     (a) =>

@@ -1,6 +1,5 @@
-import path from "path";
-import fs from "fs";
 import { getBestAddressFromFields } from "@/lib/address-display";
+import { prisma } from "@/lib/prisma";
 
 export interface Architect {
   url: string;
@@ -16,48 +15,46 @@ export interface Architect {
   awards: string[];
 }
 
-let cachedArchitects: Architect[] | null = null;
-
 export function getBestAddress(a: Architect): string | null {
   return getBestAddressFromFields(a.address, a.description);
 }
 
-export function getArchitectsFilePath(): string {
-  return path.join(process.cwd(), "architects.json");
+export async function loadArchitects(): Promise<Architect[]> {
+  const rows = await prisma.architect.findMany({
+    orderBy: { name: "asc" },
+  });
+  return rows.map((r) => ({
+    url: r.url,
+    name: r.name,
+    website: r.website || "",
+    socials: r.socials,
+    email: r.email || "",
+    address: r.address || "",
+    contact: r.contact || "",
+    description: r.description || "",
+    years_active: r.yearsActive || "",
+    staff: r.staff || "",
+    awards: r.awards,
+  }));
 }
 
-export function loadArchitects(): Architect[] {
-  if (cachedArchitects) return cachedArchitects;
-  const filePath = getArchitectsFilePath();
-  if (!fs.existsSync(filePath)) {
-    return [];
-  }
-  const raw = fs.readFileSync(filePath, "utf-8");
-  try {
-    cachedArchitects = JSON.parse(raw) as Architect[];
-    return cachedArchitects;
-  } catch {
-    return [];
-  }
-}
-
-export function getArchitectByUrl(url: string): Architect | undefined {
-  const architects = loadArchitects();
+export async function getArchitectByUrl(url: string): Promise<Architect | undefined> {
+  const architects = await loadArchitects();
   return architects.find((a) => a.url === url);
 }
 
-export function getArchitectById(id: string): Architect | undefined {
-  const architects = loadArchitects();
+export async function getArchitectById(id: string): Promise<Architect | undefined> {
+  const architects = await loadArchitects();
   const idx = architects.findIndex((a) => a.url === id || encodeURIComponent(a.url) === id);
   return idx >= 0 ? architects[idx] : undefined;
 }
 
-export function searchArchitects(params: {
+export async function searchArchitects(params: {
   q?: string;
   page?: number;
   perPage?: number;
-}): { items: Architect[]; total: number; page: number; totalPages: number } {
-  const architects = loadArchitects();
+}): Promise<{ items: Architect[]; total: number; page: number; totalPages: number }> {
+  const architects = await loadArchitects();
   let filtered = architects;
 
   const q = (params.q || "").trim().toLowerCase();

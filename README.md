@@ -1,6 +1,6 @@
 # Blocarch
 
-Architect directory scraper and dashboard. Data lives in `architects.json`; the dashboard is a Next.js app with login.
+Architect directory scraper and dashboard. The dashboard runs on Next.js with a Postgres database via Prisma.
 
 ## Scraper (Python)
 
@@ -43,7 +43,13 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ### Data
 
-The dashboard reads directly from `architects.json` in the project root. Run the scraper to populate or update it.
+The app stores architects, leads, and users in Postgres (`DATABASE_URL`).
+If you already have local JSON data, run:
+
+```bash
+npm run db:push
+npm run db:seed
+```
 
 ### Lead nurturing
 

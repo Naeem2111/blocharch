@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
   const webhookUrl = process.env.N8N_WEBHOOK_URL || body.webhookUrl;
   const markAsContacted = body.markAsContacted !== false;
 
-  const architects = loadArchitects();
+  const architects = await loadArchitects();
   const templates = loadTemplates();
   const template = templates.find((t) => t.id === templateId) || templates[0];
 
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
   if (markAsContacted) {
     const now = new Date().toISOString();
     for (const { practice } of payloads) {
-      updateLead(practice.url, { stage: "no_reply", lastEmailedAt: now });
+      await updateLead(practice.url, { stage: "no_reply", lastEmailedAt: now });
     }
   }
 

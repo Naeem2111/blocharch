@@ -1,7 +1,6 @@
-import path from "path";
-import fs from "fs";
 import { randomUUID } from "crypto";
 import { hashPassword } from "@/lib/password";
+import { prisma } from "@/lib/prisma";
 
 export type UserRole = "admin" | "user";
 
@@ -14,32 +13,13 @@ export interface UserRecord {
   createdAt: string;
 }
 
-interface UsersFile {
-  users: UserRecord[];
-}
-
-/** Writable path for users.json. Vercel serverless FS is read-only except /tmp. */
-function getUsersFilePath(): string {
-  const override = process.env.BLOCHARCH_USERS_FILE?.trim();
-  if (override) return path.isAbsolute(override) ? override : path.join(process.cwd(), override);
-  if (process.env.VERCEL) return path.join("/tmp", "blocarch-users.json");
-  return path.join(process.cwd(), "data", "users.json");
-}
-
-function ensureUsersDir(): void {
-  const dir = path.dirname(getUsersFilePath());
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-}
-
 function defaultBootstrapCreds(): { username: string; password: string } {
   const username = (process.env.BLOCHARCH_ADMIN_USERNAME || "blocharch").trim().toLowerCase();
   const password = (process.env.BLOCHARCH_ADMIN_PASSWORD || "blocharch").trim();
   return { username, password };
 }
 
-function bootstrapIfEmpty(): UsersFile {
+function bootstrapIfEmpty(): UserRecord {
   const { username, password } = defaultBootstrapCreds();
   const now = new Date().toISOString();
   const admin: UserRecord = {
@@ -49,74 +29,80 @@ function bootstrapIfEmpty(): UsersFile {
     role: "admin",
     createdAt: now,
   };
-  return { users: [admin] };
+  return admin;
 }
 
-export function loadUsersFile(): UsersFile {
-  const usersFile = getUsersFilePath();
-  ensureUsersDir();
-  if (!fs.existsSync(usersFile)) {
-    const initial = bootstrapIfEmpty();
-    saveUsersFile(initial);
-    return initial;
-  }
-  try {
-    const raw = fs.readFileSync(usersFile, "utf-8");
-    const parsed = JSON.parse(raw) as UsersFile;
-    if (!parsed || !Array.isArray(parsed.users)) {
-      const initial = bootstrapIfEmpty();
-      saveUsersFile(initial);
-      return initial;
-    }
-    if (parsed.users.length === 0) {
-      const initial = bootstrapIfEmpty();
-      saveUsersFile(initial);
-      return initial;
-    }
-    return parsed;
-  } catch {
-    const initial = bootstrapIfEmpty();
-    saveUsersFile(initial);
-    return initial;
-  }
+async function ensureBootstrapAdmin(): Promise<void> {
+  const userCount = await prisma.user.count();
+  if (userCount > 0) return;
+  const admin = bootstrapIfEmpty();
+  await prisma.user.create({
+    data: {
+      id: admin.id,
+      username: admin.username,
+      passwordHash: admin.passwordHash,
+      role: admin.role,
+      disabled: false,
+      createdAt: new Date(admin.createdAt),
+    },
+  });
 }
 
-export function saveUsersFile(data: UsersFile): void {
-  ensureUsersDir();
-  fs.writeFileSync(getUsersFilePath(), JSON.stringify(data, null, 2), "utf-8");
+function toUserRecord(row: {
+  id: string;
+  username: string;
+  passwordHash: string;
+  role: UserRole;
+  disabled: boolean;
+  createdAt: Date;
+}): UserRecord {
+  return {
+    id: row.id,
+    username: row.username,
+    passwordHash: row.passwordHash,
+    role: row.role,
+    disabled: row.disabled,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+export async function findUserByUsername(username: string): Promise<UserRecord | null> {
+  const u = normalizeUsername(username);
+  await ensureBootstrapAdmin();
+  const row = await prisma.user.findUnique({ where: { username: u } });
+  return row ? toUserRecord(row) : null;
+}
+
+export async function findUserById(id: string): Promise<UserRecord | null> {
+  await ensureBootstrapAdmin();
+  const row = await prisma.user.findUnique({ where: { id } });
+  return row ? toUserRecord(row) : null;
+}
+
+export async function listUsersPublic(): Promise<Omit<UserRecord, "passwordHash">[]> {
+  await ensureBootstrapAdmin();
+  const users = await prisma.user.findMany({ orderBy: { createdAt: "asc" } });
+  return users.map(({ passwordHash: _, ...rest }) => ({
+    ...rest,
+    createdAt: rest.createdAt.toISOString(),
+  }));
+}
+
+export async function countAdmins(): Promise<number> {
+  await ensureBootstrapAdmin();
+  return prisma.user.count({ where: { role: "admin", disabled: false } });
 }
 
 export function normalizeUsername(raw: string): string {
   return raw.trim().toLowerCase();
 }
 
-export function findUserByUsername(username: string): UserRecord | null {
-  const u = normalizeUsername(username);
-  const { users } = loadUsersFile();
-  return users.find((x) => x.username === u) ?? null;
-}
-
-export function findUserById(id: string): UserRecord | null {
-  const { users } = loadUsersFile();
-  return users.find((x) => x.id === id) ?? null;
-}
-
-export function listUsersPublic(): Omit<UserRecord, "passwordHash">[] {
-  const { users } = loadUsersFile();
-  return users.map(({ passwordHash: _, ...rest }) => rest);
-}
-
-export function countAdmins(): number {
-  const { users } = loadUsersFile();
-  return users.filter((x) => x.role === "admin" && !x.disabled).length;
-}
-
-export function createUser(input: {
+export async function createUser(input: {
   username: string;
   password: string;
   role: UserRole;
   disabled?: boolean;
-}): { ok: true; user: Omit<UserRecord, "passwordHash"> } | { ok: false; error: string } {
+}): Promise<{ ok: true; user: Omit<UserRecord, "passwordHash"> } | { ok: false; error: string }> {
   const username = normalizeUsername(input.username);
   if (username.length < 2 || username.length > 64) {
     return { ok: false, error: "Username must be 2–64 characters" };
@@ -127,51 +113,46 @@ export function createUser(input: {
   if (input.password.length < 6) {
     return { ok: false, error: "Password must be at least 6 characters" };
   }
-  const file = loadUsersFile();
-  if (file.users.some((x) => x.username === username)) {
+  await ensureBootstrapAdmin();
+  const exists = await prisma.user.findUnique({ where: { username } });
+  if (exists) {
     return { ok: false, error: "Username already exists" };
   }
-  const user: UserRecord = {
-    id: randomUUID(),
-    username,
-    passwordHash: hashPassword(input.password),
-    role: input.role,
-    disabled: input.disabled ?? false,
-    createdAt: new Date().toISOString(),
-  };
-  file.users.push(user);
-  saveUsersFile(file);
-  const { passwordHash: _, ...pub } = user;
+  const user = await prisma.user.create({
+    data: {
+      id: randomUUID(),
+      username,
+      passwordHash: hashPassword(input.password),
+      role: input.role,
+      disabled: input.disabled ?? false,
+    },
+  });
+  const { passwordHash: _, ...pub } = toUserRecord(user);
   return { ok: true, user: pub };
 }
 
-export function updateUser(
+export async function updateUser(
   id: string,
   patch: { password?: string; role?: UserRole; disabled?: boolean },
   actorId: string
-): { ok: true; user: Omit<UserRecord, "passwordHash"> } | { ok: false; error: string } {
-  const file = loadUsersFile();
-  const idx = file.users.findIndex((x) => x.id === id);
-  if (idx < 0) return { ok: false, error: "User not found" };
-  const current = file.users[idx];
+): Promise<{ ok: true; user: Omit<UserRecord, "passwordHash"> } | { ok: false; error: string }> {
+  await ensureBootstrapAdmin();
+  const current = await prisma.user.findUnique({ where: { id } });
+  if (!current) return { ok: false, error: "User not found" };
 
-  if (patch.password !== undefined) {
-    if (patch.password.length < 6) {
-      return { ok: false, error: "Password must be at least 6 characters" };
-    }
-    current.passwordHash = hashPassword(patch.password);
+  if (patch.password !== undefined && patch.password.length < 6) {
+    return { ok: false, error: "Password must be at least 6 characters" };
   }
 
   if (patch.role !== undefined && patch.role !== current.role) {
     if (current.role === "admin" && patch.role !== "admin") {
-      const otherActiveAdmins = file.users.filter(
-        (x) => x.role === "admin" && !x.disabled && x.id !== current.id
-      );
-      if (otherActiveAdmins.length === 0) {
+      const otherActiveAdmins = await prisma.user.count({
+        where: { role: "admin", disabled: false, id: { not: current.id } },
+      });
+      if (otherActiveAdmins === 0) {
         return { ok: false, error: "Cannot demote the last admin" };
       }
     }
-    current.role = patch.role;
   }
 
   if (patch.disabled !== undefined && patch.disabled !== !!current.disabled) {
@@ -179,38 +160,45 @@ export function updateUser(
       return { ok: false, error: "You cannot disable your own account" };
     }
     if (current.role === "admin" && patch.disabled) {
-      const otherActiveAdmins = file.users.filter(
-        (x) => x.role === "admin" && !x.disabled && x.id !== current.id
-      );
-      if (otherActiveAdmins.length === 0) {
+      const otherActiveAdmins = await prisma.user.count({
+        where: { role: "admin", disabled: false, id: { not: current.id } },
+      });
+      if (otherActiveAdmins === 0) {
         return { ok: false, error: "Cannot disable the only active admin" };
       }
     }
-    current.disabled = patch.disabled;
   }
 
-  saveUsersFile(file);
-  const { passwordHash: _, ...pub } = current;
+  const updated = await prisma.user.update({
+    where: { id },
+    data: {
+      ...(patch.password !== undefined ? { passwordHash: hashPassword(patch.password) } : {}),
+      ...(patch.role !== undefined ? { role: patch.role } : {}),
+      ...(patch.disabled !== undefined ? { disabled: patch.disabled } : {}),
+    },
+  });
+  const { passwordHash: _, ...pub } = toUserRecord(updated);
   return { ok: true, user: pub };
 }
 
-export function deleteUser(
+export async function deleteUser(
   id: string,
   actorId: string
-): { ok: true } | { ok: false; error: string } {
+): Promise<{ ok: true } | { ok: false; error: string }> {
   if (id === actorId) {
     return { ok: false, error: "You cannot delete your own account" };
   }
-  const file = loadUsersFile();
-  const target = file.users.find((x) => x.id === id);
+  await ensureBootstrapAdmin();
+  const target = await prisma.user.findUnique({ where: { id } });
   if (!target) return { ok: false, error: "User not found" };
   if (target.role === "admin" && !target.disabled) {
-    const otherAdmins = file.users.filter((x) => x.role === "admin" && !x.disabled && x.id !== id);
-    if (otherAdmins.length === 0) {
+    const otherAdmins = await prisma.user.count({
+      where: { role: "admin", disabled: false, id: { not: id } },
+    });
+    if (otherAdmins === 0) {
       return { ok: false, error: "Cannot delete the only active admin" };
     }
   }
-  file.users = file.users.filter((x) => x.id !== id);
-  saveUsersFile(file);
+  await prisma.user.delete({ where: { id } });
   return { ok: true };
 }

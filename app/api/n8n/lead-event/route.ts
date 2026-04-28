@@ -51,8 +51,10 @@ function scrapeEmailsFromBody(obj: unknown, depth = 0): string[] {
   return [];
 }
 
-function resolvePracticeUrl(body: Record<string, unknown>): { url: string } | { error: string; status: number } {
-  const architects = loadArchitects();
+async function resolvePracticeUrl(
+  body: Record<string, unknown>
+): Promise<{ url: string } | { error: string; status: number }> {
+  const architects = await loadArchitects();
 
   const leadId = typeof body.lead_id === "string" ? body.lead_id.trim() : "";
   if (leadId) {
@@ -141,11 +143,11 @@ export async function POST(request: NextRequest) {
       ? body.lastEmailedAt.trim()
       : undefined;
 
-  const resolved = resolvePracticeUrl(body);
+  const resolved = await resolvePracticeUrl(body);
   if ("error" in resolved) {
     return Response.json({ error: resolved.error }, { status: resolved.status });
   }
 
-  const lead = appendLeadAutomationNote(resolved.url, appendNote, { stage, lastEmailedAt });
+  const lead = await appendLeadAutomationNote(resolved.url, appendNote, { stage, lastEmailedAt });
   return Response.json({ ok: true, lead });
 }

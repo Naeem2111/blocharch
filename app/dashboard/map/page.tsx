@@ -8,15 +8,18 @@ function slugFromUrl(url: string): string {
   return m ? m[1] : "";
 }
 
-export default function MapPage() {
-  const architects = loadArchitects();
-  const practices = architects
-    .map((a) => ({
+export default async function MapPage() {
+  const architects = await loadArchitects();
+  const practices = (
+    await Promise.all(
+      architects.map(async (a) => ({
       name: a.name,
       address: getBestAddress(a) || "",
       slug: slugFromUrl(a.url),
-      stage: getOrCreateLead(a.url).stage,
+      stage: (await getOrCreateLead(a.url)).stage,
     }))
+    )
+  )
     .filter((p) => p.address.trim())
     .slice(0, 500);
 

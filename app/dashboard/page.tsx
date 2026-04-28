@@ -3,7 +3,7 @@ import { loadArchitects } from "@/lib/architects";
 import { PageHeader } from "@/components/PageHeader";
 
 export default async function DashboardPage() {
-  const architects = loadArchitects();
+  const architects = await loadArchitects();
   const total = architects.length;
   const withEmail = architects.filter((a) => a.email?.trim()).length;
 

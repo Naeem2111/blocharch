@@ -11,7 +11,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const architects = loadArchitects();
+  const architects = await loadArchitects();
   const decoded = decodeURIComponent(id);
   const practice = architects.find(
     (a) =>

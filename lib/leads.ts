@@ -1,5 +1,4 @@
-import path from "path";
-import fs from "fs";
+import { prisma } from "@/lib/prisma";
 
 /** 6 outreach stages as per n8n workflow (cold → no_reply/positive/negative/etc) */
 export const LEAD_STAGES = [
@@ -23,31 +22,8 @@ export interface LeadsData {
   [practiceUrl: string]: LeadRecord;
 }
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const LEADS_FILE = path.join(DATA_DIR, "leads.json");
-
-function ensureDataDir() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-}
-
-export function loadLeads(): LeadsData {
-  ensureDataDir();
-  if (!fs.existsSync(LEADS_FILE)) {
-    return {};
-  }
-  try {
-    const raw = fs.readFileSync(LEADS_FILE, "utf-8");
-    return JSON.parse(raw) as LeadsData;
-  } catch {
-    return {};
-  }
-}
-
-function saveLeads(data: LeadsData): void {
-  ensureDataDir();
-  fs.writeFileSync(LEADS_FILE, JSON.stringify(data, null, 2), "utf-8");
+function clampRating(value: number): number {
+  return Math.max(0, Math.min(5, Math.round(value)));
 }
 
 const OLD_TO_NEW_STAGE: Record<string, LeadStage> = {
@@ -58,60 +34,94 @@ const OLD_TO_NEW_STAGE: Record<string, LeadStage> = {
   lost: "negative_reply",
 };
 
-export function getLead(practiceUrl: string): LeadRecord | null {
-  const leads = loadLeads();
-  const r = leads[practiceUrl];
+export async function loadLeads(): Promise<LeadsData> {
+  const rows = await prisma.lead.findMany();
+  return Object.fromEntries(
+    rows.map((row) => [
+      row.architectUrl,
+      {
+        stage: row.stage,
+        rating: clampRating(row.rating),
+        notes: row.notes || undefined,
+        lastEmailedAt: row.lastEmailedAt?.toISOString(),
+      },
+    ])
+  );
+}
+
+export async function getLead(practiceUrl: string): Promise<LeadRecord | null> {
+  const r = await prisma.lead.findUnique({
+    where: { architectUrl: practiceUrl },
+  });
   if (!r) return null;
-  const raw = r.stage as string;
+  const raw = r.stage;
   const stage = LEAD_STAGES.includes(raw as LeadStage)
     ? (raw as LeadStage)
     : (OLD_TO_NEW_STAGE[raw] ?? "cold");
   return {
     stage,
-    rating: typeof r.rating === "number" ? Math.max(0, Math.min(5, r.rating)) : 0,
+    rating: clampRating(r.rating),
     notes: r.notes || undefined,
-    lastEmailedAt: r.lastEmailedAt,
+    lastEmailedAt: r.lastEmailedAt?.toISOString(),
   };
 }
 
-export function getOrCreateLead(practiceUrl: string): LeadRecord {
-  const existing = getLead(practiceUrl);
+export async function getOrCreateLead(practiceUrl: string): Promise<LeadRecord> {
+  const existing = await getLead(practiceUrl);
   if (existing) return existing;
+  await prisma.lead.create({
+    data: {
+      architectUrl: practiceUrl,
+      stage: "cold",
+      rating: 0,
+    },
+  });
   return { stage: "cold", rating: 0 };
 }
 
-export function updateLead(
+export async function updateLead(
   practiceUrl: string,
   updates: Partial<Pick<LeadRecord, "stage" | "rating" | "notes" | "lastEmailedAt">>
-): LeadRecord {
-  const leads = loadLeads();
-  const current = getOrCreateLead(practiceUrl);
+): Promise<LeadRecord> {
+  const current = await getOrCreateLead(practiceUrl);
   const next: LeadRecord = {
     ...current,
     ...updates,
     stage: updates.stage && LEAD_STAGES.includes(updates.stage) ? updates.stage : current.stage,
     rating:
-      updates.rating !== undefined
-        ? Math.max(0, Math.min(5, Math.round(updates.rating)))
-        : current.rating,
+      updates.rating !== undefined ? clampRating(updates.rating) : current.rating,
   };
-  leads[practiceUrl] = next;
-  saveLeads(leads);
+  await prisma.lead.upsert({
+    where: { architectUrl: practiceUrl },
+    update: {
+      stage: next.stage,
+      rating: next.rating,
+      notes: next.notes,
+      lastEmailedAt: next.lastEmailedAt ? new Date(next.lastEmailedAt) : null,
+    },
+    create: {
+      architectUrl: practiceUrl,
+      stage: next.stage,
+      rating: next.rating,
+      notes: next.notes,
+      lastEmailedAt: next.lastEmailedAt ? new Date(next.lastEmailedAt) : null,
+    },
+  });
   return next;
 }
 
 /** Append a timestamped line from n8n (or other automation) and set lastEmailedAt. */
-export function appendLeadAutomationNote(
+export async function appendLeadAutomationNote(
   practiceUrl: string,
   appendNote: string,
   options?: { stage?: LeadStage; lastEmailedAt?: string }
-): LeadRecord {
+): Promise<LeadRecord> {
   const ts = options?.lastEmailedAt || new Date().toISOString();
   const line = `[${ts}] ${appendNote.trim()}`;
-  const current = getOrCreateLead(practiceUrl);
+  const current = await getOrCreateLead(practiceUrl);
   const prev = (current.notes || "").trim();
   const notes = prev ? `${prev}\n${line}` : line;
-  return updateLead(practiceUrl, {
+  return await updateLead(practiceUrl, {
     notes,
     lastEmailedAt: ts,
     ...(options?.stage && LEAD_STAGES.includes(options.stage) ? { stage: options.stage } : {}),

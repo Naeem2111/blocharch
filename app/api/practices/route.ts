@@ -7,6 +7,6 @@ export async function GET(request: NextRequest) {
   const page = parseInt(searchParams.get("page") || "1", 10);
   const perPage = parseInt(searchParams.get("perPage") || "25", 10);
 
-  const result = searchArchitects({ q, page, perPage });
+  const result = await searchArchitects({ q, page, perPage });
   return Response.json(result);
 }

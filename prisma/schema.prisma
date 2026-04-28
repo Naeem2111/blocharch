@@ -1,0 +1,70 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  admin
+  user
+}
+
+enum LeadStage {
+  cold
+  no_reply
+  positive_reply
+  follow_up_interested
+  negative_reply
+  follow_up_not_interested
+}
+
+model Architect {
+  id          String   @id @default(uuid())
+  url         String   @unique
+  name        String
+  website     String?
+  socials     String[]
+  email       String?
+  address     String?
+  contact     String?
+  description String?
+  yearsActive String?  @map("years_active")
+  staff       String?
+  awards      String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  lead Lead?
+
+  @@map("architects")
+}
+
+model Lead {
+  id            String    @id @default(uuid())
+  architectUrl  String    @unique @map("architect_url")
+  stage         LeadStage @default(cold)
+  rating        Int       @default(0)
+  notes         String?
+  lastEmailedAt DateTime? @map("last_emailed_at")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  architect Architect @relation(fields: [architectUrl], references: [url], onDelete: Cascade)
+
+  @@map("leads")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  username     String   @unique
+  passwordHash String   @map("password_hash")
+  role         UserRole
+  disabled     Boolean  @default(false)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}

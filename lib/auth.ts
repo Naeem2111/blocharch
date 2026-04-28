@@ -14,7 +14,7 @@ export async function getSession(): Promise<{ payload: SessionPayload; user: Ses
   if (!raw) return null;
   const payload = await verifySessionToken(raw);
   if (!payload) return null;
-  const row = findUserById(payload.sub);
+  const row = await findUserById(payload.sub);
   if (!row || row.disabled) return null;
   if (row.role !== payload.role) return null;
   const { passwordHash: _, ...user } = row;
@@ -28,7 +28,7 @@ export async function getSessionFromRequest(
   if (!raw) return null;
   const payload = await verifySessionToken(raw);
   if (!payload) return null;
-  const row = findUserById(payload.sub);
+  const row = await findUserById(payload.sub);
   if (!row || row.disabled) return null;
   if (row.role !== payload.role) return null;
   const { passwordHash: _, ...user } = row;

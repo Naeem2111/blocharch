@@ -17,10 +17,10 @@ export async function GET(request: NextRequest) {
   const limit = Math.min(500, Math.max(1, parseInt(searchParams.get("limit") || "200", 10)));
   const withEmail = searchParams.get("withEmail") !== "false";
 
-  const architects = loadArchitects();
-  const leads = architects
-    .map((a) => {
-      const lead = getOrCreateLead(a.url);
+  const architects = await loadArchitects();
+  const leads = (await Promise.all(
+    architects.map(async (a) => {
+      const lead = await getOrCreateLead(a.url);
       return {
         ...a,
         slug: slugFromUrl(a.url),
@@ -29,6 +29,7 @@ export async function GET(request: NextRequest) {
         lead_id: a.url,
       };
     })
+  ))
     .filter((x) => !withEmail || (x.email?.trim()))
     .filter((x) => !status || x.outreach_stage === status)
     .slice(0, limit);

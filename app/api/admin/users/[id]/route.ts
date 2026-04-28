@@ -21,7 +21,7 @@ export async function PATCH(request: NextRequest, context: Ctx) {
     if (typeof body.disabled === "boolean") {
       patch.disabled = body.disabled;
     }
-    const updated = updateUser(id, patch, gate.user.id);
+    const updated = await updateUser(id, patch, gate.user.id);
     if (!updated.ok) {
       return NextResponse.json({ error: updated.error }, { status: 400 });
     }
@@ -35,7 +35,7 @@ export async function DELETE(request: NextRequest, context: Ctx) {
   const gate = await requireAdminRequest(request);
   if (gate instanceof NextResponse) return gate;
   const { id } = await context.params;
-  const removed = deleteUser(id, gate.user.id);
+  const removed = await deleteUser(id, gate.user.id);
   if (!removed.ok) {
     return NextResponse.json({ error: removed.error }, { status: 400 });
   }

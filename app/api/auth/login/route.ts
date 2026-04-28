@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
   const password = String(o.password ?? "").trim();
 
   try {
-    const user = findUserByUsername(username);
+    const user = await findUserByUsername(username);
     if (!user || user.disabled || !verifyPassword(password, user.passwordHash)) {
       return NextResponse.json({ error: "Invalid username or password" }, { status: 401 });
     }

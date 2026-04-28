@@ -2,8 +2,8 @@ import { NextRequest } from "next/server";
 import { loadArchitects } from "@/lib/architects";
 import { updateLead, getLead, LEAD_STAGES, type LeadStage } from "@/lib/leads";
 
-function resolvePracticeUrl(id: string): string | null {
-  const architects = loadArchitects();
+async function resolvePracticeUrl(id: string): Promise<string | null> {
+  const architects = await loadArchitects();
   const decoded = decodeURIComponent(id);
   const practice = architects.find((a) => {
     const m = a.url.match(/\/practice\/([^/]+)\/?$/);
@@ -18,7 +18,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const url = resolvePracticeUrl(id);
+  const url = await resolvePracticeUrl(id);
   if (!url) {
     return Response.json({ error: "Practice not found" }, { status: 404 });
   }
@@ -39,7 +39,7 @@ export async function PATCH(
     updates.lastEmailedAt = body.lastEmailedAt.trim();
   }
 
-  const lead = updateLead(url, updates);
+  const lead = await updateLead(url, updates);
   return Response.json(lead);
 }
 
@@ -48,10 +48,10 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const url = resolvePracticeUrl(id);
+  const url = await resolvePracticeUrl(id);
   if (!url) {
     return Response.json({ error: "Practice not found" }, { status: 404 });
   }
-  const lead = getLead(url);
+  const lead = await getLead(url);
   return Response.json(lead || { stage: "new", rating: 0 });
 }
