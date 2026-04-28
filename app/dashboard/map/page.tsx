@@ -1,37 +1,21 @@
-import { getBestAddress, loadArchitects } from "@/lib/architects";
-import { getOrCreateLead } from "@/lib/leads";
+import { loadPracticesForMap } from "@/lib/map-practices";
 import { PageHeader } from "@/components/PageHeader";
 import { MapClient } from "./MapClient";
 
-function slugFromUrl(url: string): string {
-  const m = url.match(/\/practice\/([^/]+)\/?$/);
-  return m ? m[1] : "";
-}
-
 export default async function MapPage() {
-  const architects = await loadArchitects();
-  const practices = (
-    await Promise.all(
-      architects.map(async (a) => ({
-      name: a.name,
-      address: getBestAddress(a) || "",
-      slug: slugFromUrl(a.url),
-      stage: (await getOrCreateLead(a.url)).stage,
-    }))
-    )
-  )
-    .filter((p) => p.address.trim())
-    .slice(0, 500);
+  const { practices, initialGeocodes } = await loadPracticesForMap();
 
   return (
     <div className="mx-auto max-w-7xl">
       <PageHeader
         title="Map"
-        description="Plot practices by address (geocoded via Nominatim and cached locally)."
+        description="Pins use coordinates stored in the database (geocoded once). Clusters keep the view responsive with thousands of practices."
       />
-      <MapClient practices={practices} />
+      <MapClient practices={practices} initialGeocodes={initialGeocodes} />
       <p className="mt-4 text-xs text-slate-500">
-        Map tiles © OpenStreetMap contributors, © CARTO. Pins load in batches so geocoding stays within hosting limits.
+        Map tiles © OpenStreetMap contributors, © CARTO. Backfill coordinates with{" "}
+        <code className="rounded bg-black/30 px-1 font-mono text-[10px] text-brand-300">npm run geocode:architects</code>{" "}
+        (respects Nominatim rate limits).
       </p>
     </div>
   );

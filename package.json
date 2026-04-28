@@ -11,12 +11,14 @@
     "db:migrate": "prisma migrate deploy",
     "db:push": "prisma db push",
     "db:seed": "node prisma/seed.mjs",
+    "geocode:architects": "node scripts/geocode-architects.mjs",
     "n8n": "npx n8n",
     "n8n:docker": "docker compose -f docker-compose.n8n.yml up -d"
   },
   "dependencies": {
     "@prisma/client": "^6.8.2",
     "leaflet": "^1.9.4",
+    "leaflet.markercluster": "^1.5.3",
     "next": "^14.2.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -24,6 +26,7 @@
   },
   "devDependencies": {
     "@types/leaflet": "^1.9.21",
+    "@types/leaflet.markercluster": "^1.5.6",
     "@types/node": "^20.0.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",

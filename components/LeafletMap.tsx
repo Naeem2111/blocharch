@@ -1,9 +1,12 @@
 "use client";
 
 import "leaflet/dist/leaflet.css";
+import "leaflet.markercluster/dist/MarkerCluster.css";
+import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import L from "leaflet";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
-import { useMemo } from "react";
+import "leaflet.markercluster";
+import { MapContainer, TileLayer, useMap } from "react-leaflet";
+import { useEffect, useMemo } from "react";
 
 type Stage =
   | "cold"
@@ -47,6 +50,56 @@ function markerIcon(stage: Stage): L.DivIcon {
   return icon;
 }
 
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function markerSignature(markers: MarkerItem[]): string {
+  return markers.map((m) => `${m.id}\t${m.lat}\t${m.lng}\t${m.stage}`).join("\n");
+}
+
+function MapClusterLayer({ markers }: { markers: MarkerItem[] }) {
+  const map = useMap();
+  const sig = useMemo(() => markerSignature(markers), [markers]);
+
+  useEffect(() => {
+    if (!markers.length) return;
+
+    const mcg = L.markerClusterGroup({
+      chunkedLoading: true,
+      chunkInterval: 120,
+      maxClusterRadius: 52,
+      spiderfyOnMaxZoom: true,
+      showCoverageOnHover: false,
+    });
+
+    for (const m of markers) {
+      const marker = L.marker([m.lat, m.lng], { icon: markerIcon(m.stage) });
+      const lines = [
+        `<div class="font-semibold">${escapeHtml(m.name)}</div>`,
+        m.subtitle ? `<div class="text-sm opacity-80">${escapeHtml(m.subtitle)}</div>` : "",
+        m.href
+          ? `<a class="text-sm text-sky-600 underline" href="${escapeHtml(m.href)}">View</a>`
+          : "",
+      ].filter(Boolean);
+      marker.bindPopup(lines.join(""));
+      mcg.addLayer(marker);
+    }
+
+    map.addLayer(mcg);
+    return () => {
+      map.removeLayer(mcg);
+      mcg.clearLayers();
+    };
+  }, [map, sig]);
+
+  return null;
+}
+
 export function LeafletMap({
   markers,
   center,
@@ -67,21 +120,7 @@ export function LeafletMap({
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png"
         />
-        {markers.map((m) => (
-          <Marker key={m.id} position={[m.lat, m.lng]} icon={markerIcon(m.stage)}>
-            <Popup>
-              <div>
-                <div className="font-semibold">{m.name}</div>
-                {m.subtitle && <div className="text-sm opacity-80">{m.subtitle}</div>}
-                {m.href && (
-                  <a className="text-sm text-brand-600 underline" href={m.href}>
-                    View
-                  </a>
-                )}
-              </div>
-            </Popup>
-          </Marker>
-        ))}
+        {markers.length > 0 ? <MapClusterLayer markers={markers} /> : null}
       </MapContainer>
       <style jsx>{`
         :global(.lead-stage-pin-wrap) {
@@ -101,4 +140,3 @@ export function LeafletMap({
     </div>
   );
 }
-

@@ -1,18 +1,26 @@
 import Link from "next/link";
 import { loadArchitects } from "@/lib/architects";
+import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/PageHeader";
 
 export default async function DashboardPage() {
   const architects = await loadArchitects();
   const total = architects.length;
   const withEmail = architects.filter((a) => a.email?.trim()).length;
+  const withWebsite = architects.filter((a) => a.website?.trim()).length;
+  const mapReady = await prisma.architect.count({
+    where: {
+      latitude: { not: null },
+      longitude: { not: null },
+    },
+  });
 
   return (
     <div className="mx-auto max-w-6xl">
       <PageHeader
         title="Overview"
         badge="Live"
-        description="Snapshot of your architect directory from architects.json — same pipeline as the project scraper."
+        description="Blocharch marketing dashboard — architect directory and outreach pipeline backed by your database."
       />
       <div className="mb-10 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         <div className="card-tool rounded-2xl p-5">
@@ -27,25 +35,23 @@ export default async function DashboardPage() {
         </div>
         <div className="card-tool rounded-2xl p-5">
           <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">With website</p>
-          <p className="mt-2 text-3xl font-semibold tabular-nums text-amber-400/90">
-            {architects.filter((a) => a.website?.trim()).length}
-          </p>
+          <p className="mt-2 text-3xl font-semibold tabular-nums text-amber-400/90">{withWebsite}</p>
           <p className="mt-1 text-xs text-slate-500">Has website URL</p>
         </div>
         <div className="card-tool rounded-2xl p-5">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Source</p>
-          <p className="mt-2 text-lg font-semibold text-slate-200">architects.json</p>
-          <p className="mt-1 text-xs text-slate-500">Base data</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Map coordinates</p>
+          <p className="mt-2 text-3xl font-semibold tabular-nums text-slate-200">{mapReady}</p>
+          <p className="mt-1 text-xs text-slate-500">Stored for map view</p>
         </div>
       </div>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Link
           href="/dashboard/practices"
           className="card-tool card-tool-hover group block rounded-2xl p-5 ring-1 ring-white/[0.06]"
         >
           <h3 className="font-semibold text-white group-hover:text-brand-300">Browse practices</h3>
           <p className="mt-2 text-sm leading-relaxed text-slate-400">
-            Search and filter architect &amp; landscape practices from the directory.
+            Search and filter architect and landscape practices from the directory.
           </p>
         </Link>
         <Link
@@ -54,20 +60,9 @@ export default async function DashboardPage() {
         >
           <h3 className="font-semibold text-white group-hover:text-brand-300">Map view</h3>
           <p className="mt-2 text-sm leading-relaxed text-slate-400">
-            Plot practices by address on an interactive map.
+            Explore practices by location; coordinates are read from the database.
           </p>
         </Link>
-        <div className="card-tool rounded-2xl p-5 ring-1 ring-white/[0.06]">
-          <h3 className="font-semibold text-white">Update data</h3>
-          <p className="mt-2 text-sm leading-relaxed text-slate-400">
-            Run{" "}
-            <code className="rounded bg-black/30 px-1.5 py-0.5 font-mono text-xs text-brand-300 ring-1 ring-white/10">
-              python scrape_architects.py
-            </code>{" "}
-            to refresh architects.json.
-          </p>
-          <p className="mt-3 text-xs text-slate-500">Data is read from the project root on each request.</p>
-        </div>
       </div>
     </div>
   );
