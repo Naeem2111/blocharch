@@ -62,15 +62,6 @@ type BoardDetail = {
 
 type AssigneeOption = { id: string; username: string; role: string };
 
-const LEAD_STAGES = [
-  "cold",
-  "no_reply",
-  "positive_reply",
-  "follow_up_interested",
-  "negative_reply",
-  "follow_up_not_interested",
-];
-
 function googleEventUrl(title: string, due: Date) {
   const start = due;
   const end = new Date(start.getTime() + 60 * 60 * 1000);
@@ -97,6 +88,9 @@ export function PlannerClient() {
   const [taskOpen, setTaskOpen] = useState<{ columnId: string } | null>(null);
   const [editTask, setEditTask] = useState<TaskRow & { columnId: string } | null>(null);
   const [dragTaskId, setDragTaskId] = useState<string | null>(null);
+  const [addColumnOpen, setAddColumnOpen] = useState(false);
+  const [newColTitle, setNewColTitle] = useState("");
+  const [newColColor, setNewColColor] = useState("#64748b");
 
   const refreshBoards = useCallback(async () => {
     const r = await fetch("/api/planner/boards");
@@ -214,6 +208,56 @@ export function PlannerClient() {
       { method: "DELETE" }
     );
     await loadDetail(boardId);
+  }
+
+  async function patchColumnApi(id: string, patch: Record<string, unknown>) {
+    return fetch(`/api/planner/columns/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+  }
+
+  async function patchColumn(id: string, patch: Record<string, unknown>) {
+    const r = await patchColumnApi(id, patch);
+    if (r.ok && boardId) await loadDetail(boardId);
+  }
+
+  async function reorderColumns(fromIdx: number, toIdx: number) {
+    if (!detail || !boardId || toIdx < 0 || toIdx >= detail.columns.length) return;
+    const a = detail.columns[fromIdx];
+    const b = detail.columns[toIdx];
+    const aOrder = a.sortOrder;
+    const bOrder = b.sortOrder;
+    const r1 = await patchColumnApi(a.id, { sortOrder: bOrder });
+    const r2 = await patchColumnApi(b.id, { sortOrder: aOrder });
+    if (r1.ok && r2.ok) await loadDetail(boardId);
+  }
+
+  async function addColumn() {
+    if (!boardId || !newColTitle.trim()) return;
+    const r = await fetch(`/api/planner/boards/${encodeURIComponent(boardId)}/columns`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: newColTitle.trim(), color: newColColor }),
+    });
+    if (r.ok) {
+      setNewColTitle("");
+      setNewColColor("#64748b");
+      setAddColumnOpen(false);
+      await loadDetail(boardId);
+    }
+  }
+
+  async function deleteColumn(columnId: string) {
+    const r = await fetch(`/api/planner/columns/${encodeURIComponent(columnId)}`, {
+      method: "DELETE",
+    });
+    if (r.ok && boardId) await loadDetail(boardId);
+    else if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      window.alert(j?.error || "Could not delete column");
+    }
   }
 
   const icsUrl =
@@ -386,8 +430,9 @@ export function PlannerClient() {
             </div>
           )}
 
-          <div className="flex gap-4 overflow-x-auto pb-4">
-            {detail.columns.map((col) => (
+          <div className="flex flex-wrap items-end gap-4">
+          <div className="flex min-w-0 flex-1 gap-4 overflow-x-auto pb-4">
+            {detail.columns.map((col, colIdx) => (
               <div
                 key={col.id}
                 className="flex w-[280px] shrink-0 flex-col rounded-xl border border-white/[0.08] bg-white/[0.02]"
@@ -396,12 +441,15 @@ export function PlannerClient() {
                 }}
                 onDrop={() => onDropColumn(col.id)}
               >
-                <div
-                  className="border-b border-white/[0.06] px-3 py-2"
-                  style={{ borderTopWidth: 3, borderTopColor: col.color }}
-                >
-                  <p className="text-sm font-semibold text-slate-200">{col.title}</p>
-                </div>
+                <EditableColumnHeader
+                  column={col}
+                  editable={detail.editable}
+                  colIndex={colIdx}
+                  totalColumns={detail.columns.length}
+                  onPatch={patchColumn}
+                  onDelete={deleteColumn}
+                  onReorder={reorderColumns}
+                />
                 <div className="flex flex-1 flex-col gap-2 p-2">
                   {col.tasks.map((t) => (
                     <button
@@ -455,6 +503,66 @@ export function PlannerClient() {
               </div>
             ))}
           </div>
+            {detail.editable ? (
+              <div className="flex w-[260px] shrink-0 flex-col gap-2 rounded-xl border border-dashed border-white/[0.12] bg-white/[0.02] p-3">
+                {!addColumnOpen ? (
+                  <button
+                    type="button"
+                    onClick={() => setAddColumnOpen(true)}
+                    className="rounded-lg py-8 text-sm text-slate-500 hover:text-brand-300"
+                  >
+                    + Add column
+                  </button>
+                ) : (
+                  <form
+                    className="flex flex-col gap-2"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      void addColumn();
+                    }}
+                  >
+                    <p className="text-xs font-medium text-slate-400">New column</p>
+                    <input
+                      required
+                      value={newColTitle}
+                      onChange={(e) => setNewColTitle(e.target.value)}
+                      placeholder="Column title"
+                      className="rounded-md border border-white/[0.08] bg-white/[0.04] px-2 py-1.5 text-sm text-white"
+                    />
+                    <div className="flex items-center gap-2">
+                      <label className="flex items-center gap-1 text-xs text-slate-500">
+                        Colour
+                        <input
+                          type="color"
+                          value={newColColor}
+                          onChange={(e) => setNewColColor(e.target.value)}
+                          className="h-8 w-10 cursor-pointer rounded border-0 bg-transparent"
+                        />
+                      </label>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="submit"
+                        className="rounded-md bg-brand-600 px-3 py-1.5 text-xs font-semibold text-slate-950"
+                      >
+                        Add
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAddColumnOpen(false);
+                          setNewColTitle("");
+                        }}
+                        className="text-xs text-slate-500"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            ) : null}
+          </div>
 
           {taskOpen && detail.editable && (
             <TaskFormModal
@@ -487,6 +595,146 @@ export function PlannerClient() {
           )}
         </>
       )}
+    </div>
+  );
+}
+
+function EditableColumnHeader({
+  column,
+  editable,
+  colIndex,
+  totalColumns,
+  onPatch,
+  onDelete,
+  onReorder,
+}: {
+  column: ColumnRow;
+  editable: boolean;
+  colIndex: number;
+  totalColumns: number;
+  onPatch: (id: string, patch: Record<string, unknown>) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+  onReorder: (from: number, to: number) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [title, setTitle] = useState(column.title);
+  const [color, setColor] = useState(column.color);
+
+  useEffect(() => {
+    setTitle(column.title);
+    setColor(column.color);
+  }, [column.id, column.title, column.color]);
+
+  const canMoveLeft = colIndex > 0;
+  const canMoveRight = colIndex < totalColumns - 1;
+  const canDelete = totalColumns > 1 && column.tasks.length === 0;
+
+  if (!editable) {
+    return (
+      <div
+        className="border-b border-white/[0.06] px-3 py-2"
+        style={{ borderTopWidth: 3, borderTopColor: column.color }}
+      >
+        <p className="text-sm font-semibold text-slate-200">{column.title}</p>
+      </div>
+    );
+  }
+
+  if (editing) {
+    return (
+      <div
+        className="border-b border-white/[0.06] px-2 py-2"
+        style={{ borderTopWidth: 3, borderTopColor: color }}
+      >
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="mb-2 w-full rounded border border-white/10 bg-black/40 px-2 py-1 text-sm text-white"
+          autoFocus
+        />
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <label className="flex items-center gap-2 text-xs text-slate-500">
+            Colour
+            <input
+              type="color"
+              value={color}
+              onChange={(e) => setColor(e.target.value)}
+              className="h-7 w-12 cursor-pointer rounded border-0 bg-transparent"
+            />
+          </label>
+          <div className="flex gap-1">
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              className="text-xs text-slate-500 hover:text-slate-300"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                const t = title.trim();
+                if (!t) return;
+                await onPatch(column.id, { title: t, color });
+                setEditing(false);
+              }}
+              className="rounded bg-brand-600 px-2 py-1 text-xs font-semibold text-slate-950"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="border-b border-white/[0.06] px-2 py-1.5"
+      style={{ borderTopWidth: 3, borderTopColor: column.color }}
+    >
+      <div className="flex items-start justify-between gap-1">
+        <p className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-200">{column.title}</p>
+        <div className="flex shrink-0 items-center gap-0.5">
+          <button
+            type="button"
+            title="Move left"
+            disabled={!canMoveLeft}
+            onClick={() => onReorder(colIndex, colIndex - 1)}
+            className="rounded p-0.5 text-slate-500 hover:bg-white/10 hover:text-slate-200 disabled:opacity-30"
+          >
+            ←
+          </button>
+          <button
+            type="button"
+            title="Move right"
+            disabled={!canMoveRight}
+            onClick={() => onReorder(colIndex, colIndex + 1)}
+            className="rounded p-0.5 text-slate-500 hover:bg-white/10 hover:text-slate-200 disabled:opacity-30"
+          >
+            →
+          </button>
+          <button
+            type="button"
+            title="Edit column"
+            onClick={() => setEditing(true)}
+            className="rounded px-1.5 py-0.5 text-xs text-brand-400 hover:bg-white/10"
+          >
+            Edit
+          </button>
+        </div>
+      </div>
+      {canDelete ? (
+        <button
+          type="button"
+          onClick={() => {
+            if (window.confirm("Delete this empty column?")) void onDelete(column.id);
+          }}
+          className="mt-1 text-[10px] text-red-400/80 hover:text-red-300"
+        >
+          Delete column
+        </button>
+      ) : null}
     </div>
   );
 }
