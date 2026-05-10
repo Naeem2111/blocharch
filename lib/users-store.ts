@@ -2,7 +2,7 @@ import { randomUUID } from "crypto";
 import { hashPassword } from "@/lib/password";
 import { prisma } from "@/lib/prisma";
 
-export type UserRole = "admin" | "user";
+export type UserRole = "admin" | "manager" | "user";
 
 export interface UserRecord {
   id: string;
@@ -60,7 +60,7 @@ function toUserRecord(row: {
     id: row.id,
     username: row.username,
     passwordHash: row.passwordHash,
-    role: row.role,
+    role: row.role as UserRole,
     disabled: row.disabled,
     createdAt: row.createdAt.toISOString(),
   };

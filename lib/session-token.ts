@@ -3,7 +3,7 @@
  * Uses HMAC-SHA256; secret from BLOCHARCH_SESSION_SECRET.
  */
 
-export type SessionRole = "admin" | "user";
+export type SessionRole = "admin" | "manager" | "user";
 
 export type SessionPayload = {
   sub: string;
@@ -88,7 +88,7 @@ export async function verifySessionToken(token: string): Promise<SessionPayload 
   if (!parsed || typeof parsed !== "object") return null;
   const o = parsed as Record<string, unknown>;
   const sub = typeof o.sub === "string" ? o.sub : "";
-  const role = o.role === "admin" || o.role === "user" ? o.role : null;
+  const role = o.role === "admin" || o.role === "user" || o.role === "manager" ? o.role : null;
   const exp = typeof o.exp === "number" ? o.exp : 0;
   if (!sub || !role || !exp) return null;
   const now = Math.floor(Date.now() / 1000);

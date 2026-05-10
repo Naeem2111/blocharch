@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 type UserRow = {
   id: string;
   username: string;
-  role: "admin" | "user";
+  role: "admin" | "manager" | "user";
   disabled?: boolean;
   createdAt: string;
 };
@@ -15,7 +15,7 @@ export function AdminUsersClient({ currentUserId }: { currentUserId: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
-  const [createForm, setCreateForm] = useState({ username: "", password: "", role: "user" as "user" | "admin" });
+  const [createForm, setCreateForm] = useState({ username: "", password: "", role: "user" as "user" | "admin" | "manager" });
   const [creating, setCreating] = useState(false);
   const [pwDraft, setPwDraft] = useState<Record<string, string>>({});
 
@@ -150,9 +150,10 @@ export function AdminUsersClient({ currentUserId }: { currentUserId: string }) {
             <select
               className="mt-1 w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-slate-100 outline-none ring-1 ring-black/20 focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/40"
               value={createForm.role}
-              onChange={(e) => setCreateForm((f) => ({ ...f, role: e.target.value as "user" | "admin" }))}
+              onChange={(e) => setCreateForm((f) => ({ ...f, role: e.target.value as "user" | "admin" | "manager" }))}
             >
               <option value="user">User</option>
+              <option value="manager">Manager</option>
               <option value="admin">Admin</option>
             </select>
           </label>
@@ -201,6 +202,7 @@ export function AdminUsersClient({ currentUserId }: { currentUserId: string }) {
                       onChange={(e) => patchUser(u.id, { role: e.target.value })}
                     >
                       <option value="user">User</option>
+                      <option value="manager">Manager</option>
                       <option value="admin">Admin</option>
                     </select>
                   </td>

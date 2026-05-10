@@ -16,7 +16,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const username = String(body.username || "");
     const password = String(body.password || "");
-    const role = body.role === "admin" || body.role === "user" ? (body.role as UserRole) : "user";
+    const role =
+      body.role === "admin" || body.role === "manager" || body.role === "user"
+        ? (body.role as UserRole)
+        : "user";
     const disabled = Boolean(body.disabled);
     const created = await createUser({ username, password, role, disabled });
     if (!created.ok) {

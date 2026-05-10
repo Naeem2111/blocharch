@@ -66,5 +66,6 @@ export const config = {
     "/api/geocode/:path*",
     "/api/me",
     "/api/admin/:path*",
+    "/api/planner/:path*",
   ],
 };

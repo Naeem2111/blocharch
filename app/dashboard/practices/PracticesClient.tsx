@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { getBestAddressFromFields } from "@/lib/address-display";
+import { gmailComposeUrl } from "@/lib/gmail-compose";
 
 interface Architect {
   url: string;
@@ -265,14 +266,19 @@ export function PracticesClient() {
                         </td>
                       )}
                       {visible.email && (
-                        <td className="px-4 py-3 text-slate-300 text-sm max-w-[14rem]">
+                        <td className="px-4 py-3 text-slate-300 text-sm max-w-[18rem]">
                           {p.email ? (
-                            <a
-                              href={`mailto:${p.email}`}
-                              className="text-brand-400 hover:text-brand-300 hover:underline break-all"
-                            >
-                              {p.email}
-                            </a>
+                            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                              <span className="break-all text-slate-300">{p.email}</span>
+                              <a
+                                href={gmailComposeUrl(p.email)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex w-fit shrink-0 items-center justify-center rounded-lg border border-white/[0.1] bg-white/[0.07] px-3 py-1.5 text-xs font-semibold text-slate-100 ring-1 ring-white/[0.06] transition-colors hover:bg-white/[0.11]"
+                              >
+                                Gmail
+                              </a>
+                            </div>
                           ) : (
                             "—"
                           )}

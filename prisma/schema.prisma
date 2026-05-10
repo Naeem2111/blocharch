@@ -9,6 +9,7 @@ datasource db {
 
 enum UserRole {
   admin
+  manager
   user
 }
 
@@ -19,6 +20,16 @@ enum LeadStage {
   follow_up_interested
   negative_reply
   follow_up_not_interested
+}
+
+enum PlannerBoardScope {
+  personal
+  team
+}
+
+enum PlannerMemberRole {
+  editor
+  viewer
 }
 
 model Architect {
@@ -69,5 +80,100 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
+  ownedPlannerBoards PlannerBoard[]       @relation("PlannerBoardOwner")
+  plannerMemberships PlannerBoardMember[]
+  assignedPlannerTasks PlannerTask[]      @relation("PlannerTaskAssignee")
+
   @@map("users")
+}
+
+model PlannerBoard {
+  id        String            @id @default(uuid())
+  title     String
+  scope     PlannerBoardScope
+  color     String            @default("#6366f1")
+  ownerId   String            @map("owner_id")
+  createdAt DateTime          @default(now()) @map("created_at")
+  updatedAt DateTime          @updatedAt @map("updated_at")
+
+  owner   User                 @relation("PlannerBoardOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  columns PlannerColumn[]
+  labels  PlannerLabel[]
+  members PlannerBoardMember[]
+
+  @@index([ownerId])
+  @@map("planner_boards")
+}
+
+model PlannerBoardMember {
+  id      String            @id @default(uuid())
+  boardId String            @map("board_id")
+  userId  String            @map("user_id")
+  role    PlannerMemberRole @default(editor)
+
+  board PlannerBoard @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  user  User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([boardId, userId])
+  @@map("planner_board_members")
+}
+
+model PlannerColumn {
+  id        String @id @default(uuid())
+  boardId   String @map("board_id")
+  title     String
+  color     String @default("#64748b")
+  sortOrder Int    @default(0) @map("sort_order")
+
+  board PlannerBoard @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  tasks PlannerTask[]
+
+  @@index([boardId])
+  @@map("planner_columns")
+}
+
+model PlannerLabel {
+  id      String @id @default(uuid())
+  boardId String @map("board_id")
+  name    String
+  color   String
+
+  board     PlannerBoard      @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  taskLinks PlannerTaskLabel[]
+
+  @@index([boardId])
+  @@map("planner_labels")
+}
+
+model PlannerTask {
+  id           String   @id @default(uuid())
+  columnId     String   @map("column_id")
+  title        String
+  description  String?
+  sortOrder    Int      @default(0) @map("sort_order")
+  assigneeId   String?  @map("assignee_id")
+  dueAt        DateTime? @map("due_at")
+  architectUrl String?  @map("architect_url")
+  customFields Json?    @map("custom_fields")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  column   PlannerColumn     @relation(fields: [columnId], references: [id], onDelete: Cascade)
+  assignee User?             @relation("PlannerTaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  labels   PlannerTaskLabel[]
+
+  @@index([columnId])
+  @@index([assigneeId])
+  @@map("planner_tasks")
+}
+
+model PlannerTaskLabel {
+  taskId  String @map("task_id")
+  labelId String @map("label_id")
+
+  task  PlannerTask  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  label PlannerLabel @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, labelId])
+  @@map("planner_task_labels")
 }

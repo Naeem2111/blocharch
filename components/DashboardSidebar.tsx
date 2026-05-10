@@ -62,6 +62,19 @@ const MARKETING_NAV: NavItem[] = [
       </svg>
     ),
   },
+  {
+    href: "/dashboard/planner",
+    label: "Project planner",
+    icon: (
+      <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.096-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.58 2.58 0 00-.1-.664M6.75 7.5V9h6V7.5m-6 3h6v3.75H6.75V10.5z"
+        />
+      </svg>
+    ),
+  },
 ];
 
 const ADMIN_NAV: NavItem[] = [
@@ -154,6 +167,10 @@ export function DashboardSidebar({ user }: { user: SessionUser }) {
               {user.role === "admin" ? (
                 <span className="ml-1.5 rounded bg-brand-500/15 px-1 py-0.5 text-[9px] font-semibold uppercase text-brand-400">
                   admin
+                </span>
+              ) : user.role === "manager" ? (
+                <span className="ml-1.5 rounded bg-amber-500/15 px-1 py-0.5 text-[9px] font-semibold uppercase text-amber-400">
+                  manager
                 </span>
               ) : null}
             </p>
