@@ -1,5 +1,6 @@
 import { getBestAddressFromFields } from "@/lib/address-display";
 import { prisma } from "@/lib/prisma";
+import { resolveMapHub, type MapHubAnchor } from "@/lib/map-hub";
 
 export type MapPracticeStage =
   | "cold"
@@ -25,6 +26,8 @@ function slugFromUrl(url: string): string {
 export async function loadPracticesForMap(): Promise<{
   practices: MapPractice[];
   initialGeocodes: Record<string, { lat: number; lng: number; displayName?: string }>;
+  /** Blocharch hub practice (Icon Architects, London) — map centers here and expands outward. */
+  hubAnchor: MapHubAnchor | null;
 }> {
   const rows = await prisma.architect.findMany({
     select: {
@@ -60,5 +63,7 @@ export async function loadPracticesForMap(): Promise<{
     }
   }
 
-  return { practices, initialGeocodes };
+  const hubAnchor = resolveMapHub(rows);
+
+  return { practices, initialGeocodes, hubAnchor };
 }

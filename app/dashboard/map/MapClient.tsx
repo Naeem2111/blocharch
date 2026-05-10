@@ -4,6 +4,8 @@ import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { MapPracticeStage } from "@/lib/map-practices";
 
+import type { MapHubAnchor } from "@/lib/map-hub";
+
 const LeafletMap = dynamic(async () => (await import("@/components/LeafletMap")).LeafletMap, {
   ssr: false,
   loading: () => (
@@ -32,9 +34,11 @@ type GeocodeEntry = { lat: number; lng: number; displayName?: string };
 export function MapClient({
   practices,
   initialGeocodes,
+  hubAnchor,
 }: {
   practices: Practice[];
   initialGeocodes: Record<string, GeocodeEntry>;
+  hubAnchor: MapHubAnchor | null;
 }) {
   const [results, setResults] = useState<Record<string, GeocodeEntry>>(() => ({ ...initialGeocodes }));
   const [loading, setLoading] = useState(false);
@@ -131,7 +135,9 @@ export function MapClient({
       stage: MapPracticeStage;
       subtitle?: string;
       href?: string;
+      hub?: boolean;
     }> = [];
+    const hubSlug = hubAnchor?.slug;
     for (const p of practices) {
       const r = results[p.address];
       if (!r) continue;
@@ -143,17 +149,19 @@ export function MapClient({
         stage: p.stage,
         subtitle: r.displayName || p.address,
         href: `/dashboard/practices/${encodeURIComponent(p.slug)}`,
+        hub: Boolean(hubSlug && p.slug === hubSlug),
       });
     }
     return out;
-  }, [practices, results]);
+  }, [practices, results, hubAnchor?.slug]);
 
   const center = useMemo(() => {
+    if (hubAnchor) return { lat: hubAnchor.lat, lng: hubAnchor.lng };
     if (markers.length === 0) return { lat: 54.5, lng: -3.0 };
     const avgLat = markers.reduce((s, m) => s + m.lat, 0) / markers.length;
     const avgLng = markers.reduce((s, m) => s + m.lng, 0) / markers.length;
     return { lat: avgLat, lng: avgLng };
-  }, [markers]);
+  }, [hubAnchor, markers]);
 
   const stageCounts = useMemo(() => {
     const counts: Record<MapPracticeStage, number> = {
@@ -190,7 +198,11 @@ export function MapClient({
           Showing {markers.length} of {practices.length} practice{practices.length === 1 ? "" : "s"} with address.
           {statusExtra}
         </p>
-        <p className="text-slate-500 text-sm">Clusters zoom apart; open a practice for its detail map.</p>
+        <p className="text-slate-500 text-sm">
+          {hubAnchor
+            ? `Framed from ${hubAnchor.name} — zoom out to see the full UK.`
+            : "Clusters zoom apart; open a practice for its detail map."}
+        </p>
       </div>
       {geocodeError && (
         <p className="text-amber-400/90 text-sm rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2">
@@ -200,6 +212,11 @@ export function MapClient({
       <LeafletMap markers={markers} center={center} zoom={6} />
       <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
         <p className="text-xs uppercase tracking-wide text-slate-500 mb-2">Automation stage colors</p>
+        {hubAnchor ? (
+          <p className="text-xs text-slate-500 mb-3">
+            Gold ring — Blocharch hub: {hubAnchor.name} (first client).
+          </p>
+        ) : null}
         <div className="flex flex-wrap gap-x-5 gap-y-2">
           {(Object.keys(STAGE_META) as MapPracticeStage[]).map((stage) => (
             <div key={stage} className="flex items-center gap-2 text-xs text-slate-300">
