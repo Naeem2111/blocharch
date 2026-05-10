@@ -4,7 +4,18 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { canEditBoard, requirePlannerSession } from "@/lib/planner-access";
 
+const TASK_SUMMARY_MAX = 2_000;
+const TASK_DESCRIPTION_MAX = 50_000;
+
 type Ctx = { params: Promise<{ taskId: string }> };
+
+function normalizeNullableLongText(raw: unknown, max: number): string | null | undefined {
+  if (raw === undefined) return undefined;
+  if (raw === null) return null;
+  if (typeof raw !== "string") return undefined;
+  const s = raw.replace(/\u200b/g, "").trimEnd().slice(0, max);
+  return s.length === 0 ? null : s;
+}
 
 async function taskBoardId(taskId: string): Promise<string | null> {
   const t = await prisma.plannerTask.findUnique({
@@ -31,9 +42,10 @@ export async function PATCH(request: NextRequest, context: Ctx) {
     const data: Prisma.PlannerTaskUncheckedUpdateInput = {};
 
     if (typeof body.title === "string") data.title = body.title.trim().slice(0, 200);
-    if (body.description !== undefined) {
-      data.description = body.description === null ? null : String(body.description);
-    }
+    const nextSummary = normalizeNullableLongText(body.summary, TASK_SUMMARY_MAX);
+    if (nextSummary !== undefined) data.summary = nextSummary;
+    const nextDesc = normalizeNullableLongText(body.description, TASK_DESCRIPTION_MAX);
+    if (nextDesc !== undefined) data.description = nextDesc;
     if (typeof body.sortOrder === "number" && Number.isFinite(body.sortOrder)) {
       data.sortOrder = body.sortOrder;
     }

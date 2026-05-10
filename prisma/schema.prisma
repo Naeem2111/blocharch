@@ -146,11 +146,12 @@ model PlannerLabel {
 }
 
 model PlannerTask {
-  id           String   @id @default(uuid())
-  columnId     String   @map("column_id")
+  id           String    @id @default(uuid())
+  columnId     String    @map("column_id")
   title        String
-  description  String?
-  sortOrder    Int      @default(0) @map("sort_order")
+  summary      String?   @db.Text
+  description  String?   @db.Text
+  sortOrder    Int       @default(0) @map("sort_order")
   assigneeId   String?  @map("assignee_id")
   dueAt        DateTime? @map("due_at")
   architectUrl String?  @map("architect_url")

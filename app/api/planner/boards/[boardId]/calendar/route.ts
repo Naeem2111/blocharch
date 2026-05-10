@@ -57,9 +57,9 @@ export async function GET(request: NextRequest, context: Ctx) {
       lines.push(`DTSTART:${fmt(start)}`);
       lines.push(`DTEND:${fmt(end)}`);
       lines.push(`SUMMARY:${icsEscape(t.title)}`);
-      const desc = [t.description, t.architectUrl ? `Lead: ${t.architectUrl}` : ""]
+      const desc = [t.summary, t.description, t.architectUrl ? `Lead: ${t.architectUrl}` : ""]
         .filter(Boolean)
-        .join("\\n");
+        .join("\\n\\n");
       if (desc) lines.push(`DESCRIPTION:${icsEscape(desc)}`);
       lines.push("END:VEVENT");
     }

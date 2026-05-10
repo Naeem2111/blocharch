@@ -3,6 +3,15 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { canEditBoard, requirePlannerSession } from "@/lib/planner-access";
 
+const TASK_SUMMARY_MAX = 2_000;
+const TASK_DESCRIPTION_MAX = 50_000;
+
+function optionalLongText(raw: unknown, max: number): string | null {
+  if (typeof raw !== "string") return null;
+  const s = raw.replace(/\u200b/g, "").trimEnd().slice(0, max);
+  return s.length === 0 ? null : s;
+}
+
 export async function POST(request: NextRequest) {
   const gate = await requirePlannerSession(request);
   if (gate instanceof NextResponse) return gate;
@@ -39,7 +48,8 @@ export async function POST(request: NextRequest) {
       data: {
         columnId,
         title,
-        description: typeof body.description === "string" ? body.description : null,
+        summary: optionalLongText(body.summary, TASK_SUMMARY_MAX),
+        description: optionalLongText(body.description, TASK_DESCRIPTION_MAX),
         sortOrder,
         assigneeId:
           typeof body.assigneeId === "string" && body.assigneeId ? body.assigneeId : null,

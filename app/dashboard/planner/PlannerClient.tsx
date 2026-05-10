@@ -20,6 +20,7 @@ type TaskLbl = { label: Label };
 type TaskRow = {
   id: string;
   title: string;
+  summary: string | null;
   description: string | null;
   sortOrder: number;
   assigneeId: string | null;
@@ -74,6 +75,25 @@ function googleEventUrl(title: string, due: Date) {
   });
   return `https://calendar.google.com/calendar/render?${p.toString()}`;
 }
+
+/** Short snippet for Kanban cards: prefer summary, else first non-empty description line */
+function taskCardPreview(t: Pick<TaskRow, "summary" | "description">): string | null {
+  const summary = (t.summary ?? "").trim();
+  if (summary) return summary;
+  const body = (t.description ?? "").trim();
+  if (!body) return null;
+  const line = body
+    .split(/\r?\n/)
+    .map((x) => x.trim())
+    .find((x) => x.length > 0);
+  return line ?? body.slice(0, 140);
+}
+
+const PLANNER_SHORT_DESC_HINT =
+  "Brief preview on the board. Paragraphs or lists work (– or • for bullets; line breaks stay).";
+
+const PLANNER_LONG_DESC_HINT =
+  "Detailed notes: paragraphs, bullets (– •), or numbered lines (1. 2.). Plain text — line breaks are kept.";
 
 export function PlannerClient() {
   const [boards, setBoards] = useState<BoardSummary[]>([]);
@@ -149,6 +169,8 @@ export function PlannerClient() {
     columnId: string,
     data: {
       title: string;
+      summary?: string | null;
+      description?: string | null;
       assigneeId?: string | null;
       dueAt?: string | null;
       architectUrl?: string | null;
@@ -451,7 +473,9 @@ export function PlannerClient() {
                   onReorder={reorderColumns}
                 />
                 <div className="flex flex-1 flex-col gap-2 p-2">
-                  {col.tasks.map((t) => (
+                  {col.tasks.map((t) => {
+                    const preview = taskCardPreview(t);
+                    return (
                     <button
                       key={t.id}
                       type="button"
@@ -461,6 +485,11 @@ export function PlannerClient() {
                       className="w-full rounded-lg border border-white/[0.06] bg-white/[0.04] p-3 text-left text-sm text-slate-200 hover:bg-white/[0.07]"
                     >
                       <p className="font-medium text-white">{t.title}</p>
+                      {preview ? (
+                          <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-[11px] text-slate-400">
+                            {preview}
+                          </p>
+                      ) : null}
                       {t.assignee ? (
                         <p className="mt-1 text-[11px] text-slate-500">{t.assignee.username}</p>
                       ) : null}
@@ -489,7 +518,8 @@ export function PlannerClient() {
                         ))}
                       </div>
                     </button>
-                  ))}
+                    );
+                  })}
                   {detail.editable && (
                     <button
                       type="button"
@@ -578,6 +608,7 @@ export function PlannerClient() {
 
           {editTask && detail.editable && (
             <EditTaskModal
+              key={editTask.id}
               task={editTask}
               labels={detail.labels}
               assignees={assignees}
@@ -838,6 +869,8 @@ function TaskFormModal({
   onClose: () => void;
   onSave: (p: {
     title: string;
+    summary?: string | null;
+    description?: string | null;
     assigneeId?: string | null;
     dueAt?: string | null;
     architectUrl?: string | null;
@@ -845,13 +878,15 @@ function TaskFormModal({
   }) => Promise<void>;
 }) {
   const [title, setTitle] = useState("");
+  const [summary, setSummary] = useState("");
+  const [description, setDescription] = useState("");
   const [assigneeId, setAssigneeId] = useState("");
   const [due, setDue] = useState("");
   const [architectUrl, setArchitectUrl] = useState("");
   const [labelIds, setLabelIds] = useState<string[]>([]);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="dialog">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-white/[0.1] bg-slate-900 p-6 shadow-xl">
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-white/[0.1] bg-slate-900 p-6 shadow-xl">
         <h3 className="text-lg font-semibold text-white">New task</h3>
         <div className="mt-4 space-y-3 text-sm">
           <label className="block text-slate-400">
@@ -860,6 +895,32 @@ function TaskFormModal({
               className="mt-1 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-white"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+            />
+          </label>
+          <label className="block text-slate-400">
+            Short summary
+            <span className="mt-1 block text-[11px] font-normal leading-snug text-slate-600">
+              {PLANNER_SHORT_DESC_HINT}
+            </span>
+            <textarea
+              className="mt-2 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 font-mono text-[13px] leading-relaxed text-white"
+              rows={4}
+              value={summary}
+              onChange={(e) => setSummary(e.target.value)}
+              placeholder="e.g.\nGoal: finalize brief\n- Sketch option A\n- Client sign-off "
+            />
+          </label>
+          <label className="block text-slate-400">
+            Full description
+            <span className="mt-1 block text-[11px] font-normal leading-snug text-slate-600">
+              {PLANNER_LONG_DESC_HINT}
+            </span>
+            <textarea
+              className="mt-2 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 font-mono text-[13px] leading-relaxed text-white"
+              rows={12}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Longer checklist, paragraphs, numbered steps...\n\n1. First step\n2. Second step "
             />
           </label>
           <label className="block text-slate-400">
@@ -925,6 +986,8 @@ function TaskFormModal({
               if (!title.trim()) return;
               await onSave({
                 title: title.trim(),
+                summary: summary.trim() || null,
+                description: description.trim() ? description : null,
                 assigneeId: assigneeId || null,
                 dueAt: due ? new Date(due).toISOString() : null,
                 architectUrl: architectUrl.trim() || null,
@@ -957,7 +1020,8 @@ function EditTaskModal({
   onDelete: (taskId: string) => Promise<void>;
 }) {
   const [title, setTitle] = useState(task.title);
-  const [desc, setDesc] = useState(task.description || "");
+  const [summary, setSummary] = useState(task.summary || "");
+  const [description, setDescription] = useState(task.description || "");
   const [assigneeId, setAssigneeId] = useState(task.assigneeId || "");
   const [due, setDue] = useState(
     task.dueAt ? task.dueAt.slice(0, 16) : ""
@@ -969,7 +1033,7 @@ function EditTaskModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="dialog">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-white/[0.1] bg-slate-900 p-6 shadow-xl">
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-white/[0.1] bg-slate-900 p-6 shadow-xl">
         <h3 className="text-lg font-semibold text-white">Edit task</h3>
         <div className="mt-4 space-y-3 text-sm">
           <label className="block text-slate-400">
@@ -981,12 +1045,27 @@ function EditTaskModal({
             />
           </label>
           <label className="block text-slate-400">
-            Description
+            Short summary
+            <span className="mt-1 block text-[11px] font-normal leading-snug text-slate-600">
+              {PLANNER_SHORT_DESC_HINT}
+            </span>
             <textarea
-              className="mt-1 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-white"
-              rows={3}
-              value={desc}
-              onChange={(e) => setDesc(e.target.value)}
+              className="mt-2 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 font-mono text-[13px] leading-relaxed text-white"
+              rows={5}
+              value={summary}
+              onChange={(e) => setSummary(e.target.value)}
+            />
+          </label>
+          <label className="block text-slate-400">
+            Full description
+            <span className="mt-1 block text-[11px] font-normal leading-snug text-slate-600">
+              {PLANNER_LONG_DESC_HINT}
+            </span>
+            <textarea
+              className="mt-2 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 font-mono text-[13px] leading-relaxed text-white"
+              rows={14}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
             />
           </label>
           <label className="block text-slate-400">
@@ -1068,7 +1147,8 @@ function EditTaskModal({
               onClick={async () => {
                 await onSave(task.id, {
                   title: title.trim(),
-                  description: desc || null,
+                  summary: summary.trim() || null,
+                  description: description.trim() ? description : null,
                   assigneeId: assigneeId || null,
                   dueAt: due ? new Date(due).toISOString() : null,
                   architectUrl: architectUrl.trim() || null,
