@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { MapPracticeStage } from "@/lib/map-practices";
 
-import type { MapHubAnchor } from "@/lib/map-hub";
+import { hubUsesIconStudio, type MapHubAnchor } from "@/lib/map-hub";
 
 const LeafletMap = dynamic(async () => (await import("@/components/LeafletMap")).LeafletMap, {
   ssr: false,
@@ -136,25 +136,40 @@ export function MapClient({
       subtitle?: string;
       href?: string;
       hub?: boolean;
+      hubDetail?: string;
     }> = [];
     const hubSlug = hubAnchor?.slug;
     for (const p of practices) {
       const r = results[p.address];
-      if (!r) continue;
+      const isHub = Boolean(hubSlug && p.slug === hubSlug);
+
+      if (!r && !(isHub && hubAnchor)) continue;
+
+      const lat = isHub && hubAnchor ? hubAnchor.lat : r!.lat;
+      const lng = isHub && hubAnchor ? hubAnchor.lng : r!.lng;
+
       out.push({
         id: p.slug,
         name: p.name,
-        lat: r.lat,
-        lng: r.lng,
+        lat,
+        lng,
         stage: p.stage,
-        subtitle: r.displayName || p.address,
+        subtitle:
+          isHub && hubAnchor
+            ? undefined
+            : r?.displayName || p.address,
         href: `/dashboard/practices/${encodeURIComponent(p.slug)}`,
-        hub: Boolean(hubSlug && p.slug === hubSlug),
+        hub: isHub,
+        hubDetail:
+          isHub && hubAnchor && hubUsesIconStudio(hubAnchor)
+            ? "5 Plato Place, 72–74 St Dionis Road, London SW6 4TU · Blocharch hub"
+            : undefined,
       });
     }
     return out;
-  }, [practices, results, hubAnchor?.slug]);
+  }, [practices, results, hubAnchor]);
 
+  const initialZoom = hubAnchor ? 11 : 6;
   const center = useMemo(() => {
     if (hubAnchor) return { lat: hubAnchor.lat, lng: hubAnchor.lng };
     if (markers.length === 0) return { lat: 54.5, lng: -3.0 };
@@ -200,7 +215,9 @@ export function MapClient({
         </p>
         <p className="text-slate-500 text-sm">
           {hubAnchor
-            ? `Framed from ${hubAnchor.name} — zoom out to see the full UK.`
+            ? hubUsesIconStudio(hubAnchor)
+              ? `${hubAnchor.name} at Plato Place (SW6) is the centre — zoom out for the full UK pipeline.`
+              : `Framed from ${hubAnchor.name} — zoom out for the full UK pipeline.`
             : "Clusters zoom apart; open a practice for its detail map."}
         </p>
       </div>
@@ -209,12 +226,25 @@ export function MapClient({
           {geocodeError}
         </p>
       )}
-      <LeafletMap markers={markers} center={center} zoom={6} />
+      <LeafletMap markers={markers} center={center} zoom={initialZoom} />
       <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
         <p className="text-xs uppercase tracking-wide text-slate-500 mb-2">Automation stage colors</p>
-        {hubAnchor ? (
+        {hubAnchor && hubUsesIconStudio(hubAnchor) ? (
           <p className="text-xs text-slate-500 mb-3">
-            Gold ring — Blocharch hub: {hubAnchor.name} (first client).
+            Large amber glow — Blocharch hub: {hubAnchor.name} at 5 Plato Place, St Dionis Road, London SW6 4TU (
+            <a
+              href="https://www.icon-architects.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-brand-400 hover:underline"
+            >
+              icon-architects.com
+            </a>
+            ). Other firms radiate outward on the map (clusters spread when you zoom).
+          </p>
+        ) : hubAnchor ? (
+          <p className="text-xs text-slate-500 mb-3">
+            Blocharch hub pin — {hubAnchor.name}. Zoom out to see practices across the UK.
           </p>
         ) : null}
         <div className="flex flex-wrap gap-x-5 gap-y-2">

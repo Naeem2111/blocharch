@@ -1,10 +1,13 @@
-/** Default map view when the hub has no coordinates yet (central London). */
-export const LONDON_VIEW_CENTER = { lat: 51.5074, lng: -0.1278 };
+/**
+ * Icon Architects studio — 5 Plato Place, 72–74 St Dionis Road, London SW6 4TU.
+ * Used when the hub row has no latitude/longitude in the DB yet (see Nominatim: Plato Place SW6).
+ */
+export const ICON_ARCHITECTS_STUDIO = { lat: 51.4734803, lng: -0.203613 };
 
 export type MapHubAnchor = {
   slug: string;
   name: string;
-  /** Best available coordinates — fall back to London until geocoded in DB. */
+  /** Hub map pin — Plato Place for Icon Architects; otherwise DB coords or London fallback. */
   lat: number;
   lng: number;
 };
@@ -23,6 +26,14 @@ type HubRow = {
   latitude: number | null;
   longitude: number | null;
 };
+
+/** True when the anchor is pinned at the Icon Architects studio (Plato Place). */
+export function hubUsesIconStudio(anchor: MapHubAnchor): boolean {
+  return (
+    Math.abs(anchor.lat - ICON_ARCHITECTS_STUDIO.lat) < 0.0003 &&
+    Math.abs(anchor.lng - ICON_ARCHITECTS_STUDIO.lng) < 0.0003
+  );
+}
 
 export function resolveMapHub(rows: HubRow[]): MapHubAnchor | null {
   const envSlug = process.env.MAP_HUB_SLUG?.trim();
@@ -48,10 +59,21 @@ export function resolveMapHub(rows: HubRow[]): MapHubAnchor | null {
   return null;
 }
 
+/** Non–Icon hub rows with no DB coords — central London (not the Icon studio). */
+const GENERIC_LONDON_FALLBACK = { lat: 51.5074, lng: -0.1278 };
+
+function usesIconStudioCoordinates(r: HubRow): boolean {
+  if (DEFAULT_HUB_NAME.test(r.name.trim())) return true;
+  return r.url.toLowerCase().includes("icon-architects.com");
+}
+
 function toAnchor(r: HubRow): MapHubAnchor {
   const slug = slugFromUrl(r.url);
+  if (usesIconStudioCoordinates(r)) {
+    return { slug, name: r.name, ...ICON_ARCHITECTS_STUDIO };
+  }
   if (r.latitude != null && r.longitude != null) {
     return { slug, name: r.name, lat: r.latitude, lng: r.longitude };
   }
-  return { slug, name: r.name, ...LONDON_VIEW_CENTER };
+  return { slug, name: r.name, ...GENERIC_LONDON_FALLBACK };
 }

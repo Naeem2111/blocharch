@@ -1,20 +1,20 @@
 import { loadPracticesForMap } from "@/lib/map-practices";
+import { hubUsesIconStudio } from "@/lib/map-hub";
 import { PageHeader } from "@/components/PageHeader";
 import { MapClient } from "./MapClient";
 
 export default async function MapPage() {
   const { practices, initialGeocodes, hubAnchor } = await loadPracticesForMap();
 
+  const mapBlurb = hubAnchor
+    ? hubUsesIconStudio(hubAnchor)
+      ? `UK practices — centred on Icon Architects at 5 Plato Place, St Dionis Road, London SW6 4TU. Zoom out for the national pipeline.`
+      : `UK practices — framed from ${hubAnchor.name}. Zoom out for the wider pipeline.`
+    : "Pins use coordinates stored in the database (geocoded once). Clusters keep the view responsive with thousands of practices.";
+
   return (
     <div className="mx-auto max-w-7xl">
-      <PageHeader
-        title="Map"
-        description={
-          hubAnchor
-            ? `UK practices on a map — framed from ${hubAnchor.name} in London (your first client), zoom out to see the wider pipeline.`
-            : "Pins use coordinates stored in the database (geocoded once). Clusters keep the view responsive with thousands of practices."
-        }
-      />
+      <PageHeader title="Map" description={mapBlurb} />
       <MapClient practices={practices} initialGeocodes={initialGeocodes} hubAnchor={hubAnchor} />
       <p className="mt-4 text-xs text-slate-500">
         Map tiles © OpenStreetMap contributors, © CARTO. Backfill coordinates with{" "}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type BoardSummary = {
   id: string;
@@ -76,17 +76,23 @@ function googleEventUrl(title: string, due: Date) {
   return `https://calendar.google.com/calendar/render?${p.toString()}`;
 }
 
-/** Short snippet for Kanban cards: prefer summary, else first non-empty description line */
-function taskCardPreview(t: Pick<TaskRow, "summary" | "description">): string | null {
-  const summary = (t.summary ?? "").trim();
-  if (summary) return summary;
-  const body = (t.description ?? "").trim();
+/** Snippet from task description for board cards */
+function taskCardDescriptionPreview(description: string | null): string | null {
+  const body = (description ?? "").trim();
   if (!body) return null;
   const line = body
     .split(/\r?\n/)
     .map((x) => x.trim())
     .find((x) => x.length > 0);
-  return line ?? body.slice(0, 140);
+  return line ?? body.slice(0, 280);
+}
+
+/** Column used for “mark done” — explicit Done/Completed title, else last column if there are at least two */
+function resolveCompletedColumnId(columns: ColumnRow[]): string | null {
+  const named = columns.find((c) => /^(done|completed)\b/i.test(c.title.trim()));
+  if (named) return named.id;
+  if (columns.length >= 2) return columns[columns.length - 1]!.id;
+  return null;
 }
 
 const PLANNER_SHORT_DESC_HINT =
@@ -111,6 +117,13 @@ export function PlannerClient() {
   const [addColumnOpen, setAddColumnOpen] = useState(false);
   const [newColTitle, setNewColTitle] = useState("");
   const [newColColor, setNewColColor] = useState("#64748b");
+
+  const suppressNextCardClickRef = useRef(false);
+
+  const completedColumnId = useMemo(
+    () => (detail ? resolveCompletedColumnId(detail.columns) : null),
+    [detail]
+  );
 
   const refreshBoards = useCallback(async () => {
     const r = await fetch("/api/planner/boards");
@@ -197,9 +210,12 @@ export function PlannerClient() {
     if (r.ok && boardId) await loadDetail(boardId);
   }
 
-  async function onDropColumn(columnId: string) {
-    if (!dragTaskId || !detail?.editable) return;
-    await patchTask(dragTaskId, { columnId });
+  async function onDropColumn(columnId: string, dataTransfer?: DataTransfer | null) {
+    if (!detail?.editable) return;
+    const fromTransfer = dataTransfer?.getData("text/plain")?.trim();
+    const taskId = dragTaskId || fromTransfer || null;
+    if (!taskId) return;
+    await patchTask(taskId, { columnId });
     setDragTaskId(null);
   }
 
@@ -211,6 +227,33 @@ export function PlannerClient() {
       body: JSON.stringify({ name, color }),
     });
     await loadDetail(boardId);
+  }
+
+  async function patchLabel(labelId: string, patch: { name?: string; color?: string }): Promise<boolean> {
+    const r = await fetch(`/api/planner/labels/${encodeURIComponent(labelId)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      window.alert((j as { error?: string }).error || "Could not update label");
+      return false;
+    }
+    if (boardId) await loadDetail(boardId);
+    return true;
+  }
+
+  async function deleteLabel(labelId: string) {
+    const r = await fetch(`/api/planner/labels/${encodeURIComponent(labelId)}`, {
+      method: "DELETE",
+    });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      window.alert((j as { error?: string }).error || "Could not delete label");
+      return;
+    }
+    if (boardId) await loadDetail(boardId);
   }
 
   async function addMember(userId: string, role: "editor" | "viewer") {
@@ -389,6 +432,13 @@ export function PlannerClient() {
                 {detail.scope === "team" ? "Team board" : "Personal board"} · Owner{" "}
                 {detail.owner.username}
                 {!detail.editable ? " · View only" : ""}
+                {detail.editable && completedColumnId ? (
+                  <>
+                    {" "}
+                    · Drag cards between columns, or use the Done checkbox (column titled Done/Completed,
+                    or the last column).
+                  </>
+                ) : null}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -437,15 +487,17 @@ export function PlannerClient() {
           {detail.editable && (
             <div className="card-tool rounded-xl p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Labels</p>
-              <div className="mt-2 flex flex-wrap gap-2">
+              <p className="mt-1 text-[11px] text-slate-600">
+                Edit name or colour anytime. Deleting removes the tag from every task on this board.
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
                 {detail.labels.map((l) => (
-                  <span
+                  <EditableLabelChip
                     key={l.id}
-                    className="rounded-full px-2.5 py-0.5 text-xs font-medium text-white ring-1 ring-white/15"
-                    style={{ backgroundColor: `${l.color}40` }}
-                  >
-                    {l.name}
-                  </span>
+                    label={l}
+                    onPatch={patchLabel}
+                    onDelete={deleteLabel}
+                  />
                 ))}
                 <LabelInlineForm onCreate={createLabel} />
               </div>
@@ -459,9 +511,14 @@ export function PlannerClient() {
                 key={col.id}
                 className="flex w-[280px] shrink-0 flex-col rounded-xl border border-white/[0.08] bg-white/[0.02]"
                 onDragOver={(e) => {
+                  if (!detail.editable || !dragTaskId) return;
                   e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
                 }}
-                onDrop={() => onDropColumn(col.id)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  void onDropColumn(col.id, e.dataTransfer);
+                }}
               >
                 <EditableColumnHeader
                   column={col}
@@ -472,52 +529,120 @@ export function PlannerClient() {
                   onDelete={deleteColumn}
                   onReorder={reorderColumns}
                 />
-                <div className="flex flex-1 flex-col gap-2 p-2">
+                <div
+                  className="flex min-h-[160px] flex-1 flex-col gap-2 p-2"
+                  onDragOver={(e) => {
+                    if (!detail.editable || !dragTaskId) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.dataTransfer.dropEffect = "move";
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    void onDropColumn(col.id, e.dataTransfer);
+                  }}
+                >
                   {col.tasks.map((t) => {
-                    const preview = taskCardPreview(t);
+                    const descPreview = taskCardDescriptionPreview(t.description);
+                    const showDoneTick =
+                      detail.editable && completedColumnId !== null && detail.columns.length >= 2;
+                    const isInDoneColumn = col.id === completedColumnId;
                     return (
-                    <button
-                      key={t.id}
-                      type="button"
-                      draggable={detail.editable}
-                      onDragStart={() => setDragTaskId(t.id)}
-                      onClick={() => setEditTask({ ...t, columnId: col.id })}
-                      className="w-full rounded-lg border border-white/[0.06] bg-white/[0.04] p-3 text-left text-sm text-slate-200 hover:bg-white/[0.07]"
-                    >
-                      <p className="font-medium text-white">{t.title}</p>
-                      {preview ? (
-                          <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-[11px] text-slate-400">
-                            {preview}
-                          </p>
-                      ) : null}
-                      {t.assignee ? (
-                        <p className="mt-1 text-[11px] text-slate-500">{t.assignee.username}</p>
-                      ) : null}
-                      {t.dueAt ? (
-                        <p className="mt-0.5 text-[11px] text-amber-200/90">
-                          Due {new Date(t.dueAt).toLocaleString()}
-                        </p>
-                      ) : null}
-                      {t.architectUrl ? (
-                        <p className="mt-1 text-[10px] text-brand-400">Lead workflow linked</p>
-                      ) : null}
-                      {t.leadStage ? (
-                        <p className="mt-0.5 text-[10px] uppercase text-slate-500">
-                          Stage: {t.leadStage.replace(/_/g, " ")}
-                        </p>
-                      ) : null}
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {t.labels.map((x) => (
-                          <span
-                            key={x.label.id}
-                            className="rounded px-1.5 py-0.5 text-[10px] text-white"
-                            style={{ backgroundColor: `${x.label.color}50` }}
-                          >
-                            {x.label.name}
-                          </span>
-                        ))}
+                      <div
+                        key={t.id}
+                        role={detail.editable ? "button" : undefined}
+                        tabIndex={detail.editable ? 0 : undefined}
+                        draggable={detail.editable}
+                        onDragStart={(e) => {
+                          if (!detail.editable) return;
+                          suppressNextCardClickRef.current = false;
+                          setDragTaskId(t.id);
+                          e.dataTransfer.effectAllowed = "move";
+                          e.dataTransfer.setData("text/plain", t.id);
+                        }}
+                        onDragEnd={() => {
+                          setDragTaskId(null);
+                          suppressNextCardClickRef.current = true;
+                        }}
+                        onDragOver={(e) => {
+                          if (!detail.editable || !dragTaskId || dragTaskId === t.id) return;
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = "move";
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          void onDropColumn(col.id, e.dataTransfer);
+                        }}
+                        onClick={() => {
+                          if (suppressNextCardClickRef.current) {
+                            suppressNextCardClickRef.current = false;
+                            return;
+                          }
+                          setEditTask({ ...t, columnId: col.id });
+                        }}
+                        onKeyDown={(e) => {
+                          if (!detail.editable) return;
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setEditTask({ ...t, columnId: col.id });
+                          }
+                        }}
+                        className={`w-full rounded-lg border border-white/[0.06] bg-white/[0.04] p-3 text-left text-sm text-slate-200 outline-none hover:bg-white/[0.07] focus-visible:ring-2 focus-visible:ring-brand-500/50 ${
+                          detail.editable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
+                        }`}
+                      >
+                        <div className="flex items-start gap-2">
+                          {showDoneTick ? (
+                            <label
+                              className="mt-0.5 shrink-0 cursor-pointer"
+                              onClick={(e) => e.stopPropagation()}
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onKeyDown={(e) => e.stopPropagation()}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isInDoneColumn}
+                                title={isInDoneColumn ? "Move out of Done" : "Mark done"}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  const doneId = completedColumnId;
+                                  const firstId = detail.columns[0]?.id;
+                                  if (!doneId || !firstId) return;
+                                  if (e.target.checked) {
+                                    void patchTask(t.id, { columnId: doneId });
+                                  } else {
+                                    void patchTask(t.id, { columnId: firstId });
+                                  }
+                                }}
+                                className="h-3.5 w-3.5 rounded border-white/20 bg-white/[0.06] text-brand-500 focus:ring-brand-500"
+                              />
+                            </label>
+                          ) : null}
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-white">{t.title}</p>
+                            {descPreview ? (
+                              <p className="mt-1 line-clamp-4 whitespace-pre-wrap text-[12px] leading-snug text-slate-400">
+                                {descPreview}
+                              </p>
+                            ) : null}
+                            {t.labels.length > 0 ? (
+                              <div className="mt-2 flex flex-wrap gap-1">
+                                {t.labels.map((x) => (
+                                  <span
+                                    key={x.label.id}
+                                    className="rounded px-1.5 py-0.5 text-[10px] text-white"
+                                    style={{ backgroundColor: `${x.label.color}50` }}
+                                  >
+                                    {x.label.name}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
                       </div>
-                    </button>
                     );
                   })}
                   {detail.editable && (
@@ -766,6 +891,106 @@ function EditableColumnHeader({
           Delete column
         </button>
       ) : null}
+    </div>
+  );
+}
+
+function EditableLabelChip({
+  label,
+  onPatch,
+  onDelete,
+}: {
+  label: Label;
+  onPatch: (id: string, patch: { name: string; color: string }) => Promise<boolean>;
+  onDelete: (id: string) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(label.name);
+  const [color, setColor] = useState(label.color);
+
+  useEffect(() => {
+    setName(label.name);
+    setColor(label.color);
+  }, [label.id, label.name, label.color]);
+
+  if (editing) {
+    return (
+      <form
+        className="flex flex-wrap items-center gap-2 rounded-lg border border-white/[0.12] bg-white/[0.04] px-2 py-1.5"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          const n = name.trim();
+          if (!n) return;
+          const ok = await onPatch(label.id, { name: n, color });
+          if (ok) setEditing(false);
+        }}
+      >
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="w-28 rounded border border-white/10 bg-black/40 px-2 py-0.5 text-xs text-white"
+          autoFocus
+          maxLength={64}
+        />
+        <label className="flex cursor-pointer items-center gap-1 text-[10px] text-slate-500">
+          Colour
+          <input
+            type="color"
+            value={color}
+            onChange={(e) => setColor(e.target.value)}
+            className="h-6 w-8 cursor-pointer rounded border-0 bg-transparent"
+          />
+        </label>
+        <button type="submit" className="text-xs font-semibold text-brand-400 hover:text-brand-300">
+          Save
+        </button>
+        <button
+          type="button"
+          className="text-xs text-slate-500 hover:text-slate-300"
+          onClick={() => {
+            setEditing(false);
+            setName(label.name);
+            setColor(label.color);
+          }}
+        >
+          Cancel
+        </button>
+      </form>
+    );
+  }
+
+  return (
+    <div
+      className="flex max-w-full items-center gap-1 rounded-full py-0.5 pl-2.5 pr-1 ring-1 ring-white/15"
+      style={{ backgroundColor: `${label.color}40` }}
+    >
+      <span className="max-w-[10rem] truncate text-xs font-medium text-white" title={label.name}>
+        {label.name}
+      </span>
+      <button
+        type="button"
+        title="Edit label"
+        onClick={() => setEditing(true)}
+        className="shrink-0 rounded px-1.5 py-0.5 text-[10px] text-brand-400 hover:bg-white/10"
+      >
+        Edit
+      </button>
+      <button
+        type="button"
+        title="Delete label"
+        onClick={() => {
+          if (
+            window.confirm(
+              `Delete label "${label.name}"? It will be removed from all tasks on this board.`
+            )
+          ) {
+            void onDelete(label.id);
+          }
+        }}
+        className="shrink-0 rounded px-1.5 py-0.5 text-[10px] text-red-400/90 hover:bg-white/10"
+      >
+        Delete
+      </button>
     </div>
   );
 }
