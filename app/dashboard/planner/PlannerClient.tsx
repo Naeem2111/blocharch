@@ -114,6 +114,7 @@ export function PlannerClient() {
   const [taskOpen, setTaskOpen] = useState<{ columnId: string } | null>(null);
   const [editTask, setEditTask] = useState<TaskRow & { columnId: string } | null>(null);
   const [dragTaskId, setDragTaskId] = useState<string | null>(null);
+  const [dropTargetColumnId, setDropTargetColumnId] = useState<string | null>(null);
   const [addColumnOpen, setAddColumnOpen] = useState(false);
   const [newColTitle, setNewColTitle] = useState("");
   const [newColColor, setNewColColor] = useState("#64748b");
@@ -200,23 +201,65 @@ export function PlannerClient() {
 
   async function patchTask(
     taskId: string,
-    body: Record<string, unknown>
-  ) {
+    body: Record<string, unknown>,
+    options?: { reloadOnSuccess?: boolean }
+  ): Promise<boolean> {
+    const reloadOnSuccess = options?.reloadOnSuccess !== false;
     const r = await fetch(`/api/planner/tasks/${encodeURIComponent(taskId)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    if (r.ok && boardId) await loadDetail(boardId);
+    if (!r.ok) return false;
+    if (reloadOnSuccess && boardId) await loadDetail(boardId);
+    return true;
+  }
+
+  /** Immediate UI move; caller syncs with PATCH + reload on failure. */
+  function applyOptimisticTaskMove(taskId: string, toColumnId: string) {
+    setDetail((prev) => {
+      if (!prev) return prev;
+      let moved: TaskRow | undefined;
+      for (const c of prev.columns) {
+        const t = c.tasks.find((x) => x.id === taskId);
+        if (t) {
+          moved = t;
+          break;
+        }
+      }
+      if (!moved) return prev;
+
+      const without = prev.columns.map((c) => ({
+        ...c,
+        tasks: c.tasks.filter((t) => t.id !== taskId),
+      }));
+      const targetTasks = without.find((c) => c.id === toColumnId)?.tasks ?? [];
+      const nextSort = Math.max(-1, ...targetTasks.map((t) => t.sortOrder)) + 1;
+      const taskWithOrder: TaskRow = { ...moved, sortOrder: nextSort };
+
+      return {
+        ...prev,
+        columns: without.map((c) =>
+          c.id === toColumnId ? { ...c, tasks: [...c.tasks, taskWithOrder] } : c
+        ),
+      };
+    });
   }
 
   async function onDropColumn(columnId: string, dataTransfer?: DataTransfer | null) {
     if (!detail?.editable) return;
     const fromTransfer = dataTransfer?.getData("text/plain")?.trim();
     const taskId = dragTaskId || fromTransfer || null;
-    if (!taskId) return;
-    await patchTask(taskId, { columnId });
+    setDropTargetColumnId(null);
     setDragTaskId(null);
+    if (!taskId) return;
+
+    const sourceColumnId = detail.columns.find((c) => c.tasks.some((t) => t.id === taskId))?.id;
+    if (!sourceColumnId || sourceColumnId === columnId) return;
+
+    applyOptimisticTaskMove(taskId, columnId);
+    const ok = await patchTask(taskId, { columnId }, { reloadOnSuccess: false });
+    if (!ok && boardId) await loadDetail(boardId);
   }
 
   async function createLabel(name: string, color: string) {
@@ -509,11 +552,22 @@ export function PlannerClient() {
             {detail.columns.map((col, colIdx) => (
               <div
                 key={col.id}
-                className="flex w-[280px] shrink-0 flex-col rounded-xl border border-white/[0.08] bg-white/[0.02]"
+                className={`flex w-[280px] shrink-0 flex-col rounded-xl border border-white/[0.08] bg-white/[0.02] transition-[box-shadow,background-color,border-color] duration-150 ${
+                  detail.editable && dragTaskId && dropTargetColumnId === col.id
+                    ? "border-brand-500/35 bg-brand-500/[0.07] ring-2 ring-brand-500/25"
+                    : ""
+                }`}
                 onDragOver={(e) => {
                   if (!detail.editable || !dragTaskId) return;
                   e.preventDefault();
                   e.dataTransfer.dropEffect = "move";
+                  setDropTargetColumnId(col.id);
+                }}
+                onDragLeave={(e) => {
+                  if (!detail.editable || !dragTaskId) return;
+                  const related = e.relatedTarget as Node | null;
+                  if (related && e.currentTarget.contains(related)) return;
+                  setDropTargetColumnId((prev) => (prev === col.id ? null : prev));
                 }}
                 onDrop={(e) => {
                   e.preventDefault();
@@ -530,12 +584,17 @@ export function PlannerClient() {
                   onReorder={reorderColumns}
                 />
                 <div
-                  className="flex min-h-[160px] flex-1 flex-col gap-2 p-2"
+                  className={`flex min-h-[160px] flex-1 flex-col gap-2 p-2 transition-colors duration-150 ${
+                    detail.editable && dragTaskId && dropTargetColumnId === col.id
+                      ? "rounded-lg bg-brand-500/[0.06]"
+                      : ""
+                  }`}
                   onDragOver={(e) => {
                     if (!detail.editable || !dragTaskId) return;
                     e.preventDefault();
                     e.stopPropagation();
                     e.dataTransfer.dropEffect = "move";
+                    setDropTargetColumnId(col.id);
                   }}
                   onDrop={(e) => {
                     e.preventDefault();
@@ -560,15 +619,39 @@ export function PlannerClient() {
                           setDragTaskId(t.id);
                           e.dataTransfer.effectAllowed = "move";
                           e.dataTransfer.setData("text/plain", t.id);
+                          const card = e.currentTarget;
+                          try {
+                            const ghost = card.cloneNode(true) as HTMLElement;
+                            ghost.style.width = `${card.offsetWidth}px`;
+                            ghost.style.opacity = "0.92";
+                            ghost.style.transform = "rotate(2deg)";
+                            ghost.style.boxShadow = "0 12px 40px rgba(0,0,0,0.45)";
+                            ghost.style.borderRadius = "0.5rem";
+                            ghost.style.pointerEvents = "none";
+                            ghost.style.position = "absolute";
+                            ghost.style.top = "-9999px";
+                            ghost.style.left = "0";
+                            document.body.appendChild(ghost);
+                            e.dataTransfer.setDragImage(ghost, e.clientX - card.getBoundingClientRect().left, e.clientY - card.getBoundingClientRect().top);
+                            requestAnimationFrame(() =>
+                              requestAnimationFrame(() => {
+                                ghost.remove();
+                              })
+                            );
+                          } catch {
+                            /* setDragImage unsupported — fallback to default preview */
+                          }
                         }}
                         onDragEnd={() => {
                           setDragTaskId(null);
+                          setDropTargetColumnId(null);
                           suppressNextCardClickRef.current = true;
                         }}
                         onDragOver={(e) => {
                           if (!detail.editable || !dragTaskId || dragTaskId === t.id) return;
                           e.preventDefault();
                           e.dataTransfer.dropEffect = "move";
+                          setDropTargetColumnId(col.id);
                         }}
                         onDrop={(e) => {
                           e.preventDefault();
@@ -589,8 +672,12 @@ export function PlannerClient() {
                             setEditTask({ ...t, columnId: col.id });
                           }
                         }}
-                        className={`w-full rounded-lg border border-white/[0.06] bg-white/[0.04] p-3 text-left text-sm text-slate-200 outline-none hover:bg-white/[0.07] focus-visible:ring-2 focus-visible:ring-brand-500/50 ${
+                        className={`w-full rounded-lg border border-white/[0.06] bg-white/[0.04] p-3 text-left text-sm text-slate-200 outline-none transition-[opacity,transform,box-shadow] duration-150 hover:bg-white/[0.07] focus-visible:ring-2 focus-visible:ring-brand-500/50 ${
                           detail.editable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
+                        } ${
+                          dragTaskId === t.id
+                            ? "opacity-35 scale-[0.985] shadow-inner ring-1 ring-brand-500/30"
+                            : ""
                         }`}
                       >
                         <div className="flex items-start gap-2">
@@ -611,9 +698,19 @@ export function PlannerClient() {
                                   const firstId = detail.columns[0]?.id;
                                   if (!doneId || !firstId) return;
                                   if (e.target.checked) {
-                                    void patchTask(t.id, { columnId: doneId });
+                                    applyOptimisticTaskMove(t.id, doneId);
+                                    void patchTask(t.id, { columnId: doneId }, { reloadOnSuccess: false }).then(
+                                      (ok) => {
+                                        if (!ok && boardId) void loadDetail(boardId);
+                                      }
+                                    );
                                   } else {
-                                    void patchTask(t.id, { columnId: firstId });
+                                    applyOptimisticTaskMove(t.id, firstId);
+                                    void patchTask(t.id, { columnId: firstId }, { reloadOnSuccess: false }).then(
+                                      (ok) => {
+                                        if (!ok && boardId) void loadDetail(boardId);
+                                      }
+                                    );
                                   }
                                 }}
                                 className="h-3.5 w-3.5 rounded border-white/20 bg-white/[0.06] text-brand-500 focus:ring-brand-500"
