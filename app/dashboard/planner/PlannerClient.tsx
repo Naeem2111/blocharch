@@ -382,7 +382,7 @@ export function PlannerClient() {
             <select
               value={newScope}
               onChange={(e) => setNewScope(e.target.value as "personal" | "team")}
-              className="mt-1 block rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+              className="select-console mt-1 block rounded-md px-3 py-2 text-sm"
             >
               <option value="personal">Personal</option>
               <option value="team">Team</option>
@@ -1051,7 +1051,7 @@ function MemberAddForm({
       <select
         value={userId}
         onChange={(e) => setUserId(e.target.value)}
-        className="rounded-md border border-white/[0.08] bg-white/[0.04] px-2 py-1.5 text-xs text-slate-200"
+        className="select-console rounded-md px-2 py-1.5 text-xs text-slate-100"
       >
         <option value="">Add teammate…</option>
         {options.map((u) => (
@@ -1063,7 +1063,7 @@ function MemberAddForm({
       <select
         value={role}
         onChange={(e) => setRole(e.target.value as "editor" | "viewer")}
-        className="rounded-md border border-white/[0.08] bg-white/[0.04] px-2 py-1.5 text-xs"
+        className="select-console rounded-md px-2 py-1.5 text-xs text-slate-100"
       >
         <option value="editor">Editor</option>
         <option value="viewer">Viewer</option>
@@ -1117,7 +1117,7 @@ function TaskFormModal({
           <label className="block text-slate-400">
             Title
             <input
-              className="mt-1 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-white"
+              className="select-console mt-1 w-full rounded-lg px-3 py-2 text-sm"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
@@ -1151,7 +1151,7 @@ function TaskFormModal({
           <label className="block text-slate-400">
             Assignee
             <select
-              className="mt-1 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-white"
+              className="select-console mt-1 w-full rounded-lg px-3 py-2 text-sm"
               value={assigneeId}
               onChange={(e) => setAssigneeId(e.target.value)}
             >
@@ -1167,7 +1167,7 @@ function TaskFormModal({
             Due (for calendar sync)
             <input
               type="datetime-local"
-              className="mt-1 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-white"
+              className="select-console mt-1 w-full rounded-lg px-3 py-2 text-sm"
               value={due}
               onChange={(e) => setDue(e.target.value)}
             />
@@ -1175,7 +1175,7 @@ function TaskFormModal({
           <label className="block text-slate-400">
             Architect / lead URL (integrates with lead nurturing)
             <input
-              className="mt-1 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-white"
+              className="select-console mt-1 w-full rounded-lg px-3 py-2 text-sm"
               value={architectUrl}
               onChange={(e) => setArchitectUrl(e.target.value)}
               placeholder="https://architectdirectory.co.uk/practice/..."
@@ -1264,7 +1264,7 @@ function EditTaskModal({
           <label className="block text-slate-400">
             Title
             <input
-              className="mt-1 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-white"
+              className="select-console mt-1 w-full rounded-lg px-3 py-2 text-sm"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
@@ -1296,7 +1296,7 @@ function EditTaskModal({
           <label className="block text-slate-400">
             Assignee
             <select
-              className="mt-1 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-white"
+              className="select-console mt-1 w-full rounded-lg px-3 py-2 text-sm"
               value={assigneeId}
               onChange={(e) => setAssigneeId(e.target.value)}
             >
@@ -1312,7 +1312,7 @@ function EditTaskModal({
             Due
             <input
               type="datetime-local"
-              className="mt-1 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-white"
+              className="select-console mt-1 w-full rounded-lg px-3 py-2 text-sm"
               value={due}
               onChange={(e) => setDue(e.target.value)}
             />
@@ -1320,7 +1320,7 @@ function EditTaskModal({
           <label className="block text-slate-400">
             Architect / lead URL
             <input
-              className="mt-1 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-white"
+              className="select-console mt-1 w-full rounded-lg px-3 py-2 text-sm"
               value={architectUrl}
               onChange={(e) => setArchitectUrl(e.target.value)}
             />

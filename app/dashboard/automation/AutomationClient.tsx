@@ -198,7 +198,7 @@ export function AutomationClient() {
           <select
             value={stage}
             onChange={(e) => { setStage(e.target.value); setPage(1); }}
-            className="rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white ring-1 ring-black/20"
+            className="select-console rounded-lg px-3 py-2 text-sm"
           >
             <option value="">All</option>
             {STAGES.map((s) => (
@@ -214,7 +214,7 @@ export function AutomationClient() {
           <select
             value={selectedTemplate}
             onChange={(e) => setSelectedTemplate(e.target.value)}
-            className="rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white ring-1 ring-black/20"
+            className="select-console rounded-lg px-3 py-2 text-sm"
           >
             {templates.map((t) => (
               <option key={t.id} value={t.id}>
@@ -294,7 +294,7 @@ export function AutomationClient() {
                       <select
                         value={item.lead.stage}
                         onChange={(e) => updateLead(item.url, { stage: e.target.value })}
-                        className="rounded border border-white/[0.08] bg-white/[0.06] px-2 py-1 text-sm text-white ring-1 ring-white/[0.04]"
+                        className="select-console rounded px-2 py-1 text-sm"
                       >
                         {STAGES.map((s) => (
                           <option key={s} value={s}>

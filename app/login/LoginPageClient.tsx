@@ -65,7 +65,7 @@ function LoginForm() {
               autoComplete="username"
               required
               className="w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-4 py-2.5 text-white placeholder-slate-500 ring-1 ring-black/20 transition-colors focus:border-brand-500/50 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
-              placeholder="blocharch"
+              placeholder="Username"
             />
           </div>
           <div className="mt-4">
@@ -90,10 +90,6 @@ function LoginForm() {
             {loading ? "Signing in…" : "Sign in to Blocharch"}
           </button>
         </form>
-        <p className="mt-6 text-center text-xs text-slate-500">
-          Default credentials: <span className="text-slate-400">blocharch</span> /{" "}
-          <span className="text-slate-400">blocharch</span>
-        </p>
       </div>
     </div>
   );

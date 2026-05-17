@@ -9,8 +9,19 @@
     --bg-main: #080a0f;
   }
 
+  html {
+    color-scheme: dark;
+  }
+
   body {
     @apply min-h-screen bg-[var(--bg-page)] text-slate-100 antialiased;
+  }
+
+  /* Native <option> menus — works in Firefox & many Chromium builds with color-scheme dark */
+  select option,
+  select optgroup {
+    background-color: #0f172a;
+    color: #f1f5f9;
   }
 }
 
@@ -36,5 +47,10 @@
 
   .card-tool-hover {
     @apply transition-colors hover:border-brand-500/25 hover:bg-white/[0.045];
+  }
+
+  /** Native select controls: solid dark field (translucent bg + OS chrome often reads as light-on-light). */
+  select.select-console {
+    @apply border border-white/[0.12] bg-slate-900 text-slate-100 ring-1 ring-black/30;
   }
 }

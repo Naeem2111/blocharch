@@ -109,7 +109,7 @@ export function LeadStatus({ slug }: { slug: string }) {
           value={stage}
           onChange={(e) => update({ stage: e.target.value })}
           disabled={saving}
-          className="px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm"
+          className="select-console px-3 py-2 rounded-lg text-sm"
         >
           {STAGES.map((s) => (
             <option key={s} value={s}>

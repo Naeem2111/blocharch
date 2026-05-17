@@ -148,7 +148,7 @@ export function AdminUsersClient({ currentUserId }: { currentUserId: string }) {
           <label className="block w-full min-w-[120px] text-xs text-slate-400 sm:w-40">
             Role
             <select
-              className="mt-1 w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-slate-100 outline-none ring-1 ring-black/20 focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/40"
+              className="select-console mt-1 w-full rounded-md px-3 py-2 text-sm outline-none focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/40"
               value={createForm.role}
               onChange={(e) => setCreateForm((f) => ({ ...f, role: e.target.value as "user" | "admin" | "manager" }))}
             >
@@ -197,7 +197,7 @@ export function AdminUsersClient({ currentUserId }: { currentUserId: string }) {
                   </td>
                   <td className="px-3 py-3">
                     <select
-                      className="rounded-md border border-white/[0.08] bg-white/[0.04] px-2 py-1.5 text-xs text-slate-100 outline-none ring-1 ring-black/20 focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/40"
+                      className="select-console rounded-md px-2 py-1.5 text-xs outline-none focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/40"
                       value={u.role}
                       onChange={(e) => patchUser(u.id, { role: e.target.value })}
                     >
