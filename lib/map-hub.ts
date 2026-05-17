@@ -20,7 +20,7 @@ function slugFromUrl(url: string): string {
 /** Matches the first-client hub practice name (case-insensitive, anywhere in the string). */
 const DEFAULT_HUB_NAME = /\bicon\s+architects\b/i;
 
-type HubRow = {
+export type MapAnchorRow = {
   name: string;
   url: string;
   latitude: number | null;
@@ -35,7 +35,7 @@ export function hubUsesIconStudio(anchor: MapHubAnchor): boolean {
   );
 }
 
-export function resolveMapHub(rows: HubRow[]): MapHubAnchor | null {
+export function resolveMapHub(rows: MapAnchorRow[]): MapHubAnchor | null {
   const envSlug = process.env.MAP_HUB_SLUG?.trim();
   const envName = process.env.MAP_HUB_NAME?.trim();
 
@@ -59,15 +59,26 @@ export function resolveMapHub(rows: HubRow[]): MapHubAnchor | null {
   return null;
 }
 
+/** Map always centres on Icon Architects (Plato Place) when no hub row is resolved from data/env. */
+export const SYNTHETIC_ICON_FOCAL_ANCHOR: MapHubAnchor = {
+  slug: "",
+  name: "Icon Architects",
+  ...ICON_ARCHITECTS_STUDIO,
+};
+
+export function getMapFocalAnchor(rows: MapAnchorRow[]): MapHubAnchor {
+  return resolveMapHub(rows) ?? SYNTHETIC_ICON_FOCAL_ANCHOR;
+}
+
 /** Non–Icon hub rows with no DB coords — central London (not the Icon studio). */
 const GENERIC_LONDON_FALLBACK = { lat: 51.5074, lng: -0.1278 };
 
-function usesIconStudioCoordinates(r: HubRow): boolean {
+function usesIconStudioCoordinates(r: MapAnchorRow): boolean {
   if (DEFAULT_HUB_NAME.test(r.name.trim())) return true;
   return r.url.toLowerCase().includes("icon-architects.com");
 }
 
-function toAnchor(r: HubRow): MapHubAnchor {
+function toAnchor(r: MapAnchorRow): MapHubAnchor {
   const slug = slugFromUrl(r.url);
   if (usesIconStudioCoordinates(r)) {
     return { slug, name: r.name, ...ICON_ARCHITECTS_STUDIO };

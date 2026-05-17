@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { MapPracticeStage } from "@/lib/map-practices";
+import { MAP_PRACTICE_DISPLAY_LIMIT, type MapPracticeStage } from "@/lib/map-practices";
 
 import { hubUsesIconStudio, type MapHubAnchor } from "@/lib/map-hub";
 
@@ -17,6 +17,8 @@ const LeafletMap = dynamic(async () => (await import("@/components/LeafletMap"))
 
 type Practice = { name: string; address: string; slug: string; stage: MapPracticeStage };
 
+const MAP_FOCAL_SYNTHETIC_ID = "__blocharch_map_focal__";
+
 const STAGE_META: Record<MapPracticeStage, { label: string; color: string }> = {
   cold: { label: "Cold", color: "#0ea5e9" },
   no_reply: { label: "No reply", color: "#f59e0b" },
@@ -26,7 +28,7 @@ const STAGE_META: Record<MapPracticeStage, { label: string; color: string }> = {
   follow_up_not_interested: { label: "Follow-up not interested", color: "#f97316" },
 };
 
-/** Per-request batch size for Nominatim (uncached addresses only). */
+/** Per-request batch size for Nominatim (uncached addresses only). Order follows proximity-sorted practices. */
 const GEOCODE_CHUNK = 8;
 
 type GeocodeEntry = { lat: number; lng: number; displayName?: string };
@@ -34,11 +36,11 @@ type GeocodeEntry = { lat: number; lng: number; displayName?: string };
 export function MapClient({
   practices,
   initialGeocodes,
-  hubAnchor,
+  focalAnchor,
 }: {
   practices: Practice[];
   initialGeocodes: Record<string, GeocodeEntry>;
-  hubAnchor: MapHubAnchor | null;
+  focalAnchor: MapHubAnchor;
 }) {
   const [results, setResults] = useState<Record<string, GeocodeEntry>>(() => ({ ...initialGeocodes }));
   const [loading, setLoading] = useState(false);
@@ -126,7 +128,7 @@ export function MapClient({
     };
   }, [practiceKey, initialKey]);
 
-  const markers = useMemo(() => {
+  const markersBase = useMemo(() => {
     const out: Array<{
       id: string;
       name: string;
@@ -138,15 +140,15 @@ export function MapClient({
       hub?: boolean;
       hubDetail?: string;
     }> = [];
-    const hubSlug = hubAnchor?.slug;
+    const hubSlug = focalAnchor.slug;
     for (const p of practices) {
       const r = results[p.address];
       const isHub = Boolean(hubSlug && p.slug === hubSlug);
 
-      if (!r && !(isHub && hubAnchor)) continue;
+      if (!r && !(isHub && focalAnchor)) continue;
 
-      const lat = isHub && hubAnchor ? hubAnchor.lat : r!.lat;
-      const lng = isHub && hubAnchor ? hubAnchor.lng : r!.lng;
+      const lat = isHub && focalAnchor ? focalAnchor.lat : r!.lat;
+      const lng = isHub && focalAnchor ? focalAnchor.lng : r!.lng;
 
       out.push({
         id: p.slug,
@@ -155,28 +157,45 @@ export function MapClient({
         lng,
         stage: p.stage,
         subtitle:
-          isHub && hubAnchor
+          isHub && focalAnchor
             ? undefined
             : r?.displayName || p.address,
         href: `/dashboard/practices/${encodeURIComponent(p.slug)}`,
         hub: isHub,
         hubDetail:
-          isHub && hubAnchor && hubUsesIconStudio(hubAnchor)
+          isHub && focalAnchor && hubUsesIconStudio(focalAnchor)
             ? "5 Plato Place, 72–74 St Dionis Road, London SW6 4TU · Blocharch hub"
             : undefined,
       });
     }
     return out;
-  }, [practices, results, hubAnchor]);
+  }, [practices, results, focalAnchor]);
 
-  const initialZoom = hubAnchor ? 11 : 6;
-  const center = useMemo(() => {
-    if (hubAnchor) return { lat: hubAnchor.lat, lng: hubAnchor.lng };
-    if (markers.length === 0) return { lat: 54.5, lng: -3.0 };
-    const avgLat = markers.reduce((s, m) => s + m.lat, 0) / markers.length;
-    const avgLng = markers.reduce((s, m) => s + m.lng, 0) / markers.length;
-    return { lat: avgLat, lng: avgLng };
-  }, [hubAnchor, markers]);
+  const markers = useMemo(() => {
+    const list = [...markersBase];
+    const needsSyntheticPin =
+      hubUsesIconStudio(focalAnchor) && !markersBase.some((m) => m.hub);
+    if (needsSyntheticPin) {
+      list.unshift({
+        id: MAP_FOCAL_SYNTHETIC_ID,
+        name: focalAnchor.name,
+        lat: focalAnchor.lat,
+        lng: focalAnchor.lng,
+        stage: "cold",
+        hub: true,
+        hubDetail: "5 Plato Place, 72–74 St Dionis Road, London SW6 4TU · Blocharch hub",
+        href: "https://www.icon-architects.com/",
+      });
+    }
+    return list;
+  }, [markersBase, focalAnchor]);
+
+  const initialZoom = hubUsesIconStudio(focalAnchor) ? 13 : 11;
+
+  const center = useMemo(
+    () => ({ lat: focalAnchor.lat, lng: focalAnchor.lng }),
+    [focalAnchor.lat, focalAnchor.lng]
+  );
 
   const stageCounts = useMemo(() => {
     const counts: Record<MapPracticeStage, number> = {
@@ -187,7 +206,10 @@ export function MapClient({
       negative_reply: 0,
       follow_up_not_interested: 0,
     };
-    for (const m of markers) counts[m.stage] += 1;
+    for (const m of markers) {
+      if (m.id === MAP_FOCAL_SYNTHETIC_ID) continue;
+      counts[m.stage] += 1;
+    }
     return counts;
   }, [markers]);
 
@@ -197,28 +219,33 @@ export function MapClient({
 
   let statusExtra = "";
   if (practicesWithDbCoords > 0 && pendingGeocode === 0) {
-    statusExtra = ` All ${markers.length} coordinates loaded from the database.`;
+    statusExtra = ` All ${markers.filter((m) => m.id !== MAP_FOCAL_SYNTHETIC_ID).length} practice pins loaded from the database.`;
   } else if (practicesWithDbCoords > 0 && pendingGeocode > 0) {
-    statusExtra = ` ${practicesWithDbCoords} from database; geocoding ${pendingGeocode} remainder${loading ? `…${geocodeProgress}` : ""}.`;
+    statusExtra = ` ${practicesWithDbCoords} from database; geocoding ${pendingGeocode} more (nearest-first queue)${loading ? `…${geocodeProgress}` : ""}.`;
   } else if (pendingGeocode > 0 && loading) {
     statusExtra = ` Geocoding…${geocodeProgress}`;
   } else if (pendingGeocode > 0) {
     statusExtra = ` ${pendingGeocode} without stored coordinates — run npm run geocode:architects to backfill.`;
   }
 
+  const pinCount = markers.filter((m) => m.id !== MAP_FOCAL_SYNTHETIC_ID).length;
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-slate-500 text-sm">
-          Showing {markers.length} of {practices.length} practice{practices.length === 1 ? "" : "s"} with address.
+          Showing {pinCount} mapped practice{pinCount === 1 ? "" : "s"} — up to{" "}
+          {MAP_PRACTICE_DISPLAY_LIMIT} loaded, ordered nearest-first to{" "}
+          {hubUsesIconStudio(focalAnchor) ? "Icon Architects (Plato Place)" : focalAnchor.name}
+          {practices.length < MAP_PRACTICE_DISPLAY_LIMIT
+            ? ` (${practices.length} in directory with usable addresses).`
+            : "."}
           {statusExtra}
         </p>
         <p className="text-slate-500 text-sm">
-          {hubAnchor
-            ? hubUsesIconStudio(hubAnchor)
-              ? `${hubAnchor.name} at Plato Place (SW6) is the centre — zoom out for the full UK pipeline.`
-              : `Framed from ${hubAnchor.name} — zoom out for the full UK pipeline.`
-            : "Clusters zoom apart; open a practice for its detail map."}
+          {hubUsesIconStudio(focalAnchor)
+            ? "Zoomed on Plato Place (SW6); zoom out for regional / UK context."
+            : `Framed on ${focalAnchor.name} — zoom out for wider coverage.`}
         </p>
       </div>
       {geocodeError && (
@@ -229,9 +256,9 @@ export function MapClient({
       <LeafletMap markers={markers} center={center} zoom={initialZoom} />
       <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
         <p className="text-xs uppercase tracking-wide text-slate-500 mb-2">Automation stage colors</p>
-        {hubAnchor && hubUsesIconStudio(hubAnchor) ? (
+        {hubUsesIconStudio(focalAnchor) ? (
           <p className="text-xs text-slate-500 mb-3">
-            Large amber glow — Blocharch hub: {hubAnchor.name} at 5 Plato Place, St Dionis Road, London SW6 4TU (
+            Large amber glow — Blocharch focal point: {focalAnchor.name} at 5 Plato Place, St Dionis Road, London SW6 4TU (
             <a
               href="https://www.icon-architects.com/"
               target="_blank"
@@ -240,13 +267,13 @@ export function MapClient({
             >
               icon-architects.com
             </a>
-            ). Other firms radiate outward on the map (clusters spread when you zoom).
+            ). Listed practices are prioritised by proximity to this studio.
           </p>
-        ) : hubAnchor ? (
+        ) : (
           <p className="text-xs text-slate-500 mb-3">
-            Blocharch hub pin — {hubAnchor.name}. Zoom out to see practices across the UK.
+            Hub pin — {focalAnchor.name}. Listed practices are prioritised by proximity to this focal point.
           </p>
-        ) : null}
+        )}
         <div className="flex flex-wrap gap-x-5 gap-y-2">
           {(Object.keys(STAGE_META) as MapPracticeStage[]).map((stage) => (
             <div key={stage} className="flex items-center gap-2 text-xs text-slate-300">

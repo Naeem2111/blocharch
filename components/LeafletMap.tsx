@@ -133,7 +133,9 @@ function MapClusterLayer({ markers }: { markers: MarkerItem[] }) {
             : "",
         m.subtitle ? `<div class="text-sm opacity-80">${escapeHtml(m.subtitle)}</div>` : "",
         m.href
-          ? `<a class="text-sm text-sky-600 underline" href="${escapeHtml(m.href)}">View</a>`
+          ? /^https?:\/\//i.test(m.href)
+            ? `<a class="text-sm text-sky-600 underline" href="${escapeHtml(m.href)}" target="_blank" rel="noopener noreferrer">Website</a>`
+            : `<a class="text-sm text-sky-600 underline" href="${escapeHtml(m.href)}">View practice</a>`
           : "",
       ].filter(Boolean);
       marker.bindPopup(lines.join(""));
