@@ -166,7 +166,9 @@ export function LeafletMap({
   const mapCenter = useMemo(() => [center.lat, center.lng] as [number, number], [center.lat, center.lng]);
 
   return (
-    <div className={`overflow-hidden rounded-2xl border border-white/[0.1] ring-1 ring-white/[0.06] ${heightClassName}`}>
+    <div
+      className={`leaflet-map-cluster-blue overflow-hidden rounded-2xl border border-white/[0.1] ring-1 ring-white/[0.06] ${heightClassName}`}
+    >
       <MapContainer center={mapCenter} zoom={zoom} scrollWheelZoom className="h-full w-full">
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
@@ -190,7 +192,7 @@ export function LeafletMap({
           border: 2px solid #ffffff;
           box-shadow: 0 0 0 1px rgba(2, 6, 23, 0.35);
         }
-        :global(.lead-stage-pin--hub) {
+        :global(.leaflet-map-cluster-blue .lead-stage-pin--hub) {
           width: 36px;
           height: 36px;
           border-width: 4px;
@@ -198,6 +200,18 @@ export function LeafletMap({
             0 0 0 5px rgba(245, 158, 11, 0.45),
             0 0 28px 12px rgba(245, 158, 11, 0.28),
             0 0 0 1px rgba(2, 6, 23, 0.35);
+        }
+        /** Unify MarkerCluster tiers (small/medium/large) — default CSS is green / yellow / orange. */
+        :global(.leaflet-map-cluster-blue .marker-cluster-small),
+        :global(.leaflet-map-cluster-blue .marker-cluster-medium),
+        :global(.leaflet-map-cluster-blue .marker-cluster-large) {
+          background-color: rgba(56, 189, 248, 0.32);
+        }
+        :global(.leaflet-map-cluster-blue .marker-cluster-small div),
+        :global(.leaflet-map-cluster-blue .marker-cluster-medium div),
+        :global(.leaflet-map-cluster-blue .marker-cluster-large div) {
+          background-color: rgba(14, 165, 233, 0.85);
+          color: rgb(248, 250, 252);
         }
       `}</style>
     </div>

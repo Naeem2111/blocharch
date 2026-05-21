@@ -197,6 +197,17 @@ export function PlannerClient() {
   const [newColColor, setNewColColor] = useState("#64748b");
 
   const suppressNextCardClickRef = useRef(false);
+  /** Mirrors dragTaskId for drop handlers (state can lag in edge timings). */
+  const dragTaskIdRef = useRef<string | null>(null);
+  const detailRef = useRef(detail);
+
+  useEffect(() => {
+    detailRef.current = detail;
+  }, [detail]);
+
+  useEffect(() => {
+    dragTaskIdRef.current = dragTaskId;
+  }, [dragTaskId]);
 
   const completedColumnId = useMemo(
     () => (detail ? resolveCompletedColumnId(detail.columns) : null),
@@ -333,37 +344,62 @@ export function PlannerClient() {
     void persistTaskOrder(nextDetail);
   }
 
+  function resolveDraggedTaskId(dataTransfer?: DataTransfer | null) {
+    return (
+      dragTaskIdRef.current ||
+      dragTaskId ||
+      dataTransfer?.getData("text/plain")?.trim() ||
+      null
+    );
+  }
+
   async function onDropColumn(columnId: string, dataTransfer?: DataTransfer | null) {
-    if (!detail?.editable) return;
-    const fromTransfer = dataTransfer?.getData("text/plain")?.trim();
-    const taskId = dragTaskId || fromTransfer || null;
+    const snap = detailRef.current;
+    if (!snap?.editable) return;
+    const taskId = resolveDraggedTaskId(dataTransfer)?.trim() || null;
     setDropTargetColumnId(null);
     setTaskDropGuide(null);
     setDragTaskId(null);
+    dragTaskIdRef.current = null;
     if (!taskId) return;
 
-    reorderTasksAndPersist(detail, taskId, columnId, null);
+    reorderTasksAndPersist(snap, taskId, columnId, null);
   }
 
   /** Drop onto a card outline: insert relative to midpoint. */
   function onDropCard(columnId: string, anchorTaskId: string, e: React.DragEvent) {
-    if (!detail?.editable) return;
-    const fromTransfer = e.dataTransfer?.getData("text/plain")?.trim();
-    const taskId = dragTaskId || fromTransfer || null;
+    const snap = detailRef.current;
+    if (!snap?.editable) return;
+    const taskIdRaw = resolveDraggedTaskId(e.dataTransfer)?.trim() || null;
     setDropTargetColumnId(null);
     setTaskDropGuide(null);
     setDragTaskId(null);
-    if (!taskId || !detail) return;
+    dragTaskIdRef.current = null;
+    if (!taskIdRaw || !snap) return;
     /** Dropping onto the card itself has no insertion anchor once the row is stripped. */
-    if (anchorTaskId === taskId) return;
+    if (anchorTaskId === taskIdRaw) return;
 
-    const col = detail.columns.find((c) => c.id === columnId);
+    const col = snap.columns.find((c) => c.id === columnId);
     if (!col) return;
 
     const placement = taskCardDropPlacement(e, e.currentTarget as HTMLElement);
-    const beforeId = insertAnchorBeforeId(col.tasks, anchorTaskId, placement, taskId);
+    const beforeId = insertAnchorBeforeId(col.tasks, anchorTaskId, placement, taskIdRaw);
 
-    reorderTasksAndPersist(detail, taskId, columnId, beforeId);
+    reorderTasksAndPersist(snap, taskIdRaw, columnId, beforeId);
+  }
+
+  /** Hits the flex gutter between cards — insert before anchor task without relying on midpoint. */
+  function onDropInsertRail(columnId: string, insertBeforeTaskId: string | null, e: React.DragEvent) {
+    const snap = detailRef.current;
+    if (!snap?.editable) return;
+    const taskIdRaw = resolveDraggedTaskId(e.dataTransfer)?.trim() || null;
+    setDropTargetColumnId(null);
+    setTaskDropGuide(null);
+    setDragTaskId(null);
+    dragTaskIdRef.current = null;
+    if (!taskIdRaw) return;
+
+    reorderTasksAndPersist(snap, taskIdRaw, columnId, insertBeforeTaskId);
   }
 
   async function createLabel(name: string, color: string) {
@@ -704,20 +740,20 @@ export function PlannerClient() {
                   onReorder={reorderColumns}
                 />
                 <div
-                  className={`flex min-h-[160px] flex-1 flex-col gap-2 p-2 transition-colors duration-150 ${
+                  className={`flex min-h-[160px] flex-1 flex-col space-y-3 p-2 transition-colors duration-150 ${
                     detail.editable && dragTaskId && dropTargetColumnId === col.id
                       ? "rounded-lg bg-brand-500/[0.06]"
                       : ""
                   }`}
                   onDragOver={(e) => {
-                    if (!detail.editable || !dragTaskId) return;
+                    if (!detail.editable || !dragTaskId || col.tasks.length > 0) return;
                     e.preventDefault();
-                    e.stopPropagation();
                     e.dataTransfer.dropEffect = "move";
                     setDropTargetColumnId(col.id);
                     setTaskDropGuide({ columnId: col.id, beforeTaskId: null });
                   }}
                   onDrop={(e) => {
+                    if (col.tasks.length > 0) return;
                     e.preventDefault();
                     e.stopPropagation();
                     void onDropColumn(col.id, e.dataTransfer);
@@ -744,6 +780,31 @@ export function PlannerClient() {
                             className="-mx-0.5 h-0.5 shrink-0 rounded-full bg-brand-400/85 shadow-[0_0_8px_rgba(52,211,153,0.35)]"
                           />
                         ) : null}
+                      {detail.editable && dragTaskId && dragTaskId !== t.id ? (
+                        <div
+                          role="separator"
+                          aria-orientation="horizontal"
+                          aria-label="Drop to insert row here"
+                          className={`h-[12px] shrink-0 rounded-md border transition-colors md:h-[14px] ${
+                            dragTaskId && taskDropGuide?.columnId === col.id && taskDropGuide.beforeTaskId === t.id
+                              ? "border-brand-400/50 bg-brand-500/15"
+                              : "border-transparent bg-transparent hover:border-brand-500/25 hover:bg-brand-500/10"
+                          }`}
+                          onDragOver={(e) => {
+                            if (!dragTaskId) return;
+                            e.preventDefault();
+                            e.stopPropagation();
+                            e.dataTransfer.dropEffect = "move";
+                            setDropTargetColumnId(col.id);
+                            setTaskDropGuide({ columnId: col.id, beforeTaskId: t.id });
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onDropInsertRail(col.id, t.id, e);
+                          }}
+                        />
+                      ) : null}
                       <div
                         role={detail.editable ? "button" : undefined}
                         tabIndex={detail.editable ? 0 : undefined}
@@ -751,6 +812,7 @@ export function PlannerClient() {
                         onDragStart={(e) => {
                           if (!detail.editable) return;
                           suppressNextCardClickRef.current = false;
+                          dragTaskIdRef.current = t.id;
                           setDragTaskId(t.id);
                           e.dataTransfer.effectAllowed = "move";
                           e.dataTransfer.setData("text/plain", t.id);
@@ -778,6 +840,7 @@ export function PlannerClient() {
                           }
                         }}
                         onDragEnd={() => {
+                          dragTaskIdRef.current = null;
                           setDragTaskId(null);
                           setDropTargetColumnId(null);
                           setTaskDropGuide(null);
@@ -839,13 +902,14 @@ export function PlannerClient() {
                                 title={isInDoneColumn ? "Move out of Done" : "Mark done"}
                                 onChange={(e) => {
                                   e.stopPropagation();
+                                  const snap = detailRef.current;
                                   const doneId = completedColumnId;
-                                  const firstId = detail.columns[0]?.id;
-                                  if (!doneId || !firstId || !detail) return;
+                                  const firstId = snap?.columns[0]?.id;
+                                  if (!doneId || !firstId || !snap) return;
                                   if (e.target.checked) {
-                                    reorderTasksAndPersist(detail, t.id, doneId, null);
+                                    reorderTasksAndPersist(snap, t.id, doneId, null);
                                   } else {
-                                    reorderTasksAndPersist(detail, t.id, firstId, null);
+                                    reorderTasksAndPersist(snap, t.id, firstId, null);
                                   }
                                 }}
                                 className="h-3.5 w-3.5 rounded border-white/20 bg-white/[0.06] text-brand-500 focus:ring-brand-500"
@@ -878,16 +942,31 @@ export function PlannerClient() {
                       </Fragment>
                     );
                   })}
-                  {detail.editable &&
-                    dragTaskId &&
-                    taskDropGuide?.columnId === col.id &&
-                    taskDropGuide.beforeTaskId === null ? (
-                      <div
-                        role="presentation"
-                        aria-hidden
-                        className="-mx-0.5 mb-1 h-0.5 shrink-0 rounded-full bg-brand-400/85 shadow-[0_0_8px_rgba(52,211,153,0.35)]"
-                      />
-                    ) : null}
+                  {detail.editable && dragTaskId && col.tasks.length > 0 ? (
+                    <div
+                      role="separator"
+                      aria-orientation="horizontal"
+                      aria-label="Drop to add at bottom of column"
+                      className={`h-[14px] shrink-0 rounded-md border transition-colors ${
+                        taskDropGuide?.columnId === col.id && taskDropGuide.beforeTaskId === null
+                          ? "border-brand-400/50 bg-brand-500/15"
+                          : "border-transparent hover:border-brand-500/25 hover:bg-brand-500/10"
+                      }`}
+                      onDragOver={(e) => {
+                        if (!dragTaskId) return;
+                        e.preventDefault();
+                        e.stopPropagation();
+                        e.dataTransfer.dropEffect = "move";
+                        setDropTargetColumnId(col.id);
+                        setTaskDropGuide({ columnId: col.id, beforeTaskId: null });
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onDropInsertRail(col.id, null, e);
+                      }}
+                    />
+                  ) : null}
                   {detail.editable && (
                     <button
                       type="button"
