@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type BoardSummary = {
   id: string;
@@ -101,6 +101,78 @@ const PLANNER_SHORT_DESC_HINT =
 const PLANNER_LONG_DESC_HINT =
   "Detailed notes: paragraphs, bullets (– •), or numbered lines (1. 2.). Plain text — line breaks are kept.";
 
+function normalizeColumnTaskOrder(col: ColumnRow): ColumnRow {
+  return {
+    ...col,
+    tasks: col.tasks.map((t, i) => ({ ...t, sortOrder: i })),
+  };
+}
+
+/** insertBeforeTaskId: insert moved task before this row; null = append to column tail. */
+function plannerDetailAfterMovingTask(
+  detail: BoardDetail,
+  taskId: string,
+  destColumnId: string,
+  insertBeforeTaskId: string | null
+): BoardDetail {
+  let mover: TaskRow | null = null;
+
+  const stripped = detail.columns.map((col) => {
+    const found = col.tasks.find((t) => t.id === taskId);
+    if (!found) return col;
+    mover = found;
+    return {
+      ...col,
+      tasks: col.tasks.filter((t) => t.id !== taskId),
+    };
+  });
+
+  if (!mover) return detail;
+
+  const merged = stripped.map((col) => {
+    if (col.id !== destColumnId) return col;
+    const ts = [...col.tasks];
+    let insertAt = ts.length;
+    if (insertBeforeTaskId !== null) {
+      const bi = ts.findIndex((t) => t.id === insertBeforeTaskId);
+      insertAt = bi === -1 ? ts.length : bi;
+    }
+    const mergedTasks = [...ts.slice(0, insertAt), mover!, ...ts.slice(insertAt)].map((t, i) => ({
+      ...t,
+      sortOrder: i,
+    }));
+    return {
+      ...col,
+      tasks: mergedTasks,
+    };
+  });
+
+  return {
+    ...detail,
+    columns: merged.map(normalizeColumnTaskOrder),
+  };
+}
+
+/** Where to slice a card vertically for “drop before vs after”. */
+function taskCardDropPlacement(e: React.DragEvent, cardEl: HTMLElement): "before" | "after" {
+  const r = cardEl.getBoundingClientRect();
+  return e.clientY < r.top + r.height / 2 ? "before" : "after";
+}
+
+function insertAnchorBeforeId(
+  columnTasks: TaskRow[],
+  hoveredTaskId: string,
+  placement: "before" | "after",
+  draggingId: string | null
+): string | null {
+  const sans = draggingId ? columnTasks.filter((t) => t.id !== draggingId) : columnTasks;
+  if (placement === "before") return hoveredTaskId;
+  const ti = sans.findIndex((t) => t.id === hoveredTaskId);
+  if (ti === -1) return null;
+  const nextRow = sans[ti + 1];
+  return nextRow ? nextRow.id : null;
+}
+
 export function PlannerClient() {
   const [boards, setBoards] = useState<BoardSummary[]>([]);
   const [filter, setFilter] = useState<"all" | "personal" | "team">("all");
@@ -115,6 +187,11 @@ export function PlannerClient() {
   const [editTask, setEditTask] = useState<TaskRow & { columnId: string } | null>(null);
   const [dragTaskId, setDragTaskId] = useState<string | null>(null);
   const [dropTargetColumnId, setDropTargetColumnId] = useState<string | null>(null);
+  /** Drop stripe: insert before row id (null = end of column). */
+  const [taskDropGuide, setTaskDropGuide] = useState<{
+    columnId: string;
+    beforeTaskId: string | null;
+  } | null>(null);
   const [addColumnOpen, setAddColumnOpen] = useState(false);
   const [newColTitle, setNewColTitle] = useState("");
   const [newColColor, setNewColColor] = useState("#64748b");
@@ -215,35 +292,45 @@ export function PlannerClient() {
     return true;
   }
 
-  /** Immediate UI move; caller syncs with PATCH + reload on failure. */
-  function applyOptimisticTaskMove(taskId: string, toColumnId: string) {
-    setDetail((prev) => {
-      if (!prev) return prev;
-      let moved: TaskRow | undefined;
-      for (const c of prev.columns) {
-        const t = c.tasks.find((x) => x.id === taskId);
-        if (t) {
-          moved = t;
-          break;
-        }
+  const persistTaskOrder = useCallback(
+    async (snapshot: BoardDetail) => {
+      try {
+        const r = await fetch(
+          `/api/planner/boards/${encodeURIComponent(snapshot.id)}/reorder-tasks`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              columns: snapshot.columns.map((c) => ({
+                columnId: c.id,
+                taskIds: c.tasks.map((t) => t.id),
+              })),
+            }),
+          }
+        );
+        if (!r.ok && boardId) await loadDetail(boardId);
+      } catch {
+        if (boardId) await loadDetail(boardId);
       }
-      if (!moved) return prev;
+    },
+    [boardId, loadDetail]
+  );
 
-      const without = prev.columns.map((c) => ({
-        ...c,
-        tasks: c.tasks.filter((t) => t.id !== taskId),
-      }));
-      const targetTasks = without.find((c) => c.id === toColumnId)?.tasks ?? [];
-      const nextSort = Math.max(-1, ...targetTasks.map((t) => t.sortOrder)) + 1;
-      const taskWithOrder: TaskRow = { ...moved, sortOrder: nextSort };
-
-      return {
-        ...prev,
-        columns: without.map((c) =>
-          c.id === toColumnId ? { ...c, tasks: [...c.tasks, taskWithOrder] } : c
-        ),
-      };
-    });
+  /** Reorder visually, then POST full layout once (server catches up in background). */
+  function reorderTasksAndPersist(
+    snapshot: BoardDetail,
+    taskId: string,
+    destColumnId: string,
+    insertBeforeTaskId: string | null
+  ) {
+    const nextDetail = plannerDetailAfterMovingTask(
+      snapshot,
+      taskId,
+      destColumnId,
+      insertBeforeTaskId
+    );
+    setDetail(nextDetail);
+    void persistTaskOrder(nextDetail);
   }
 
   async function onDropColumn(columnId: string, dataTransfer?: DataTransfer | null) {
@@ -251,15 +338,32 @@ export function PlannerClient() {
     const fromTransfer = dataTransfer?.getData("text/plain")?.trim();
     const taskId = dragTaskId || fromTransfer || null;
     setDropTargetColumnId(null);
+    setTaskDropGuide(null);
     setDragTaskId(null);
     if (!taskId) return;
 
-    const sourceColumnId = detail.columns.find((c) => c.tasks.some((t) => t.id === taskId))?.id;
-    if (!sourceColumnId || sourceColumnId === columnId) return;
+    reorderTasksAndPersist(detail, taskId, columnId, null);
+  }
 
-    applyOptimisticTaskMove(taskId, columnId);
-    const ok = await patchTask(taskId, { columnId }, { reloadOnSuccess: false });
-    if (!ok && boardId) await loadDetail(boardId);
+  /** Drop onto a card outline: insert relative to midpoint. */
+  function onDropCard(columnId: string, anchorTaskId: string, e: React.DragEvent) {
+    if (!detail?.editable) return;
+    const fromTransfer = e.dataTransfer?.getData("text/plain")?.trim();
+    const taskId = dragTaskId || fromTransfer || null;
+    setDropTargetColumnId(null);
+    setTaskDropGuide(null);
+    setDragTaskId(null);
+    if (!taskId || !detail) return;
+    /** Dropping onto the card itself has no insertion anchor once the row is stripped. */
+    if (anchorTaskId === taskId) return;
+
+    const col = detail.columns.find((c) => c.id === columnId);
+    if (!col) return;
+
+    const placement = taskCardDropPlacement(e, e.currentTarget as HTMLElement);
+    const beforeId = insertAnchorBeforeId(col.tasks, anchorTaskId, placement, taskId);
+
+    reorderTasksAndPersist(detail, taskId, columnId, beforeId);
   }
 
   async function createLabel(name: string, color: string) {
@@ -335,11 +439,19 @@ export function PlannerClient() {
     if (!detail || !boardId || toIdx < 0 || toIdx >= detail.columns.length) return;
     const a = detail.columns[fromIdx];
     const b = detail.columns[toIdx];
+    if (!a || !b) return;
+    const nextCols = [...detail.columns];
+    nextCols[fromIdx] = { ...b, sortOrder: a.sortOrder };
+    nextCols[toIdx] = { ...a, sortOrder: b.sortOrder };
+    setDetail({ ...detail, columns: nextCols });
+
     const aOrder = a.sortOrder;
     const bOrder = b.sortOrder;
-    const r1 = await patchColumnApi(a.id, { sortOrder: bOrder });
-    const r2 = await patchColumnApi(b.id, { sortOrder: aOrder });
-    if (r1.ok && r2.ok) await loadDetail(boardId);
+    const [r1, r2] = await Promise.all([
+      patchColumnApi(a.id, { sortOrder: bOrder }),
+      patchColumnApi(b.id, { sortOrder: aOrder }),
+    ]);
+    if (!r1.ok || !r2.ok) await loadDetail(boardId);
   }
 
   async function addColumn() {
@@ -475,11 +587,18 @@ export function PlannerClient() {
                 {detail.scope === "team" ? "Team board" : "Personal board"} · Owner{" "}
                 {detail.owner.username}
                 {!detail.editable ? " · View only" : ""}
-                {detail.editable && completedColumnId ? (
+                {detail.editable ? (
                   <>
                     {" "}
-                    · Drag cards between columns, or use the Done checkbox (column titled Done/Completed,
-                    or the last column).
+                    · Drag cards to reorder (drop on the top or bottom half of a card) or move lists; the
+                    board updates instantly and syncs in the background.
+                    {completedColumnId ? (
+                      <>
+                        {" "}
+                        Done checkbox moves to Done/Completed (or the last column when there isn’t one
+                        titled Done).
+                      </>
+                    ) : null}
                   </>
                 ) : null}
               </p>
@@ -568,6 +687,7 @@ export function PlannerClient() {
                   const related = e.relatedTarget as Node | null;
                   if (related && e.currentTarget.contains(related)) return;
                   setDropTargetColumnId((prev) => (prev === col.id ? null : prev));
+                  setTaskDropGuide((prev) => (prev?.columnId === col.id ? null : prev));
                 }}
                 onDrop={(e) => {
                   e.preventDefault();
@@ -595,6 +715,7 @@ export function PlannerClient() {
                     e.stopPropagation();
                     e.dataTransfer.dropEffect = "move";
                     setDropTargetColumnId(col.id);
+                    setTaskDropGuide({ columnId: col.id, beforeTaskId: null });
                   }}
                   onDrop={(e) => {
                     e.preventDefault();
@@ -607,9 +728,23 @@ export function PlannerClient() {
                     const showDoneTick =
                       detail.editable && completedColumnId !== null && detail.columns.length >= 2;
                     const isInDoneColumn = col.id === completedColumnId;
+                    const showInsertLine =
+                      detail.editable &&
+                      dragTaskId &&
+                      dragTaskId !== t.id &&
+                      taskDropGuide?.columnId === col.id &&
+                      taskDropGuide.beforeTaskId === t.id;
+
                     return (
+                      <Fragment key={t.id}>
+                        {showInsertLine ? (
+                          <div
+                            role="presentation"
+                            aria-hidden
+                            className="-mx-0.5 h-0.5 shrink-0 rounded-full bg-brand-400/85 shadow-[0_0_8px_rgba(52,211,153,0.35)]"
+                          />
+                        ) : null}
                       <div
-                        key={t.id}
                         role={detail.editable ? "button" : undefined}
                         tabIndex={detail.editable ? 0 : undefined}
                         draggable={detail.editable}
@@ -645,18 +780,28 @@ export function PlannerClient() {
                         onDragEnd={() => {
                           setDragTaskId(null);
                           setDropTargetColumnId(null);
+                          setTaskDropGuide(null);
                           suppressNextCardClickRef.current = true;
                         }}
                         onDragOver={(e) => {
                           if (!detail.editable || !dragTaskId || dragTaskId === t.id) return;
                           e.preventDefault();
+                          e.stopPropagation();
                           e.dataTransfer.dropEffect = "move";
                           setDropTargetColumnId(col.id);
+                          const placement = taskCardDropPlacement(e, e.currentTarget as HTMLElement);
+                          const guideBeforeId = insertAnchorBeforeId(
+                            col.tasks,
+                            t.id,
+                            placement,
+                            dragTaskId
+                          );
+                          setTaskDropGuide({ columnId: col.id, beforeTaskId: guideBeforeId });
                         }}
                         onDrop={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          void onDropColumn(col.id, e.dataTransfer);
+                          void onDropCard(col.id, t.id, e);
                         }}
                         onClick={() => {
                           if (suppressNextCardClickRef.current) {
@@ -696,21 +841,11 @@ export function PlannerClient() {
                                   e.stopPropagation();
                                   const doneId = completedColumnId;
                                   const firstId = detail.columns[0]?.id;
-                                  if (!doneId || !firstId) return;
+                                  if (!doneId || !firstId || !detail) return;
                                   if (e.target.checked) {
-                                    applyOptimisticTaskMove(t.id, doneId);
-                                    void patchTask(t.id, { columnId: doneId }, { reloadOnSuccess: false }).then(
-                                      (ok) => {
-                                        if (!ok && boardId) void loadDetail(boardId);
-                                      }
-                                    );
+                                    reorderTasksAndPersist(detail, t.id, doneId, null);
                                   } else {
-                                    applyOptimisticTaskMove(t.id, firstId);
-                                    void patchTask(t.id, { columnId: firstId }, { reloadOnSuccess: false }).then(
-                                      (ok) => {
-                                        if (!ok && boardId) void loadDetail(boardId);
-                                      }
-                                    );
+                                    reorderTasksAndPersist(detail, t.id, firstId, null);
                                   }
                                 }}
                                 className="h-3.5 w-3.5 rounded border-white/20 bg-white/[0.06] text-brand-500 focus:ring-brand-500"
@@ -740,8 +875,19 @@ export function PlannerClient() {
                           </div>
                         </div>
                       </div>
+                      </Fragment>
                     );
                   })}
+                  {detail.editable &&
+                    dragTaskId &&
+                    taskDropGuide?.columnId === col.id &&
+                    taskDropGuide.beforeTaskId === null ? (
+                      <div
+                        role="presentation"
+                        aria-hidden
+                        className="-mx-0.5 mb-1 h-0.5 shrink-0 rounded-full bg-brand-400/85 shadow-[0_0_8px_rgba(52,211,153,0.35)]"
+                      />
+                    ) : null}
                   {detail.editable && (
                     <button
                       type="button"
