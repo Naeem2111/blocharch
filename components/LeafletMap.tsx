@@ -107,6 +107,24 @@ function MapViewController({
   return null;
 }
 
+/** Animated snap back to focal hub when `tick` increases (initial tick 0 is ignored). */
+function HubRecenterController({
+  tick,
+  mapCenter,
+  zoom,
+}: {
+  tick: number;
+  mapCenter: [number, number];
+  zoom: number;
+}) {
+  const map = useMap();
+  useEffect(() => {
+    if (tick <= 0) return;
+    map.setView(mapCenter, zoom, { animate: true });
+  }, [tick, map, zoom, mapCenter[0], mapCenter[1]]);
+  return null;
+}
+
 function MapClusterLayer({ markers }: { markers: MarkerItem[] }) {
   const map = useMap();
   const sig = useMemo(() => markerSignature(markers), [markers]);
@@ -157,11 +175,14 @@ export function LeafletMap({
   center,
   zoom = 6,
   heightClassName = "h-[520px]",
+  hubRecenterTick = 0,
 }: {
   markers: MarkerItem[];
   center: { lat: number; lng: number };
   zoom?: number;
   heightClassName?: string;
+  /** Bump (e.g. `setTick((n) => n + 1)`) to animate the map back to `center` / `zoom` (hub focal pin). */
+  hubRecenterTick?: number;
 }) {
   const mapCenter = useMemo(() => [center.lat, center.lng] as [number, number], [center.lat, center.lng]);
 
@@ -175,6 +196,7 @@ export function LeafletMap({
           url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
         />
         <MapViewController center={mapCenter} zoom={zoom} />
+        <HubRecenterController tick={hubRecenterTick} mapCenter={mapCenter} zoom={zoom} />
         {markers.some((m) => m.hub && m.hubDetail) ? <HubRadiusLayer markers={markers} /> : null}
         {markers.length > 0 ? <MapClusterLayer markers={markers} /> : null}
       </MapContainer>

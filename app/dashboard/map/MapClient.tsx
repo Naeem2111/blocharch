@@ -6,6 +6,16 @@ import { MAP_PRACTICE_DISPLAY_LIMIT, type MapPracticeStage } from "@/lib/map-pra
 
 import { hubUsesIconStudio, type MapHubAnchor } from "@/lib/map-hub";
 
+const MAP_ICON = (
+  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden>
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M9 6.75V15m6-6v8.25m.106-18.256c.746.393 1.196 1.192 1.196 2.042v15.638a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184m7.5 0v-.462c0-.41-.34-.75-.75-.75h-4.5c-.41 0-.75.34-.75.75v.462m4.5 0v.462c0 .41-.34.75-.75.75h-4.5a.75.75 0 01-.75-.75v-.462m4.5 0h-4.5"
+    />
+  </svg>
+);
+
 const LeafletMap = dynamic(async () => (await import("@/components/LeafletMap")).LeafletMap, {
   ssr: false,
   loading: () => (
@@ -47,6 +57,11 @@ export function MapClient({
   const [geocodeError, setGeocodeError] = useState<string | null>(null);
   const [chunksDone, setChunksDone] = useState(0);
   const [chunksTotal, setChunksTotal] = useState(0);
+
+  const [pinSearchInput, setPinSearchInput] = useState("");
+  const [pinFilter, setPinFilter] = useState("");
+  /** Increment to tell LeafletMap to fly back to the focal hub coordinates. */
+  const [hubRecenterTick, setHubRecenterTick] = useState(0);
 
   const initialKey = useMemo(() => Object.keys(initialGeocodes).sort().join("|"), [initialGeocodes]);
   const initialGeoRef = useRef(initialGeocodes);
@@ -190,6 +205,26 @@ export function MapClient({
     return list;
   }, [markersBase, focalAnchor]);
 
+  const filteredMarkers = useMemo(() => {
+    const t = pinFilter.trim().toLowerCase();
+    if (!t) return markers;
+    return markers.filter((m) => {
+      const nameOk = m.name.toLowerCase().includes(t);
+      const subOk = (m.subtitle ?? "").toLowerCase().includes(t);
+      const idOk =
+        typeof m.id === "string"
+          ? m.id.toLowerCase().includes(t.replace(/\s+/g, ""))
+          : false;
+      if (nameOk || subOk || idOk) return true;
+      if (m.id === MAP_FOCAL_SYNTHETIC_ID) {
+        const hubName = focalAnchor.name.toLowerCase();
+        const hubSlug = focalAnchor.slug.toLowerCase();
+        return hubName.includes(t) || hubSlug.includes(t.replace(/\s+/g, ""));
+      }
+      return false;
+    });
+  }, [markers, pinFilter, focalAnchor.name, focalAnchor.slug]);
+
   const initialZoom = hubUsesIconStudio(focalAnchor) ? 13 : 11;
 
   const center = useMemo(
@@ -206,12 +241,12 @@ export function MapClient({
       negative_reply: 0,
       follow_up_not_interested: 0,
     };
-    for (const m of markers) {
+    for (const m of filteredMarkers) {
       if (m.id === MAP_FOCAL_SYNTHETIC_ID) continue;
       counts[m.stage] += 1;
     }
     return counts;
-  }, [markers]);
+  }, [filteredMarkers]);
 
   const practicesWithDbCoords = practices.filter((p) => initialGeocodes[p.address]).length;
   const pendingGeocode = practices.filter((p) => p.address && !results[p.address]).length;
@@ -229,12 +264,68 @@ export function MapClient({
   }
 
   const pinCount = markers.filter((m) => m.id !== MAP_FOCAL_SYNTHETIC_ID).length;
+  const visiblePinCount = filteredMarkers.filter((m) => m.id !== MAP_FOCAL_SYNTHETIC_ID).length;
+  const hasActiveFilter = pinFilter.trim().length > 0;
+
+  const applyPinFilter = () => {
+    setPinFilter(pinSearchInput.trim());
+  };
+
+  const hubRecenterTitle = hubUsesIconStudio(focalAnchor)
+    ? "Icon Architects hub (Plato Place)"
+    : `${focalAnchor.name} focal pin`;
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
+        <input
+          type="search"
+          value={pinSearchInput}
+          onChange={(e) => setPinSearchInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") applyPinFilter();
+          }}
+          placeholder="Search by practice name, address, or slug…"
+          aria-label="Filter map pins"
+          className="flex-1 min-w-0 rounded-lg border border-white/[0.08] bg-white/[0.04] px-4 py-2.5 text-sm text-white placeholder-slate-500 ring-1 ring-black/20 focus:border-brand-500/50 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+        />
+        <div className="flex shrink-0 gap-2">
+          <button
+            type="button"
+            onClick={applyPinFilter}
+            className="inline-flex items-center justify-center rounded-lg bg-gradient-to-r from-brand-500 to-brand-600 p-2.5 text-slate-950 shadow-lg shadow-brand/25 ring-1 ring-brand-400/40 transition-opacity hover:opacity-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/70"
+            title="Apply search"
+            aria-label="Apply map search filter"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor" aria-hidden>
+              <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={() => setHubRecenterTick((n) => n + 1)}
+            className="inline-flex items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.06] p-2.5 text-slate-300 ring-1 ring-white/[0.04] transition-colors hover:border-brand-500/35 hover:bg-brand-500/10 hover:text-brand-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50"
+            title={`Center map on ${hubRecenterTitle}`}
+            aria-label={`Center map on ${hubRecenterTitle}`}
+          >
+            {MAP_ICON}
+          </button>
+        </div>
+      </div>
+
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-slate-500 text-sm">
-          Showing {pinCount} mapped practice{pinCount === 1 ? "" : "s"} — up to{" "}
+          {hasActiveFilter ? (
+            <>
+              Showing {visiblePinCount} match{visiblePinCount === 1 ? "" : "es"} ({pinCount} total mapped){' '}
+            </>
+          ) : (
+            <>
+              Showing {pinCount} mapped practice{pinCount === 1 ? "" : "s"}
+            </>
+          )}
+          {' '}
+          — up to{" "}
           {MAP_PRACTICE_DISPLAY_LIMIT} loaded, ordered nearest-first to{" "}
           {hubUsesIconStudio(focalAnchor) ? "Icon Architects (Plato Place)" : focalAnchor.name}
           {practices.length < MAP_PRACTICE_DISPLAY_LIMIT
@@ -253,7 +344,30 @@ export function MapClient({
           {geocodeError}
         </p>
       )}
-      <LeafletMap markers={markers} center={center} zoom={initialZoom} />
+      {filteredMarkers.length > 0 ? (
+        <LeafletMap
+          markers={filteredMarkers}
+          center={center}
+          zoom={initialZoom}
+          hubRecenterTick={hubRecenterTick}
+        />
+      ) : (
+        <div className="card-tool flex h-[520px] flex-col items-center justify-center rounded-2xl ring-1 ring-white/[0.06] px-6 text-center">
+          <p className="text-slate-400 text-sm">
+            No practices match “{pinFilter.trim()}”. Clear or change the search to see pins.
+          </p>
+          <button
+            type="button"
+            className="mt-4 rounded-lg border border-white/10 bg-white/[0.06] px-4 py-2 text-sm font-medium text-slate-200 hover:bg-white/[0.09]"
+            onClick={() => {
+              setPinSearchInput("");
+              setPinFilter("");
+            }}
+          >
+            Clear search
+          </button>
+        </div>
+      )}
       <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
         <p className="text-xs uppercase tracking-wide text-slate-500 mb-2">Automation stage colors</p>
         {hubUsesIconStudio(focalAnchor) ? (
