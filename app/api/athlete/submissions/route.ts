@@ -12,6 +12,8 @@ import {
   requireAthletePortalSession,
 } from "@/lib/ops-access";
 import { computeMonthlyHoursSummary, dateOnlyUtc, parseDateOnly } from "@/lib/ops-hours";
+import { buildDailyHourAlerts, isSubmissionEditable } from "@/lib/ops-alerts";
+import { lockStaleSubmissions } from "@/lib/ops-commercial";
 
 type LineItemInput = {
   clientId: string;
@@ -61,6 +63,8 @@ export async function GET(request: NextRequest) {
   if (gate instanceof NextResponse) return gate;
   const { athlete } = gate;
 
+  await lockStaleSubmissions(athlete.id);
+
   const submissions = await prisma.opsDailySubmission.findMany({
     where: { athleteId: athlete.id },
     orderBy: { submissionDate: "desc" },
@@ -76,6 +80,7 @@ export async function GET(request: NextRequest) {
   });
 
   return NextResponse.json({
+    monthlyHourCap: athlete.monthlyHourCap,
     submissions: submissions.map((s) => ({
       id: s.id,
       submissionDate: s.submissionDate.toISOString().slice(0, 10),
@@ -84,6 +89,8 @@ export async function GET(request: NextRequest) {
       dailyNote: s.dailyNote,
       totalHours: Number(s.totalHours),
       lockedAt: s.lockedAt?.toISOString() ?? null,
+      editable: isSubmissionEditable(s.submissionDate, s.lockedAt),
+      alerts: buildDailyHourAlerts(Number(s.totalHours)),
       lineItems: s.lineItems.map((li) => ({
         id: li.id,
         clientName: li.client.name,
@@ -112,6 +119,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "At least one valid project entry is required" }, { status: 400 });
     }
 
+    await lockStaleSubmissions(athlete.id);
+
     const existing = await prisma.opsDailySubmission.findUnique({
       where: {
         athleteId_submissionDate: { athleteId: athlete.id, submissionDate },
@@ -119,6 +128,9 @@ export async function POST(request: NextRequest) {
     });
     if (existing?.lockedAt) {
       return NextResponse.json({ error: "This submission is locked" }, { status: 400 });
+    }
+    if (existing && !isSubmissionEditable(existing.submissionDate, existing.lockedAt)) {
+      return NextResponse.json({ error: "This submission is past the edit window" }, { status: 400 });
     }
 
     for (const li of lineItems) {
@@ -246,6 +258,7 @@ export async function POST(request: NextRequest) {
           overtimeTriggered: preview.overtimeTriggered,
           overtimeHours: preview.monthOvertimeHours,
           totalEarningsZar: preview.totalEarningsZar,
+          alerts: buildDailyHourAlerts(todayHours),
         },
       },
       { status: existing ? 200 : 201 }

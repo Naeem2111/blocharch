@@ -29,6 +29,16 @@ type CalcPanel = {
   overtimeTriggered: boolean;
   overtimeHours: number;
   totalEarningsZar: number;
+  alerts?: Array<{ code: string; severity: string; message: string }>;
+};
+
+type PastSubmission = {
+  id: string;
+  submissionDate: string;
+  totalHours: number;
+  lockedAt: string | null;
+  editable: boolean;
+  alerts: Array<{ code: string; severity: string; message: string }>;
 };
 
 function emptyLine(): LineItemForm {
@@ -46,6 +56,8 @@ function emptyLine(): LineItemForm {
 
 export function AthleteSubmissionsClient() {
   const [projects, setProjects] = useState<AssignedProject[]>([]);
+  const [pastSubmissions, setPastSubmissions] = useState<PastSubmission[]>([]);
+  const [monthlyHourCap, setMonthlyHourCap] = useState(160);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -58,9 +70,14 @@ export function AthleteSubmissionsClient() {
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
   const load = useCallback(async () => {
-    const r = await fetch("/api/athlete/projects");
-    const j = await r.json();
-    if (r.ok) setProjects(j.projects || []);
+    const [pr, sr] = await Promise.all([fetch("/api/athlete/projects"), fetch("/api/athlete/submissions")]);
+    const pj = await pr.json();
+    const sj = await sr.json();
+    if (pr.ok) setProjects(pj.projects || []);
+    if (sr.ok) {
+      setPastSubmissions(sj.submissions || []);
+      if (sj.monthlyHourCap) setMonthlyHourCap(sj.monthlyHourCap);
+    }
     setLoading(false);
   }, []);
 
@@ -128,6 +145,7 @@ export function AthleteSubmissionsClient() {
       }
       setCalc(j.calculation);
       setSuccess("Daily log saved.");
+      void load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save");
     } finally {
@@ -138,6 +156,7 @@ export function AthleteSubmissionsClient() {
   if (loading) return <p className="text-sm text-slate-500">Loading…</p>;
 
   return (
+    <div className="space-y-8">
     <form onSubmit={submit} className="space-y-6">
       <div className="card-tool grid gap-4 rounded-xl p-4 md:grid-cols-3">
         <label className="text-xs text-slate-400">
@@ -317,7 +336,7 @@ export function AthleteSubmissionsClient() {
                 <dd className="font-medium text-white">{calc.monthHoursAfter.toFixed(1)}h</dd>
               </div>
               <div>
-                <dt className="text-slate-500">Remaining to 160h</dt>
+                <dt className="text-slate-500">Remaining to {monthlyHourCap}h</dt>
                 <dd className="font-medium text-white">{calc.hoursRemaining.toFixed(1)}h</dd>
               </div>
               <div>
@@ -348,5 +367,39 @@ export function AthleteSubmissionsClient() {
         {saving ? "Saving…" : "Save daily log"}
       </button>
     </form>
+
+      <div className="card-tool rounded-xl p-5">
+        <h2 className="text-sm font-semibold text-white">Recent submissions</h2>
+        <p className="mt-1 text-xs text-slate-500">
+          Logs lock automatically after {1} day. Contact admin to unlock older entries.
+        </p>
+        {pastSubmissions.length === 0 ? (
+          <p className="mt-3 text-sm text-slate-500">No submissions yet.</p>
+        ) : (
+          <ul className="mt-4 space-y-2">
+            {pastSubmissions.map((s) => (
+              <li
+                key={s.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white/[0.03] px-3 py-2 text-sm"
+              >
+                <span className="text-slate-300">
+                  {s.submissionDate} · {s.totalHours}h
+                  {s.lockedAt ? (
+                    <span className="ml-2 rounded bg-white/[0.06] px-1.5 py-0.5 text-[10px] uppercase text-slate-500">
+                      Locked
+                    </span>
+                  ) : s.editable ? (
+                    <span className="ml-2 text-[10px] text-brand-300">Editable</span>
+                  ) : null}
+                </span>
+                {s.alerts.length > 0 ? (
+                  <span className="text-xs text-amber-300">{s.alerts[0]?.message}</span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
   );
 }

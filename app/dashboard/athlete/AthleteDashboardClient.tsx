@@ -3,6 +3,12 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+type OpsAlert = {
+  code: string;
+  severity: "info" | "warning" | "critical";
+  message: string;
+};
+
 type DashboardData = {
   profile: { fullName: string; athleteCode: string; blocharchStartDate: string; monthlyHourCap: number };
   summary: {
@@ -14,7 +20,16 @@ type DashboardData = {
   };
   activeProjects: number;
   openBlockers: number;
-  recentSubmissions: Array<{ submissionDate: string; totalHours: number }>;
+  checkInRequests: number;
+  todayHours: number;
+  alerts: OpsAlert[];
+  recentSubmissions: Array<{ submissionDate: string; totalHours: number; lockedAt: string | null }>;
+};
+
+const severityClass: Record<OpsAlert["severity"], string> = {
+  info: "text-slate-300",
+  warning: "text-amber-300",
+  critical: "text-red-300",
 };
 
 export function AthleteDashboardClient() {
@@ -59,10 +74,8 @@ export function AthleteDashboardClient() {
           </p>
         </div>
         <div className="card-tool rounded-xl p-4">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Lifetime hours</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-200">
-            {summary.lifetimeHours.toFixed(1)}
-          </p>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Today</p>
+          <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-200">{data.todayHours.toFixed(1)}h</p>
         </div>
       </div>
 
@@ -91,7 +104,17 @@ export function AthleteDashboardClient() {
         </div>
         <div className="card-tool rounded-xl p-5">
           <h2 className="text-sm font-semibold text-white">Alerts</h2>
-          <p className="mt-2 text-sm text-slate-400">{data.openBlockers} open blocker(s)</p>
+          {data.alerts.length === 0 ? (
+            <p className="mt-2 text-sm text-slate-500">No active alerts.</p>
+          ) : (
+            <ul className="mt-3 space-y-2">
+              {data.alerts.map((a) => (
+                <li key={a.code} className={`text-sm ${severityClass[a.severity]}`}>
+                  {a.message}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
         <div className="card-tool rounded-xl p-5 md:col-span-2">
           <h2 className="text-sm font-semibold text-white">Recent submissions</h2>
@@ -101,7 +124,12 @@ export function AthleteDashboardClient() {
             <ul className="mt-3 space-y-2">
               {data.recentSubmissions.map((s) => (
                 <li key={s.submissionDate} className="flex justify-between text-sm text-slate-300">
-                  <span>{s.submissionDate}</span>
+                  <span>
+                    {s.submissionDate}
+                    {s.lockedAt ? (
+                      <span className="ml-2 text-[10px] uppercase text-slate-500">Locked</span>
+                    ) : null}
+                  </span>
                   <span>{s.totalHours}h</span>
                 </li>
               ))}
