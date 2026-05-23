@@ -2,11 +2,12 @@ type PageHeaderProps = {
   title: string;
   description?: string;
   badge?: string;
+  className?: string;
 };
 
-export function PageHeader({ title, description, badge }: PageHeaderProps) {
+export function PageHeader({ title, description, badge, className = "" }: PageHeaderProps) {
   return (
-    <header className="mb-8">
+    <header className={`mb-0 ${className}`.trim()}>
       <div className="flex flex-wrap items-center gap-2 gap-y-1">
         <h1 className="text-2xl font-semibold tracking-tight text-white">{title}</h1>
         {badge ? (

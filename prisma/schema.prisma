@@ -32,6 +32,74 @@ enum PlannerMemberRole {
   viewer
 }
 
+enum OpsClientStatus {
+  active
+  inactive
+}
+
+enum OpsPricingTier {
+  tier_25
+  tier_30
+  tier_35
+  tier_40
+}
+
+enum OpsAthleteStatus {
+  active
+  inactive
+}
+
+enum OpsProjectComplexity {
+  low
+  medium
+  high
+}
+
+enum OpsProjectStatus {
+  not_started
+  in_progress
+  waiting_on_feedback
+  zoom_required
+  blocked
+  completed
+  handed_over
+}
+
+enum OpsProjectPhase {
+  survey_conversion
+  existing_drawings
+  proposed_drawings
+  planning_submission
+  tender_construction_pack
+  construction
+  housekeeping_internal
+}
+
+enum OpsTaskType {
+  plans
+  sections
+  elevations
+  joinery_drawings
+  electrical_drawings
+  modelling_3d
+  rendering
+  coordination_markups
+  review_qa
+  admin_housekeeping
+  other
+}
+
+enum OpsUrgencyStatus {
+  normal
+  critical
+  completed
+}
+
+enum OpsExchangeRateType {
+  live
+  reporting
+}
+
 model Architect {
   id          String   @id @default(uuid())
   url         String   @unique
@@ -77,12 +145,16 @@ model User {
   passwordHash String   @map("password_hash")
   role         UserRole
   disabled     Boolean  @default(false)
+  /** UI theme preference — "dark" or "light". */
+  theme        String   @default("dark")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   ownedPlannerBoards PlannerBoard[]       @relation("PlannerBoardOwner")
   plannerMemberships PlannerBoardMember[]
   assignedPlannerTasks PlannerTask[]      @relation("PlannerTaskAssignee")
+  plannerTodoItems     PlannerTodoItem[]
+  opsAthleteProfile    OpsAthlete?
 
   @@map("users")
 }
@@ -156,16 +228,40 @@ model PlannerTask {
   dueAt        DateTime? @map("due_at")
   architectUrl String?  @map("architect_url")
   customFields Json?    @map("custom_fields")
+  /** When set, this task row is a duplicate pulled onto a personal board from another planner task. */
+  linkedFromTaskId String? @map("linked_from_task_id")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   column   PlannerColumn     @relation(fields: [columnId], references: [id], onDelete: Cascade)
   assignee User?             @relation("PlannerTaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
   labels   PlannerTaskLabel[]
+  linkedFromPlannerTask PlannerTask? @relation("PlannerTaskCopies", fields: [linkedFromTaskId], references: [id], onDelete: SetNull)
+  copiedPlannerTasks    PlannerTask[] @relation("PlannerTaskCopies")
+  plannerTodoItems      PlannerTodoItem[]
 
   @@index([columnId])
   @@index([assigneeId])
+  @@index([linkedFromTaskId])
   @@map("planner_tasks")
+}
+
+/** Per-user checklist rows pointing at planner tasks anywhere the user can see. */
+model PlannerTodoItem {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  taskId    String   @map("task_id")
+  sortOrder Int      @default(0) @map("sort_order")
+  completed Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task PlannerTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, taskId])
+  @@index([userId, completed, sortOrder])
+  @@map("planner_todo_items")
 }
 
 model PlannerTaskLabel {
@@ -177,4 +273,148 @@ model PlannerTaskLabel {
 
   @@id([taskId, labelId])
   @@map("planner_task_labels")
+}
+
+model OpsClient {
+  id            String          @id @default(uuid())
+  name          String
+  companyName   String?         @map("company_name")
+  contactPerson String?         @map("contact_person")
+  email         String?
+  phone         String?
+  country       String?
+  status        OpsClientStatus @default(active)
+  notes         String?         @db.Text
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+
+  commercial   OpsClientCommercialProfile?
+  projects     OpsProject[]
+  lineItems    OpsSubmissionLineItem[]
+
+  @@map("ops_clients")
+}
+
+model OpsClientCommercialProfile {
+  id                 String         @id @default(uuid())
+  clientId           String         @unique @map("client_id")
+  pricingTier        OpsPricingTier @default(tier_30) @map("pricing_tier")
+  laneCostGbp        Decimal        @map("lane_cost_gbp") @db.Decimal(10, 2)
+  overtimeBillingGbp Decimal        @default(20) @map("overtime_billing_gbp") @db.Decimal(10, 2)
+  activeLaneCount    Int            @default(1) @map("active_lane_count")
+  notes              String?        @db.Text
+
+  client OpsClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("ops_client_commercial_profiles")
+}
+
+model OpsAthlete {
+  id               String           @id @default(uuid())
+  userId           String           @unique @map("user_id")
+  fullName         String           @map("full_name")
+  athleteCode      String           @unique @map("athlete_code")
+  email            String?
+  dateOfBirth      DateTime?        @map("date_of_birth") @db.Date
+  baseMonthlyPayZar Decimal         @default(20000) @map("base_monthly_pay_zar") @db.Decimal(12, 2)
+  monthlyHourCap   Int              @default(160) @map("monthly_hour_cap")
+  overtimeRateZar  Decimal          @default(200) @map("overtime_rate_zar") @db.Decimal(10, 2)
+  blocharchStartDate DateTime       @map("blocharch_start_date") @db.Date
+  status           OpsAthleteStatus @default(active)
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projects     OpsProject[]
+  submissions  OpsDailySubmission[]
+
+  @@map("ops_athletes")
+}
+
+model OpsProject {
+  id                String              @id @default(uuid())
+  clientId          String              @map("client_id")
+  assignedAthleteId String?             @map("assigned_athlete_id")
+  name              String
+  projectNumber     String              @map("project_number")
+  address           String?             @db.Text
+  latitude          Float?
+  longitude         Float?
+  projectLead       String?             @map("project_lead")
+  complexity        OpsProjectComplexity @default(medium)
+  startDate         DateTime?           @map("start_date") @db.Date
+  dueDate           DateTime?           @map("due_date") @db.Date
+  handoverDate      DateTime?           @map("handover_date") @db.Date
+  currentStage      OpsProjectPhase     @default(existing_drawings) @map("current_stage")
+  currentStatus     OpsProjectStatus    @default(not_started) @map("current_status")
+  notes             String?             @db.Text
+  blockerFlag       Boolean             @default(false) @map("blocker_flag")
+  checkInRequested  Boolean             @default(false) @map("check_in_requested")
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+
+  client          OpsClient               @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  assignedAthlete OpsAthlete?             @relation(fields: [assignedAthleteId], references: [id], onDelete: SetNull)
+  lineItems       OpsSubmissionLineItem[]
+
+  @@unique([clientId, projectNumber])
+  @@index([assignedAthleteId])
+  @@map("ops_projects")
+}
+
+model OpsDailySubmission {
+  id               String   @id @default(uuid())
+  athleteId        String   @map("athlete_id")
+  submissionDate   DateTime @map("submission_date") @db.Date
+  wellbeingScore   Int?     @map("wellbeing_score")
+  checkInRequested Boolean  @default(false) @map("check_in_requested")
+  dailyNote        String?  @map("daily_note") @db.Text
+  totalHours       Decimal  @default(0) @map("total_hours") @db.Decimal(6, 2)
+  lockedAt         DateTime? @map("locked_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  athlete   OpsAthlete              @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  lineItems OpsSubmissionLineItem[]
+
+  @@unique([athleteId, submissionDate])
+  @@index([athleteId, submissionDate])
+  @@map("ops_daily_submissions")
+}
+
+model OpsSubmissionLineItem {
+  id                String           @id @default(uuid())
+  submissionId      String           @map("submission_id")
+  clientId          String           @map("client_id")
+  projectId         String           @map("project_id")
+  projectPhase      OpsProjectPhase  @map("project_phase")
+  taskType          OpsTaskType      @map("task_type")
+  hoursWorked       Decimal          @map("hours_worked") @db.Decimal(5, 2)
+  completionPercent Int?             @map("completion_percent")
+  urgencyStatus     OpsUrgencyStatus @default(normal) @map("urgency_status")
+  completedSummary  String?          @map("completed_summary") @db.Text
+  blockerFlag       Boolean          @default(false) @map("blocker_flag")
+  blockerNote       String?          @map("blocker_note") @db.Text
+  notes             String?          @db.Text
+  createdAt         DateTime         @default(now()) @map("created_at")
+
+  submission OpsDailySubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  client     OpsClient          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  project    OpsProject         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([submissionId])
+  @@index([projectId])
+  @@map("ops_submission_line_items")
+}
+
+model OpsExchangeRate {
+  id             String              @id @default(uuid())
+  effectiveMonth DateTime            @map("effective_month") @db.Date
+  gbpToZarRate   Decimal             @map("gbp_to_zar_rate") @db.Decimal(10, 4)
+  rateType       OpsExchangeRateType @map("rate_type")
+  activeFlag     Boolean             @default(true) @map("active_flag")
+  createdAt      DateTime            @default(now()) @map("created_at")
+
+  @@index([effectiveMonth, rateType, activeFlag])
+  @@map("ops_exchange_rates")
 }

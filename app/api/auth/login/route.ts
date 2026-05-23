@@ -4,6 +4,7 @@ import { verifyPassword } from "@/lib/password";
 import { requestIsSecure } from "@/lib/request-https";
 import { buildSessionPayload, defaultSessionExpirySeconds, signSessionToken } from "@/lib/session-token";
 import { findUserByUsername } from "@/lib/users-store";
+import { THEME_COOKIE, themeCookieMaxAge } from "@/lib/theme";
 
 export async function POST(request: NextRequest) {
   let body: unknown;
@@ -37,6 +38,13 @@ export async function POST(request: NextRequest) {
       secure,
       sameSite: "lax",
       maxAge: defaultSessionExpirySeconds(),
+      path: "/",
+    });
+    res.cookies.set(THEME_COOKIE, user.theme, {
+      httpOnly: false,
+      secure,
+      sameSite: "lax",
+      maxAge: themeCookieMaxAge(),
       path: "/",
     });
     return res;

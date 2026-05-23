@@ -1,13 +1,23 @@
 "use client";
 
+import { Fragment } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BrandMark } from "@/components/BrandMark";
 import { LogoutButton } from "@/components/LogoutButton";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { BLOCHARCH_SITE } from "@/lib/blocharch-brand";
 import type { SessionUser } from "@/lib/auth";
+import { canAccessModule, type AppModule } from "@/lib/permissions";
 
-type NavItem = { href: string; label: string; icon: React.ReactNode; adminOnly?: boolean };
+type NavItem = { href: string; label: string; icon: React.ReactNode };
+
+type NavSection = {
+  id: string;
+  label: string;
+  module: AppModule;
+  items: NavItem[];
+};
 
 const MARKETING_NAV: NavItem[] = [
   {
@@ -62,6 +72,9 @@ const MARKETING_NAV: NavItem[] = [
       </svg>
     ),
   },
+];
+
+const PLANNER_NAV: NavItem[] = [
   {
     href: "/dashboard/planner",
     label: "Project planner",
@@ -77,11 +90,68 @@ const MARKETING_NAV: NavItem[] = [
   },
 ];
 
+const OPS_NAV: NavItem[] = [
+  {
+    href: "/dashboard/ops",
+    label: "Ops overview",
+    icon: (
+      <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5M9 11.25v1.5M12 9v3.75m3-6.75v6.75"
+        />
+      </svg>
+    ),
+  },
+];
+
+const ATHLETE_PORTAL_NAV: NavItem[] = [
+  {
+    href: "/dashboard/athlete",
+    label: "My dashboard",
+    icon: (
+      <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"
+        />
+      </svg>
+    ),
+  },
+  {
+    href: "/dashboard/athlete/submissions",
+    label: "Daily log",
+    icon: (
+      <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"
+        />
+      </svg>
+    ),
+  },
+  {
+    href: "/dashboard/athlete/projects",
+    label: "My projects",
+    icon: (
+      <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z"
+        />
+      </svg>
+    ),
+  },
+];
+
 const ADMIN_NAV: NavItem[] = [
   {
     href: "/dashboard/admin",
     label: "Users & access",
-    adminOnly: true,
     icon: (
       <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
         <path
@@ -94,8 +164,18 @@ const ADMIN_NAV: NavItem[] = [
   },
 ];
 
+const NAV_SECTIONS: NavSection[] = [
+  { id: "marketing", label: "Marketing", module: "marketing", items: MARKETING_NAV },
+  { id: "ops", label: "Athlete operations", module: "ops", items: OPS_NAV },
+  { id: "athlete_portal", label: "My workspace", module: "athlete_portal", items: ATHLETE_PORTAL_NAV },
+  { id: "planner", label: "Project planner", module: "planner", items: PLANNER_NAV },
+  { id: "admin", label: "Admin", module: "admin", items: ADMIN_NAV },
+];
+
 function navActive(pathname: string, href: string): boolean {
   if (href === "/dashboard") return pathname === "/dashboard";
+  if (href === "/dashboard/ops") return pathname === "/dashboard/ops" || pathname.startsWith("/dashboard/ops/");
+  if (href === "/dashboard/athlete") return pathname === "/dashboard/athlete";
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
@@ -118,15 +198,14 @@ function NavLink({ href, label, icon, pathname }: NavItem & { pathname: string }
 
 export function DashboardSidebar({ user }: { user: SessionUser }) {
   const pathname = usePathname() || "";
-  const marketingItems = MARKETING_NAV;
-  const adminItems = ADMIN_NAV.filter((item) => !item.adminOnly || user.role === "admin");
+  const visibleSections = NAV_SECTIONS.filter((section) => canAccessModule(user.role, section.module));
 
   return (
     <aside className="flex w-[260px] min-h-screen flex-shrink-0 flex-col border-r border-white/[0.06] bg-[var(--bg-sidebar)]">
       <div className="border-b border-white/[0.06] px-4 py-5">
         <BrandMark />
         <p className="mt-3 text-xs leading-relaxed text-slate-500">
-          Internal dashboard for Blocharch properties — directory, maps, and lead workflows in one place.
+          Blocharch console — marketing, project operations, and athlete workflows in one place.
         </p>
         <a
           href={BLOCHARCH_SITE}
@@ -141,23 +220,28 @@ export function DashboardSidebar({ user }: { user: SessionUser }) {
         </a>
       </div>
       <nav className="flex-1 space-y-1 p-3" aria-label="Main">
-        <p className="px-3 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Marketing</p>
-        <div className="space-y-0.5">
-          {marketingItems.map((item) => (
-            <NavLink key={item.href} {...item} pathname={pathname} />
-          ))}
-        </div>
-        {adminItems.length > 0 ? (
-          <>
-            <p className="px-3 pb-1 pt-5 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Admin</p>
+        {visibleSections.map((section, index) => (
+          <Fragment key={section.id}>
+            {index > 0 ? (
+              <p className="px-3 pb-1 pt-5 text-[10px] font-semibold uppercase tracking-wider text-slate-600">
+                {section.label}
+              </p>
+            ) : (
+              <p className="px-3 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-slate-600">
+                {section.label}
+              </p>
+            )}
             <div className="space-y-0.5">
-              {adminItems.map((item) => (
+              {section.items.map((item) => (
                 <NavLink key={item.href} {...item} pathname={pathname} />
               ))}
             </div>
-          </>
-        ) : null}
+          </Fragment>
+        ))}
       </nav>
+      <div className="border-t border-white/[0.06] px-3 py-3">
+        <ThemeToggle />
+      </div>
       <div className="border-t border-white/[0.06] p-4">
         <div className="flex items-center justify-between gap-2 rounded-lg bg-white/[0.03] px-3 py-2.5 ring-1 ring-white/[0.06]">
           <div className="min-w-0">
@@ -171,6 +255,10 @@ export function DashboardSidebar({ user }: { user: SessionUser }) {
               ) : user.role === "manager" ? (
                 <span className="ml-1.5 rounded bg-amber-500/15 px-1 py-0.5 text-[9px] font-semibold uppercase text-amber-400">
                   manager
+                </span>
+              ) : user.role === "user" ? (
+                <span className="ml-1.5 rounded bg-slate-500/15 px-1 py-0.5 text-[9px] font-semibold uppercase text-slate-400">
+                  athlete
                 </span>
               ) : null}
             </p>

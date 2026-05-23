@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 type BoardSummary = {
   id: string;
@@ -27,6 +27,7 @@ type TaskRow = {
   dueAt: string | null;
   architectUrl: string | null;
   customFields: Record<string, unknown> | null;
+  linkedFromTaskId?: string | null;
   assignee: Assignee | null;
   labels: TaskLbl[];
   leadStage?: string | null;
@@ -62,6 +63,32 @@ type BoardDetail = {
 };
 
 type AssigneeOption = { id: string; username: string; role: string };
+
+type PlannerTodoDTO = {
+  id: string;
+  completed: boolean;
+  sortOrder: number;
+  task: {
+    id: string;
+    title: string;
+    summary: string | null;
+    column: { title: string; board: { id: string; title: string; scope: string } };
+  };
+};
+
+type BrowseTaskRow = {
+  id: string;
+  title: string;
+  boardTitle: string;
+  scope: string;
+  columnTitle: string;
+};
+
+function resolveBacklogColumnId(columns: ColumnRow[]): string | null {
+  const named = columns.find((c) => /^backlog\b/i.test(c.title.trim()));
+  if (named) return named.id;
+  return columns[0]?.id ?? null;
+}
 
 function googleEventUrl(title: string, due: Date) {
   const start = due;
@@ -100,6 +127,11 @@ const PLANNER_SHORT_DESC_HINT =
 
 const PLANNER_LONG_DESC_HINT =
   "Detailed notes: paragraphs, bullets (– •), or numbered lines (1. 2.). Plain text — line breaks are kept.";
+
+function removePlannerDragGhosts() {
+  if (typeof document === "undefined") return;
+  document.querySelectorAll("[data-planner-drag-ghost]").forEach((el) => el.remove());
+}
 
 function normalizeColumnTaskOrder(col: ColumnRow): ColumnRow {
   return {
@@ -196,10 +228,28 @@ export function PlannerClient() {
   const [newColTitle, setNewColTitle] = useState("");
   const [newColColor, setNewColColor] = useState("#64748b");
 
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [plannerTodos, setPlannerTodos] = useState<PlannerTodoDTO[]>([]);
+  const [linkKanbanModalOpen, setLinkKanbanModalOpen] = useState(false);
+  const [browseQ, setBrowseQ] = useState("");
+  const [browseBusy, setBrowseBusy] = useState(false);
+  const [browseRows, setBrowseRows] = useState<BrowseTaskRow[]>([]);
+  const [copyModal, setCopyModal] = useState<{ taskId: string; title: string } | null>(null);
+  const [copyBoardId, setCopyBoardId] = useState<string | null>(null);
+  const [copyColumns, setCopyColumns] = useState<Array<{ id: string; title: string }>>([]);
+  const [copyColumnId, setCopyColumnId] = useState<string | null>(null);
+  const [copySaving, setCopySaving] = useState(false);
+
   const suppressNextCardClickRef = useRef(false);
   /** Mirrors dragTaskId for drop handlers (state can lag in edge timings). */
   const dragTaskIdRef = useRef<string | null>(null);
+  const dragGhostRef = useRef<HTMLElement | null>(null);
   const detailRef = useRef(detail);
+
+  useEffect(() => {
+    removePlannerDragGhosts();
+    return () => removePlannerDragGhosts();
+  }, []);
 
   useEffect(() => {
     detailRef.current = detail;
@@ -220,12 +270,33 @@ export function PlannerClient() {
     if (r.ok) setBoards(j.boards || []);
   }, []);
 
-  const loadDetail = useCallback(async (id: string) => {
+  const loadDetail = useCallback(async (id: string): Promise<BoardDetail | null> => {
     const r = await fetch(`/api/planner/boards/${encodeURIComponent(id)}`);
-    if (!r.ok) return;
     const j = await r.json();
-    setDetail(j as BoardDetail);
+    if (!r.ok) return null;
+    const typed = j as BoardDetail;
+    setDetail(typed);
+    return typed;
   }, []);
+
+  const refreshTodos = useCallback(async () => {
+    const r = await fetch("/api/planner/todos");
+    const j = await r.json().catch(() => ({}));
+    if (r.ok) setPlannerTodos((j.todos as PlannerTodoDTO[]) ?? []);
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/me")
+      .then(async (r) => {
+        const j = await r.json().catch(() => ({}));
+        if (r.ok && typeof j?.user?.id === "string") setCurrentUserId(j.user.id);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    refreshTodos().catch(() => {});
+  }, [refreshTodos]);
 
   useEffect(() => {
     setLoading(true);
@@ -251,6 +322,116 @@ export function PlannerClient() {
     if (filter === "all") return boards;
     return boards.filter((b) => b.scope === filter);
   }, [boards, filter]);
+
+  const personalOwnedBoards = useMemo(() => {
+    if (!currentUserId) return [];
+    return boards.filter((b) => b.scope === "personal" && b.ownerId === currentUserId);
+  }, [boards, currentUserId]);
+
+  const todoTaskIdSet = useMemo(() => new Set(plannerTodos.map((x) => x.task.id)), [plannerTodos]);
+
+  async function navigateBoardAndFocusTask(targetBoardId: string, taskId: string) {
+    setBoardId(targetBoardId);
+    const bd = await loadDetail(targetBoardId);
+    if (!bd) return;
+    for (const col of bd.columns) {
+      const row = col.tasks.find((x) => x.id === taskId);
+      if (row) {
+        setEditTask({ ...row, columnId: col.id });
+        break;
+      }
+    }
+  }
+
+  async function addTaskToMyTodo(taskIdLink: string) {
+    const r = await fetch("/api/planner/todos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ taskId: taskIdLink }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      window.alert((j as { error?: string }).error || "Could not add to your list");
+      return;
+    }
+    await refreshTodos();
+  }
+
+  function openPersonalCopyModal(taskId: string, taskTitle: string) {
+    const firstBoard = personalOwnedBoards[0]?.id ?? null;
+    setCopyModal({ taskId, title: taskTitle });
+    setCopyBoardId(firstBoard);
+  }
+
+  async function confirmCopyToPersonalBoard() {
+    if (!copyModal?.taskId || !copyColumnId) return;
+    setCopySaving(true);
+    try {
+      const r = await fetch("/api/planner/tasks/copy-to-personal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sourceTaskId: copyModal.taskId,
+          targetColumnId: copyColumnId,
+        }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        window.alert((j as { error?: string }).error || "Could not copy to personal board");
+        return;
+      }
+      const targetBid = typeof j.targetBoardId === "string" ? j.targetBoardId : null;
+      setCopyModal(null);
+      if (targetBid) setBoardId(targetBid);
+      await refreshBoards();
+      if (targetBid) await loadDetail(targetBid);
+      await refreshTodos();
+    } finally {
+      setCopySaving(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!linkKanbanModalOpen) return;
+    let cancelled = false;
+    const h = window.setTimeout(async () => {
+      setBrowseBusy(true);
+      try {
+        const qs = browseQ.trim() ? `?q=${encodeURIComponent(browseQ.trim())}` : "";
+        const r = await fetch(`/api/planner/tasks/browse${qs}`);
+        const j = await r.json().catch(() => ({}));
+        if (!cancelled && r.ok) setBrowseRows((j.tasks as BrowseTaskRow[]) ?? []);
+      } finally {
+        if (!cancelled) setBrowseBusy(false);
+      }
+    }, 300);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(h);
+    };
+  }, [linkKanbanModalOpen, browseQ]);
+
+  useEffect(() => {
+    if (!copyModal || !copyBoardId) {
+      setCopyColumns([]);
+      setCopyColumnId(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const r = await fetch(`/api/planner/boards/${encodeURIComponent(copyBoardId)}`);
+      const j = await r.json().catch(() => null);
+      if (cancelled || !r.ok || !j) return;
+      const bd = j as BoardDetail;
+      const cols = bd.columns.map((c) => ({ id: c.id, title: c.title }));
+      setCopyColumns(cols);
+      const bl = resolveBacklogColumnId(bd.columns);
+      setCopyColumnId(bl ?? cols[0]?.id ?? null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [copyModal, copyBoardId]);
 
   async function createBoard(e: React.FormEvent) {
     e.preventDefault();
@@ -614,6 +795,94 @@ export function PlannerClient() {
         ) : null}
       </div>
 
+      <section className="card-tool rounded-xl p-4" aria-labelledby="planner-cross-todos-heading">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h3 id="planner-cross-todos-heading" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Cross-board todos
+            </h3>
+            <p className="mt-1 max-w-xl text-[11px] leading-relaxed text-slate-600">
+              Pins tasks from any board you can see. Check them off privately here; originals stay on their Kanban.
+              Copy a team card onto your{" "}
+              <span className="text-slate-500">personal</span> board to move it locally.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setBrowseQ("");
+              setLinkKanbanModalOpen(true);
+            }}
+            className="shrink-0 rounded-lg bg-white/[0.08] px-3 py-2 text-xs font-medium text-slate-200 ring-1 ring-white/[0.08] hover:bg-white/[0.12]"
+          >
+            + Link task…
+          </button>
+        </div>
+        {plannerTodos.length === 0 ? (
+          <p className="mt-3 text-sm text-slate-500">
+            Nothing here yet — open a Kanban card and use <span className="text-slate-400">Todo</span>, or browse with
+            &quot;Link task&quot;.
+          </p>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {plannerTodos.map((row) => {
+              const b = row.task.column.board;
+              return (
+                <li
+                  key={row.id}
+                  className="flex flex-wrap items-start gap-x-3 gap-y-2 rounded-lg border border-white/[0.06] bg-black/20 px-3 py-2"
+                >
+                  <label className="flex shrink-0 cursor-pointer items-start gap-2 pt-0.5">
+                    <input
+                      type="checkbox"
+                      checked={row.completed}
+                      className="mt-1 rounded border-white/20 bg-white/[0.06] text-brand-500"
+                      onChange={(e) => {
+                        void (async () => {
+                          await fetch(`/api/planner/todos/${encodeURIComponent(row.id)}`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ completed: e.target.checked }),
+                          }).then(async (rs) => {
+                            if (!rs.ok) return;
+                            await refreshTodos();
+                          });
+                        })();
+                      }}
+                    />
+                  </label>
+                  <div className="min-w-0 flex-1">
+                    <button
+                      type="button"
+                      className={`text-left text-sm font-medium ${row.completed ? "text-slate-500 line-through" : "text-white hover:text-brand-100"}`}
+                      onClick={() => void navigateBoardAndFocusTask(b.id, row.task.id)}
+                    >
+                      {row.task.title}
+                    </button>
+                    <p className="text-[10px] text-slate-500">
+                      [{b.scope}] {b.title} · {row.task.column.title}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    title="Remove from list only"
+                    onClick={() =>
+                      void (async () => {
+                        await fetch(`/api/planner/todos/${encodeURIComponent(row.id)}`, { method: "DELETE" });
+                        await refreshTodos();
+                      })()
+                    }
+                    className="shrink-0 text-[11px] text-slate-500 hover:text-red-400"
+                  >
+                    Remove
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
       {detail && (
         <>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -806,8 +1075,8 @@ export function PlannerClient() {
                         />
                       ) : null}
                       <div
-                        role={detail.editable ? "button" : undefined}
-                        tabIndex={detail.editable ? 0 : undefined}
+                        role="button"
+                        tabIndex={0}
                         draggable={detail.editable}
                         onDragStart={(e) => {
                           if (!detail.editable) return;
@@ -816,23 +1085,38 @@ export function PlannerClient() {
                           setDragTaskId(t.id);
                           e.dataTransfer.effectAllowed = "move";
                           e.dataTransfer.setData("text/plain", t.id);
+                          removePlannerDragGhosts();
+                          if (dragGhostRef.current) {
+                            dragGhostRef.current.remove();
+                            dragGhostRef.current = null;
+                          }
                           const card = e.currentTarget;
                           try {
                             const ghost = card.cloneNode(true) as HTMLElement;
+                            ghost.setAttribute("data-planner-drag-ghost", "true");
                             ghost.style.width = `${card.offsetWidth}px`;
                             ghost.style.opacity = "0.92";
                             ghost.style.transform = "rotate(2deg)";
                             ghost.style.boxShadow = "0 12px 40px rgba(0,0,0,0.45)";
                             ghost.style.borderRadius = "0.5rem";
                             ghost.style.pointerEvents = "none";
-                            ghost.style.position = "absolute";
-                            ghost.style.top = "-9999px";
-                            ghost.style.left = "0";
+                            ghost.style.position = "fixed";
+                            ghost.style.top = "-10000px";
+                            ghost.style.left = "-10000px";
+                            ghost.style.zIndex = "-1";
                             document.body.appendChild(ghost);
-                            e.dataTransfer.setDragImage(ghost, e.clientX - card.getBoundingClientRect().left, e.clientY - card.getBoundingClientRect().top);
+                            dragGhostRef.current = ghost;
+                            e.dataTransfer.setDragImage(
+                              ghost,
+                              e.clientX - card.getBoundingClientRect().left,
+                              e.clientY - card.getBoundingClientRect().top
+                            );
                             requestAnimationFrame(() =>
                               requestAnimationFrame(() => {
-                                ghost.remove();
+                                if (dragGhostRef.current === ghost) {
+                                  ghost.remove();
+                                  dragGhostRef.current = null;
+                                }
                               })
                             );
                           } catch {
@@ -840,6 +1124,11 @@ export function PlannerClient() {
                           }
                         }}
                         onDragEnd={() => {
+                          if (dragGhostRef.current) {
+                            dragGhostRef.current.remove();
+                            dragGhostRef.current = null;
+                          }
+                          removePlannerDragGhosts();
                           dragTaskIdRef.current = null;
                           setDragTaskId(null);
                           setDropTargetColumnId(null);
@@ -874,7 +1163,6 @@ export function PlannerClient() {
                           setEditTask({ ...t, columnId: col.id });
                         }}
                         onKeyDown={(e) => {
-                          if (!detail.editable) return;
                           if (e.key === "Enter" || e.key === " ") {
                             e.preventDefault();
                             setEditTask({ ...t, columnId: col.id });
@@ -918,6 +1206,11 @@ export function PlannerClient() {
                           ) : null}
                           <div className="min-w-0 flex-1">
                             <p className="font-medium text-white">{t.title}</p>
+                            {t.linkedFromTaskId ? (
+                              <p className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-brand-400/85">
+                                From another board · edit your personal copy here
+                              </p>
+                            ) : null}
                             {descPreview ? (
                               <p className="mt-1 line-clamp-4 whitespace-pre-wrap text-[12px] leading-snug text-slate-400">
                                 {descPreview}
@@ -936,6 +1229,33 @@ export function PlannerClient() {
                                 ))}
                               </div>
                             ) : null}
+                            <div
+                              className="mt-2 flex flex-wrap gap-2"
+                              onClick={(e) => e.stopPropagation()}
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onKeyDown={(e) => e.stopPropagation()}
+                              role="group"
+                              aria-label="Cross-board shortcuts"
+                            >
+                              <button
+                                type="button"
+                                disabled={todoTaskIdSet.has(t.id)}
+                                onClick={() => void addTaskToMyTodo(t.id)}
+                                className="rounded-md border border-white/[0.1] px-2 py-1 text-[10px] font-medium text-brand-300 hover:bg-brand-500/15 disabled:cursor-not-allowed disabled:opacity-40"
+                              >
+                                {todoTaskIdSet.has(t.id) ? "On checklist" : "Todo"}
+                              </button>
+                              {personalOwnedBoards.length > 0 ? (
+                                <button
+                                  type="button"
+                                  onClick={() => openPersonalCopyModal(t.id, t.title)}
+                                  className="rounded-md border border-white/[0.1] px-2 py-1 text-[10px] font-medium text-slate-300 hover:bg-white/[0.08]"
+                                  title={`Copy onto your ${personalOwnedBoards.length === 1 ? `"${personalOwnedBoards[0]!.title}"` : "personal"} board`}
+                                >
+                                  Personal board…
+                                </button>
+                              ) : null}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -1053,13 +1373,35 @@ export function PlannerClient() {
             />
           )}
 
-          {editTask && detail.editable && (
+          {editTask && detail && (
             <EditTaskModal
               key={editTask.id}
+              readOnly={!detail.editable}
               task={editTask}
               labels={detail.labels}
               assignees={assignees}
               onClose={() => setEditTask(null)}
+              footerExtra={
+                <div className="mt-5 flex flex-wrap gap-2 border-t border-white/[0.08] pt-4">
+                  <button
+                    type="button"
+                    disabled={todoTaskIdSet.has(editTask.id)}
+                    onClick={() => void addTaskToMyTodo(editTask.id)}
+                    className="rounded-lg border border-white/[0.1] px-3 py-1.5 text-xs font-medium text-brand-300 hover:bg-brand-500/15 disabled:opacity-40"
+                  >
+                    {todoTaskIdSet.has(editTask.id) ? "On checklist" : "Add to checklist"}
+                  </button>
+                  {personalOwnedBoards.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => openPersonalCopyModal(editTask.id, editTask.title)}
+                      className="rounded-lg border border-white/[0.1] px-3 py-1.5 text-xs font-medium text-slate-300 hover:bg-white/[0.08]"
+                    >
+                      Copy to personal board…
+                    </button>
+                  ) : null}
+                </div>
+              }
               onSave={async (taskId, payload) => {
                 await patchTask(taskId, payload);
                 setEditTask(null);
@@ -1068,11 +1410,152 @@ export function PlannerClient() {
                 await fetch(`/api/planner/tasks/${encodeURIComponent(taskId)}`, { method: "DELETE" });
                 setEditTask(null);
                 if (boardId) await loadDetail(boardId);
+                await refreshTodos();
               }}
             />
           )}
         </>
       )}
+
+      {linkKanbanModalOpen ? (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="link-kanban-title"
+        >
+          <div className="max-h-[85vh] w-full max-w-lg overflow-hidden rounded-2xl border border-white/[0.1] bg-slate-900 shadow-xl">
+            <div className="border-b border-white/[0.08] p-4">
+              <h3 id="link-kanban-title" className="text-lg font-semibold text-white">
+                Link a task to your checklist
+              </h3>
+              <p className="mt-1 text-xs text-slate-500">
+                Search every board you can access. Adds a reference without moving the card.
+              </p>
+              <input
+                type="search"
+                value={browseQ}
+                onChange={(e) => setBrowseQ(e.target.value)}
+                placeholder="Search task title…"
+                className="mt-3 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white placeholder-slate-500"
+                autoFocus
+              />
+            </div>
+            <div className="max-h-[50vh] overflow-y-auto p-2">
+              {browseBusy ? (
+                <p className="p-4 text-sm text-slate-500">Searching…</p>
+              ) : browseRows.length === 0 ? (
+                <p className="p-4 text-sm text-slate-500">No tasks found.</p>
+              ) : (
+                <ul className="space-y-1">
+                  {browseRows.map((row) => (
+                    <li
+                      key={row.id}
+                      className="flex items-start justify-between gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-slate-100">{row.title}</p>
+                        <p className="text-[10px] text-slate-500">
+                          [{row.scope}] {row.boardTitle} · {row.columnTitle}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={todoTaskIdSet.has(row.id)}
+                        onClick={() =>
+                          void (async () => {
+                            await addTaskToMyTodo(row.id);
+                            setLinkKanbanModalOpen(false);
+                          })()
+                        }
+                        className="shrink-0 rounded-md bg-brand-600 px-2 py-1 text-[11px] font-semibold text-slate-950 disabled:opacity-40"
+                      >
+                        {todoTaskIdSet.has(row.id) ? "Added" : "Add"}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className="flex justify-end border-t border-white/[0.08] p-3">
+              <button
+                type="button"
+                onClick={() => setLinkKanbanModalOpen(false)}
+                className="rounded-lg px-4 py-2 text-sm text-slate-400 hover:text-white"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {copyModal ? (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-md rounded-2xl border border-white/[0.1] bg-slate-900 p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-white">Copy to personal board</h3>
+            <p className="mt-1 text-xs text-slate-500">
+              Creates a new card on your personal Kanban from:{" "}
+              <span className="text-slate-300">{copyModal.title}</span>
+            </p>
+            {personalOwnedBoards.length === 0 ? (
+              <p className="mt-4 text-sm text-amber-400/90">Create a personal board first.</p>
+            ) : (
+              <>
+                <label className="mt-4 block text-xs text-slate-400">
+                  Personal board
+                  <select
+                    value={copyBoardId ?? ""}
+                    onChange={(e) => setCopyBoardId(e.target.value || null)}
+                    className="select-console mt-1 block w-full rounded-lg px-3 py-2 text-sm"
+                  >
+                    {personalOwnedBoards.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="mt-3 block text-xs text-slate-400">
+                  Column
+                  <select
+                    value={copyColumnId ?? ""}
+                    onChange={(e) => setCopyColumnId(e.target.value || null)}
+                    className="select-console mt-1 block w-full rounded-lg px-3 py-2 text-sm"
+                  >
+                    {copyColumns.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </>
+            )}
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setCopyModal(null)}
+                className="rounded-lg px-4 py-2 text-sm text-slate-400 hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={copySaving || !copyColumnId || personalOwnedBoards.length === 0}
+                onClick={() => void confirmCopyToPersonalBoard()}
+                className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-40"
+              >
+                {copySaving ? "Copying…" : "Copy"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1555,6 +2038,8 @@ function EditTaskModal({
   task,
   labels,
   assignees,
+  readOnly = false,
+  footerExtra,
   onClose,
   onSave,
   onDelete,
@@ -1562,6 +2047,8 @@ function EditTaskModal({
   task: TaskRow & { columnId: string };
   labels: Label[];
   assignees: AssigneeOption[];
+  readOnly?: boolean;
+  footerExtra?: ReactNode;
   onClose: () => void;
   onSave: (taskId: string, body: Record<string, unknown>) => Promise<void>;
   onDelete: (taskId: string) => Promise<void>;
@@ -1581,13 +2068,17 @@ function EditTaskModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="dialog">
       <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-white/[0.1] bg-slate-900 p-6 shadow-xl">
-        <h3 className="text-lg font-semibold text-white">Edit task</h3>
+        <h3 className="text-lg font-semibold text-white">{readOnly ? "View task" : "Edit task"}</h3>
+        {readOnly ? (
+          <p className="mt-1 text-xs text-slate-500">This board is read-only. You cannot change fields here.</p>
+        ) : null}
         <div className="mt-4 space-y-3 text-sm">
           <label className="block text-slate-400">
             Title
             <input
-              className="select-console mt-1 w-full rounded-lg px-3 py-2 text-sm"
+              className="select-console mt-1 w-full rounded-lg px-3 py-2 text-sm disabled:opacity-60"
               value={title}
+              disabled={readOnly}
               onChange={(e) => setTitle(e.target.value)}
             />
           </label>
@@ -1597,9 +2088,10 @@ function EditTaskModal({
               {PLANNER_SHORT_DESC_HINT}
             </span>
             <textarea
-              className="mt-2 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 font-mono text-[13px] leading-relaxed text-white"
+              className="mt-2 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 font-mono text-[13px] leading-relaxed text-white disabled:opacity-60"
               rows={5}
               value={summary}
+              disabled={readOnly}
               onChange={(e) => setSummary(e.target.value)}
             />
           </label>
@@ -1609,17 +2101,19 @@ function EditTaskModal({
               {PLANNER_LONG_DESC_HINT}
             </span>
             <textarea
-              className="mt-2 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 font-mono text-[13px] leading-relaxed text-white"
+              className="mt-2 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 font-mono text-[13px] leading-relaxed text-white disabled:opacity-60"
               rows={14}
               value={description}
+              disabled={readOnly}
               onChange={(e) => setDescription(e.target.value)}
             />
           </label>
           <label className="block text-slate-400">
             Assignee
             <select
-              className="select-console mt-1 w-full rounded-lg px-3 py-2 text-sm"
+              className="select-console mt-1 w-full rounded-lg px-3 py-2 text-sm disabled:opacity-60"
               value={assigneeId}
+              disabled={readOnly}
               onChange={(e) => setAssigneeId(e.target.value)}
             >
               <option value="">—</option>
@@ -1634,16 +2128,18 @@ function EditTaskModal({
             Due
             <input
               type="datetime-local"
-              className="select-console mt-1 w-full rounded-lg px-3 py-2 text-sm"
+              className="select-console mt-1 w-full rounded-lg px-3 py-2 text-sm disabled:opacity-60"
               value={due}
+              disabled={readOnly}
               onChange={(e) => setDue(e.target.value)}
             />
           </label>
           <label className="block text-slate-400">
             Architect / lead URL
             <input
-              className="select-console mt-1 w-full rounded-lg px-3 py-2 text-sm"
+              className="select-console mt-1 w-full rounded-lg px-3 py-2 text-sm disabled:opacity-60"
               value={architectUrl}
+              disabled={readOnly}
               onChange={(e) => setArchitectUrl(e.target.value)}
             />
           </label>
@@ -1651,9 +2147,13 @@ function EditTaskModal({
             <p className="text-slate-400">Labels</p>
             <div className="mt-1 flex flex-wrap gap-2">
               {labels.map((l) => (
-                <label key={l.id} className="flex cursor-pointer items-center gap-1 text-xs">
+                <label
+                  key={l.id}
+                  className={`flex items-center gap-1 text-xs ${readOnly ? "cursor-default opacity-80" : "cursor-pointer"}`}
+                >
                   <input
                     type="checkbox"
+                    disabled={readOnly}
                     checked={labelIds.includes(l.id)}
                     onChange={(e) => {
                       setLabelIds((prev) =>
@@ -1677,35 +2177,42 @@ function EditTaskModal({
             </a>
           ) : null}
         </div>
+        {footerExtra}
         <div className="mt-6 flex flex-wrap justify-between gap-2">
-          <button
-            type="button"
-            onClick={() => onDelete(task.id)}
-            className="text-sm text-red-400 hover:underline"
-          >
-            Delete task
-          </button>
+          {readOnly ? (
+            <span />
+          ) : (
+            <button
+              type="button"
+              onClick={() => onDelete(task.id)}
+              className="text-sm text-red-400 hover:underline"
+            >
+              Delete task
+            </button>
+          )}
           <div className="flex gap-2">
             <button type="button" onClick={onClose} className="text-sm text-slate-500">
               Close
             </button>
-            <button
-              type="button"
-              onClick={async () => {
-                await onSave(task.id, {
-                  title: title.trim(),
-                  summary: summary.trim() || null,
-                  description: description.trim() ? description : null,
-                  assigneeId: assigneeId || null,
-                  dueAt: due ? new Date(due).toISOString() : null,
-                  architectUrl: architectUrl.trim() || null,
-                  labelIds,
-                });
-              }}
-              className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-slate-950"
-            >
-              Save
-            </button>
+            {readOnly ? null : (
+              <button
+                type="button"
+                onClick={async () => {
+                  await onSave(task.id, {
+                    title: title.trim(),
+                    summary: summary.trim() || null,
+                    description: description.trim() ? description : null,
+                    assigneeId: assigneeId || null,
+                    dueAt: due ? new Date(due).toISOString() : null,
+                    architectUrl: architectUrl.trim() || null,
+                    labelIds,
+                  });
+                }}
+                className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-slate-950"
+              >
+                Save
+              </button>
+            )}
           </div>
         </div>
       </div>

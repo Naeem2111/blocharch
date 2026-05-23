@@ -1,8 +1,10 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { redirect } from "next/navigation";
 import { verifySessionToken, type SessionPayload } from "@/lib/session-token";
 import { findUserById, type UserRecord } from "@/lib/users-store";
+import { canAccessModule, defaultDashboardPath } from "@/lib/permissions";
 
 export const AUTH_COOKIE = "blocarch_session";
 
@@ -46,8 +48,32 @@ export async function requireAdminRequest(
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (session.user.role !== "admin") {
+  if (!canAccessModule(session.user.role, "admin")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  return session;
+}
+
+export async function requireAdminPage() {
+  const session = await getSession();
+  if (!session || !canAccessModule(session.user.role, "admin")) {
+    redirect(defaultDashboardPath(session?.user.role ?? "user"));
+  }
+  return session;
+}
+
+export async function requireOpsPage() {
+  const session = await getSession();
+  if (!session || !canAccessModule(session.user.role, "ops")) {
+    redirect(defaultDashboardPath(session?.user.role ?? "user"));
+  }
+  return session;
+}
+
+export async function requireAthletePage() {
+  const session = await getSession();
+  if (!session || !canAccessModule(session.user.role, "athlete_portal")) {
+    redirect(defaultDashboardPath(session?.user.role ?? "user"));
   }
   return session;
 }

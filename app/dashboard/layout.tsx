@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { DashboardSidebar } from "@/components/DashboardSidebar";
 import { getSession } from "@/lib/auth";
+import { THEME_COOKIE, themeCookieMaxAge } from "@/lib/theme";
 
 export default async function DashboardLayout({
   children,
@@ -11,6 +13,14 @@ export default async function DashboardLayout({
   if (!session) {
     redirect("/login");
   }
+
+  const cookieStore = await cookies();
+  cookieStore.set(THEME_COOKIE, session.user.theme, {
+    httpOnly: false,
+    sameSite: "lax",
+    maxAge: themeCookieMaxAge(),
+    path: "/",
+  });
 
   return (
     <div className="flex min-h-screen">

@@ -1,0 +1,352 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { PROJECT_PHASE_LABELS, TASK_TYPE_LABELS } from "@/lib/ops-constants";
+
+type AssignedProject = {
+  id: string;
+  name: string;
+  projectNumber: string;
+  complexity: string;
+  client: { id: string; name: string };
+};
+
+type LineItemForm = {
+  key: string;
+  projectId: string;
+  projectPhase: string;
+  taskType: string;
+  hoursWorked: string;
+  completedSummary: string;
+  blockerFlag: boolean;
+  blockerNote: string;
+};
+
+type CalcPanel = {
+  todayHours: number;
+  monthHoursAfter: number;
+  hoursRemaining: number;
+  overtimeTriggered: boolean;
+  overtimeHours: number;
+  totalEarningsZar: number;
+};
+
+function emptyLine(): LineItemForm {
+  return {
+    key: crypto.randomUUID(),
+    projectId: "",
+    projectPhase: "existing_drawings",
+    taskType: "plans",
+    hoursWorked: "",
+    completedSummary: "",
+    blockerFlag: false,
+    blockerNote: "",
+  };
+}
+
+export function AthleteSubmissionsClient() {
+  const [projects, setProjects] = useState<AssignedProject[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [calc, setCalc] = useState<CalcPanel | null>(null);
+  const [wellbeingScore, setWellbeingScore] = useState("3");
+  const [checkInRequested, setCheckInRequested] = useState(false);
+  const [dailyNote, setDailyNote] = useState("");
+  const [lines, setLines] = useState<LineItemForm[]>([emptyLine()]);
+  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+
+  const load = useCallback(async () => {
+    const r = await fetch("/api/athlete/projects");
+    const j = await r.json();
+    if (r.ok) setProjects(j.projects || []);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const todayHoursPreview = lines.reduce((sum, li) => sum + (Number(li.hoursWorked) || 0), 0);
+
+  function updateLine(key: string, patch: Partial<LineItemForm>) {
+    setLines((prev) => prev.map((li) => (li.key === key ? { ...li, ...patch } : li)));
+  }
+
+  function addLine() {
+    setLines((prev) => [...prev, emptyLine()]);
+  }
+
+  function removeLine(key: string) {
+    setLines((prev) => (prev.length <= 1 ? prev : prev.filter((li) => li.key !== key)));
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+    setSaving(true);
+    try {
+      const lineItems = lines
+        .filter((li) => li.projectId && Number(li.hoursWorked) > 0)
+        .map((li) => {
+          const project = projects.find((p) => p.id === li.projectId);
+          if (!project) throw new Error("Invalid project");
+          return {
+            clientId: project.client.id,
+            projectId: li.projectId,
+            projectPhase: li.projectPhase,
+            taskType: li.taskType,
+            hoursWorked: Number(li.hoursWorked),
+            completedSummary: li.completedSummary || null,
+            blockerFlag: li.blockerFlag,
+            blockerNote: li.blockerNote || null,
+          };
+        });
+
+      if (lineItems.length === 0) {
+        setError("Add at least one project entry with hours.");
+        return;
+      }
+
+      const r = await fetch("/api/athlete/submissions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          submissionDate: today,
+          wellbeingScore: Number(wellbeingScore),
+          checkInRequested,
+          dailyNote,
+          lineItems,
+        }),
+      });
+      const j = await r.json();
+      if (!r.ok) {
+        setError(j.error || "Could not save submission");
+        return;
+      }
+      setCalc(j.calculation);
+      setSuccess("Daily log saved.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) return <p className="text-sm text-slate-500">Loading…</p>;
+
+  return (
+    <form onSubmit={submit} className="space-y-6">
+      <div className="card-tool grid gap-4 rounded-xl p-4 md:grid-cols-3">
+        <label className="text-xs text-slate-400">
+          Date
+          <input
+            readOnly
+            value={today}
+            className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-slate-300"
+          />
+        </label>
+        <label className="text-xs text-slate-400">
+          Wellbeing (1–5)
+          <select
+            value={wellbeingScore}
+            onChange={(e) => setWellbeingScore(e.target.value)}
+            className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
+          >
+            {[1, 2, 3, 4, 5].map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex items-end gap-2 pb-2 text-xs text-slate-400">
+          <input
+            type="checkbox"
+            checked={checkInRequested}
+            onChange={(e) => setCheckInRequested(e.target.checked)}
+            className="rounded border-white/20"
+          />
+          Request check-in
+        </label>
+        <label className="text-xs text-slate-400 md:col-span-3">
+          Daily note (optional)
+          <textarea
+            value={dailyNote}
+            onChange={(e) => setDailyNote(e.target.value)}
+            rows={2}
+            className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+          />
+        </label>
+      </div>
+
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-white">Project entries</h2>
+          <button
+            type="button"
+            onClick={addLine}
+            className="text-xs font-medium text-brand-300 hover:text-brand-200"
+          >
+            + Add project entry
+          </button>
+        </div>
+
+        {projects.length === 0 ? (
+          <p className="text-sm text-slate-500">No assigned projects — you cannot log work yet.</p>
+        ) : null}
+
+        {lines.map((li) => {
+          const project = projects.find((p) => p.id === li.projectId);
+          return (
+            <div key={li.key} className="card-tool grid gap-3 rounded-xl p-4 md:grid-cols-2">
+              <label className="text-xs text-slate-400 md:col-span-2">
+                Project
+                <select
+                  required
+                  value={li.projectId}
+                  onChange={(e) => updateLine(li.key, { projectId: e.target.value })}
+                  className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
+                >
+                  <option value="">Select project…</option>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.client.name} — {p.name} ({p.projectNumber})
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {project ? (
+                <p className="text-[11px] text-slate-500 md:col-span-2">Complexity: {project.complexity}</p>
+              ) : null}
+              <label className="text-xs text-slate-400">
+                Project phase
+                <select
+                  value={li.projectPhase}
+                  onChange={(e) => updateLine(li.key, { projectPhase: e.target.value })}
+                  className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
+                >
+                  {Object.entries(PROJECT_PHASE_LABELS).map(([k, label]) => (
+                    <option key={k} value={k}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-xs text-slate-400">
+                Task type
+                <select
+                  value={li.taskType}
+                  onChange={(e) => updateLine(li.key, { taskType: e.target.value })}
+                  className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
+                >
+                  {Object.entries(TASK_TYPE_LABELS).map(([k, label]) => (
+                    <option key={k} value={k}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-xs text-slate-400">
+                Hours worked
+                <input
+                  type="number"
+                  min={0.25}
+                  max={24}
+                  step={0.25}
+                  required
+                  value={li.hoursWorked}
+                  onChange={(e) => updateLine(li.key, { hoursWorked: e.target.value })}
+                  className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+                />
+              </label>
+              <label className="text-xs text-slate-400 md:col-span-2">
+                What was completed
+                <textarea
+                  value={li.completedSummary}
+                  onChange={(e) => updateLine(li.key, { completedSummary: e.target.value })}
+                  rows={2}
+                  className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+                />
+              </label>
+              <label className="flex items-center gap-2 text-xs text-slate-400">
+                <input
+                  type="checkbox"
+                  checked={li.blockerFlag}
+                  onChange={(e) => updateLine(li.key, { blockerFlag: e.target.checked })}
+                />
+                Blocker flagged
+              </label>
+              {li.blockerFlag ? (
+                <label className="text-xs text-slate-400">
+                  Blocker note
+                  <input
+                    value={li.blockerNote}
+                    onChange={(e) => updateLine(li.key, { blockerNote: e.target.value })}
+                    className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+                  />
+                </label>
+              ) : null}
+              {lines.length > 1 ? (
+                <button
+                  type="button"
+                  onClick={() => removeLine(li.key)}
+                  className="text-xs text-slate-500 hover:text-red-300 md:col-span-2 md:text-left"
+                >
+                  Remove entry
+                </button>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="card-tool rounded-xl p-4">
+        <h2 className="text-sm font-semibold text-white">Smart calculation</h2>
+        <dl className="mt-3 grid grid-cols-2 gap-3 text-sm md:grid-cols-3">
+          <div>
+            <dt className="text-slate-500">Today (preview)</dt>
+            <dd className="font-medium text-white">{todayHoursPreview.toFixed(2)}h</dd>
+          </div>
+          {calc ? (
+            <>
+              <div>
+                <dt className="text-slate-500">Month after save</dt>
+                <dd className="font-medium text-white">{calc.monthHoursAfter.toFixed(1)}h</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Remaining to 160h</dt>
+                <dd className="font-medium text-white">{calc.hoursRemaining.toFixed(1)}h</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Overtime</dt>
+                <dd className="font-medium text-amber-300">
+                  {calc.overtimeTriggered ? `${calc.overtimeHours.toFixed(1)}h` : "No"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Est. monthly earnings</dt>
+                <dd className="font-medium text-brand-300">R {calc.totalEarningsZar.toLocaleString()}</dd>
+              </div>
+            </>
+          ) : (
+            <div className="col-span-2 text-xs text-slate-500">Save to update month-to-date calculations.</div>
+          )}
+        </dl>
+      </div>
+
+      {error ? <p className="text-sm text-red-400">{error}</p> : null}
+      {success ? <p className="text-sm text-brand-300">{success}</p> : null}
+
+      <button
+        type="submit"
+        disabled={saving || projects.length === 0}
+        className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-brand-500 disabled:opacity-50"
+      >
+        {saving ? "Saving…" : "Save daily log"}
+      </button>
+    </form>
+  );
+}

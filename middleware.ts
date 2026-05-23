@@ -1,8 +1,24 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { verifySessionToken } from "@/lib/session-token";
+import { verifySessionToken, type SessionRole } from "@/lib/session-token";
+import {
+  canAccessModule,
+  defaultDashboardPath,
+  isAdminApiPath,
+  isAdminDashboardPath,
+  isAthleteApiPath,
+  isAthleteDashboardPath,
+  isMarketingApiPath,
+  isMarketingDashboardPath,
+  isOpsApiPath,
+  isOpsDashboardPath,
+} from "@/lib/permissions";
 
 const AUTH_COOKIE = "blocarch_session";
+
+function roleFromPayload(payload: { role: SessionRole } | null): SessionRole | null {
+  return payload?.role ?? null;
+}
 
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
@@ -10,6 +26,7 @@ export async function middleware(request: NextRequest) {
   const cookie = request.cookies.get(AUTH_COOKIE)?.value;
   const payload = cookie ? await verifySessionToken(cookie) : null;
   const isAuthenticated = payload !== null;
+  const role = roleFromPayload(payload);
 
   // /login: never redirect authenticated users here — RSC flight requests break on 302.
   // Server `app/login/page.tsx` calls redirect() when a session exists instead.
@@ -25,13 +42,39 @@ export async function middleware(request: NextRequest) {
     apiKey &&
     apiKey === process.env.N8N_API_KEY;
 
-  const isAdminPath = path.startsWith("/dashboard/admin") || path.startsWith("/api/admin/");
-  if (isAdminPath && !n8nAuthorized) {
-    if (!payload || payload.role !== "admin") {
-      if (path.startsWith("/api/admin")) {
+  if ((isAdminDashboardPath(path) || isAdminApiPath(path)) && !n8nAuthorized) {
+    if (!role || !canAccessModule(role, "admin")) {
+      if (isApi) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
-      return NextResponse.redirect(new URL("/dashboard", request.url));
+      return NextResponse.redirect(new URL(defaultDashboardPath(role ?? "user"), request.url));
+    }
+  }
+
+  if ((isMarketingDashboardPath(path) || isMarketingApiPath(path)) && !n8nAuthorized) {
+    if (!role || !canAccessModule(role, "marketing")) {
+      if (isApi) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+      return NextResponse.redirect(new URL(defaultDashboardPath(role ?? "user"), request.url));
+    }
+  }
+
+  if ((isOpsDashboardPath(path) || isOpsApiPath(path)) && !n8nAuthorized) {
+    if (!role || !canAccessModule(role, "ops")) {
+      if (isApi) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+      return NextResponse.redirect(new URL(defaultDashboardPath(role ?? "user"), request.url));
+    }
+  }
+
+  if ((isAthleteDashboardPath(path) || isAthleteApiPath(path)) && !n8nAuthorized) {
+    if (!role || !canAccessModule(role, "athlete_portal")) {
+      if (isApi) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+      return NextResponse.redirect(new URL(defaultDashboardPath(role ?? "user"), request.url));
     }
   }
 
@@ -46,7 +89,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (path === "/") {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    return NextResponse.redirect(new URL(defaultDashboardPath(role ?? "user"), request.url));
   }
 
   return NextResponse.next();
@@ -65,7 +108,10 @@ export const config = {
     "/api/n8n/:path*",
     "/api/geocode/:path*",
     "/api/me",
+    "/api/me/preferences",
     "/api/admin/:path*",
     "/api/planner/:path*",
+    "/api/ops/:path*",
+    "/api/athlete/:path*",
   ],
 };

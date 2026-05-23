@@ -2,9 +2,16 @@ import fs from "node:fs";
 import path from "node:path";
 import { PrismaClient } from "@prisma/client";
 import crypto from "node:crypto";
+import { randomBytes, scryptSync } from "node:crypto";
 
 const prisma = new PrismaClient();
 const root = process.cwd();
+
+function hashPasswordScrypt(plain) {
+  const salt = randomBytes(16);
+  const hash = scryptSync(plain, salt, 32, { N: 16384, r: 8, p: 1 });
+  return `scrypt$${salt.toString("base64")}$${hash.toString("base64")}`;
+}
 
 function readJsonSafe(filePath, fallback) {
   if (!fs.existsSync(filePath)) return fallback;
@@ -128,11 +135,96 @@ async function seedUsers() {
   return rows.length;
 }
 
+async function seedOpsDemo() {
+  const existing = await prisma.opsClient.count();
+  if (existing > 0) return { skipped: true };
+
+  const admin = await prisma.user.findFirst({ where: { role: "admin" } });
+  if (!admin) return { skipped: true, reason: "no admin user" };
+
+  const athleteUserId = crypto.randomUUID();
+  const athlete = await prisma.$transaction(async (tx) => {
+    await tx.user.create({
+      data: {
+        id: athleteUserId,
+        username: "athlete01",
+        passwordHash: hashPasswordScrypt("athlete01"),
+        role: "user",
+        disabled: false,
+      },
+    });
+
+    const client = await tx.opsClient.create({
+      data: {
+        name: "Demo Client Ltd",
+        companyName: "Demo Client Ltd",
+        contactPerson: "Jane Client",
+        email: "client@example.com",
+        country: "UK",
+        commercial: {
+          create: {
+            pricingTier: "tier_30",
+            laneCostGbp: 2041,
+            activeLaneCount: 1,
+          },
+        },
+      },
+    });
+
+    const athleteProfile = await tx.opsAthlete.create({
+      data: {
+        userId: athleteUserId,
+        fullName: "Athlete 01",
+        athleteCode: "ATH-01",
+        email: "athlete01@example.com",
+        blocharchStartDate: new Date("2025-01-01"),
+        baseMonthlyPayZar: 20000,
+        monthlyHourCap: 160,
+        overtimeRateZar: 200,
+      },
+    });
+
+    await tx.opsProject.createMany({
+      data: [
+        {
+          clientId: client.id,
+          assignedAthleteId: athleteProfile.id,
+          name: "1692 24 Stevenage Road",
+          projectNumber: "1692-24",
+          address: "24 Stevenage Road, London",
+          projectLead: "Jethro",
+          complexity: "medium",
+          currentStage: "existing_drawings",
+          currentStatus: "in_progress",
+          dueDate: new Date("2026-06-30"),
+        },
+        {
+          clientId: client.id,
+          assignedAthleteId: athleteProfile.id,
+          name: "1716 20 Baker Street",
+          projectNumber: "1716-20",
+          address: "20 Baker Street, London",
+          projectLead: "Jethro",
+          complexity: "high",
+          currentStage: "proposed_drawings",
+          currentStatus: "not_started",
+          dueDate: new Date("2026-08-15"),
+        },
+      ],
+    });
+
+    return athleteProfile;
+  });
+
+  return { skipped: false, athleteCode: athlete.athleteCode, username: "athlete01" };
+}
+
 async function main() {
   const architects = await seedArchitects();
   const leads = await seedLeads();
   const users = await seedUsers();
-  console.log(`Seed complete. architects=${architects} leads=${leads} users=${users}`);
+  const ops = await seedOpsDemo();
+  console.log(`Seed complete. architects=${architects} leads=${leads} users=${users} ops=${JSON.stringify(ops)}`);
 }
 
 main()

@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { hashPassword } from "@/lib/password";
 import { prisma } from "@/lib/prisma";
+import { DEFAULT_THEME, normalizeTheme, type ThemePreference } from "@/lib/theme";
 
 export type UserRole = "admin" | "manager" | "user";
 
@@ -10,6 +11,7 @@ export interface UserRecord {
   passwordHash: string;
   role: UserRole;
   disabled?: boolean;
+  theme: ThemePreference;
   createdAt: string;
 }
 
@@ -27,6 +29,7 @@ function bootstrapIfEmpty(): UserRecord {
     username,
     passwordHash: hashPassword(password),
     role: "admin",
+    theme: DEFAULT_THEME,
     createdAt: now,
   };
   return admin;
@@ -54,6 +57,7 @@ function toUserRecord(row: {
   passwordHash: string;
   role: UserRole;
   disabled: boolean;
+  theme?: string | null;
   createdAt: Date;
 }): UserRecord {
   return {
@@ -62,6 +66,7 @@ function toUserRecord(row: {
     passwordHash: row.passwordHash,
     role: row.role as UserRole,
     disabled: row.disabled,
+    theme: normalizeTheme(row.theme),
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -83,7 +88,11 @@ export async function listUsersPublic(): Promise<Omit<UserRecord, "passwordHash"
   await ensureBootstrapAdmin();
   const users = await prisma.user.findMany({ orderBy: { createdAt: "asc" } });
   return users.map(({ passwordHash: _, ...rest }) => ({
-    ...rest,
+    id: rest.id,
+    username: rest.username,
+    role: rest.role as UserRole,
+    disabled: rest.disabled,
+    theme: normalizeTheme(rest.theme),
     createdAt: rest.createdAt.toISOString(),
   }));
 }
@@ -175,6 +184,24 @@ export async function updateUser(
       ...(patch.password !== undefined ? { passwordHash: hashPassword(patch.password) } : {}),
       ...(patch.role !== undefined ? { role: patch.role } : {}),
       ...(patch.disabled !== undefined ? { disabled: patch.disabled } : {}),
+    },
+  });
+  const { passwordHash: _, ...pub } = toUserRecord(updated);
+  return { ok: true, user: pub };
+}
+
+export async function updateUserPreferences(
+  id: string,
+  patch: { theme?: ThemePreference }
+): Promise<{ ok: true; user: Omit<UserRecord, "passwordHash"> } | { ok: false; error: string }> {
+  await ensureBootstrapAdmin();
+  const current = await prisma.user.findUnique({ where: { id } });
+  if (!current) return { ok: false, error: "User not found" };
+
+  const updated = await prisma.user.update({
+    where: { id },
+    data: {
+      ...(patch.theme !== undefined ? { theme: patch.theme } : {}),
     },
   });
   const { passwordHash: _, ...pub } = toUserRecord(updated);
