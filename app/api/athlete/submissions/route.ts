@@ -93,13 +93,17 @@ export async function GET(request: NextRequest) {
       alerts: buildDailyHourAlerts(Number(s.totalHours)),
       lineItems: s.lineItems.map((li) => ({
         id: li.id,
+        clientId: li.clientId,
+        projectId: li.projectId,
         clientName: li.client.name,
         projectName: li.project.name,
         projectNumber: li.project.projectNumber,
         projectPhase: li.projectPhase,
         taskType: li.taskType,
         hoursWorked: Number(li.hoursWorked),
+        completedSummary: li.completedSummary,
         blockerFlag: li.blockerFlag,
+        blockerNote: li.blockerNote,
       })),
     })),
   });
@@ -127,10 +131,7 @@ export async function POST(request: NextRequest) {
       },
     });
     if (existing?.lockedAt) {
-      return NextResponse.json({ error: "This submission is locked" }, { status: 400 });
-    }
-    if (existing && !isSubmissionEditable(existing.submissionDate, existing.lockedAt)) {
-      return NextResponse.json({ error: "This submission is past the edit window" }, { status: 400 });
+      return NextResponse.json({ error: "This submission is locked — ask admin to unlock" }, { status: 400 });
     }
 
     for (const li of lineItems) {

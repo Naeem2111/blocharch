@@ -36,9 +36,21 @@ type PastSubmission = {
   id: string;
   submissionDate: string;
   totalHours: number;
+  wellbeingScore: number | null;
+  checkInRequested: boolean;
+  dailyNote: string | null;
   lockedAt: string | null;
   editable: boolean;
   alerts: Array<{ code: string; severity: string; message: string }>;
+  lineItems: Array<{
+    projectId: string;
+    projectPhase: string;
+    taskType: string;
+    hoursWorked: number;
+    completedSummary: string | null;
+    blockerFlag: boolean;
+    blockerNote: string | null;
+  }>;
 };
 
 function emptyLine(): LineItemForm {
@@ -67,7 +79,53 @@ export function AthleteSubmissionsClient() {
   const [checkInRequested, setCheckInRequested] = useState(false);
   const [dailyNote, setDailyNote] = useState("");
   const [lines, setLines] = useState<LineItemForm[]>([emptyLine()]);
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [formLocked, setFormLocked] = useState(false);
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+
+  function applySubmission(sub: PastSubmission, notify?: string) {
+    setSelectedDate(sub.submissionDate);
+    setWellbeingScore(String(sub.wellbeingScore ?? 3));
+    setCheckInRequested(sub.checkInRequested);
+    setDailyNote(sub.dailyNote ?? "");
+    setFormLocked(!sub.editable);
+    setLines(
+      sub.lineItems.length > 0
+        ? sub.lineItems.map((li) => ({
+            key: crypto.randomUUID(),
+            projectId: li.projectId,
+            projectPhase: li.projectPhase,
+            taskType: li.taskType,
+            hoursWorked: String(li.hoursWorked),
+            completedSummary: li.completedSummary ?? "",
+            blockerFlag: li.blockerFlag,
+            blockerNote: li.blockerNote ?? "",
+          }))
+        : [emptyLine()]
+    );
+    if (notify) setSuccess(notify);
+  }
+
+  function loadSubmissionIntoForm(sub: PastSubmission) {
+    if (!sub.editable) {
+      setError("This submission is locked. Ask admin to unlock it under Commercial → Submission locks.");
+      return;
+    }
+    setError("");
+    applySubmission(sub, `Editing ${sub.submissionDate}`);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function resetToToday() {
+    setSelectedDate(today);
+    setWellbeingScore("3");
+    setCheckInRequested(false);
+    setDailyNote("");
+    setLines([emptyLine()]);
+    setFormLocked(false);
+    setError("");
+    setSuccess("");
+  }
 
   const load = useCallback(async () => {
     const [pr, sr] = await Promise.all([fetch("/api/athlete/projects"), fetch("/api/athlete/submissions")]);
@@ -75,8 +133,11 @@ export function AthleteSubmissionsClient() {
     const sj = await sr.json();
     if (pr.ok) setProjects(pj.projects || []);
     if (sr.ok) {
-      setPastSubmissions(sj.submissions || []);
+      const subs: PastSubmission[] = sj.submissions || [];
+      setPastSubmissions(subs);
       if (sj.monthlyHourCap) setMonthlyHourCap(sj.monthlyHourCap);
+      const todaySub = subs.find((s) => s.submissionDate === today);
+      if (todaySub?.editable) applySubmission(todaySub);
     }
     setLoading(false);
   }, []);
@@ -131,7 +192,7 @@ export function AthleteSubmissionsClient() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          submissionDate: today,
+          submissionDate: selectedDate,
           wellbeingScore: Number(wellbeingScore),
           checkInRequested,
           dailyNote,
@@ -163,7 +224,7 @@ export function AthleteSubmissionsClient() {
           Date
           <input
             readOnly
-            value={today}
+            value={selectedDate}
             className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-slate-300"
           />
         </label>
@@ -361,7 +422,7 @@ export function AthleteSubmissionsClient() {
 
       <button
         type="submit"
-        disabled={saving || projects.length === 0}
+        disabled={saving || projects.length === 0 || formLocked}
         className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-brand-500 disabled:opacity-50"
       >
         {saving ? "Saving…" : "Save daily log"}
@@ -371,7 +432,7 @@ export function AthleteSubmissionsClient() {
       <div className="card-tool rounded-xl p-5">
         <h2 className="text-sm font-semibold text-white">Recent submissions</h2>
         <p className="mt-1 text-xs text-slate-500">
-          Logs lock automatically after {1} day. Contact admin to unlock older entries.
+          Logs auto-lock after 7 days. Click Edit on an unlocked entry below, or ask admin to unlock under Commercial.
         </p>
         {pastSubmissions.length === 0 ? (
           <p className="mt-3 text-sm text-slate-500">No submissions yet.</p>
@@ -392,8 +453,14 @@ export function AthleteSubmissionsClient() {
                     <span className="ml-2 text-[10px] text-brand-300">Editable</span>
                   ) : null}
                 </span>
-                {s.alerts.length > 0 ? (
-                  <span className="text-xs text-amber-300">{s.alerts[0]?.message}</span>
+                {s.editable ? (
+                  <button
+                    type="button"
+                    onClick={() => loadSubmissionIntoForm(s)}
+                    className="text-xs text-brand-300 hover:text-brand-200"
+                  >
+                    Edit
+                  </button>
                 ) : null}
               </li>
             ))}

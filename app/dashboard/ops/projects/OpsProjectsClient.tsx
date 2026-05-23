@@ -7,15 +7,34 @@ type ClientOption = { id: string; name: string };
 type AthleteOption = { id: string; fullName: string; athleteCode: string };
 type ProjectRow = {
   id: string;
+  clientId: string;
   clientName: string;
+  assignedAthleteId: string | null;
   assignedAthleteName: string | null;
   name: string;
   projectNumber: string;
+  address: string | null;
+  projectLead: string | null;
   complexity: keyof typeof COMPLEXITY_LABELS;
   currentStage: keyof typeof PROJECT_PHASE_LABELS;
   currentStatus: keyof typeof PROJECT_STATUS_LABELS;
+  startDate: string | null;
   dueDate: string | null;
+  handoverDate: string | null;
+  notes: string | null;
   blockerFlag: boolean;
+  checkInRequested: boolean;
+};
+
+const emptyCreate = {
+  clientId: "",
+  assignedAthleteId: "",
+  name: "",
+  projectNumber: "",
+  address: "",
+  projectLead: "",
+  complexity: "medium",
+  dueDate: "",
 };
 
 export function OpsProjectsClient() {
@@ -24,16 +43,25 @@ export function OpsProjectsClient() {
   const [athletes, setAthletes] = useState<AthleteOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState("");
-  const [form, setForm] = useState({
-    clientId: "",
+  const [msg, setMsg] = useState("");
+  const [form, setForm] = useState(emptyCreate);
+  const [editForm, setEditForm] = useState({
     assignedAthleteId: "",
     name: "",
     projectNumber: "",
     address: "",
     projectLead: "",
     complexity: "medium",
+    currentStage: "existing_drawings",
+    currentStatus: "not_started",
+    startDate: "",
     dueDate: "",
+    handoverDate: "",
+    notes: "",
+    blockerFlag: false,
+    checkInRequested: false,
   });
 
   const load = useCallback(async () => {
@@ -68,11 +96,7 @@ export function OpsProjectsClient() {
     const r = await fetch("/api/ops/projects", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...form,
-        assignedAthleteId: form.assignedAthleteId || null,
-        dueDate: form.dueDate || null,
-      }),
+      body: JSON.stringify({ ...form, assignedAthleteId: form.assignedAthleteId || null, dueDate: form.dueDate || null }),
     });
     const j = await r.json();
     if (!r.ok) {
@@ -80,16 +104,53 @@ export function OpsProjectsClient() {
       return;
     }
     setOpen(false);
-    setForm({
-      clientId: "",
-      assignedAthleteId: "",
-      name: "",
-      projectNumber: "",
-      address: "",
-      projectLead: "",
-      complexity: "medium",
-      dueDate: "",
+    setForm(emptyCreate);
+    await load();
+  }
+
+  function startEdit(p: ProjectRow) {
+    setEditingId(p.id);
+    setEditForm({
+      assignedAthleteId: p.assignedAthleteId ?? "",
+      name: p.name,
+      projectNumber: p.projectNumber,
+      address: p.address ?? "",
+      projectLead: p.projectLead ?? "",
+      complexity: p.complexity,
+      currentStage: p.currentStage,
+      currentStatus: p.currentStatus,
+      startDate: p.startDate ?? "",
+      dueDate: p.dueDate ?? "",
+      handoverDate: p.handoverDate ?? "",
+      notes: p.notes ?? "",
+      blockerFlag: p.blockerFlag,
+      checkInRequested: p.checkInRequested,
     });
+    setError("");
+    setMsg("");
+  }
+
+  async function saveEdit(id: string) {
+    setError("");
+    const r = await fetch(`/api/ops/projects/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...editForm,
+        assignedAthleteId: editForm.assignedAthleteId || null,
+        startDate: editForm.startDate || null,
+        dueDate: editForm.dueDate || null,
+        handoverDate: editForm.handoverDate || null,
+        notes: editForm.notes || null,
+      }),
+    });
+    const j = await r.json();
+    if (!r.ok) {
+      setError(j.error || "Could not save");
+      return;
+    }
+    setEditingId(null);
+    setMsg("Project updated.");
     await load();
   }
 
@@ -99,156 +160,58 @@ export function OpsProjectsClient() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-slate-400">{projects.length} project(s)</p>
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-brand-500"
-        >
+        <button type="button" onClick={() => setOpen(true)} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-brand-500">
           New project
         </button>
       </div>
+      {msg ? <p className="text-sm text-brand-300">{msg}</p> : null}
 
       {open && (
         <form onSubmit={createProject} className="card-tool grid gap-3 rounded-xl p-4 md:grid-cols-2">
-          <label className="text-xs text-slate-400">
-            Client
-            <select
-              required
-              value={form.clientId}
-              onChange={(e) => setForm((f) => ({ ...f, clientId: e.target.value }))}
-              className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
-            >
-              <option value="">Select client…</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-xs text-slate-400">
-            Assigned athlete
-            <select
-              value={form.assignedAthleteId}
-              onChange={(e) => setForm((f) => ({ ...f, assignedAthleteId: e.target.value }))}
-              className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
-            >
-              <option value="">Unassigned</option>
-              {athletes.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.fullName} ({a.athleteCode})
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-xs text-slate-400">
-            Project name
-            <input
-              required
-              value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
-            />
-          </label>
-          <label className="text-xs text-slate-400">
-            Project number
-            <input
-              required
-              value={form.projectNumber}
-              onChange={(e) => setForm((f) => ({ ...f, projectNumber: e.target.value }))}
-              className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
-            />
-          </label>
-          <label className="text-xs text-slate-400 md:col-span-2">
-            Address
-            <input
-              value={form.address}
-              onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
-              className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
-            />
-          </label>
-          <label className="text-xs text-slate-400">
-            Project lead
-            <input
-              value={form.projectLead}
-              onChange={(e) => setForm((f) => ({ ...f, projectLead: e.target.value }))}
-              className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
-            />
-          </label>
-          <label className="text-xs text-slate-400">
-            Complexity
-            <select
-              value={form.complexity}
-              onChange={(e) => setForm((f) => ({ ...f, complexity: e.target.value }))}
-              className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
-            >
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-            </select>
-          </label>
-          <label className="text-xs text-slate-400">
-            Due date
-            <input
-              type="date"
-              value={form.dueDate}
-              onChange={(e) => setForm((f) => ({ ...f, dueDate: e.target.value }))}
-              className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
-            />
-          </label>
+          <label className="text-xs text-slate-400">Client<select required value={form.clientId} onChange={(e) => setForm((f) => ({ ...f, clientId: e.target.value }))} className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"><option value="">Select…</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+          <label className="text-xs text-slate-400">Athlete<select value={form.assignedAthleteId} onChange={(e) => setForm((f) => ({ ...f, assignedAthleteId: e.target.value }))} className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"><option value="">Unassigned</option>{athletes.map((a) => <option key={a.id} value={a.id}>{a.fullName}</option>)}</select></label>
+          <label className="text-xs text-slate-400">Name<input required value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
+          <label className="text-xs text-slate-400">Number<input required value={form.projectNumber} onChange={(e) => setForm((f) => ({ ...f, projectNumber: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
+          <label className="text-xs text-slate-400 md:col-span-2">Address<input value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
+          <label className="text-xs text-slate-400">Due<input type="date" value={form.dueDate} onChange={(e) => setForm((f) => ({ ...f, dueDate: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
           {error ? <p className="text-sm text-red-400 md:col-span-2">{error}</p> : null}
-          <div className="flex gap-2 md:col-span-2">
-            <button type="submit" className="rounded-lg bg-white/[0.08] px-4 py-2 text-sm text-slate-100">
-              Create project
-            </button>
-            <button type="button" onClick={() => setOpen(false)} className="text-sm text-slate-500">
-              Cancel
-            </button>
-          </div>
+          <div className="flex gap-2 md:col-span-2"><button type="submit" className="rounded-lg bg-white/[0.08] px-4 py-2 text-sm text-slate-100">Create</button><button type="button" onClick={() => setOpen(false)} className="text-sm text-slate-500">Cancel</button></div>
         </form>
       )}
 
-      <div className="overflow-x-auto rounded-xl border border-white/[0.06]">
-        <table className="min-w-full text-left text-sm">
-          <thead className="border-b border-white/[0.06] bg-white/[0.02] text-xs uppercase tracking-wider text-slate-500">
-            <tr>
-              <th className="px-4 py-3">Project</th>
-              <th className="px-4 py-3">Client</th>
-              <th className="px-4 py-3">Athlete</th>
-              <th className="px-4 py-3">Stage</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Due</th>
-            </tr>
-          </thead>
-          <tbody>
-            {projects.map((p) => (
-              <tr key={p.id} className="border-b border-white/[0.04] text-slate-300">
-                <td className="px-4 py-3">
-                  <p className="font-medium text-white">
-                    {p.name}
-                    {p.blockerFlag ? (
-                      <span className="ml-2 rounded bg-red-500/15 px-1.5 py-0.5 text-[10px] text-red-300">Blocker</span>
-                    ) : null}
-                  </p>
-                  <p className="text-xs text-slate-500">{p.projectNumber}</p>
-                </td>
-                <td className="px-4 py-3">{p.clientName}</td>
-                <td className="px-4 py-3">{p.assignedAthleteName ?? "—"}</td>
-                <td className="px-4 py-3">{PROJECT_PHASE_LABELS[p.currentStage]}</td>
-                <td className="px-4 py-3">{PROJECT_STATUS_LABELS[p.currentStatus]}</td>
-                <td className="px-4 py-3">{p.dueDate ?? "—"}</td>
-              </tr>
-            ))}
-            {projects.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
-                  No projects yet.
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
+      <div className="space-y-3">
+        {projects.map((p) => (
+          <div key={p.id} className="card-tool rounded-xl p-4">
+            {editingId === p.id ? (
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="text-xs text-slate-400">Name<input value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
+                <label className="text-xs text-slate-400">Number<input value={editForm.projectNumber} onChange={(e) => setEditForm((f) => ({ ...f, projectNumber: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
+                <label className="text-xs text-slate-400">Athlete<select value={editForm.assignedAthleteId} onChange={(e) => setEditForm((f) => ({ ...f, assignedAthleteId: e.target.value }))} className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"><option value="">Unassigned</option>{athletes.map((a) => <option key={a.id} value={a.id}>{a.fullName}</option>)}</select></label>
+                <label className="text-xs text-slate-400">Complexity<select value={editForm.complexity} onChange={(e) => setEditForm((f) => ({ ...f, complexity: e.target.value }))} className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
+                <label className="text-xs text-slate-400">Stage<select value={editForm.currentStage} onChange={(e) => setEditForm((f) => ({ ...f, currentStage: e.target.value }))} className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm">{Object.entries(PROJECT_PHASE_LABELS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
+                <label className="text-xs text-slate-400">Status<select value={editForm.currentStatus} onChange={(e) => setEditForm((f) => ({ ...f, currentStatus: e.target.value }))} className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm">{Object.entries(PROJECT_STATUS_LABELS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
+                <label className="text-xs text-slate-400">Due<input type="date" value={editForm.dueDate} onChange={(e) => setEditForm((f) => ({ ...f, dueDate: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
+                <label className="text-xs text-slate-400">Handover<input type="date" value={editForm.handoverDate} onChange={(e) => setEditForm((f) => ({ ...f, handoverDate: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
+                <label className="text-xs text-slate-400 md:col-span-2">Notes<textarea value={editForm.notes} onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))} rows={2} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
+                <label className="flex items-center gap-2 text-xs text-slate-400"><input type="checkbox" checked={editForm.blockerFlag} onChange={(e) => setEditForm((f) => ({ ...f, blockerFlag: e.target.checked }))} /> Blocker</label>
+                <label className="flex items-center gap-2 text-xs text-slate-400"><input type="checkbox" checked={editForm.checkInRequested} onChange={(e) => setEditForm((f) => ({ ...f, checkInRequested: e.target.checked }))} /> Check-in requested</label>
+                <div className="flex gap-2 md:col-span-2"><button type="button" onClick={() => void saveEdit(p.id)} className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-slate-950">Save</button><button type="button" onClick={() => setEditingId(null)} className="text-xs text-slate-500">Cancel</button></div>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <p className="font-medium text-white">{p.name}{p.blockerFlag ? <span className="ml-2 rounded bg-red-500/15 px-1.5 py-0.5 text-[10px] text-red-300">Blocker</span> : null}</p>
+                  <p className="text-xs text-slate-500">{p.clientName} · {p.projectNumber} · {p.assignedAthleteName ?? "Unassigned"}</p>
+                  <p className="text-xs text-slate-500">{PROJECT_PHASE_LABELS[p.currentStage]} · {PROJECT_STATUS_LABELS[p.currentStatus]}{p.dueDate ? ` · Due ${p.dueDate}` : ""}</p>
+                </div>
+                <button type="button" onClick={() => startEdit(p)} className="text-xs text-brand-300 hover:text-brand-200">Edit</button>
+              </div>
+            )}
+          </div>
+        ))}
+        {projects.length === 0 ? <p className="text-sm text-slate-500">No projects yet.</p> : null}
       </div>
+      {error && !open ? <p className="text-sm text-red-400">{error}</p> : null}
     </div>
   );
 }

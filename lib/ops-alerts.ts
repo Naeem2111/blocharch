@@ -73,7 +73,7 @@ export function buildCheckInAlert(count: number): OpsAlert | null {
 }
 
 /** Submissions older than this many calendar days (UTC) are auto-locked. */
-export const SUBMISSION_EDIT_GRACE_DAYS = 1;
+export const SUBMISSION_EDIT_GRACE_DAYS = 7;
 
 export function submissionEditCutoffUtc(now = new Date()): Date {
   const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
@@ -81,12 +81,8 @@ export function submissionEditCutoffUtc(now = new Date()): Date {
   return d;
 }
 
-export function isSubmissionEditable(
-  submissionDate: Date,
-  lockedAt: Date | null,
-  now = new Date()
-): boolean {
-  if (lockedAt) return false;
-  const cutoff = submissionEditCutoffUtc(now);
-  return submissionDate >= cutoff;
+/** Editable when not locked. Admin unlock clears lockedAt so any past log can be edited again. */
+export function isSubmissionEditable(submissionDate: Date, lockedAt: Date | null): boolean {
+  void submissionDate;
+  return lockedAt == null;
 }
