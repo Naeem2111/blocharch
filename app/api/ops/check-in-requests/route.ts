@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import type { OpsCheckInStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireOpsSession } from "@/lib/ops-access";
 import { serializeCheckInRequest } from "@/lib/check-in-requests";
@@ -15,12 +16,14 @@ export async function GET(request: NextRequest) {
   if (gate instanceof NextResponse) return gate;
 
   const status = request.nextUrl.searchParams.get("status")?.trim();
-  const where =
-    status === "pending"
-      ? { status: { in: ["pending", "counter_proposed"] as const } }
-      : status && status !== "all"
-        ? { status: status as "pending" | "approved" | "declined" | "counter_proposed" | "confirmed" | "cancelled" }
-        : undefined;
+  const pendingStatuses: OpsCheckInStatus[] = ["pending", "counter_proposed"];
+
+  let where: Prisma.OpsCheckInRequestWhereInput | undefined;
+  if (status === "pending") {
+    where = { status: { in: pendingStatuses } };
+  } else if (status && status !== "all") {
+    where = { status: status as OpsCheckInStatus };
+  }
 
   const rows = await prisma.opsCheckInRequest.findMany({
     where,
@@ -30,7 +33,7 @@ export async function GET(request: NextRequest) {
   });
 
   const pendingCount = await prisma.opsCheckInRequest.count({
-    where: { status: { in: ["pending", "counter_proposed"] } },
+    where: { status: { in: pendingStatuses } },
   });
 
   return NextResponse.json({
