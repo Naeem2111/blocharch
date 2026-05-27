@@ -54,6 +54,12 @@ export function AthleteBookCallClient() {
   const [reason, setReason] = useState("");
   const [contextNotes, setContextNotes] = useState("");
   const [selectedSlot, setSelectedSlot] = useState("");
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
+  const [slotsError, setSlotsError] = useState("");
+
+  /** Dropdown when we have generated slots; free-form datetime only as fallback. */
+  const useManualPicker = slots.length === 0;
 
   const refresh = useCallback(async () => {
     const [projR, slotR, reqR] = await Promise.all([
@@ -71,6 +77,12 @@ export function AthleteBookCallClient() {
       setSlots(slotJ.slots || []);
       setCalendarConnected(!!slotJ.calendarConnected);
       setSlotSource(slotJ.source || "");
+      setSlotsError("");
+    } else {
+      setSlots([]);
+      setSlotsError(
+        (slotJ as { error?: string }).error || "Could not load time slots — use the date/time fields below."
+      );
     }
     if (reqR.ok) setRequests(reqJ.requests || []);
   }, []);
@@ -83,14 +95,39 @@ export function AthleteBookCallClient() {
     e.preventDefault();
     setError("");
     setSuccess("");
-    const slot = slots.find((s) => s.start === selectedSlot);
-    if (!slot) {
-      setError("Choose an available time slot");
-      return;
-    }
     if (!reason.trim()) {
       setError("Reason is required");
       return;
+    }
+
+    let requestedStartAt: string;
+    let requestedEndAt: string;
+
+    if (useManualPicker) {
+      if (!customStart) {
+        setError("Choose a preferred start date and time");
+        return;
+      }
+      const start = new Date(customStart);
+      if (Number.isNaN(start.getTime())) {
+        setError("Invalid start time");
+        return;
+      }
+      const end = customEnd ? new Date(customEnd) : new Date(start.getTime() + 30 * 60 * 1000);
+      if (Number.isNaN(end.getTime()) || end <= start) {
+        setError("End time must be after start time");
+        return;
+      }
+      requestedStartAt = start.toISOString();
+      requestedEndAt = end.toISOString();
+    } else {
+      const slot = slots.find((s) => s.start === selectedSlot);
+      if (!slot) {
+        setError("Choose an available time slot");
+        return;
+      }
+      requestedStartAt = slot.start;
+      requestedEndAt = slot.end;
     }
 
     setSaving(true);
@@ -102,8 +139,8 @@ export function AthleteBookCallClient() {
           projectId: projectId || null,
           reason,
           contextNotes,
-          requestedStartAt: slot.start,
-          requestedEndAt: slot.end,
+          requestedStartAt,
+          requestedEndAt,
         }),
       });
       const j = await r.json().catch(() => ({}));
@@ -115,6 +152,8 @@ export function AthleteBookCallClient() {
       setReason("");
       setContextNotes("");
       setSelectedSlot("");
+      setCustomStart("");
+      setCustomEnd("");
       await refresh();
     } finally {
       setSaving(false);
@@ -143,15 +182,19 @@ export function AthleteBookCallClient() {
     <div className="space-y-8">
       {!calendarConnected ? (
         <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100/90">
-          Jethro&apos;s Google Calendar is not connected yet — you can still pick a preferred time and he will
-          confirm manually. Once calendar env vars are set, slots will reflect real availability.
+          {slots.length > 0
+            ? "Jethro's Google Calendar is not connected — times below are standard weekday slots (UK). He will confirm manually."
+            : "Jethro's Google Calendar is not connected — enter your preferred date and time below and he will confirm manually."}
         </p>
       ) : (
         <p className="text-sm text-slate-500">
           Showing available slots from Jethro&apos;s calendar
-          {slotSource === "google_calendar" ? " (live)." : "."}
+          {slotSource === "google_calendar" ? " (live)." : " (standard weekday hours)."}
         </p>
       )}
+      {slotsError ? (
+        <p className="text-sm text-amber-400/90">{slotsError}</p>
+      ) : null}
 
       <form onSubmit={submit} className="card-tool space-y-4 rounded-xl p-5">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">New request</h2>
@@ -183,22 +226,58 @@ export function AthleteBookCallClient() {
           />
         </label>
 
-        <label className="block text-xs text-slate-400">
-          Preferred time <span className="text-red-400">*</span>
-          <select
-            required
-            value={selectedSlot}
-            onChange={(e) => setSelectedSlot(e.target.value)}
-            className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
-          >
-            <option value="">Select a slot…</option>
-            {slots.map((s) => (
-              <option key={s.start} value={s.start}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        {useManualPicker ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block text-xs text-slate-400">
+              Preferred start <span className="text-red-400">*</span>
+              <input
+                type="datetime-local"
+                required
+                value={customStart}
+                onChange={(e) => {
+                  setCustomStart(e.target.value);
+                  if (e.target.value && !customEnd) {
+                    const s = new Date(e.target.value);
+                    if (!Number.isNaN(s.getTime())) {
+                      const end = new Date(s.getTime() + 30 * 60 * 1000);
+                      const pad = (n: number) => String(n).padStart(2, "0");
+                      setCustomEnd(
+                        `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}T${pad(end.getHours())}:${pad(end.getMinutes())}`
+                      );
+                    }
+                  }
+                }}
+                className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+              />
+            </label>
+            <label className="block text-xs text-slate-400">
+              Preferred end (optional, default 30 min)
+              <input
+                type="datetime-local"
+                value={customEnd}
+                onChange={(e) => setCustomEnd(e.target.value)}
+                className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+              />
+            </label>
+          </div>
+        ) : (
+          <label className="block text-xs text-slate-400">
+            Preferred time <span className="text-red-400">*</span>
+            <select
+              required
+              value={selectedSlot}
+              onChange={(e) => setSelectedSlot(e.target.value)}
+              className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
+            >
+              <option value="">Select a slot…</option>
+              {slots.map((s) => (
+                <option key={s.start} value={s.start}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
 
         <label className="block text-xs text-slate-400">
           Notes / context (optional)

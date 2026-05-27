@@ -133,9 +133,9 @@ function getZonedParts(date: Date, timeZone: string) {
     month: "numeric",
     day: "numeric",
     weekday: "short",
-    hour: "numeric",
-    minute: "numeric",
-    hour12: false,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
   }).formatToParts(date);
   const pick = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
   return {
@@ -148,6 +148,25 @@ function getZonedParts(date: Date, timeZone: string) {
   };
 }
 
+function isWeekend(weekday: string): boolean {
+  const w = weekday.toLowerCase().replace(/\./g, "");
+  return w.startsWith("sat") || w.startsWith("sun");
+}
+
+export function getDefaultSlotConfig(): GoogleCalendarConfig {
+  return {
+    clientId: "",
+    clientSecret: "",
+    refreshToken: "",
+    calendarId: "primary",
+    timezone: process.env.GOOGLE_CALENDAR_TIMEZONE?.trim() || "Europe/London",
+    slotMinutes: Math.min(120, Math.max(15, parseInt(process.env.GOOGLE_SLOT_MINUTES || "30", 10) || 30)),
+    workdayStartHour: parseInt(process.env.GOOGLE_WORKDAY_START || "9", 10) || 9,
+    workdayEndHour: parseInt(process.env.GOOGLE_WORKDAY_END || "17", 10) || 17,
+    horizonDays: Math.min(42, Math.max(7, parseInt(process.env.GOOGLE_AVAILABILITY_DAYS || "21", 10) || 21)),
+  };
+}
+
 /** UTC instant for a local wall-clock time in `timeZone`. */
 export function dateAtLocalTime(
   year: number,
@@ -157,32 +176,60 @@ export function dateAtLocalTime(
   minute: number,
   timeZone: string
 ): Date {
-  let t = Date.UTC(year, month - 1, day, hour, minute);
-  for (let i = 0; i < 4; i++) {
-    const p = getZonedParts(new Date(t), timeZone);
-    const diffMin = (hour - p.hour) * 60 + (minute - p.minute) + (day - p.day) * 24 * 60;
-    t -= diffMin * 60 * 1000;
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    hour12: false,
+  });
+
+  const wallUtc = Date.UTC(year, month - 1, day, hour, minute);
+  let guess = wallUtc;
+
+  for (let i = 0; i < 8; i++) {
+    const parts = formatter.formatToParts(new Date(guess));
+    const pick = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+    const py = pick("year");
+    const pm = pick("month");
+    const pd = pick("day");
+    const ph = pick("hour");
+    const pmin = pick("minute");
+
+    const shownUtc = Date.UTC(py, pm - 1, pd, ph, pmin);
+    const diff = shownUtc - wallUtc;
+    if (diff === 0) return new Date(guess);
+    guess -= diff;
   }
-  return new Date(t);
+
+  return new Date(guess);
 }
 
-/** Candidate weekday slots in the configured timezone. */
-function generateCandidateSlots(config: GoogleCalendarConfig): AvailableSlot[] {
+/** Weekday time slots in the configured timezone (used with or without Google Calendar). */
+export function generateCandidateSlots(config: GoogleCalendarConfig): AvailableSlot[] {
   const slots: AvailableSlot[] = [];
-  const now = new Date();
+  const now = Date.now();
+  const leadMs = 2 * 60 * 60 * 1000;
   const slotMs = config.slotMinutes * 60 * 1000;
-  for (let d = 0; d < config.horizonDays; d++) {
-    const probe = new Date(now.getTime() + d * 24 * 60 * 60 * 1000);
+  const seenDays = new Set<string>();
+  const maxMs = config.horizonDays * 24 * 60 * 60 * 1000;
+
+  for (let offset = 0; offset <= maxMs && seenDays.size < config.horizonDays + 7; offset += 3 * 60 * 60 * 1000) {
+    const probe = new Date(now + offset);
     const zp = getZonedParts(probe, config.timezone);
-    if (zp.weekday === "Sat" || zp.weekday === "Sun") continue;
+    const dayKey = `${zp.year}-${zp.month}-${zp.day}`;
+    if (seenDays.has(dayKey) || isWeekend(zp.weekday)) continue;
+    seenDays.add(dayKey);
 
     for (let hour = config.workdayStartHour; hour < config.workdayEndHour; hour++) {
       for (let min = 0; min < 60; min += config.slotMinutes) {
-        const endMin = min + config.slotMinutes;
-        if (endMin > 60 && hour + 1 >= config.workdayEndHour) continue;
+        if (hour === config.workdayEndHour - 1 && min + config.slotMinutes > 60) continue;
 
         const start = dateAtLocalTime(zp.year, zp.month, zp.day, hour, min, config.timezone);
-        if (start.getTime() < now.getTime() + 2 * 60 * 60 * 1000) continue;
+        if (start.getTime() < now + leadMs) continue;
 
         const end = new Date(start.getTime() + slotMs);
         slots.push({
@@ -194,6 +241,7 @@ function generateCandidateSlots(config: GoogleCalendarConfig): AvailableSlot[] {
     }
   }
 
+  slots.sort((a, b) => a.start.localeCompare(b.start));
   return slots;
 }
 
@@ -218,22 +266,15 @@ export async function listAvailableSlots(
   extraBusy: Array<{ start: Date; end: Date }> = []
 ): Promise<{ slots: AvailableSlot[]; source: "google_calendar" | "manual" }> {
   const config = getGoogleCalendarConfig();
-  const candidates = generateCandidateSlots(
-    config ?? {
-      clientId: "",
-      clientSecret: "",
-      refreshToken: "",
-      calendarId: "primary",
-      timezone: "Europe/London",
-      slotMinutes: 30,
-      workdayStartHour: 9,
-      workdayEndHour: 17,
-      horizonDays: 21,
-    }
-  );
+  const slotConfig = config ?? getDefaultSlotConfig();
+  const candidates = generateCandidateSlots(slotConfig);
+
+  if (candidates.length === 0) {
+    console.error("generateCandidateSlots returned no slots");
+  }
 
   if (!config) {
-    return { slots: candidates.slice(0, 40), source: "manual" };
+    return { slots: candidates.slice(0, 60), source: "manual" };
   }
 
   try {
@@ -248,10 +289,11 @@ export async function listAvailableSlots(
       return !busy.some((b) => overlaps(s, e, b.start, b.end));
     });
 
-    return { slots: free.slice(0, 60), source: "google_calendar" };
+    const picked = free.length > 0 ? free : candidates;
+    return { slots: picked.slice(0, 60), source: "google_calendar" };
   } catch (e) {
     console.error("Google Calendar availability failed:", e);
-    return { slots: candidates.slice(0, 40), source: "manual" };
+    return { slots: candidates.slice(0, 60), source: "manual" };
   }
 }
 
