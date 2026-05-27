@@ -27,6 +27,16 @@ enum PlannerBoardScope {
   team
 }
 
+/** Fixed system boards vs user-created boards (see lib/planner-system-boards.ts). */
+enum PlannerBoardKind {
+  custom
+  blocharch_outbox
+  blocharch_inbox
+  my_tasks
+  completed
+  project
+}
+
 enum PlannerMemberRole {
   editor
   viewer
@@ -160,20 +170,30 @@ model User {
 }
 
 model PlannerBoard {
-  id        String            @id @default(uuid())
-  title     String
-  scope     PlannerBoardScope
-  color     String            @default("#6366f1")
-  ownerId   String            @map("owner_id")
-  createdAt DateTime          @default(now()) @map("created_at")
-  updatedAt DateTime          @updatedAt @map("updated_at")
+  id           String            @id @default(uuid())
+  title        String
+  scope        PlannerBoardScope
+  kind         PlannerBoardKind  @default(custom)
+  color        String            @default("#6366f1")
+  ownerId      String            @map("owner_id")
+  /** Athlete workspace boards (inbox, my tasks, project boards, etc.). */
+  athleteId    String?           @map("athlete_id")
+  opsProjectId String?           @map("ops_project_id")
+  isSystem     Boolean           @default(false) @map("is_system")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
 
-  owner   User                 @relation("PlannerBoardOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  columns PlannerColumn[]
-  labels  PlannerLabel[]
-  members PlannerBoardMember[]
+  owner       User                 @relation("PlannerBoardOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  athlete     OpsAthlete?          @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  opsProject  OpsProject?          @relation(fields: [opsProjectId], references: [id], onDelete: SetNull)
+  columns     PlannerColumn[]
+  labels      PlannerLabel[]
+  members     PlannerBoardMember[]
+  outboxTasks OpsOutboxTask[]
 
   @@index([ownerId])
+  @@index([athleteId])
+  @@index([opsProjectId])
   @@map("planner_boards")
 }
 
@@ -315,6 +335,7 @@ model OpsAthlete {
   fullName         String           @map("full_name")
   athleteCode      String           @unique @map("athlete_code")
   email            String?
+  phone            String?
   dateOfBirth      DateTime?        @map("date_of_birth") @db.Date
   baseMonthlyPayZar Decimal         @default(20000) @map("base_monthly_pay_zar") @db.Decimal(12, 2)
   monthlyHourCap   Int              @default(160) @map("monthly_hour_cap")
@@ -327,6 +348,9 @@ model OpsAthlete {
   user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   projects     OpsProject[]
   submissions  OpsDailySubmission[]
+  plannerBoards PlannerBoard[]
+  outboxTasks  OpsOutboxTask[]      @relation("OutboxTargetAthlete")
+  notifications OpsNotification[]
 
   @@map("ops_athletes")
 }
@@ -356,10 +380,76 @@ model OpsProject {
   client          OpsClient               @relation(fields: [clientId], references: [id], onDelete: Cascade)
   assignedAthlete OpsAthlete?             @relation(fields: [assignedAthleteId], references: [id], onDelete: SetNull)
   lineItems       OpsSubmissionLineItem[]
+  plannerBoards   PlannerBoard[]
+  outboxTasks     OpsOutboxTask[]
 
   @@unique([clientId, projectNumber])
   @@index([assignedAthleteId])
   @@map("ops_projects")
+}
+
+enum OpsNotificationType {
+  check_in_request
+  zoom_check_in
+  review_request
+  blocker
+  project_question
+  completed_task
+  daily_submission_flag
+  birthday
+}
+
+enum OpsOutboxPriority {
+  low
+  normal
+  high
+  urgent
+}
+
+/** Admin Blocharch Outbox assignments → athlete Blocharch Inbox. */
+model OpsOutboxTask {
+  id              String            @id @default(uuid())
+  createdByUserId String            @map("created_by_user_id")
+  athleteId       String            @map("athlete_id")
+  projectId       String?           @map("project_id")
+  title           String?
+  description     String?           @db.Text
+  dueAt           DateTime?         @map("due_at")
+  priority        OpsOutboxPriority @default(normal)
+  notes           String?           @db.Text
+  attachments     Json?
+  inboxBoardId    String?           @map("inbox_board_id")
+  inboxTaskId     String?           @map("inbox_task_id")
+  deliveredAt     DateTime?         @map("delivered_at")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  athlete    OpsAthlete   @relation("OutboxTargetAthlete", fields: [athleteId], references: [id], onDelete: Cascade)
+  project    OpsProject?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  inboxBoard PlannerBoard? @relation(fields: [inboxBoardId], references: [id], onDelete: SetNull)
+
+  @@index([athleteId])
+  @@index([createdByUserId])
+  @@map("ops_outbox_tasks")
+}
+
+/** Admin/manager notification feed (check-ins, blockers, reviews, etc.). */
+model OpsNotification {
+  id          String              @id @default(uuid())
+  athleteId   String?             @map("athlete_id")
+  projectId   String?             @map("project_id")
+  type        OpsNotificationType
+  title       String
+  message     String?             @db.Text
+  actionRequired String?          @map("action_required") @db.Text
+  readAt      DateTime?           @map("read_at")
+  createdAt   DateTime            @default(now()) @map("created_at")
+
+  athlete OpsAthlete? @relation(fields: [athleteId], references: [id], onDelete: SetNull)
+
+  @@index([readAt, createdAt])
+  @@index([athleteId])
+  @@map("ops_notifications")
 }
 
 model OpsDailySubmission {

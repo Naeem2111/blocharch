@@ -12,20 +12,28 @@ export async function GET(request: NextRequest) {
   if (gate instanceof NextResponse) return gate;
   const { user } = gate;
 
+  const ownerUserId = request.nextUrl.searchParams.get("ownerUserId")?.trim() || null;
+
   const ids = await planBoardIdsForUser(user);
   if (ids.length === 0) {
     return NextResponse.json({ boards: [] });
   }
 
   const boards = await prisma.plannerBoard.findMany({
-    where: { id: { in: ids } },
+    where: {
+      id: { in: ids },
+      ...(ownerUserId ? { ownerId: ownerUserId } : {}),
+    },
     orderBy: [{ scope: "asc" }, { updatedAt: "desc" }],
     select: {
       id: true,
       title: true,
       scope: true,
+      kind: true,
+      isSystem: true,
       color: true,
       ownerId: true,
+      athleteId: true,
       updatedAt: true,
       owner: { select: { username: true } },
       _count: { select: { columns: true } },

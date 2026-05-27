@@ -1,18 +1,28 @@
+import { Suspense } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { getSession } from "@/lib/auth";
+import { provisionMissingPlannerBoards } from "@/lib/planner-provision";
 import { PlannerClient } from "./PlannerClient";
 
-export default function PlannerPage() {
+export default async function PlannerPage() {
+  const session = await getSession();
+  if (session?.user.role === "admin") {
+    await provisionMissingPlannerBoards().catch(() => {});
+  }
+
   return (
     <div className="mx-auto max-w-[min(100vw-2rem,90rem)]">
       <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
         <PageHeader
           title="Project planner"
-          description="Kanban for personal and team work: colour-coded columns, labels, assignments, architect lead links, team access, and calendar export. Managers can open every team board."
+          description="Personal boards for your work, or Team to open an athlete workspace and Kanban. Fixed system boards (Inbox, My Tasks, Completed) cannot be removed by athletes."
         />
         <ThemeToggle compact />
       </div>
-      <PlannerClient />
+      <Suspense fallback={<p className="text-slate-500 text-sm">Loading planner…</p>}>
+        <PlannerClient />
+      </Suspense>
     </div>
   );
 }

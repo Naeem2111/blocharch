@@ -6,9 +6,13 @@ export type AthleteNavItem = {
 };
 
 export const ATHLETE_NAV: AthleteNavItem[] = [
-  { href: "/dashboard/athlete", label: "Dashboard" },
+  { href: "/dashboard/athlete", label: "My dashboard" },
   { href: "/dashboard/athlete/submissions", label: "Daily log" },
   { href: "/dashboard/athlete/projects", label: "My projects" },
+  { href: "/dashboard/athlete/projects/completed", label: "Completed projects" },
+  { href: "/dashboard/athlete/notifications", label: "My notifications" },
+  { href: "/dashboard/athlete/book-call", label: "Book a call" },
+  { href: "/dashboard/planner?area=personal", label: "Project planner" },
 ];
 
 export function AthleteSubNav({ pathname }: { pathname: string }) {
@@ -21,7 +25,9 @@ export function AthleteSubNav({ pathname }: { pathname: string }) {
         const active =
           item.href === "/dashboard/athlete"
             ? pathname === "/dashboard/athlete"
-            : pathname === item.href || pathname.startsWith(`${item.href}/`);
+            : item.href.startsWith("/dashboard/planner")
+              ? pathname.startsWith("/dashboard/planner")
+              : pathname === item.href || pathname.startsWith(`${item.href}/`);
         return (
           <Link
             key={item.href}

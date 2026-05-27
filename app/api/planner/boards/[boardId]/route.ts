@@ -7,6 +7,7 @@ import {
   canViewBoard,
   requirePlannerSession,
 } from "@/lib/planner-access";
+import { isProtectedSystemBoard } from "@/lib/planner-system-boards";
 
 type Ctx = { params: Promise<{ boardId: string }> };
 
@@ -85,6 +86,15 @@ export async function PATCH(request: NextRequest, context: Ctx) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const existing = await prisma.plannerBoard.findUnique({ where: { id: boardId } });
+  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (
+    isProtectedSystemBoard(existing.kind, existing.isSystem) &&
+    user.role !== "admin"
+  ) {
+    return NextResponse.json({ error: "Only admin can edit fixed system boards" }, { status: 403 });
+  }
+
   try {
     const body = await request.json();
     const title =
@@ -114,6 +124,9 @@ export async function DELETE(request: NextRequest, context: Ctx) {
 
   const board = await prisma.plannerBoard.findUnique({ where: { id: boardId } });
   if (!board) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (isProtectedSystemBoard(board.kind, board.isSystem)) {
+    return NextResponse.json({ error: "System boards cannot be deleted" }, { status: 403 });
+  }
   if (user.role !== "admin" && board.ownerId !== user.id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }

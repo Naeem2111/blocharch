@@ -1,16 +1,28 @@
 "use client";
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 type BoardSummary = {
   id: string;
   title: string;
   scope: "personal" | "team";
+  kind?: string;
+  isSystem?: boolean;
   color: string;
   ownerId: string;
   updatedAt: string;
   owner: { username: string };
   _count: { columns: number };
+};
+
+type TeamAthleteRow = {
+  id: string;
+  userId: string;
+  fullName: string;
+  athleteCode: string;
+  username: string;
+  activeProjects: number;
 };
 
 type Label = { id: string; name: string; color: string };
@@ -206,8 +218,12 @@ function insertAnchorBeforeId(
 }
 
 export function PlannerClient() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const area = searchParams.get("area");
+  const athleteUserId = searchParams.get("athlete");
+
   const [boards, setBoards] = useState<BoardSummary[]>([]);
-  const [filter, setFilter] = useState<"all" | "personal" | "team">("all");
   const [boardId, setBoardId] = useState<string | null>(null);
   const [detail, setDetail] = useState<BoardDetail | null>(null);
   const [assignees, setAssignees] = useState<AssigneeOption[]>([]);
@@ -229,6 +245,10 @@ export function PlannerClient() {
   const [newColColor, setNewColColor] = useState("#64748b");
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentRole, setCurrentRole] = useState<"admin" | "manager" | "user" | null>(null);
+  const [teamAthletes, setTeamAthletes] = useState<TeamAthleteRow[]>([]);
+  const [teamAthletesLoading, setTeamAthletesLoading] = useState(false);
+  const [selectedAthleteName, setSelectedAthleteName] = useState<string | null>(null);
   const [plannerTodos, setPlannerTodos] = useState<PlannerTodoDTO[]>([]);
   const [linkKanbanModalOpen, setLinkKanbanModalOpen] = useState(false);
   const [browseQ, setBrowseQ] = useState("");
@@ -264,11 +284,17 @@ export function PlannerClient() {
     [detail]
   );
 
+  const canUseTeamRoster = currentRole === "admin" || currentRole === "manager";
+  const showHub = !area;
+  const showTeamRoster = area === "team" && !athleteUserId && canUseTeamRoster;
+  const showBoardPicker = area === "personal" || (area === "team" && !!athleteUserId);
+
   const refreshBoards = useCallback(async () => {
-    const r = await fetch("/api/planner/boards");
+    const qs = athleteUserId ? `?ownerUserId=${encodeURIComponent(athleteUserId)}` : "";
+    const r = await fetch(`/api/planner/boards${qs}`);
     const j = await r.json();
     if (r.ok) setBoards(j.boards || []);
-  }, []);
+  }, [athleteUserId]);
 
   const loadDetail = useCallback(async (id: string): Promise<BoardDetail | null> => {
     const r = await fetch(`/api/planner/boards/${encodeURIComponent(id)}`);
@@ -289,14 +315,82 @@ export function PlannerClient() {
     fetch("/api/me")
       .then(async (r) => {
         const j = await r.json().catch(() => ({}));
-        if (r.ok && typeof j?.user?.id === "string") setCurrentUserId(j.user.id);
+        if (r.ok && typeof j?.user?.id === "string") {
+          setCurrentUserId(j.user.id);
+          const role = j?.user?.role;
+          if (role === "admin" || role === "manager" || role === "user") {
+            setCurrentRole(role);
+          }
+        }
       })
       .catch(() => {});
   }, []);
 
   useEffect(() => {
+    if (!showTeamRoster) return;
+    setTeamAthletesLoading(true);
+    fetch("/api/planner/athletes")
+      .then(async (r) => {
+        const j = await r.json().catch(() => ({}));
+        if (r.ok) setTeamAthletes(j.athletes || []);
+      })
+      .finally(() => setTeamAthletesLoading(false));
+  }, [showTeamRoster]);
+
+  useEffect(() => {
+    if (!athleteUserId) {
+      setSelectedAthleteName(null);
+      return;
+    }
+    const row = teamAthletes.find((a) => a.userId === athleteUserId);
+    if (row) setSelectedAthleteName(row.fullName);
+    else {
+      fetch("/api/planner/athletes")
+        .then(async (r) => {
+          const j = await r.json().catch(() => ({}));
+          if (!r.ok) return;
+          const list = (j.athletes || []) as TeamAthleteRow[];
+          setTeamAthletes(list);
+          const hit = list.find((a) => a.userId === athleteUserId);
+          if (hit) setSelectedAthleteName(hit.fullName);
+        })
+        .catch(() => {});
+    }
+  }, [athleteUserId, teamAthletes]);
+
+  useEffect(() => {
+    if (currentRole === "user" && !area) {
+      router.replace("/dashboard/planner?area=personal");
+    }
+  }, [currentRole, area, router]);
+
+  useEffect(() => {
     refreshTodos().catch(() => {});
   }, [refreshTodos]);
+
+  const filteredBoards = useMemo(() => {
+    if (area === "personal" && currentUserId) {
+      return boards.filter(
+        (b) =>
+          b.ownerId === currentUserId &&
+          (b.scope === "personal" || b.kind === "blocharch_outbox")
+      );
+    }
+    if (area === "team" && athleteUserId) {
+      return boards.filter((b) => b.ownerId === athleteUserId);
+    }
+    return [];
+  }, [boards, area, currentUserId, athleteUserId]);
+
+  function goPlanner(params: { area?: string; athlete?: string }) {
+    const p = new URLSearchParams();
+    if (params.area) p.set("area", params.area);
+    if (params.athlete) p.set("athlete", params.athlete);
+    const q = p.toString();
+    router.push(q ? `/dashboard/planner?${q}` : "/dashboard/planner");
+    setBoardId(null);
+    setDetail(null);
+  }
 
   useEffect(() => {
     setLoading(true);
@@ -309,19 +403,20 @@ export function PlannerClient() {
   }, [refreshBoards]);
 
   useEffect(() => {
-    if (!boardId && boards.length > 0) {
-      setBoardId(boards[0].id);
+    if (!showBoardPicker) {
+      setBoardId(null);
+      setDetail(null);
+      return;
     }
-  }, [boards, boardId]);
+    if (!boardId && filteredBoards.length > 0) {
+      setBoardId(filteredBoards[0]!.id);
+    }
+  }, [boards, boardId, showBoardPicker, filteredBoards]);
 
   useEffect(() => {
-    if (boardId) loadDetail(boardId);
-  }, [boardId, loadDetail]);
-
-  const filteredBoards = useMemo(() => {
-    if (filter === "all") return boards;
-    return boards.filter((b) => b.scope === filter);
-  }, [boards, filter]);
+    if (boardId && showBoardPicker) loadDetail(boardId);
+    else if (!showBoardPicker) setDetail(null);
+  }, [boardId, loadDetail, showBoardPicker]);
 
   const personalOwnedBoards = useMemo(() => {
     if (!currentUserId) return [];
@@ -708,22 +803,100 @@ export function PlannerClient() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-wrap items-center gap-2">
-          {(["all", "personal", "team"] as const).map((f) => (
+      {showHub ? (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => goPlanner({ area: "personal" })}
+            className="card-tool rounded-xl p-6 text-left ring-1 ring-white/[0.08] transition-colors hover:bg-white/[0.04]"
+          >
+            <p className="text-lg font-semibold text-white">Personal</p>
+            <p className="mt-2 text-sm text-slate-400">
+              Your boards, including Blocharch Outbox when you are admin.
+            </p>
+          </button>
+          {canUseTeamRoster ? (
             <button
-              key={f}
               type="button"
-              onClick={() => setFilter(f)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium ring-1 transition-colors ${
-                filter === f
-                  ? "bg-brand-500/20 text-brand-200 ring-brand-500/30"
-                  : "bg-white/[0.04] text-slate-400 ring-white/[0.08] hover:bg-white/[0.07]"
-              }`}
+              onClick={() => goPlanner({ area: "team" })}
+              className="card-tool rounded-xl p-6 text-left ring-1 ring-white/[0.08] transition-colors hover:bg-white/[0.04]"
             >
-              {f === "all" ? "All boards" : f === "personal" ? "Personal" : "Team"}
+              <p className="text-lg font-semibold text-white">Team</p>
+              <p className="mt-2 text-sm text-slate-400">
+                Pick an athlete to open their workspace and Kanban boards.
+              </p>
             </button>
-          ))}
+          ) : null}
+        </div>
+      ) : null}
+
+      {showTeamRoster ? (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => goPlanner({})}
+              className="text-sm text-slate-500 hover:text-slate-300"
+            >
+              ← Project planner
+            </button>
+            <span className="text-slate-600">/</span>
+            <span className="text-sm font-medium text-slate-300">Team</span>
+          </div>
+          <p className="text-sm text-slate-400">Select an athlete to view their workspace boards.</p>
+          {teamAthletesLoading ? (
+            <p className="text-sm text-slate-500">Loading athletes…</p>
+          ) : (
+            <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {teamAthletes.map((a) => (
+                <li key={a.id}>
+                  <button
+                    type="button"
+                    onClick={() => goPlanner({ area: "team", athlete: a.userId })}
+                    className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-left transition-colors hover:bg-white/[0.06]"
+                  >
+                    <span className="font-medium text-slate-100">{a.fullName}</span>
+                    <span className="mt-1 block text-xs text-slate-500">
+                      {a.athleteCode} · {a.activeProjects} active project
+                      {a.activeProjects === 1 ? "" : "s"}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {!teamAthletesLoading && teamAthletes.length === 0 ? (
+            <p className="text-sm text-slate-500">No active athletes yet.</p>
+          ) : null}
+        </div>
+      ) : null}
+
+      {showBoardPicker ? (
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <button
+            type="button"
+            onClick={() => goPlanner({})}
+            className="text-slate-500 hover:text-slate-300"
+          >
+            Project planner
+          </button>
+          <span className="text-slate-600">/</span>
+          <button
+            type="button"
+            onClick={() =>
+              goPlanner(area === "team" ? { area: "team" } : { area: "personal" })
+            }
+            className="text-slate-400 hover:text-slate-200"
+          >
+            {area === "team" ? "Team" : "Personal"}
+          </button>
+          {area === "team" && selectedAthleteName ? (
+            <>
+              <span className="text-slate-600">/</span>
+              <span className="font-medium text-slate-200">{selectedAthleteName}</span>
+            </>
+          ) : null}
         </div>
         <button
           type="button"
@@ -733,8 +906,9 @@ export function PlannerClient() {
           New board
         </button>
       </div>
+      ) : null}
 
-      {newBoardOpen && (
+      {showBoardPicker && newBoardOpen && (
         <form
           onSubmit={createBoard}
           className="card-tool flex flex-wrap items-end gap-3 rounded-xl p-4"
@@ -773,6 +947,7 @@ export function PlannerClient() {
         </form>
       )}
 
+      {showBoardPicker ? (
       <div className="flex flex-wrap gap-2">
         {filteredBoards.map((b) => (
           <button
@@ -787,14 +962,21 @@ export function PlannerClient() {
             style={{ borderLeftWidth: 4, borderLeftColor: b.color }}
           >
             <span className="font-medium">{b.title}</span>
-            <span className="ml-2 text-[10px] uppercase text-slate-500">{b.scope}</span>
+            {b.isSystem ? (
+              <span className="ml-2 text-[10px] uppercase text-amber-500/80">fixed</span>
+            ) : (
+              <span className="ml-2 text-[10px] uppercase text-slate-500">{b.scope}</span>
+            )}
           </button>
         ))}
         {filteredBoards.length === 0 ? (
           <p className="text-sm text-slate-500">No boards yet — create one to get started.</p>
         ) : null}
       </div>
+      ) : null}
 
+      {showBoardPicker ? (
+      <>
       <section className="card-tool rounded-xl p-4" aria-labelledby="planner-cross-todos-heading">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -1416,6 +1598,8 @@ export function PlannerClient() {
           )}
         </>
       )}
+      </>
+      ) : null}
 
       {linkKanbanModalOpen ? (
         <div

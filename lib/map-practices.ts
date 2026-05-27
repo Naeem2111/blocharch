@@ -17,8 +17,18 @@ export type MapPractice = {
   stage: MapPracticeStage;
 };
 
-/** Max practices on the dashboard map — nearest to the focal hub first (see loadPracticesForMap). */
-export const MAP_PRACTICE_DISPLAY_LIMIT = 750;
+/**
+ * Max practices on the dashboard map (0 = no cap — show full database).
+ * Set MAP_PRACTICE_DISPLAY_LIMIT=750 to restore proximity cap.
+ */
+function resolveMapDisplayLimit(): number {
+  const raw = process.env.MAP_PRACTICE_DISPLAY_LIMIT?.trim();
+  if (!raw || raw === "0" || raw.toLowerCase() === "all") return 0;
+  const n = parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+export const MAP_PRACTICE_DISPLAY_LIMIT = resolveMapDisplayLimit();
 
 function slugFromUrl(url: string): string {
   const m = url.match(/\/practice\/([^/]+)\/?$/);
@@ -99,7 +109,9 @@ export async function loadPracticesForMap(): Promise<{
 
   for (const r of rows) {
     const addr =
-      getBestAddressFromFields(r.address ?? "", r.description ?? "")?.trim() || "";
+      getBestAddressFromFields(r.address ?? "", r.description ?? "")?.trim() ||
+      r.name.trim() ||
+      "";
     if (!addr) continue;
 
     const stage = (r.lead?.stage ?? "cold") as MapPracticeStage;
@@ -126,15 +138,16 @@ export async function loadPracticesForMap(): Promise<{
 
   enriched.sort(compareEnriched);
 
-  let picked = enriched.slice(0, MAP_PRACTICE_DISPLAY_LIMIT);
+  const cap = MAP_PRACTICE_DISPLAY_LIMIT;
+  let picked = cap > 0 ? enriched.slice(0, cap) : enriched;
 
   const hubSlug = focalAnchor.slug;
-  if (hubSlug) {
+  if (hubSlug && cap > 0) {
     const hasHub = picked.some((x) => x.practice.slug === hubSlug);
     if (!hasHub) {
       const hubRow = enriched.find((x) => x.practice.slug === hubSlug);
       if (hubRow) {
-        if (picked.length >= MAP_PRACTICE_DISPLAY_LIMIT) picked = picked.slice(0, -1);
+        if (picked.length >= cap) picked = picked.slice(0, -1);
         picked.push(hubRow);
         picked.sort(compareEnriched);
       }

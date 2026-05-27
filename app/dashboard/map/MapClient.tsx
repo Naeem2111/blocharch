@@ -325,12 +325,21 @@ export function MapClient({
             </>
           )}
           {' '}
-          — up to{" "}
-          {MAP_PRACTICE_DISPLAY_LIMIT} loaded, ordered nearest-first to{" "}
-          {hubUsesIconStudio(focalAnchor) ? "Icon Architects (Plato Place)" : focalAnchor.name}
-          {practices.length < MAP_PRACTICE_DISPLAY_LIMIT
-            ? ` (${practices.length} in directory with usable addresses).`
-            : "."}
+          {MAP_PRACTICE_DISPLAY_LIMIT > 0 ? (
+            <>
+              — up to {MAP_PRACTICE_DISPLAY_LIMIT} loaded, ordered nearest-first to{" "}
+              {hubUsesIconStudio(focalAnchor) ? "Icon Architects (Plato Place)" : focalAnchor.name}
+              {practices.length < MAP_PRACTICE_DISPLAY_LIMIT
+                ? ` (${practices.length} in directory with usable addresses).`
+                : "."}
+            </>
+          ) : (
+            <>
+              — full directory loaded ({practices.length} practices), ordered nearest-first to{" "}
+              {hubUsesIconStudio(focalAnchor) ? "Icon Architects (Plato Place)" : focalAnchor.name}.
+              Pins without stored coordinates are geocoded in batches as you view the map.
+            </>
+          )}
           {statusExtra}
         </p>
         <p className="text-slate-500 text-sm">

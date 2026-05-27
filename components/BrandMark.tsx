@@ -28,8 +28,8 @@ export function BrandMark({ className = "", compact = false, variant = "row" }: 
         priority
         className={
           stack
-            ? "h-20 w-20 max-h-[5.5rem] max-w-[5.5rem] object-contain"
-            : "h-10 w-10 object-contain object-left"
+            ? "h-20 w-20 max-h-[5.5rem] max-w-[5.5rem] object-contain dark:mix-blend-normal"
+            : "h-10 w-10 object-contain object-left dark:mix-blend-normal"
         }
       />
       {!compact && (

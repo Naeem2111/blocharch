@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/password";
 import { requireOpsSession } from "@/lib/ops-access";
 import { parseDateOnly } from "@/lib/ops-hours";
+import { ensureAthleteSystemBoards } from "@/lib/planner-system-boards";
 
 export async function GET(request: NextRequest) {
   const gate = await requireOpsSession(request);
@@ -84,18 +85,21 @@ export async function POST(request: NextRequest) {
           disabled: false,
         },
       });
-      return tx.opsAthlete.create({
+      const created = await tx.opsAthlete.create({
         data: {
           userId,
           fullName,
           athleteCode,
           email: body.email ? String(body.email).trim() : null,
+          phone: body.phone ? String(body.phone).trim() : null,
           blocharchStartDate: startDate,
           baseMonthlyPayZar: body.baseMonthlyPayZar ?? 20000,
           monthlyHourCap: body.monthlyHourCap ?? 160,
           overtimeRateZar: body.overtimeRateZar ?? 200,
         },
       });
+      await ensureAthleteSystemBoards(created.id, userId, tx);
+      return created;
     });
 
     return NextResponse.json(
