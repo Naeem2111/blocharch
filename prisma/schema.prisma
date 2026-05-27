@@ -351,6 +351,7 @@ model OpsAthlete {
   plannerBoards PlannerBoard[]
   outboxTasks  OpsOutboxTask[]      @relation("OutboxTargetAthlete")
   notifications OpsNotification[]
+  checkInRequests OpsCheckInRequest[]
 
   @@map("ops_athletes")
 }
@@ -382,10 +383,20 @@ model OpsProject {
   lineItems       OpsSubmissionLineItem[]
   plannerBoards   PlannerBoard[]
   outboxTasks     OpsOutboxTask[]
+  checkInRequests OpsCheckInRequest[]
 
   @@unique([clientId, projectNumber])
   @@index([assignedAthleteId])
   @@map("ops_projects")
+}
+
+enum OpsCheckInStatus {
+  pending
+  approved
+  declined
+  counter_proposed
+  confirmed
+  cancelled
 }
 
 enum OpsNotificationType {
@@ -450,6 +461,35 @@ model OpsNotification {
   @@index([readAt, createdAt])
   @@index([athleteId])
   @@map("ops_notifications")
+}
+
+/** Athlete Book a Call → admin Check-In Requests (Google Calendar when configured). */
+model OpsCheckInRequest {
+  id               String           @id @default(uuid())
+  athleteId        String           @map("athlete_id")
+  projectId        String?          @map("project_id")
+  reason           String
+  contextNotes     String?          @map("context_notes") @db.Text
+  requestedStartAt DateTime         @map("requested_start_at")
+  requestedEndAt   DateTime         @map("requested_end_at")
+  status           OpsCheckInStatus @default(pending)
+  adminNote        String?          @map("admin_note") @db.Text
+  counterStartAt   DateTime?        @map("counter_start_at")
+  counterEndAt     DateTime?        @map("counter_end_at")
+  zoomLink         String?          @map("zoom_link")
+  googleEventId    String?          @map("google_event_id")
+  googleEventLink  String?          @map("google_event_link")
+  resolvedByUserId String?          @map("resolved_by_user_id")
+  resolvedAt       DateTime?        @map("resolved_at")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  athlete OpsAthlete  @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  project OpsProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([athleteId, status])
+  @@index([status, createdAt])
+  @@map("ops_check_in_requests")
 }
 
 model OpsDailySubmission {

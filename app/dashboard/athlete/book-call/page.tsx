@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/PageHeader";
+import { AthleteBookCallClient } from "./AthleteBookCallClient";
 
 export default function BookCallPage() {
   return (
@@ -7,9 +8,7 @@ export default function BookCallPage() {
         title="Book a call"
         description="Request a check-in slot from Jethro’s calendar — project, reason, preferred time, and notes."
       />
-      <p className="text-sm text-slate-500">
-        Coming soon — Google Calendar availability, approval flow, and Zoom link confirmation.
-      </p>
+      <AthleteBookCallClient />
     </div>
   );
 }

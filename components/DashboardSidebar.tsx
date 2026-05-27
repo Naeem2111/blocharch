@@ -141,6 +141,15 @@ const OPS_NAV: NavItem[] = [
     ),
   },
   {
+    href: "/dashboard/ops/check-ins",
+    label: "Check-in requests",
+    icon: (
+      <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M18 3v2.25M5.25 9h13.5M4.5 21h15a2.25 2.25 0 002.25-2.25V7.5A2.25 2.25 0 0019.5 5.25h-15a2.25 2.25 0 00-2.25 2.25v11.25A2.25 2.25 0 004.5 21z" />
+      </svg>
+    ),
+  },
+  {
     href: "/dashboard/ops/notifications",
     label: "Notifications",
     icon: (
