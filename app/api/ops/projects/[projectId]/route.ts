@@ -8,6 +8,8 @@ import {
 } from "@/lib/ops-constants";
 import { requireOpsSession } from "@/lib/ops-access";
 import { parseDateOnly } from "@/lib/ops-hours";
+import { syncProjectAfterOpsUpdate } from "@/lib/planner-project-sync";
+import type { OpsProjectStatus } from "@prisma/client";
 
 type RouteContext = { params: Promise<{ projectId: string }> };
 
@@ -81,6 +83,20 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         assignedAthlete: { select: { id: true, fullName: true, athleteCode: true } },
       },
     });
+
+    await syncProjectAfterOpsUpdate(
+      projectId,
+      {
+        assignedAthleteId: existing.assignedAthleteId,
+        currentStatus: existing.currentStatus,
+        name: existing.name,
+      },
+      {
+        assignedAthleteId: project.assignedAthleteId,
+        currentStatus: project.currentStatus as OpsProjectStatus,
+        name: project.name,
+      }
+    ).catch(() => {});
 
     return NextResponse.json({
       project: {

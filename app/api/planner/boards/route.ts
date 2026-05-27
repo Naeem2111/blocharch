@@ -23,6 +23,15 @@ export async function GET(request: NextRequest) {
     where: {
       id: { in: ids },
       ...(ownerUserId ? { ownerId: ownerUserId } : {}),
+      OR: [
+        { kind: { not: "project" } },
+        { opsProjectId: null },
+        {
+          opsProject: {
+            currentStatus: { notIn: ["completed", "handed_over"] },
+          },
+        },
+      ],
     },
     orderBy: [{ scope: "asc" }, { updatedAt: "desc" }],
     select: {

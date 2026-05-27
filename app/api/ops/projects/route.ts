@@ -8,6 +8,7 @@ import {
 } from "@/lib/ops-constants";
 import { requireOpsSession } from "@/lib/ops-access";
 import { parseDateOnly } from "@/lib/ops-hours";
+import { syncProjectBoardOnAssign } from "@/lib/planner-project-sync";
 
 export async function GET(request: NextRequest) {
   const gate = await requireOpsSession(request);
@@ -97,6 +98,10 @@ export async function POST(request: NextRequest) {
         notes: body.notes ? String(body.notes).trim() : null,
       },
     });
+
+    if (assignedAthleteId) {
+      await syncProjectBoardOnAssign(project.id).catch(() => {});
+    }
 
     return NextResponse.json({ project: { id: project.id, name: project.name } }, { status: 201 });
   } catch (err) {

@@ -2,6 +2,8 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { BlocharchOutboxPanel } from "@/components/planner/BlocharchOutboxPanel";
+import { usesAthleteCompletedFlow } from "@/lib/planner-completed";
 
 type BoardSummary = {
   id: string;
@@ -64,6 +66,9 @@ type BoardDetail = {
   id: string;
   title: string;
   scope: "personal" | "team";
+  kind?: string;
+  athleteId?: string | null;
+  isSystem?: boolean;
   color: string;
   ownerId: string;
   owner: Assignee;
@@ -283,6 +288,29 @@ export function PlannerClient() {
     () => (detail ? resolveCompletedColumnId(detail.columns) : null),
     [detail]
   );
+
+  const athleteCompletedFlow = useMemo(
+    () =>
+      detail?.athleteId && detail.kind
+        ? usesAthleteCompletedFlow(detail.kind, detail.athleteId)
+        : false,
+    [detail]
+  );
+
+  async function toggleTaskCompleted(taskId: string, completed: boolean) {
+    const r = await fetch(`/api/planner/tasks/${encodeURIComponent(taskId)}/complete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ completed }),
+    });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      window.alert((j as { error?: string }).error || "Could not update task");
+      return;
+    }
+    if (boardId) await loadDetail(boardId);
+    await refreshBoards();
+  }
 
   const canUseTeamRoster = currentRole === "admin" || currentRole === "manager";
   const showHub = !area;
@@ -1065,7 +1093,9 @@ export function PlannerClient() {
         )}
       </section>
 
-      {detail && (
+      {detail?.kind === "blocharch_outbox" ? <BlocharchOutboxPanel /> : null}
+
+      {detail && detail.kind !== "blocharch_outbox" ? (
         <>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -1212,9 +1242,17 @@ export function PlannerClient() {
                 >
                   {col.tasks.map((t) => {
                     const descPreview = taskCardDescriptionPreview(t.description);
+                    const onCompletedBoard =
+                      detail.kind === "completed" && !!detail.athleteId;
                     const showDoneTick =
-                      detail.editable && completedColumnId !== null && detail.columns.length >= 2;
-                    const isInDoneColumn = col.id === completedColumnId;
+                      detail.editable &&
+                      (onCompletedBoard ||
+                        athleteCompletedFlow ||
+                        (completedColumnId !== null && detail.columns.length >= 2));
+                    const isInDoneColumn =
+                      onCompletedBoard || athleteCompletedFlow
+                        ? detail.kind === "completed"
+                        : col.id === completedColumnId;
                     const showInsertLine =
                       detail.editable &&
                       dragTaskId &&
@@ -1369,9 +1407,17 @@ export function PlannerClient() {
                               <input
                                 type="checkbox"
                                 checked={isInDoneColumn}
-                                title={isInDoneColumn ? "Move out of Done" : "Mark done"}
+                                title={
+                                  isInDoneColumn
+                                    ? "Restore to previous board"
+                                    : "Mark complete"
+                                }
                                 onChange={(e) => {
                                   e.stopPropagation();
+                                  if (athleteCompletedFlow || onCompletedBoard) {
+                                    void toggleTaskCompleted(t.id, e.target.checked);
+                                    return;
+                                  }
                                   const snap = detailRef.current;
                                   const doneId = completedColumnId;
                                   const firstId = snap?.columns[0]?.id;
@@ -1597,7 +1643,7 @@ export function PlannerClient() {
             />
           )}
         </>
-      )}
+      ) : null}
       </>
       ) : null}
 

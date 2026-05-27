@@ -12,6 +12,7 @@ export const OPS_NAV: OpsNavItem[] = [
   { href: "/dashboard/ops/projects", label: "Projects" },
   { href: "/dashboard/ops/commercial", label: "Commercial" },
   { href: "/dashboard/ops/analytics", label: "Analytics" },
+  { href: "/dashboard/ops/notifications", label: "Notifications" },
 ];
 
 export function OpsSubNav({ pathname }: { pathname: string }) {

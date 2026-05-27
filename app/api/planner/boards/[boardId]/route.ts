@@ -62,6 +62,10 @@ export async function GET(request: NextRequest, context: Ctx) {
 
   const payload = {
     ...board,
+    kind: board.kind,
+    athleteId: board.athleteId,
+    isSystem: board.isSystem,
+    opsProjectId: board.opsProjectId,
     columns: board.columns.map((col) => ({
       ...col,
       tasks: col.tasks.map((t) => ({

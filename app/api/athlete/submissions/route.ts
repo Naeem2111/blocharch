@@ -14,6 +14,7 @@ import {
 import { computeMonthlyHoursSummary, dateOnlyUtc, parseDateOnly } from "@/lib/ops-hours";
 import { buildDailyHourAlerts, isSubmissionEditable } from "@/lib/ops-alerts";
 import { lockStaleSubmissions } from "@/lib/ops-commercial";
+import { createOpsNotification } from "@/lib/ops-notifications";
 
 type LineItemInput = {
   clientId: string;
@@ -234,6 +235,35 @@ export async function POST(request: NextRequest) {
 
       return created;
     });
+
+    if (body.checkInRequested) {
+      await createOpsNotification({
+        athleteId: athlete.id,
+        type: "check_in_request",
+        title: `${athlete.fullName} requested a check-in`,
+        message: body.dailyNote ? String(body.dailyNote).trim() : null,
+        actionRequired: "Review check-in request and respond via Book a Call flow",
+      }).catch(() => {});
+    }
+
+    const blockerItems = lineItems.filter((li) => li.blockerFlag);
+    if (blockerItems.length > 0) {
+      const projects = await prisma.opsProject.findMany({
+        where: { id: { in: blockerItems.map((li) => li.projectId) } },
+        select: { id: true, name: true },
+      });
+      const nameById = Object.fromEntries(projects.map((p) => [p.id, p.name]));
+      for (const li of blockerItems) {
+        await createOpsNotification({
+          athleteId: athlete.id,
+          projectId: li.projectId,
+          type: "blocker",
+          title: `Blocker on ${nameById[li.projectId] ?? "project"}`,
+          message: li.blockerNote ?? li.notes ?? null,
+          actionRequired: "Review blocker and follow up with athlete",
+        }).catch(() => {});
+      }
+    }
 
     const monthSummary = await athleteMonthlySummary(athlete);
     const todayHours = Number(submission.totalHours);
