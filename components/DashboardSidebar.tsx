@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BrandMark } from "@/components/BrandMark";
@@ -9,6 +9,14 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { BLOCHARCH_SITE } from "@/lib/blocharch-brand";
 import type { SessionUser } from "@/lib/auth";
 import { canAccessModule, type AppModule } from "@/lib/permissions";
+import {
+  applyItemOrder,
+  applySectionOrder,
+  loadSidebarNavOrder,
+  reorderIds,
+  saveSidebarNavOrder,
+  type SidebarNavOrder,
+} from "@/lib/sidebar-nav-order";
 
 type NavItem = { href: string; label: string; icon: React.ReactNode };
 
@@ -251,12 +259,33 @@ function navActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+function DragHandle({ label }: { label: string }) {
+  return (
+    <span
+      draggable
+      aria-label={`Reorder ${label}`}
+      title="Drag to reorder"
+      className="flex h-8 w-5 shrink-0 cursor-grab items-center justify-center rounded text-slate-600 active:cursor-grabbing hover:bg-white/[0.06] hover:text-slate-400"
+      onClick={(e) => e.preventDefault()}
+    >
+      <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+        <circle cx="5" cy="4" r="1.25" />
+        <circle cx="11" cy="4" r="1.25" />
+        <circle cx="5" cy="8" r="1.25" />
+        <circle cx="11" cy="8" r="1.25" />
+        <circle cx="5" cy="12" r="1.25" />
+        <circle cx="11" cy="12" r="1.25" />
+      </svg>
+    </span>
+  );
+}
+
 function NavLink({ href, label, icon, pathname }: NavItem & { pathname: string }) {
   const active = navActive(pathname, href);
   return (
     <Link
       href={href}
-      className={`flex items-center gap-3 rounded-lg py-2.5 pl-8 pr-3 text-sm font-medium transition-colors ${
+      className={`flex min-w-0 flex-1 items-center gap-3 rounded-lg py-2.5 pr-3 text-sm font-medium transition-colors ${
         active
           ? "bg-brand-500/15 text-brand-300 ring-1 ring-brand-500/25"
           : "text-slate-400 hover:bg-white/[0.04] hover:text-slate-200"
@@ -268,9 +297,206 @@ function NavLink({ href, label, icon, pathname }: NavItem & { pathname: string }
   );
 }
 
+type DragItemState = { sectionId: string; index: number } | null;
+type DragSectionState = { index: number } | null;
+
+function DraggableNavItem({
+  item,
+  sectionId,
+  index,
+  pathname,
+  dragging,
+  dropIndex,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
+}: {
+  item: NavItem;
+  sectionId: string;
+  index: number;
+  pathname: string;
+  dragging: DragItemState;
+  dropIndex: number | null;
+  onDragStart: (sectionId: string, index: number) => void;
+  onDragOver: (sectionId: string, index: number) => void;
+  onDrop: (sectionId: string, index: number) => void;
+  onDragEnd: () => void;
+}) {
+  const isDragging =
+    dragging?.sectionId === sectionId && dragging.index === index;
+  const showDropBefore =
+    dropIndex === index &&
+    dragging !== null &&
+    (dragging.sectionId !== sectionId || dragging.index !== index);
+
+  return (
+    <div
+      className={`relative flex items-center gap-0.5 ${isDragging ? "opacity-40" : ""}`}
+      onDragOver={(e) => {
+        if (!dragging || dragging.sectionId !== sectionId) return;
+        e.preventDefault();
+        onDragOver(sectionId, index);
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        onDrop(sectionId, index);
+      }}
+    >
+      {showDropBefore ? (
+        <span className="pointer-events-none absolute -top-0.5 left-1 right-1 h-0.5 rounded-full bg-brand-400/80" />
+      ) : null}
+      <span
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.effectAllowed = "move";
+          e.dataTransfer.setData("application/x-sidebar-item", `${sectionId}:${index}`);
+          onDragStart(sectionId, index);
+        }}
+        onDragEnd={onDragEnd}
+      >
+        <DragHandle label={item.label} />
+      </span>
+      <NavLink {...item} pathname={pathname} />
+    </div>
+  );
+}
+
+function DraggableSectionHeader({
+  label,
+  index,
+  isFirst,
+  dragging,
+  dropIndex,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
+}: {
+  label: string;
+  index: number;
+  isFirst: boolean;
+  dragging: DragSectionState;
+  dropIndex: number | null;
+  onDragStart: (index: number) => void;
+  onDragOver: (index: number) => void;
+  onDrop: (index: number) => void;
+  onDragEnd: () => void;
+}) {
+  const isDragging = dragging?.index === index;
+  const showDropBefore =
+    dropIndex === index && dragging !== null && dragging.index !== index;
+
+  return (
+    <div
+      className={`relative flex items-center gap-1 ${isFirst ? "pt-1" : "pt-5"} ${isDragging ? "opacity-40" : ""}`}
+      onDragOver={(e) => {
+        if (!dragging) return;
+        e.preventDefault();
+        onDragOver(index);
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        onDrop(index);
+      }}
+    >
+      {showDropBefore ? (
+        <span className="pointer-events-none absolute top-2 left-1 right-1 h-0.5 rounded-full bg-brand-400/80" />
+      ) : null}
+      <span
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.effectAllowed = "move";
+          e.dataTransfer.setData("application/x-sidebar-section", String(index));
+          onDragStart(index);
+        }}
+        onDragEnd={onDragEnd}
+      >
+        <DragHandle label={`${label} section`} />
+      </span>
+      <p className="min-w-0 flex-1 px-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-600">
+        {label}
+      </p>
+    </div>
+  );
+}
+
 export function DashboardSidebar({ user }: { user: SessionUser }) {
   const pathname = usePathname() || "";
-  const visibleSections = NAV_SECTIONS.filter((section) => canAccessModule(user.role, section.module));
+  const [navOrder, setNavOrder] = useState<SidebarNavOrder | null>(null);
+  const [hydrated, setHydrated] = useState(false);
+  const skipSaveRef = useRef(true);
+  const [dragItem, setDragItem] = useState<DragItemState>(null);
+  const [dropItemIndex, setDropItemIndex] = useState<number | null>(null);
+  const [dragSection, setDragSection] = useState<DragSectionState>(null);
+  const [dropSectionIndex, setDropSectionIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    const saved = loadSidebarNavOrder(user.id);
+    setNavOrder(saved);
+    skipSaveRef.current = saved !== null;
+    setHydrated(true);
+  }, [user.id]);
+
+  useEffect(() => {
+    if (!hydrated || !navOrder) return;
+    if (skipSaveRef.current) {
+      skipSaveRef.current = false;
+      return;
+    }
+    saveSidebarNavOrder(user.id, navOrder);
+  }, [navOrder, hydrated, user.id]);
+
+  const visibleSections = useMemo(() => {
+    const filtered = NAV_SECTIONS.filter((section) => canAccessModule(user.role, section.module));
+    const ordered = applySectionOrder(filtered, navOrder?.sections);
+    return ordered.map((section) => ({
+      ...section,
+      items: applyItemOrder(section.items, navOrder?.items[section.id]),
+    }));
+  }, [user.role, navOrder]);
+
+  const persistSectionOrder = (ids: string[]) => {
+    setNavOrder((prev) => ({
+      sections: ids,
+      items: prev?.items ?? {},
+    }));
+  };
+
+  const persistItemOrder = (sectionId: string, hrefs: string[]) => {
+    setNavOrder((prev) => ({
+      sections: prev?.sections ?? visibleSections.map((s) => s.id),
+      items: { ...(prev?.items ?? {}), [sectionId]: hrefs },
+    }));
+  };
+
+  const handleItemDrop = (sectionId: string, toIndex: number) => {
+    if (!dragItem || dragItem.sectionId !== sectionId) {
+      setDragItem(null);
+      setDropItemIndex(null);
+      return;
+    }
+    const section = visibleSections.find((s) => s.id === sectionId);
+    if (!section) return;
+    const hrefs = section.items.map((i) => i.href);
+    const next = reorderIds(hrefs, dragItem.index, toIndex);
+    persistItemOrder(sectionId, next);
+    setDragItem(null);
+    setDropItemIndex(null);
+  };
+
+  const handleSectionDrop = (toIndex: number) => {
+    if (!dragSection) {
+      setDragSection(null);
+      setDropSectionIndex(null);
+      return;
+    }
+    const ids = visibleSections.map((s) => s.id);
+    const next = reorderIds(ids, dragSection.index, toIndex);
+    persistSectionOrder(next);
+    setDragSection(null);
+    setDropSectionIndex(null);
+  };
 
   return (
     <aside className="flex w-[260px] min-h-screen flex-shrink-0 flex-col border-r border-white/[0.06] bg-[var(--bg-sidebar)]">
@@ -292,23 +518,54 @@ export function DashboardSidebar({ user }: { user: SessionUser }) {
         </a>
       </div>
       <nav className="flex-1 space-y-1 p-3" aria-label="Main">
-        {visibleSections.map((section, index) => (
-          <Fragment key={section.id}>
-            {index > 0 ? (
-              <p className="px-3 pb-1 pt-5 text-[10px] font-semibold uppercase tracking-wider text-slate-600">
-                {section.label}
-              </p>
-            ) : (
-              <p className="px-3 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-slate-600">
-                {section.label}
-              </p>
-            )}
+        <p className="px-1 pb-2 text-[10px] text-slate-600">
+          Drag <span className="text-slate-500">⋮⋮</span> to reorder sections and links. Saved for your account on this device.
+        </p>
+        {visibleSections.map((section, sectionIndex) => (
+          <div key={section.id} className="space-y-0.5">
+            <DraggableSectionHeader
+              label={section.label}
+              index={sectionIndex}
+              isFirst={sectionIndex === 0}
+              dragging={dragSection}
+              dropIndex={dropSectionIndex}
+              onDragStart={(index) => {
+                setDragSection({ index });
+                setDragItem(null);
+              }}
+              onDragOver={setDropSectionIndex}
+              onDrop={handleSectionDrop}
+              onDragEnd={() => {
+                setDragSection(null);
+                setDropSectionIndex(null);
+              }}
+            />
             <div className="space-y-0.5">
-              {section.items.map((item) => (
-                <NavLink key={item.href} {...item} pathname={pathname} />
+              {section.items.map((item, itemIndex) => (
+                <DraggableNavItem
+                  key={item.href}
+                  item={item}
+                  sectionId={section.id}
+                  index={itemIndex}
+                  pathname={pathname}
+                  dragging={dragItem}
+                  dropIndex={dropItemIndex}
+                  onDragStart={(sid, idx) => {
+                    setDragItem({ sectionId: sid, index: idx });
+                    setDragSection(null);
+                  }}
+                  onDragOver={(sid, idx) => {
+                    if (dragItem?.sectionId === sid) setDropItemIndex(idx);
+                  }}
+                  onDrop={handleItemDrop}
+                  onDragEnd={() => {
+                    setDragItem(null);
+                    setDropItemIndex(null);
+                  }}
+                />
               ))}
             </div>
-          </Fragment>
+          </div>
         ))}
       </nav>
       <div className="border-t border-white/[0.06] px-3 py-3">
