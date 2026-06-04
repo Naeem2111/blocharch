@@ -3,6 +3,11 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isOpsPricingTier, laneCostForTier } from "@/lib/ops-constants";
 import { requireOpsSession } from "@/lib/ops-access";
+import {
+  clientInclude,
+  mapClientToJson,
+  parseContactsFromBody,
+} from "@/lib/ops-client-api";
 
 export async function GET(request: NextRequest) {
   const gate = await requireOpsSession(request);
@@ -10,30 +15,11 @@ export async function GET(request: NextRequest) {
 
   const clients = await prisma.opsClient.findMany({
     orderBy: { name: "asc" },
-    include: { commercial: true, _count: { select: { projects: true } } },
+    include: clientInclude,
   });
 
   return NextResponse.json({
-    clients: clients.map((c) => ({
-      id: c.id,
-      name: c.name,
-      companyName: c.companyName,
-      contactPerson: c.contactPerson,
-      email: c.email,
-      phone: c.phone,
-      country: c.country,
-      status: c.status,
-      notes: c.notes,
-      projectCount: c._count.projects,
-      commercial: c.commercial
-        ? {
-            pricingTier: c.commercial.pricingTier,
-            laneCostGbp: Number(c.commercial.laneCostGbp),
-            overtimeBillingGbp: Number(c.commercial.overtimeBillingGbp),
-            activeLaneCount: c.commercial.activeLaneCount,
-          }
-        : null,
-    })),
+    clients: clients.map(mapClientToJson),
   });
 }
 
@@ -51,16 +37,23 @@ export async function POST(request: NextRequest) {
     const tierRaw = String(body.pricingTier || "tier_30");
     const pricingTier = isOpsPricingTier(tierRaw) ? tierRaw : "tier_30";
     const activeLaneCount = Math.max(1, Math.min(20, Number(body.activeLaneCount) || 1));
+    const contacts = parseContactsFromBody(body) ?? [];
 
     const client = await prisma.opsClient.create({
       data: {
         name,
         companyName: body.companyName ? String(body.companyName).trim() : null,
-        contactPerson: body.contactPerson ? String(body.contactPerson).trim() : null,
-        email: body.email ? String(body.email).trim() : null,
+        software: body.software ? String(body.software).trim() : null,
         phone: body.phone ? String(body.phone).trim() : null,
         country: body.country ? String(body.country).trim() : null,
         notes: body.notes ? String(body.notes).trim() : null,
+        contacts: {
+          create: contacts.map((c, i) => ({
+            name: c.name,
+            email: c.email,
+            sortOrder: i,
+          })),
+        },
         commercial: {
           create: {
             pricingTier,
@@ -69,10 +62,10 @@ export async function POST(request: NextRequest) {
           },
         },
       },
-      include: { commercial: true },
+      include: clientInclude,
     });
 
-    return NextResponse.json({ client: { id: client.id, name: client.name } }, { status: 201 });
+    return NextResponse.json({ client: mapClientToJson(client) }, { status: 201 });
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }

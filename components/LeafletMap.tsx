@@ -135,7 +135,8 @@ function MapClusterLayer({ markers }: { markers: MarkerItem[] }) {
     const mcg = L.markerClusterGroup({
       chunkedLoading: true,
       chunkInterval: 120,
-      maxClusterRadius: 52,
+      maxClusterRadius: 40,
+      disableClusteringAtZoom: 13,
       spiderfyOnMaxZoom: true,
       showCoverageOnHover: false,
     });

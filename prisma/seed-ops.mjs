@@ -38,9 +38,11 @@ async function main() {
       data: {
         name: "Demo Client Ltd",
         companyName: "Demo Client Ltd",
-        contactPerson: "Jane Client",
-        email: "client@example.com",
+        software: "Revit, AutoCAD",
         country: "UK",
+        contacts: {
+          create: [{ name: "Jane Client", email: "client@example.com", sortOrder: 0 }],
+        },
         commercial: {
           create: {
             pricingTier: "tier_30",

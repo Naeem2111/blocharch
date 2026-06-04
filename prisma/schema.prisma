@@ -296,23 +296,37 @@ model PlannerTaskLabel {
 }
 
 model OpsClient {
-  id            String          @id @default(uuid())
-  name          String
-  companyName   String?         @map("company_name")
-  contactPerson String?         @map("contact_person")
-  email         String?
-  phone         String?
-  country       String?
-  status        OpsClientStatus @default(active)
-  notes         String?         @db.Text
-  createdAt     DateTime        @default(now()) @map("created_at")
-  updatedAt     DateTime        @updatedAt @map("updated_at")
+  id          String          @id @default(uuid())
+  name        String
+  companyName String?         @map("company_name")
+  software    String?         @db.Text
+  phone       String?
+  country     String?
+  status      OpsClientStatus @default(active)
+  notes       String?         @db.Text
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
 
-  commercial   OpsClientCommercialProfile?
-  projects     OpsProject[]
-  lineItems    OpsSubmissionLineItem[]
+  commercial OpsClientCommercialProfile?
+  contacts   OpsClientContact[]
+  projects   OpsProject[]
+  lineItems  OpsSubmissionLineItem[]
 
   @@map("ops_clients")
+}
+
+model OpsClientContact {
+  id        String   @id @default(uuid())
+  clientId  String   @map("client_id")
+  name      String
+  email     String?
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  client OpsClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@map("ops_client_contacts")
 }
 
 model OpsClientCommercialProfile {

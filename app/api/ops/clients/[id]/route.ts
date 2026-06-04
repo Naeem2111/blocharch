@@ -4,6 +4,11 @@ import { prisma } from "@/lib/prisma";
 import type { OpsPricingTier } from "@prisma/client";
 import { isOpsPricingTier, laneCostForTier } from "@/lib/ops-constants";
 import { requireOpsSession } from "@/lib/ops-access";
+import {
+  clientInclude,
+  mapClientToJson,
+  parseContactsFromBody,
+} from "@/lib/ops-client-api";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -23,8 +28,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const clientData: {
       name?: string;
       companyName?: string | null;
-      contactPerson?: string | null;
-      email?: string | null;
+      software?: string | null;
       phone?: string | null;
       country?: string | null;
       status?: "active" | "inactive";
@@ -38,13 +42,18 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       }
       clientData.name = name;
     }
-    if (body.companyName !== undefined) clientData.companyName = body.companyName ? String(body.companyName).trim() : null;
-    if (body.contactPerson !== undefined) clientData.contactPerson = body.contactPerson ? String(body.contactPerson).trim() : null;
-    if (body.email !== undefined) clientData.email = body.email ? String(body.email).trim() : null;
+    if (body.companyName !== undefined) {
+      clientData.companyName = body.companyName ? String(body.companyName).trim() : null;
+    }
+    if (body.software !== undefined) {
+      clientData.software = body.software ? String(body.software).trim() : null;
+    }
     if (body.phone !== undefined) clientData.phone = body.phone ? String(body.phone).trim() : null;
     if (body.country !== undefined) clientData.country = body.country ? String(body.country).trim() : null;
     if (body.notes !== undefined) clientData.notes = body.notes ? String(body.notes).trim() : null;
     if (body.status === "active" || body.status === "inactive") clientData.status = body.status;
+
+    const contacts = parseContactsFromBody(body);
 
     const commercialData: {
       pricingTier?: OpsPricingTier;
@@ -69,45 +78,39 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
 
     const client = await prisma.$transaction(async (tx) => {
-      const updated = await tx.opsClient.update({
+      await tx.opsClient.update({
         where: { id },
         data: clientData,
-        include: { commercial: true, _count: { select: { projects: true } } },
       });
+
+      if (contacts !== undefined) {
+        await tx.opsClientContact.deleteMany({ where: { clientId: id } });
+        if (contacts.length > 0) {
+          await tx.opsClientContact.createMany({
+            data: contacts.map((c, i) => ({
+              clientId: id,
+              name: c.name,
+              email: c.email,
+              sortOrder: i,
+            })),
+          });
+        }
+      }
+
       if (existing.commercial && Object.keys(commercialData).length > 0) {
         await tx.opsClientCommercialProfile.update({
           where: { clientId: id },
           data: commercialData,
         });
       }
+
       return tx.opsClient.findUniqueOrThrow({
         where: { id },
-        include: { commercial: true, _count: { select: { projects: true } } },
+        include: clientInclude,
       });
     });
 
-    return NextResponse.json({
-      client: {
-        id: client.id,
-        name: client.name,
-        companyName: client.companyName,
-        contactPerson: client.contactPerson,
-        email: client.email,
-        phone: client.phone,
-        country: client.country,
-        status: client.status,
-        notes: client.notes,
-        projectCount: client._count.projects,
-        commercial: client.commercial
-          ? {
-              pricingTier: client.commercial.pricingTier,
-              laneCostGbp: Number(client.commercial.laneCostGbp),
-              overtimeBillingGbp: Number(client.commercial.overtimeBillingGbp),
-              activeLaneCount: client.commercial.activeLaneCount,
-            }
-          : null,
-      },
-    });
+    return NextResponse.json({ client: mapClientToJson(client) });
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }

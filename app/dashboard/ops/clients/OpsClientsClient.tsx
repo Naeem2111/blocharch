@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+type ClientContact = { id?: string; name: string; email: string };
+
 type ClientRow = {
   id: string;
   name: string;
   companyName: string | null;
-  contactPerson: string | null;
-  email: string | null;
+  software: string | null;
+  contacts: ClientContact[];
   phone: string | null;
   country: string | null;
   status: string;
@@ -16,14 +18,73 @@ type ClientRow = {
   commercial: { pricingTier: string; laneCostGbp: number; activeLaneCount: number } | null;
 };
 
+const emptyContact = (): ClientContact => ({ name: "", email: "" });
+
 const emptyCreate = {
   name: "",
   companyName: "",
-  contactPerson: "",
-  email: "",
+  software: "",
+  contacts: [emptyContact()],
   pricingTier: "tier_30",
   activeLaneCount: "1",
 };
+
+function ContactFields({
+  contacts,
+  onChange,
+}: {
+  contacts: ClientContact[];
+  onChange: (next: ClientContact[]) => void;
+}) {
+  return (
+    <div className="space-y-2 md:col-span-2">
+      <p className="text-xs font-medium text-slate-400">Contacts</p>
+      {contacts.map((row, i) => (
+        <div key={i} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+          <input
+            placeholder="Contact name"
+            value={row.name}
+            onChange={(e) => {
+              const next = [...contacts];
+              next[i] = { ...next[i], name: e.target.value };
+              onChange(next);
+            }}
+            className="rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+          />
+          <input
+            type="email"
+            placeholder="Email"
+            value={row.email}
+            onChange={(e) => {
+              const next = [...contacts];
+              next[i] = { ...next[i], email: e.target.value };
+              onChange(next);
+            }}
+            className="rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+          />
+          {contacts.length > 1 ? (
+            <button
+              type="button"
+              onClick={() => onChange(contacts.filter((_, j) => j !== i))}
+              className="text-xs text-slate-500 hover:text-red-300 sm:self-center"
+            >
+              Remove
+            </button>
+          ) : (
+            <span className="hidden sm:block" />
+          )}
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={() => onChange([...contacts, emptyContact()])}
+        className="text-xs text-brand-300 hover:text-brand-200"
+      >
+        + Add contact
+      </button>
+    </div>
+  );
+}
 
 export function OpsClientsClient() {
   const [clients, setClients] = useState<ClientRow[]>([]);
@@ -34,8 +95,8 @@ export function OpsClientsClient() {
   const [editForm, setEditForm] = useState({
     name: "",
     companyName: "",
-    contactPerson: "",
-    email: "",
+    software: "",
+    contacts: [emptyContact()],
     phone: "",
     country: "",
     status: "active",
@@ -57,13 +118,29 @@ export function OpsClientsClient() {
     void load();
   }, [load]);
 
+  function contactsPayload(rows: ClientContact[]) {
+    return rows
+      .filter((c) => c.name.trim() || c.email.trim())
+      .map((c) => ({
+        name: c.name.trim(),
+        email: c.email.trim() || null,
+      }));
+  }
+
   async function createClient(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     const r = await fetch("/api/ops/clients", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, activeLaneCount: Number(form.activeLaneCount) }),
+      body: JSON.stringify({
+        name: form.name,
+        companyName: form.companyName,
+        software: form.software,
+        contacts: contactsPayload(form.contacts),
+        pricingTier: form.pricingTier,
+        activeLaneCount: Number(form.activeLaneCount),
+      }),
     });
     const j = await r.json();
     if (!r.ok) {
@@ -80,8 +157,11 @@ export function OpsClientsClient() {
     setEditForm({
       name: c.name,
       companyName: c.companyName ?? "",
-      contactPerson: c.contactPerson ?? "",
-      email: c.email ?? "",
+      software: c.software ?? "",
+      contacts:
+        c.contacts.length > 0
+          ? c.contacts.map((ct) => ({ id: ct.id, name: ct.name, email: ct.email ?? "" }))
+          : [emptyContact()],
       phone: c.phone ?? "",
       country: c.country ?? "",
       status: c.status,
@@ -98,7 +178,18 @@ export function OpsClientsClient() {
     const r = await fetch(`/api/ops/clients/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...editForm, activeLaneCount: Number(editForm.activeLaneCount) }),
+      body: JSON.stringify({
+        name: editForm.name,
+        companyName: editForm.companyName,
+        software: editForm.software,
+        contacts: contactsPayload(editForm.contacts),
+        phone: editForm.phone,
+        country: editForm.country,
+        status: editForm.status,
+        notes: editForm.notes,
+        pricingTier: editForm.pricingTier,
+        activeLaneCount: Number(editForm.activeLaneCount),
+      }),
     });
     const j = await r.json();
     if (!r.ok) {
@@ -145,23 +236,41 @@ export function OpsClientsClient() {
         <form onSubmit={createClient} className="card-tool grid gap-3 rounded-xl p-4 md:grid-cols-2">
           <label className="text-xs text-slate-400">
             Client name
-            <input required value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" />
+            <input
+              required
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+            />
           </label>
           <label className="text-xs text-slate-400">
             Company
-            <input value={form.companyName} onChange={(e) => setForm((f) => ({ ...f, companyName: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" />
+            <input
+              value={form.companyName}
+              onChange={(e) => setForm((f) => ({ ...f, companyName: e.target.value }))}
+              className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+            />
           </label>
-          <label className="text-xs text-slate-400">
-            Contact person
-            <input value={form.contactPerson} onChange={(e) => setForm((f) => ({ ...f, contactPerson: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" />
+          <label className="text-xs text-slate-400 md:col-span-2">
+            Software used
+            <input
+              value={form.software}
+              onChange={(e) => setForm((f) => ({ ...f, software: e.target.value }))}
+              placeholder="e.g. Revit, AutoCAD, Rhino"
+              className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+            />
           </label>
-          <label className="text-xs text-slate-400">
-            Email
-            <input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" />
-          </label>
+          <ContactFields
+            contacts={form.contacts}
+            onChange={(contacts) => setForm((f) => ({ ...f, contacts }))}
+          />
           <label className="text-xs text-slate-400">
             Pricing tier
-            <select value={form.pricingTier} onChange={(e) => setForm((f) => ({ ...f, pricingTier: e.target.value }))} className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm">
+            <select
+              value={form.pricingTier}
+              onChange={(e) => setForm((f) => ({ ...f, pricingTier: e.target.value }))}
+              className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
+            >
               <option value="tier_25">25%</option>
               <option value="tier_30">30%</option>
               <option value="tier_35">35%</option>
@@ -170,12 +279,23 @@ export function OpsClientsClient() {
           </label>
           <label className="text-xs text-slate-400">
             Active lanes
-            <input type="number" min={1} max={20} value={form.activeLaneCount} onChange={(e) => setForm((f) => ({ ...f, activeLaneCount: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" />
+            <input
+              type="number"
+              min={1}
+              max={20}
+              value={form.activeLaneCount}
+              onChange={(e) => setForm((f) => ({ ...f, activeLaneCount: e.target.value }))}
+              className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+            />
           </label>
           {error ? <p className="text-sm text-red-400 md:col-span-2">{error}</p> : null}
           <div className="flex gap-2 md:col-span-2">
-            <button type="submit" className="rounded-lg bg-white/[0.08] px-4 py-2 text-sm text-slate-100">Create client</button>
-            <button type="button" onClick={() => setOpen(false)} className="text-sm text-slate-500">Cancel</button>
+            <button type="submit" className="rounded-lg bg-white/[0.08] px-4 py-2 text-sm text-slate-100">
+              Create client
+            </button>
+            <button type="button" onClick={() => setOpen(false)} className="text-sm text-slate-500">
+              Cancel
+            </button>
           </div>
         </form>
       )}
@@ -187,34 +307,59 @@ export function OpsClientsClient() {
               <div className="grid gap-3 md:grid-cols-2">
                 <label className="text-xs text-slate-400">
                   Name
-                  <input value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" />
+                  <input
+                    value={editForm.name}
+                    onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                    className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+                  />
                 </label>
                 <label className="text-xs text-slate-400">
                   Status
-                  <select value={editForm.status} onChange={(e) => setEditForm((f) => ({ ...f, status: e.target.value }))} className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm">
+                  <select
+                    value={editForm.status}
+                    onChange={(e) => setEditForm((f) => ({ ...f, status: e.target.value }))}
+                    className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
+                  >
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
                   </select>
                 </label>
                 <label className="text-xs text-slate-400">
                   Company
-                  <input value={editForm.companyName} onChange={(e) => setEditForm((f) => ({ ...f, companyName: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" />
-                </label>
-                <label className="text-xs text-slate-400">
-                  Contact
-                  <input value={editForm.contactPerson} onChange={(e) => setEditForm((f) => ({ ...f, contactPerson: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" />
-                </label>
-                <label className="text-xs text-slate-400">
-                  Email
-                  <input value={editForm.email} onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" />
+                  <input
+                    value={editForm.companyName}
+                    onChange={(e) => setEditForm((f) => ({ ...f, companyName: e.target.value }))}
+                    className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+                  />
                 </label>
                 <label className="text-xs text-slate-400">
                   Phone
-                  <input value={editForm.phone} onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" />
+                  <input
+                    value={editForm.phone}
+                    onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))}
+                    className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+                  />
                 </label>
+                <label className="text-xs text-slate-400 md:col-span-2">
+                  Software used
+                  <input
+                    value={editForm.software}
+                    onChange={(e) => setEditForm((f) => ({ ...f, software: e.target.value }))}
+                    placeholder="e.g. Revit, AutoCAD, Rhino"
+                    className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+                  />
+                </label>
+                <ContactFields
+                  contacts={editForm.contacts}
+                  onChange={(contacts) => setEditForm((f) => ({ ...f, contacts }))}
+                />
                 <label className="text-xs text-slate-400">
                   Tier
-                  <select value={editForm.pricingTier} onChange={(e) => setEditForm((f) => ({ ...f, pricingTier: e.target.value }))} className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm">
+                  <select
+                    value={editForm.pricingTier}
+                    onChange={(e) => setEditForm((f) => ({ ...f, pricingTier: e.target.value }))}
+                    className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
+                  >
                     <option value="tier_25">25%</option>
                     <option value="tier_30">30%</option>
                     <option value="tier_35">35%</option>
@@ -223,16 +368,41 @@ export function OpsClientsClient() {
                 </label>
                 <label className="text-xs text-slate-400">
                   Lanes
-                  <input type="number" min={1} value={editForm.activeLaneCount} onChange={(e) => setEditForm((f) => ({ ...f, activeLaneCount: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" />
+                  <input
+                    type="number"
+                    min={1}
+                    value={editForm.activeLaneCount}
+                    onChange={(e) => setEditForm((f) => ({ ...f, activeLaneCount: e.target.value }))}
+                    className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+                  />
                 </label>
                 <label className="text-xs text-slate-400 md:col-span-2">
                   Notes
-                  <textarea value={editForm.notes} onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))} rows={2} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" />
+                  <textarea
+                    value={editForm.notes}
+                    onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))}
+                    rows={2}
+                    className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+                  />
                 </label>
                 <div className="flex gap-2 md:col-span-2">
-                  <button type="button" onClick={() => void saveEdit(c.id)} className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-slate-950">Save</button>
-                  <button type="button" onClick={() => setEditingId(null)} className="text-xs text-slate-500">Cancel</button>
-                  <button type="button" onClick={() => void deleteClient(c.id, c.name)} className="text-xs text-red-400 hover:text-red-300">Delete client</button>
+                  <button
+                    type="button"
+                    onClick={() => void saveEdit(c.id)}
+                    className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-slate-950"
+                  >
+                    Save
+                  </button>
+                  <button type="button" onClick={() => setEditingId(null)} className="text-xs text-slate-500">
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void deleteClient(c.id, c.name)}
+                    className="text-xs text-red-400 hover:text-red-300"
+                  >
+                    Delete client
+                  </button>
                 </div>
               </div>
             ) : (
@@ -240,11 +410,25 @@ export function OpsClientsClient() {
                 <div>
                   <p className="font-medium text-white">{c.name}</p>
                   <p className="text-xs text-slate-500">
-                    {c.commercial?.pricingTier.replace("tier_", "")}% · £{c.commercial?.laneCostGbp.toLocaleString()} · {c.commercial?.activeLaneCount} lane(s) · {c.projectCount} project(s)
+                    {c.commercial?.pricingTier.replace("tier_", "")}% · £
+                    {c.commercial?.laneCostGbp.toLocaleString()} · {c.commercial?.activeLaneCount} lane(s) ·{" "}
+                    {c.projectCount} project(s)
                   </p>
-                  {c.email ? <p className="text-xs text-slate-500">{c.email}</p> : null}
+                  {c.software ? <p className="text-xs text-slate-500">Software: {c.software}</p> : null}
+                  {c.contacts.map((ct) => (
+                    <p key={ct.id ?? ct.name} className="text-xs text-slate-500">
+                      {ct.name}
+                      {ct.email ? ` · ${ct.email}` : ""}
+                    </p>
+                  ))}
                 </div>
-                <button type="button" onClick={() => startEdit(c)} className="text-xs text-brand-300 hover:text-brand-200">Edit</button>
+                <button
+                  type="button"
+                  onClick={() => startEdit(c)}
+                  className="text-xs text-brand-300 hover:text-brand-200"
+                >
+                  Edit
+                </button>
               </div>
             )}
           </div>

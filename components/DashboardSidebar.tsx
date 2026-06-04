@@ -362,22 +362,45 @@ function DraggableNavItem({
   );
 }
 
+function SectionChevron({ expanded }: { expanded: boolean }) {
+  return (
+    <svg
+      className={`h-4 w-4 shrink-0 text-slate-500 transition-transform duration-200 ${expanded ? "rotate-90" : ""}`}
+      viewBox="0 0 20 20"
+      fill="currentColor"
+      aria-hidden
+    >
+      <path
+        fillRule="evenodd"
+        d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
+        clipRule="evenodd"
+      />
+    </svg>
+  );
+}
+
 function DraggableSectionHeader({
+  sectionId,
   label,
   index,
   isFirst,
+  collapsed,
   dragging,
   dropIndex,
+  onToggleCollapse,
   onDragStart,
   onDragOver,
   onDrop,
   onDragEnd,
 }: {
+  sectionId: string;
   label: string;
   index: number;
   isFirst: boolean;
+  collapsed: boolean;
   dragging: DragSectionState;
   dropIndex: number | null;
+  onToggleCollapse: (sectionId: string) => void;
   onDragStart: (index: number) => void;
   onDragOver: (index: number) => void;
   onDrop: (index: number) => void;
@@ -386,10 +409,11 @@ function DraggableSectionHeader({
   const isDragging = dragging?.index === index;
   const showDropBefore =
     dropIndex === index && dragging !== null && dragging.index !== index;
+  const expanded = !collapsed;
 
   return (
     <div
-      className={`relative flex items-center gap-1 ${isFirst ? "pt-1" : "pt-5"} ${isDragging ? "opacity-40" : ""}`}
+      className={`relative ${isFirst ? "pt-1" : "pt-4"} ${isDragging ? "opacity-40" : ""}`}
       onDragOver={(e) => {
         if (!dragging) return;
         e.preventDefault();
@@ -403,20 +427,30 @@ function DraggableSectionHeader({
       {showDropBefore ? (
         <span className="pointer-events-none absolute top-2 left-1 right-1 h-0.5 rounded-full bg-brand-400/80" />
       ) : null}
-      <span
-        draggable
-        onDragStart={(e) => {
-          e.dataTransfer.effectAllowed = "move";
-          e.dataTransfer.setData("application/x-sidebar-section", String(index));
-          onDragStart(index);
-        }}
-        onDragEnd={onDragEnd}
-      >
-        <DragHandle label={`${label} section`} />
-      </span>
-      <p className="min-w-0 flex-1 px-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-600">
-        {label}
-      </p>
+      <div className="flex items-center gap-0.5">
+        <span
+          draggable
+          onDragStart={(e) => {
+            e.dataTransfer.effectAllowed = "move";
+            e.dataTransfer.setData("application/x-sidebar-section", String(index));
+            onDragStart(index);
+          }}
+          onDragEnd={onDragEnd}
+        >
+          <DragHandle label={`${label} section`} />
+        </span>
+        <button
+          type="button"
+          id={`sidebar-section-${sectionId}`}
+          aria-expanded={expanded}
+          aria-controls={`sidebar-section-items-${sectionId}`}
+          onClick={() => onToggleCollapse(sectionId)}
+          className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-2 text-left text-sm font-bold uppercase tracking-wide text-slate-300 transition-colors hover:bg-white/[0.05] hover:text-slate-100"
+        >
+          <SectionChevron expanded={expanded} />
+          <span className="truncate">{label}</span>
+        </button>
+      </div>
     </div>
   );
 }
@@ -447,6 +481,11 @@ export function DashboardSidebar({ user }: { user: SessionUser }) {
     saveSidebarNavOrder(user.id, navOrder);
   }, [navOrder, hydrated, user.id]);
 
+  const collapsedSectionIds = useMemo(
+    () => new Set(navOrder?.collapsedSections ?? []),
+    [navOrder?.collapsedSections]
+  );
+
   const visibleSections = useMemo(() => {
     const filtered = NAV_SECTIONS.filter((section) => canAccessModule(user.role, section.module));
     const ordered = applySectionOrder(filtered, navOrder?.sections);
@@ -460,6 +499,7 @@ export function DashboardSidebar({ user }: { user: SessionUser }) {
     setNavOrder((prev) => ({
       sections: ids,
       items: prev?.items ?? {},
+      collapsedSections: prev?.collapsedSections,
     }));
   };
 
@@ -467,7 +507,22 @@ export function DashboardSidebar({ user }: { user: SessionUser }) {
     setNavOrder((prev) => ({
       sections: prev?.sections ?? visibleSections.map((s) => s.id),
       items: { ...(prev?.items ?? {}), [sectionId]: hrefs },
+      collapsedSections: prev?.collapsedSections,
     }));
+  };
+
+  const toggleSectionCollapse = (sectionId: string) => {
+    skipSaveRef.current = false;
+    setNavOrder((prev) => {
+      const collapsed = new Set(prev?.collapsedSections ?? []);
+      if (collapsed.has(sectionId)) collapsed.delete(sectionId);
+      else collapsed.add(sectionId);
+      return {
+        sections: prev?.sections ?? visibleSections.map((s) => s.id),
+        items: prev?.items ?? {},
+        collapsedSections: Array.from(collapsed),
+      };
+    });
   };
 
   const handleItemDrop = (sectionId: string, toIndex: number) => {
@@ -521,14 +576,19 @@ export function DashboardSidebar({ user }: { user: SessionUser }) {
         <p className="px-1 pb-2 text-[10px] text-slate-600">
           Drag <span className="text-slate-500">⋮⋮</span> to reorder sections and links. Saved for your account on this device.
         </p>
-        {visibleSections.map((section, sectionIndex) => (
+        {visibleSections.map((section, sectionIndex) => {
+          const sectionCollapsed = collapsedSectionIds.has(section.id);
+          return (
           <div key={section.id} className="space-y-0.5">
             <DraggableSectionHeader
+              sectionId={section.id}
               label={section.label}
               index={sectionIndex}
               isFirst={sectionIndex === 0}
+              collapsed={sectionCollapsed}
               dragging={dragSection}
               dropIndex={dropSectionIndex}
+              onToggleCollapse={toggleSectionCollapse}
               onDragStart={(index) => {
                 setDragSection({ index });
                 setDragItem(null);
@@ -540,7 +600,8 @@ export function DashboardSidebar({ user }: { user: SessionUser }) {
                 setDropSectionIndex(null);
               }}
             />
-            <div className="space-y-0.5">
+            {!sectionCollapsed ? (
+            <div id={`sidebar-section-items-${section.id}`} className="space-y-0.5 pb-1">
               {section.items.map((item, itemIndex) => (
                 <DraggableNavItem
                   key={item.href}
@@ -565,8 +626,10 @@ export function DashboardSidebar({ user }: { user: SessionUser }) {
                 />
               ))}
             </div>
+            ) : null}
           </div>
-        ))}
+          );
+        })}
       </nav>
       <div className="border-t border-white/[0.06] px-3 py-3">
         <ThemeToggle />

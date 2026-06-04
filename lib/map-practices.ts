@@ -138,8 +138,15 @@ export async function loadPracticesForMap(): Promise<{
 
   enriched.sort(compareEnriched);
 
+  const withCoords = enriched.filter((x) => x.lat != null && x.lng != null);
+  const withoutCoords = enriched.filter((x) => x.lat == null || x.lng == null);
+
   const cap = MAP_PRACTICE_DISPLAY_LIMIT;
-  let picked = cap > 0 ? enriched.slice(0, cap) : enriched;
+  /** Always include every practice that already has DB coordinates. */
+  let picked =
+    cap > 0
+      ? [...withCoords, ...withoutCoords].slice(0, Math.max(cap, withCoords.length))
+      : [...withCoords, ...withoutCoords.slice(0, 400)];
 
   const hubSlug = focalAnchor.slug;
   if (hubSlug && cap > 0) {

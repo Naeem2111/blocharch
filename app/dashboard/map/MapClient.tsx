@@ -103,7 +103,7 @@ export function MapClient({
             method: "POST",
             headers: { "Content-Type": "application/json" },
             credentials: "same-origin",
-            body: JSON.stringify({ addresses: slice, limit: slice.length }),
+            body: JSON.stringify({ addresses: slice, limit: slice.length, persist: true }),
           });
           const json = await res.json().catch(() => ({}));
           if (!res.ok) {
@@ -353,14 +353,7 @@ export function MapClient({
           {geocodeError}
         </p>
       )}
-      {filteredMarkers.length > 0 ? (
-        <LeafletMap
-          markers={filteredMarkers}
-          center={center}
-          zoom={initialZoom}
-          hubRecenterTick={hubRecenterTick}
-        />
-      ) : (
+      {hasActiveFilter && filteredMarkers.length === 0 ? (
         <div className="card-tool flex h-[520px] flex-col items-center justify-center rounded-2xl ring-1 ring-white/[0.06] px-6 text-center">
           <p className="text-slate-400 text-sm">
             No practices match “{pinFilter.trim()}”. Clear or change the search to see pins.
@@ -375,6 +368,21 @@ export function MapClient({
           >
             Clear search
           </button>
+        </div>
+      ) : (
+        <div className="relative">
+          {loading && pendingGeocode > 0 ? (
+            <p className="absolute left-3 top-3 z-[1000] rounded-lg border border-white/10 bg-slate-950/90 px-3 py-2 text-xs text-slate-300 shadow-lg">
+              Loading map pins… {chunksDone}/{chunksTotal} batches
+              {pinCount > 0 ? ` (${pinCount} visible)` : ""}
+            </p>
+          ) : null}
+          <LeafletMap
+            markers={filteredMarkers}
+            center={center}
+            zoom={initialZoom}
+            hubRecenterTick={hubRecenterTick}
+          />
         </div>
       )}
       <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">

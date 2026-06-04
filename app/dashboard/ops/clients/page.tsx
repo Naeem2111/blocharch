@@ -6,7 +6,7 @@ export default function OpsClientsPage() {
     <>
       <PageHeader
         title="Client manager"
-        description="Create clients, set pricing tiers, lane costs, overtime rates, and active lane counts."
+        description="Each client is billed per lane per month (tier rate × lane count). Projects track hours against that lane capacity."
         className="mb-8"
       />
       <OpsClientsClient />

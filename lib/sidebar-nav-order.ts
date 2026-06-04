@@ -1,6 +1,8 @@
 export type SidebarNavOrder = {
   sections: string[];
   items: Record<string, string[]>;
+  /** Section ids that are collapsed in the sidebar. */
+  collapsedSections?: string[];
 };
 
 const STORAGE_PREFIX = "blocharch.sidebar-order.v1:";
@@ -31,6 +33,9 @@ export function loadSidebarNavOrder(userId: string): SidebarNavOrder | null {
               )
             )
           : {},
+      collapsedSections: Array.isArray(parsed.collapsedSections)
+        ? parsed.collapsedSections.filter((id): id is string => typeof id === "string")
+        : [],
     };
   } catch {
     return null;

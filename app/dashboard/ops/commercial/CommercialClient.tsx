@@ -1,6 +1,24 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { LANE_MONTHLY_HOURS } from "@/lib/ops-constants";
+
+type ClientLaneRow = {
+  clientId: string;
+  clientName: string;
+  clientStatus: string;
+  pricingTier: string;
+  laneCostGbp: number;
+  activeLaneCount: number;
+  monthlyLaneRevenueGbp: number;
+  includedHours: number;
+  hoursUsed: number;
+  utilizationPercent: number;
+  overtimeHours: number;
+  overtimeRevenueGbp: number;
+  totalClientRevenueGbp: number;
+  projectCount: number;
+};
 
 type LedgerRow = {
   athleteName: string;
@@ -17,9 +35,12 @@ type CommercialData = {
   month: string;
   reportingRate: number;
   totalRevenueGbp: number;
+  totalLaneRevenueGbp: number;
+  totalOvertimeRevenueGbp: number;
   totalCostGbp: number;
   grossMarginGbp: number;
   grossMarginPercent: number;
+  clientLanes: ClientLaneRow[];
   rows: LedgerRow[];
 };
 
@@ -155,10 +176,20 @@ export function CommercialClient() {
 
       {ledger ? (
         <>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="card-tool rounded-xl p-4">
-              <p className="text-[10px] uppercase text-slate-500">Revenue</p>
-              <p className="mt-1 text-xl font-semibold text-white">£{ledger.totalRevenueGbp.toLocaleString()}</p>
+              <p className="text-[10px] uppercase text-slate-500">Lane revenue</p>
+              <p className="mt-1 text-xl font-semibold text-white">
+                £{ledger.totalLaneRevenueGbp.toLocaleString()}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">Per client × lanes (monthly)</p>
+            </div>
+            <div className="card-tool rounded-xl p-4">
+              <p className="text-[10px] uppercase text-slate-500">Overtime billing</p>
+              <p className="mt-1 text-xl font-semibold text-white">
+                £{ledger.totalOvertimeRevenueGbp.toLocaleString()}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">Hours over lane capacity</p>
             </div>
             <div className="card-tool rounded-xl p-4">
               <p className="text-[10px] uppercase text-slate-500">Athlete cost</p>
@@ -169,17 +200,92 @@ export function CommercialClient() {
               <p className="mt-1 text-xl font-semibold text-brand-300">
                 £{ledger.grossMarginGbp.toLocaleString()} ({ledger.grossMarginPercent}%)
               </p>
+              <p className="mt-1 text-xs text-slate-500">
+                Total billed £{ledger.totalRevenueGbp.toLocaleString()}
+              </p>
             </div>
           </div>
 
           <div className="card-tool overflow-x-auto rounded-xl">
+            <div className="border-b border-white/[0.06] px-4 py-3">
+              <h2 className="text-sm font-semibold text-white">Client lanes (billing)</h2>
+              <p className="mt-1 text-xs text-slate-500">
+                Each active lane bills at the tier rate for the month. Project hours below show utilization against{" "}
+                {LANE_MONTHLY_HOURS}h included per lane.
+              </p>
+            </div>
+            <table className="min-w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-white/[0.06] text-xs uppercase text-slate-500">
+                  <th className="px-4 py-3">Client</th>
+                  <th className="px-4 py-3">Lanes</th>
+                  <th className="px-4 py-3">£/lane</th>
+                  <th className="px-4 py-3">Monthly billing</th>
+                  <th className="px-4 py-3">Hours used</th>
+                  <th className="px-4 py-3">Capacity</th>
+                  <th className="px-4 py-3">Util %</th>
+                  <th className="px-4 py-3">OT £</th>
+                  <th className="px-4 py-3">Projects</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ledger.clientLanes.map((lane) => (
+                  <tr key={lane.clientId} className="border-b border-white/[0.04] text-slate-300">
+                    <td className="px-4 py-2">
+                      {lane.clientName}
+                      {lane.clientStatus !== "active" ? (
+                        <span className="ml-1 text-xs text-amber-400">({lane.clientStatus})</span>
+                      ) : null}
+                    </td>
+                    <td className="px-4 py-2 tabular-nums">{lane.activeLaneCount}</td>
+                    <td className="px-4 py-2 tabular-nums">£{lane.laneCostGbp.toLocaleString()}</td>
+                    <td className="px-4 py-2 tabular-nums font-medium text-white">
+                      £{lane.monthlyLaneRevenueGbp.toLocaleString()}
+                    </td>
+                    <td className="px-4 py-2 tabular-nums">{lane.hoursUsed}</td>
+                    <td className="px-4 py-2 tabular-nums text-slate-500">{lane.includedHours}h</td>
+                    <td className="px-4 py-2 tabular-nums">
+                      <span
+                        className={
+                          lane.utilizationPercent > 100
+                            ? "text-amber-300"
+                            : lane.utilizationPercent >= 80
+                              ? "text-brand-300"
+                              : ""
+                        }
+                      >
+                        {lane.utilizationPercent}%
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 tabular-nums">
+                      {lane.overtimeRevenueGbp > 0 ? `£${lane.overtimeRevenueGbp.toLocaleString()}` : "—"}
+                    </td>
+                    <td className="px-4 py-2 tabular-nums text-slate-500">{lane.projectCount}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {ledger.clientLanes.length === 0 ? (
+              <p className="p-4 text-sm text-slate-500">
+                No clients with commercial profiles yet. Add a client under Athlete operations → Clients.
+              </p>
+            ) : null}
+          </div>
+
+          <div className="card-tool overflow-x-auto rounded-xl">
+            <div className="border-b border-white/[0.06] px-4 py-3">
+              <h2 className="text-sm font-semibold text-white">Athlete utilization (projects)</h2>
+              <p className="mt-1 text-xs text-slate-500">
+                Hours from daily logs allocate athlete cost; revenue share is proportional to hours on each client.
+              </p>
+            </div>
             <table className="min-w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-white/[0.06] text-xs uppercase text-slate-500">
                   <th className="px-4 py-3">Athlete</th>
                   <th className="px-4 py-3">Client</th>
-                  <th className="px-4 py-3">Hours</th>
-                  <th className="px-4 py-3">Revenue</th>
+                  <th className="px-4 py-3">Hours (usage)</th>
+                  <th className="px-4 py-3">Revenue share</th>
                   <th className="px-4 py-3">Cost</th>
                   <th className="px-4 py-3">Margin</th>
                 </tr>
@@ -203,7 +309,9 @@ export function CommercialClient() {
               </tbody>
             </table>
             {ledger.rows.length === 0 ? (
-              <p className="p-4 text-sm text-slate-500">No submission hours logged for this month yet.</p>
+              <p className="p-4 text-sm text-slate-500">
+                No project hours logged this month — lane billing above still applies for active clients.
+              </p>
             ) : null}
           </div>
         </>

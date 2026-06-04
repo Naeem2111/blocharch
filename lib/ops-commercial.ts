@@ -1,9 +1,33 @@
 import { prisma } from "@/lib/prisma";
+import {
+  LANE_MONTHLY_HOURS,
+  laneIncludedHours,
+  monthlyLaneRevenueGbp,
+} from "@/lib/ops-constants";
 import { computeMonthlyHoursSummary, monthEndUtc, monthStartUtc } from "@/lib/ops-hours";
 import { getReportingRateOrDefault } from "@/lib/ops-exchange";
 import { OPS_ALERT_THRESHOLDS, submissionEditCutoffUtc } from "@/lib/ops-alerts";
 
-const STANDARD_MONTH_HOURS = 160;
+export { LANE_MONTHLY_HOURS };
+
+export type ClientLaneCommercialRow = {
+  clientId: string;
+  clientName: string;
+  clientStatus: string;
+  pricingTier: string;
+  laneCostGbp: number;
+  activeLaneCount: number;
+  /** Fixed monthly fee: lane cost × number of lanes (active clients only). */
+  monthlyLaneRevenueGbp: number;
+  includedHours: number;
+  /** Hours logged on projects this month (lane utilization). */
+  hoursUsed: number;
+  utilizationPercent: number;
+  overtimeHours: number;
+  overtimeRevenueGbp: number;
+  totalClientRevenueGbp: number;
+  projectCount: number;
+};
 
 export type CommercialLedgerRow = {
   athleteId: string;
@@ -11,7 +35,9 @@ export type CommercialLedgerRow = {
   athleteCode: string;
   clientId: string;
   clientName: string;
+  /** Hours on this client's projects (usage tracking). */
   hoursWorked: number;
+  /** Share of client lane + overtime revenue attributed by hours. */
   revenueGbp: number;
   athleteCostZar: number;
   athleteCostGbp: number;
@@ -23,10 +49,15 @@ export type CommercialSummary = {
   month: string;
   reportingRate: number;
   totalRevenueGbp: number;
+  totalLaneRevenueGbp: number;
+  totalOvertimeRevenueGbp: number;
   totalCostZar: number;
   totalCostGbp: number;
   grossMarginGbp: number;
   grossMarginPercent: number;
+  /** Per-client lane billing — present as soon as client + lanes exist. */
+  clientLanes: ClientLaneCommercialRow[];
+  /** Per-athlete utilization on each client (from daily log / projects). */
   rows: CommercialLedgerRow[];
   athleteTotals: Array<{
     athleteId: string;
@@ -52,57 +83,115 @@ export async function buildCommercialLedger(reference: Date): Promise<Commercial
   const to = monthEndUtc(reference);
   const reportingRate = await getReportingRateOrDefault(reference);
 
-  const lineItems = await prisma.opsSubmissionLineItem.findMany({
-    where: {
-      submission: {
-        submissionDate: { gte: from, lte: to },
+  const [clients, lineItems, athletes] = await Promise.all([
+    prisma.opsClient.findMany({
+      include: {
+        commercial: true,
+        _count: { select: { projects: true } },
       },
-    },
-    include: {
-      client: {
-        include: { commercial: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.opsSubmissionLineItem.findMany({
+      where: {
+        submission: {
+          submissionDate: { gte: from, lte: to },
+        },
       },
-      submission: {
-        include: { athlete: true },
+      include: {
+        client: { include: { commercial: true } },
+        submission: { include: { athlete: true } },
       },
-    },
-  });
+    }),
+    prisma.opsAthlete.findMany({ where: { status: "active" } }),
+  ]);
 
-  const rowMap = new Map<string, CommercialLedgerRow>();
+  const hoursByClient = new Map<string, number>();
+  const hoursByAthleteClient = new Map<string, number>();
+  const athleteClientMeta = new Map<
+    string,
+    { athlete: (typeof lineItems)[0]["submission"]["athlete"]; client: (typeof lineItems)[0]["client"] }
+  >();
 
   for (const li of lineItems) {
-    const athlete = li.submission.athlete;
-    const client = li.client;
-    const commercial = client.commercial;
-    const laneCostGbp = commercial ? Number(commercial.laneCostGbp) : 0;
-    const laneCount = commercial?.activeLaneCount ?? 1;
-    const hourlyGbp = laneCostGbp / STANDARD_MONTH_HOURS;
     const hours = Number(li.hoursWorked);
-    const revenueGbp = hours * hourlyGbp * laneCount;
-
-    const key = `${athlete.id}:${client.id}`;
-    const existing = rowMap.get(key);
-    if (existing) {
-      existing.hoursWorked += hours;
-      existing.revenueGbp += revenueGbp;
-    } else {
-      rowMap.set(key, {
-        athleteId: athlete.id,
-        athleteName: athlete.fullName,
-        athleteCode: athlete.athleteCode,
-        clientId: client.id,
-        clientName: client.name,
-        hoursWorked: hours,
-        revenueGbp,
-        athleteCostZar: 0,
-        athleteCostGbp: 0,
-        marginGbp: 0,
-        marginPercent: 0,
-      });
+    hoursByClient.set(li.clientId, (hoursByClient.get(li.clientId) ?? 0) + hours);
+    const key = `${li.submission.athlete.id}:${li.clientId}`;
+    hoursByAthleteClient.set(key, (hoursByAthleteClient.get(key) ?? 0) + hours);
+    if (!athleteClientMeta.has(key)) {
+      athleteClientMeta.set(key, { athlete: li.submission.athlete, client: li.client });
     }
   }
 
-  const athletes = await prisma.opsAthlete.findMany({ where: { status: "active" } });
+  const clientLanes: ClientLaneCommercialRow[] = [];
+  const clientRevenueTotal = new Map<string, number>();
+
+  for (const client of clients) {
+    const commercial = client.commercial;
+    if (!commercial) continue;
+
+    const laneCostGbp = Number(commercial.laneCostGbp);
+    const activeLaneCount = commercial.activeLaneCount;
+    const includedHours = laneIncludedHours(activeLaneCount);
+    const hoursUsed = round2(hoursByClient.get(client.id) ?? 0);
+    const utilizationPercent =
+      includedHours > 0 ? round2(Math.min(100, (hoursUsed / includedHours) * 100)) : 0;
+
+    const overtimeHours =
+      client.status === "active" ? round2(Math.max(0, hoursUsed - includedHours)) : 0;
+    const overtimeBillingGbp = Number(commercial.overtimeBillingGbp);
+    const overtimeRevenueGbp = round2(overtimeHours * overtimeBillingGbp);
+
+    const monthlyLaneRevenue =
+      client.status === "active" ? round2(monthlyLaneRevenueGbp(laneCostGbp, activeLaneCount)) : 0;
+    const totalClientRevenueGbp = round2(monthlyLaneRevenue + overtimeRevenueGbp);
+
+    clientRevenueTotal.set(client.id, totalClientRevenueGbp);
+
+    clientLanes.push({
+      clientId: client.id,
+      clientName: client.name,
+      clientStatus: client.status,
+      pricingTier: commercial.pricingTier,
+      laneCostGbp,
+      activeLaneCount,
+      monthlyLaneRevenueGbp: monthlyLaneRevenue,
+      includedHours,
+      hoursUsed,
+      utilizationPercent,
+      overtimeHours,
+      overtimeRevenueGbp,
+      totalClientRevenueGbp,
+      projectCount: client._count.projects,
+    });
+  }
+
+  const rowMap = new Map<string, CommercialLedgerRow>();
+
+  for (const [key, hoursWorked] of Array.from(hoursByAthleteClient.entries())) {
+    const meta = athleteClientMeta.get(key);
+    if (!meta) continue;
+    const { athlete, client } = meta;
+    const clientId = client.id;
+    const totalHoursOnClient = hoursByClient.get(clientId) ?? 0;
+    const clientRevenue = clientRevenueTotal.get(clientId) ?? 0;
+    const revenueGbp =
+      totalHoursOnClient > 0 ? round2((hoursWorked / totalHoursOnClient) * clientRevenue) : 0;
+
+    rowMap.set(key, {
+      athleteId: athlete.id,
+      athleteName: athlete.fullName,
+      athleteCode: athlete.athleteCode,
+      clientId: client.id,
+      clientName: client.name,
+      hoursWorked: round2(hoursWorked),
+      revenueGbp,
+      athleteCostZar: 0,
+      athleteCostGbp: 0,
+      marginGbp: 0,
+      marginPercent: 0,
+    });
+  }
+
   const athleteCostMap = new Map<string, { costZar: number; costGbp: number }>();
 
   for (const athlete of athletes) {
@@ -137,8 +226,6 @@ export async function buildCommercialLedger(reference: Date): Promise<Commercial
       row.athleteCostZar = round2(athleteCost.costZar * share);
       row.athleteCostGbp = round2(athleteCost.costGbp * share);
     }
-    row.revenueGbp = round2(row.revenueGbp);
-    row.hoursWorked = round2(row.hoursWorked);
     row.marginGbp = round2(row.revenueGbp - row.athleteCostGbp);
     row.marginPercent = row.revenueGbp > 0 ? round2((row.marginGbp / row.revenueGbp) * 100) : 0;
   }
@@ -147,7 +234,15 @@ export async function buildCommercialLedger(reference: Date): Promise<Commercial
 
   const athleteTotalsMap = new Map<
     string,
-    { athleteId: string; athleteName: string; hoursWorked: number; revenueGbp: number; costZar: number; costGbp: number; marginGbp: number }
+    {
+      athleteId: string;
+      athleteName: string;
+      hoursWorked: number;
+      revenueGbp: number;
+      costZar: number;
+      costGbp: number;
+      marginGbp: number;
+    }
   >();
 
   for (const row of rows) {
@@ -180,7 +275,15 @@ export async function buildCommercialLedger(reference: Date): Promise<Commercial
     marginGbp: round2(t.marginGbp),
   }));
 
-  const totalRevenueGbp = round2(rows.reduce((s, r) => s + r.revenueGbp, 0));
+  const totalLaneRevenueGbp = round2(
+    clientLanes.reduce((s, c) => s + c.monthlyLaneRevenueGbp, 0)
+  );
+  const totalOvertimeRevenueGbp = round2(
+    clientLanes.reduce((s, c) => s + c.overtimeRevenueGbp, 0)
+  );
+  const totalRevenueGbp = round2(
+    clientLanes.reduce((s, c) => s + c.totalClientRevenueGbp, 0)
+  );
   const totalCostZar = round2(Array.from(athleteCostMap.values()).reduce((s, c) => s + c.costZar, 0));
   const totalCostGbp = round2(totalCostZar / reportingRate);
   const grossMarginGbp = round2(totalRevenueGbp - totalCostGbp);
@@ -189,10 +292,13 @@ export async function buildCommercialLedger(reference: Date): Promise<Commercial
     month: from.toISOString().slice(0, 7),
     reportingRate,
     totalRevenueGbp,
+    totalLaneRevenueGbp,
+    totalOvertimeRevenueGbp,
     totalCostZar,
     totalCostGbp,
     grossMarginGbp,
     grossMarginPercent: totalRevenueGbp > 0 ? round2((grossMarginGbp / totalRevenueGbp) * 100) : 0,
+    clientLanes,
     rows,
     athleteTotals,
   };
@@ -270,20 +376,26 @@ export async function buildAnalytics(reference: Date): Promise<AnalyticsPayload>
     take: 20,
   });
 
-  const clientProfitMap = new Map<string, { clientName: string; revenueGbp: number; costGbp: number }>();
+  const clientCostMap = new Map<string, number>();
   for (const row of ledger.rows) {
-    const cp = clientProfitMap.get(row.clientId);
-    if (cp) {
-      cp.revenueGbp += row.revenueGbp;
-      cp.costGbp += row.athleteCostGbp;
-    } else {
-      clientProfitMap.set(row.clientId, {
-        clientName: row.clientName,
-        revenueGbp: row.revenueGbp,
-        costGbp: row.athleteCostGbp,
-      });
-    }
+    clientCostMap.set(row.clientId, (clientCostMap.get(row.clientId) ?? 0) + row.athleteCostGbp);
   }
+
+  const profitabilityByClient = ledger.clientLanes
+    .map((lane) => {
+      const costGbp = round2(clientCostMap.get(lane.clientId) ?? 0);
+      const revenueGbp = lane.totalClientRevenueGbp;
+      const marginGbp = round2(revenueGbp - costGbp);
+      return {
+        clientId: lane.clientId,
+        clientName: lane.clientName,
+        revenueGbp,
+        costGbp,
+        marginGbp,
+        marginPercent: revenueGbp > 0 ? round2((marginGbp / revenueGbp) * 100) : 0,
+      };
+    })
+    .sort((a, b) => b.marginGbp - a.marginGbp);
 
   return {
     month: from.toISOString().slice(0, 7),
@@ -309,19 +421,7 @@ export async function buildAnalytics(reference: Date): Promise<AnalyticsPayload>
         assignedAthleteName: p.assignedAthlete?.fullName ?? null,
       };
     }),
-    profitabilityByClient: Array.from(clientProfitMap.entries())
-      .map(([clientId, v]) => {
-        const marginGbp = round2(v.revenueGbp - v.costGbp);
-        return {
-          clientId,
-          clientName: v.clientName,
-          revenueGbp: round2(v.revenueGbp),
-          costGbp: round2(v.costGbp),
-          marginGbp,
-          marginPercent: v.revenueGbp > 0 ? round2((marginGbp / v.revenueGbp) * 100) : 0,
-        };
-      })
-      .sort((a, b) => b.marginGbp - a.marginGbp),
+    profitabilityByClient,
   };
 }
 
@@ -330,18 +430,19 @@ export async function buildOpsOverview(reference: Date) {
   const to = monthEndUtc(reference);
   const ledger = await buildCommercialLedger(reference);
 
-  const [activeAthletes, activeProjects, openBlockers, checkInRequests, dailySubmissions] = await Promise.all([
-    prisma.opsAthlete.count({ where: { status: "active" } }),
-    prisma.opsProject.count({
-      where: { currentStatus: { notIn: ["completed", "handed_over"] } },
-    }),
-    prisma.opsProject.count({ where: { blockerFlag: true } }),
-    prisma.opsProject.count({ where: { checkInRequested: true } }),
-    prisma.opsDailySubmission.findMany({
-      where: { submissionDate: { gte: from, lte: to } },
-      select: { totalHours: true },
-    }),
-  ]);
+  const [activeAthletes, activeProjects, openBlockers, checkInRequests, dailySubmissions] =
+    await Promise.all([
+      prisma.opsAthlete.count({ where: { status: "active" } }),
+      prisma.opsProject.count({
+        where: { currentStatus: { notIn: ["completed", "handed_over"] } },
+      }),
+      prisma.opsProject.count({ where: { blockerFlag: true } }),
+      prisma.opsProject.count({ where: { checkInRequested: true } }),
+      prisma.opsDailySubmission.findMany({
+        where: { submissionDate: { gte: from, lte: to } },
+        select: { totalHours: true },
+      }),
+    ]);
 
   let daily12Count = 0;
   let daily14Count = 0;

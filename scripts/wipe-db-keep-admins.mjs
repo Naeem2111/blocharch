@@ -1,6 +1,12 @@
 /**
- * Wipe all app data except admin users (role = admin).
+ * Wipe app data except admin users (role = admin).
  * Usage: node scripts/wipe-db-keep-admins.mjs --confirm
+ *        node scripts/wipe-db-keep-admins.mjs --confirm --keep-clients
+ *        node scripts/wipe-db-keep-admins.mjs --confirm --keep-practices
+ *        node scripts/wipe-db-keep-admins.mjs --confirm --keep-planner
+ *   --keep-clients     Skip ops clients, commercial profiles, athletes, and projects.
+ *   --keep-practices   Skip architects + marketing leads (practices database).
+ *   --keep-planner     Skip planner boards, tasks, columns, and outbox queue.
  */
 import { PrismaClient } from "@prisma/client";
 
@@ -35,25 +41,46 @@ async function main() {
     console.log(`  ${key}: ${counts[key]}`);
   };
 
+  const keepClients = process.argv.includes("--keep-clients");
+  const keepPractices = process.argv.includes("--keep-practices");
+  const keepPlanner = process.argv.includes("--keep-planner");
+  if (keepClients) {
+    console.log("Keeping ops clients, athletes, and projects (--keep-clients).");
+  }
+  if (keepPractices) {
+    console.log("Keeping marketing practices (--keep-practices).");
+  }
+  if (keepPlanner) {
+    console.log("Keeping planner / Kanban (--keep-planner).");
+  }
+
   console.log("\nDeleting…");
-  await del("plannerTodoItems", () => prisma.plannerTodoItem.deleteMany());
-  await del("opsOutboxTasks", () => prisma.opsOutboxTask.deleteMany());
+  if (!keepPlanner) {
+    await del("plannerTodoItems", () => prisma.plannerTodoItem.deleteMany());
+    await del("opsOutboxTasks", () => prisma.opsOutboxTask.deleteMany());
+    await del("plannerBoards", () => prisma.plannerBoard.deleteMany());
+  }
   await del("opsSubmissionLineItems", () => prisma.opsSubmissionLineItem.deleteMany());
   await del("opsDailySubmissions", () => prisma.opsDailySubmission.deleteMany());
   await del("opsAthleteNotifications", () => prisma.opsAthleteNotification.deleteMany());
   await del("opsCheckInRequests", () => prisma.opsCheckInRequest.deleteMany());
   await del("opsNotifications", () => prisma.opsNotification.deleteMany());
-  await del("plannerBoards", () => prisma.plannerBoard.deleteMany());
-  await del("opsProjects", () => prisma.opsProject.deleteMany());
-  await del("opsClientCommercial", () => prisma.opsClientCommercialProfile.deleteMany());
-  await del("opsClients", () => prisma.opsClient.deleteMany());
-  await del("opsAthletes", () => prisma.opsAthlete.deleteMany());
+  if (!keepClients) {
+    await del("opsProjects", () => prisma.opsProject.deleteMany());
+    await del("opsClientCommercial", () => prisma.opsClientCommercialProfile.deleteMany());
+    await del("opsClients", () => prisma.opsClient.deleteMany());
+    await del("opsAthletes", () => prisma.opsAthlete.deleteMany());
+  }
   await del("opsExchangeRates", () => prisma.opsExchangeRate.deleteMany());
-  await del("leads", () => prisma.lead.deleteMany());
-  await del("architects", () => prisma.architect.deleteMany());
-  await del("nonAdminUsers", () =>
-    prisma.user.deleteMany({ where: { role: { not: "admin" } } })
-  );
+  if (!keepPractices) {
+    await del("leads", () => prisma.lead.deleteMany());
+    await del("architects", () => prisma.architect.deleteMany());
+  }
+  if (!keepClients) {
+    await del("nonAdminUsers", () =>
+      prisma.user.deleteMany({ where: { role: { not: "admin" } } })
+    );
+  }
 
   console.log("\nDone.");
 

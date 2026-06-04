@@ -71,6 +71,17 @@ export function laneCostForTier(tier: OpsPricingTier): number {
   return PRICING_TIER_LANE_GBP[tier];
 }
 
+/** Included production hours per lane per month (lane billing is fixed; hours track utilization). */
+export const LANE_MONTHLY_HOURS = 160;
+
+export function monthlyLaneRevenueGbp(laneCostGbp: number, activeLaneCount: number): number {
+  return laneCostGbp * Math.max(0, activeLaneCount);
+}
+
+export function laneIncludedHours(activeLaneCount: number): number {
+  return LANE_MONTHLY_HOURS * Math.max(0, activeLaneCount);
+}
+
 export function isOpsProjectPhase(v: string): v is OpsProjectPhase {
   return v in PROJECT_PHASE_LABELS;
 }
