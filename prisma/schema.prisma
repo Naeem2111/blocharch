@@ -351,9 +351,34 @@ model OpsAthlete {
   plannerBoards PlannerBoard[]
   outboxTasks  OpsOutboxTask[]      @relation("OutboxTargetAthlete")
   notifications OpsNotification[]
+  athleteNotifications OpsAthleteNotification[]
   checkInRequests OpsCheckInRequest[]
 
   @@map("ops_athletes")
+}
+
+enum OpsAthleteNotificationType {
+  task_assigned
+  check_in_update
+  project_completed
+  admin_message
+}
+
+/** Notifications shown to the athlete in My Notifications. */
+model OpsAthleteNotification {
+  id        String                     @id @default(uuid())
+  athleteId String                     @map("athlete_id")
+  type      OpsAthleteNotificationType
+  title     String
+  message   String?                    @db.Text
+  linkPath  String?                    @map("link_path")
+  readAt    DateTime?                  @map("read_at")
+  createdAt DateTime                   @default(now()) @map("created_at")
+
+  athlete OpsAthlete @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@index([athleteId, createdAt])
+  @@map("ops_athlete_notifications")
 }
 
 model OpsProject {
@@ -372,6 +397,8 @@ model OpsProject {
   handoverDate      DateTime?           @map("handover_date") @db.Date
   currentStage      OpsProjectPhase     @default(existing_drawings) @map("current_stage")
   currentStatus     OpsProjectStatus    @default(not_started) @map("current_status")
+  /** Latest progress % from daily log (0–100). */
+  progressPercent   Int?                @map("progress_percent")
   notes             String?             @db.Text
   blockerFlag       Boolean             @default(false) @map("blocker_flag")
   checkInRequested  Boolean             @default(false) @map("check_in_requested")

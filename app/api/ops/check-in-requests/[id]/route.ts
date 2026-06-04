@@ -8,6 +8,7 @@ import {
   serializeCheckInRequest,
   syncCalendarEventDescription,
 } from "@/lib/check-in-requests";
+import { createAthleteNotification } from "@/lib/ops-athlete-notifications";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -36,10 +37,17 @@ export async function PATCH(request: NextRequest, context: Ctx) {
           resolvedAt: new Date(),
         },
         include: {
-          athlete: { select: { fullName: true, athleteCode: true, email: true } },
+          athlete: { select: { id: true, fullName: true, athleteCode: true, email: true } },
           project: { include: { client: { select: { name: true } } } },
         },
       });
+      await createAthleteNotification({
+        athleteId: row.athlete.id,
+        type: "check_in_update",
+        title: "Check-in request declined",
+        message: adminNote ?? null,
+        linkPath: "/dashboard/athlete/book-call",
+      }).catch(() => {});
       return NextResponse.json({ request: serializeCheckInRequest(row) });
     }
 
@@ -71,7 +79,7 @@ export async function PATCH(request: NextRequest, context: Ctx) {
           resolvedAt: new Date(),
         },
         include: {
-          athlete: { select: { fullName: true, athleteCode: true, email: true } },
+          athlete: { select: { id: true, fullName: true, athleteCode: true, email: true } },
           project: { include: { client: { select: { name: true } } } },
         },
       });
@@ -79,6 +87,14 @@ export async function PATCH(request: NextRequest, context: Ctx) {
       if (row.googleEventId && (zoomLink || adminNote)) {
         await syncCalendarEventDescription(row.googleEventId, row).catch(() => {});
       }
+
+      await createAthleteNotification({
+        athleteId: row.athlete.id,
+        type: "check_in_update",
+        title: "Check-in approved",
+        message: row.zoomLink ? `Zoom: ${row.zoomLink}` : adminNote ?? null,
+        linkPath: "/dashboard/athlete/book-call",
+      }).catch(() => {});
 
       return NextResponse.json({ request: serializeCheckInRequest(row) });
     }
@@ -105,10 +121,17 @@ export async function PATCH(request: NextRequest, context: Ctx) {
           zoomLink: zoomLink ?? existing.zoomLink,
         },
         include: {
-          athlete: { select: { fullName: true, athleteCode: true, email: true } },
+          athlete: { select: { id: true, fullName: true, athleteCode: true, email: true } },
           project: { include: { client: { select: { name: true } } } },
         },
       });
+      await createAthleteNotification({
+        athleteId: row.athlete.id,
+        type: "check_in_update",
+        title: "New check-in time proposed",
+        message: adminNote ?? "Please confirm the proposed time in Book a Call.",
+        linkPath: "/dashboard/athlete/book-call",
+      }).catch(() => {});
       return NextResponse.json({ request: serializeCheckInRequest(row) });
     }
 

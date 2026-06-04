@@ -19,6 +19,7 @@ type DashboardData = {
     totalEarningsZar: number;
   };
   activeProjects: number;
+  completedProjects: number;
   openBlockers: number;
   checkInRequests: number;
   todayHours: number;
@@ -76,6 +77,18 @@ export function AthleteDashboardClient() {
         <div className="card-tool rounded-xl p-4">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Today</p>
           <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-200">{data.todayHours.toFixed(1)}h</p>
+        </div>
+        <div className="card-tool rounded-xl p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">All-time hours</p>
+          <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-200">
+            {summary.lifetimeHours.toFixed(0)}h
+          </p>
+        </div>
+        <div className="card-tool rounded-xl p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Projects</p>
+          <p className="mt-1 text-lg font-semibold text-white">
+            {data.activeProjects} active · {data.completedProjects} done
+          </p>
         </div>
       </div>
 

@@ -1,5 +1,6 @@
 import type { OpsOutboxPriority } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { createAthleteNotification } from "@/lib/ops-athlete-notifications";
 import { ensureAthleteSystemBoards } from "@/lib/planner-system-boards";
 
 const PRIORITY_LABEL: Record<OpsOutboxPriority, string> = {
@@ -103,6 +104,14 @@ export async function deliverOutboxTaskToInbox(outboxTaskId: string) {
       deliveredAt: new Date(),
     },
   });
+
+  await createAthleteNotification({
+    athleteId: athlete.id,
+    type: "task_assigned",
+    title: title,
+    message: row.project?.name ? `Project: ${row.project.name}` : "New work in your Blocharch Inbox",
+    linkPath: "/dashboard/planner?team=1",
+  }).catch(() => {});
 
   return { taskId: task.id, alreadyDelivered: false };
 }

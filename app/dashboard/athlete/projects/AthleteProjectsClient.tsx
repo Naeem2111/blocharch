@@ -6,6 +6,7 @@ import {
   PROJECT_PHASE_LABELS,
   PROJECT_STATUS_LABELS,
 } from "@/lib/ops-constants";
+import { computeProjectTimeline } from "@/lib/project-timeline";
 
 type ProjectRow = {
   id: string;
@@ -15,8 +16,10 @@ type ProjectRow = {
   complexity: keyof typeof COMPLEXITY_LABELS;
   currentStage: keyof typeof PROJECT_PHASE_LABELS;
   currentStatus: keyof typeof PROJECT_STATUS_LABELS;
+  startDate: string | null;
   dueDate: string | null;
   handoverDate: string | null;
+  progressPercent: number | null;
   notes: string | null;
   blockerFlag: boolean;
   client: { name: string };
@@ -79,7 +82,13 @@ export function AthleteProjectsClient() {
     <div className="space-y-4">
       {msg ? <p className="text-sm text-brand-300">{msg}</p> : null}
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
-      {projects.map((p) => (
+      {projects.map((p) => {
+        const timeline = computeProjectTimeline({
+          startDate: p.startDate,
+          dueDate: p.dueDate,
+          handoverDate: p.handoverDate,
+        });
+        return (
         <article key={p.id} className="card-tool rounded-xl p-5">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
@@ -92,6 +101,21 @@ export function AthleteProjectsClient() {
               <p className="text-xs text-slate-500">
                 {p.client.name} · {p.projectNumber}
               </p>
+              <p
+                className={`mt-2 text-xs ${
+                  timeline.isOverdue
+                    ? "text-red-300"
+                    : timeline.isDueSoon
+                      ? "text-amber-300"
+                      : "text-slate-500"
+                }`}
+              >
+                {timeline.daysActive != null ? `${timeline.daysActive} days active · ` : ""}
+                {timeline.label}
+              </p>
+              {p.progressPercent != null ? (
+                <p className="mt-1 text-xs text-slate-400">Progress: {p.progressPercent}%</p>
+              ) : null}
             </div>
             <div className="flex items-center gap-2">
               <span className="rounded-md bg-white/[0.06] px-2 py-1 text-[10px] uppercase text-slate-400">
@@ -196,7 +220,8 @@ export function AthleteProjectsClient() {
             </>
           )}
         </article>
-      ))}
+        );
+      })}
       {projects.length === 0 ? (
         <p className="text-sm text-slate-500">No projects assigned yet. Ask your admin to assign projects to you.</p>
       ) : null}

@@ -3,6 +3,14 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BlocharchOutboxPanel } from "@/components/planner/BlocharchOutboxPanel";
+import { MultiBoardKanban } from "@/components/planner/MultiBoardKanban";
+import {
+  boardDetailAfterCrossBoardMove,
+  boardDetailAfterMovingTask,
+  findBoardIdForColumn,
+  type KanbanBoardDetail,
+} from "@/lib/planner-board-mutation";
+import { createDragHighlightScheduler } from "@/lib/planner-drag-ui";
 import { usesAthleteCompletedFlow } from "@/lib/planner-completed";
 
 type BoardSummary = {
@@ -157,49 +165,22 @@ function normalizeColumnTaskOrder(col: ColumnRow): ColumnRow {
   };
 }
 
-/** insertBeforeTaskId: insert moved task before this row; null = append to column tail. */
-function plannerDetailAfterMovingTask(
-  detail: BoardDetail,
-  taskId: string,
-  destColumnId: string,
-  insertBeforeTaskId: string | null
-): BoardDetail {
-  let mover: TaskRow | null = null;
-
-  const stripped = detail.columns.map((col) => {
-    const found = col.tasks.find((t) => t.id === taskId);
-    if (!found) return col;
-    mover = found;
-    return {
-      ...col,
-      tasks: col.tasks.filter((t) => t.id !== taskId),
-    };
-  });
-
-  if (!mover) return detail;
-
-  const merged = stripped.map((col) => {
-    if (col.id !== destColumnId) return col;
-    const ts = [...col.tasks];
-    let insertAt = ts.length;
-    if (insertBeforeTaskId !== null) {
-      const bi = ts.findIndex((t) => t.id === insertBeforeTaskId);
-      insertAt = bi === -1 ? ts.length : bi;
+function findBoardContainingTask(
+  boards: Record<string, BoardDetail>,
+  single: BoardDetail | null,
+  taskId: string
+): BoardDetail | null {
+  for (const b of Object.values(boards)) {
+    for (const col of b.columns) {
+      if (col.tasks.some((t) => t.id === taskId)) return b;
     }
-    const mergedTasks = [...ts.slice(0, insertAt), mover!, ...ts.slice(insertAt)].map((t, i) => ({
-      ...t,
-      sortOrder: i,
-    }));
-    return {
-      ...col,
-      tasks: mergedTasks,
-    };
-  });
-
-  return {
-    ...detail,
-    columns: merged.map(normalizeColumnTaskOrder),
-  };
+  }
+  if (single) {
+    for (const col of single.columns) {
+      if (col.tasks.some((t) => t.id === taskId)) return single;
+    }
+  }
+  return null;
 }
 
 /** Where to slice a card vertically for “drop before vs after”. */
@@ -264,12 +245,24 @@ export function PlannerClient() {
   const [copyColumns, setCopyColumns] = useState<Array<{ id: string; title: string }>>([]);
   const [copyColumnId, setCopyColumnId] = useState<string | null>(null);
   const [copySaving, setCopySaving] = useState(false);
+  const [allBoardsView, setAllBoardsView] = useState(false);
+  const [boardDetailsById, setBoardDetailsById] = useState<Record<string, BoardDetail>>({});
+  const [dropTargetBoardId, setDropTargetBoardId] = useState<string | null>(null);
+  const [boardsLoading, setBoardsLoading] = useState(false);
 
   const suppressNextCardClickRef = useRef(false);
   /** Mirrors dragTaskId for drop handlers (state can lag in edge timings). */
   const dragTaskIdRef = useRef<string | null>(null);
   const dragGhostRef = useRef<HTMLElement | null>(null);
+  const moveInFlightRef = useRef(false);
   const detailRef = useRef(detail);
+  const boardsDetailRef = useRef<Record<string, BoardDetail>>({});
+  const dragHighlightRef = useRef(
+    createDragHighlightScheduler((columnId, guide) => {
+      setDropTargetColumnId(columnId);
+      setTaskDropGuide(guide);
+    })
+  );
 
   useEffect(() => {
     removePlannerDragGhosts();
@@ -281,8 +274,44 @@ export function PlannerClient() {
   }, [detail]);
 
   useEffect(() => {
+    boardsDetailRef.current = boardDetailsById;
+  }, [boardDetailsById]);
+
+  useEffect(() => {
     dragTaskIdRef.current = dragTaskId;
   }, [dragTaskId]);
+
+  function clearDragState() {
+    dragHighlightRef.current.cancel();
+    dragTaskIdRef.current = null;
+    setDragTaskId(null);
+    setDropTargetColumnId(null);
+    setDropTargetBoardId(null);
+    setTaskDropGuide(null);
+    removePlannerDragGhosts();
+    if (dragGhostRef.current) {
+      dragGhostRef.current.remove();
+      dragGhostRef.current = null;
+    }
+  }
+
+  function scheduleDragHighlight(
+    columnId: string | null,
+    guide: { columnId: string; beforeTaskId: string | null } | null
+  ) {
+    if (!dragTaskIdRef.current) return;
+    dragHighlightRef.current.schedule(columnId, guide);
+  }
+
+  useEffect(() => {
+    const onEnd = () => {
+      requestAnimationFrame(() => {
+        if (dragTaskIdRef.current) clearDragState();
+      });
+    };
+    window.addEventListener("dragend", onEnd);
+    return () => window.removeEventListener("dragend", onEnd);
+  }, []);
 
   const completedColumnId = useMemo(
     () => (detail ? resolveCompletedColumnId(detail.columns) : null),
@@ -308,7 +337,8 @@ export function PlannerClient() {
       window.alert((j as { error?: string }).error || "Could not update task");
       return;
     }
-    if (boardId) await loadDetail(boardId);
+    if (allBoardsView) await loadAllBoardDetails();
+    else if (boardId) await loadDetail(boardId);
     await refreshBoards();
   }
 
@@ -330,6 +360,7 @@ export function PlannerClient() {
     if (!r.ok) return null;
     const typed = j as BoardDetail;
     setDetail(typed);
+    setBoardDetailsById((prev) => ({ ...prev, [id]: typed }));
     return typed;
   }, []);
 
@@ -409,6 +440,45 @@ export function PlannerClient() {
     }
     return [];
   }, [boards, area, currentUserId, athleteUserId]);
+
+  const loadAllBoardDetails = useCallback(async () => {
+    const ids = filteredBoards
+      .filter((b) => b.kind !== "blocharch_outbox")
+      .map((b) => b.id);
+    if (ids.length === 0) return;
+    setBoardsLoading(true);
+    try {
+      const results = await Promise.all(
+        ids.map(async (id) => {
+          const r = await fetch(`/api/planner/boards/${encodeURIComponent(id)}`);
+          const j = await r.json();
+          return r.ok ? (j as BoardDetail) : null;
+        })
+      );
+      const map: Record<string, BoardDetail> = {};
+      for (const bd of results) {
+        if (bd?.id) map[bd.id] = bd;
+      }
+      setBoardDetailsById(map);
+      if (boardId && map[boardId]) setDetail(map[boardId]);
+    } finally {
+      setBoardsLoading(false);
+    }
+  }, [filteredBoards, boardId]);
+
+  useEffect(() => {
+    if (allBoardsView && showBoardPicker && filteredBoards.length > 0) {
+      void loadAllBoardDetails();
+    }
+  }, [allBoardsView, showBoardPicker, filteredBoards, loadAllBoardDetails]);
+
+  const multiBoardList = useMemo(
+    () =>
+      Object.values(boardDetailsById)
+        .filter((b) => b.kind !== "blocharch_outbox")
+        .sort((a, b) => a.title.localeCompare(b.title)),
+    [boardDetailsById]
+  );
 
   function goPlanner(params: { area?: string; athlete?: string }) {
     const p = new URLSearchParams();
@@ -571,6 +641,27 @@ export function PlannerClient() {
     if (j.board?.id) setBoardId(j.board.id);
   }
 
+  async function renameBoard(id: string, currentTitle: string) {
+    const t = window.prompt("Board name", currentTitle)?.trim();
+    if (!t) return;
+    await fetch(`/api/planner/boards/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: t }),
+    });
+    await refreshBoards();
+    await loadDetail(id);
+  }
+
+  async function deleteBoard(boardId: string, title: string) {
+    if (!window.confirm(`Delete board "${title}"? Tasks on this board will be removed.`)) return;
+    const r = await fetch(`/api/planner/boards/${encodeURIComponent(boardId)}`, { method: "DELETE" });
+    if (!r.ok) return;
+    setBoardId(null);
+    setDetail(null);
+    await refreshBoards();
+  }
+
   async function addTask(
     columnId: string,
     data: {
@@ -631,21 +722,112 @@ export function PlannerClient() {
     [boardId, loadDetail]
   );
 
-  /** Reorder visually, then POST full layout once (server catches up in background). */
+  function setBoardInStore(board: BoardDetail) {
+    setBoardDetailsById((prev) => ({ ...prev, [board.id]: board }));
+    if (boardId === board.id || detail?.id === board.id) setDetail(board);
+  }
+
+  async function persistTaskMove(
+    taskId: string,
+    destColumnId: string,
+    insertBeforeTaskId: string | null
+  ) {
+    if (moveInFlightRef.current) return;
+    moveInFlightRef.current = true;
+    clearDragState();
+    try {
+      const r = await fetch(`/api/planner/tasks/${encodeURIComponent(taskId)}/move`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ columnId: destColumnId, insertBeforeTaskId }),
+      });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        window.alert((j as { error?: string }).error || "Could not move task");
+        if (allBoardsView) await loadAllBoardDetails();
+        else if (boardId) await loadDetail(boardId);
+        return;
+      }
+      if (allBoardsView) await loadAllBoardDetails();
+      else if (boardId) await loadDetail(boardId);
+      await refreshBoards();
+    } finally {
+      moveInFlightRef.current = false;
+    }
+  }
+
+  /** Optimistic UI, then single move API (same-board and cross-board). */
   function reorderTasksAndPersist(
     snapshot: BoardDetail,
     taskId: string,
     destColumnId: string,
     insertBeforeTaskId: string | null
   ) {
-    const nextDetail = plannerDetailAfterMovingTask(
+    if (moveInFlightRef.current) return;
+
+    const onSameBoard = snapshot.columns.some((c) => c.id === destColumnId);
+    if (onSameBoard) {
+      const nextDetail = boardDetailAfterMovingTask(
+        snapshot,
+        taskId,
+        destColumnId,
+        insertBeforeTaskId
+      );
+      setBoardInStore(nextDetail as BoardDetail);
+      void persistTaskMove(taskId, destColumnId, insertBeforeTaskId);
+      return;
+    }
+
+    const store = {
+      ...boardsDetailRef.current,
+      ...(detailRef.current ? { [detailRef.current.id]: detailRef.current } : {}),
+    };
+    const destBoardId = findBoardIdForColumn(store, destColumnId);
+    const destBoard = destBoardId ? store[destBoardId] : null;
+    if (!destBoard?.editable) return;
+
+    const { source, dest } = boardDetailAfterCrossBoardMove(
       snapshot,
+      destBoard as KanbanBoardDetail,
       taskId,
       destColumnId,
       insertBeforeTaskId
     );
-    setDetail(nextDetail);
-    void persistTaskOrder(nextDetail);
+    setBoardInStore(source as BoardDetail);
+    setBoardInStore(dest as BoardDetail);
+    void persistTaskMove(taskId, destColumnId, insertBeforeTaskId);
+  }
+
+  async function moveTaskUniversal(
+    taskId: string,
+    destColumnId: string,
+    insertBeforeTaskId: string | null
+  ) {
+    const source =
+      findBoardContainingTask(boardsDetailRef.current, detailRef.current, taskId) ??
+      detailRef.current;
+    if (!source) return;
+    reorderTasksAndPersist(source, taskId, destColumnId, insertBeforeTaskId);
+  }
+
+  async function onDropBoardTab(targetBoardId: string, dataTransfer?: DataTransfer | null) {
+    const taskId = resolveDraggedTaskId(dataTransfer)?.trim() || null;
+    clearDragState();
+    if (!taskId || targetBoardId === boardId) return;
+
+    let target: BoardDetail | null = boardDetailsById[targetBoardId] ?? null;
+    if (!target) {
+      target = await loadDetail(targetBoardId);
+    }
+    if (!target?.editable) return;
+    const backlogId = resolveBacklogColumnId(target.columns);
+    if (!backlogId) return;
+
+    const source =
+      findBoardContainingTask(boardsDetailRef.current, detailRef.current, taskId) ?? detailRef.current;
+    if (!source) return;
+    reorderTasksAndPersist(source, taskId, backlogId, null);
+    setBoardId(targetBoardId);
   }
 
   function resolveDraggedTaskId(dataTransfer?: DataTransfer | null) {
@@ -658,52 +840,67 @@ export function PlannerClient() {
   }
 
   async function onDropColumn(columnId: string, dataTransfer?: DataTransfer | null) {
-    const snap = detailRef.current;
-    if (!snap?.editable) return;
     const taskId = resolveDraggedTaskId(dataTransfer)?.trim() || null;
-    setDropTargetColumnId(null);
-    setTaskDropGuide(null);
-    setDragTaskId(null);
-    dragTaskIdRef.current = null;
-    if (!taskId) return;
+    if (!taskId) {
+      clearDragState();
+      return;
+    }
 
-    reorderTasksAndPersist(snap, taskId, columnId, null);
+    const source = findBoardContainingTask(boardsDetailRef.current, detailRef.current, taskId);
+    if (!source?.editable) return;
+    const mergedStore = {
+      ...boardsDetailRef.current,
+      ...(detailRef.current ? { [detailRef.current.id]: detailRef.current } : {}),
+    };
+    const destBoardId = findBoardIdForColumn(mergedStore, columnId);
+    const dest = destBoardId ? mergedStore[destBoardId] : null;
+    if (dest && !dest.editable) return;
+
+    reorderTasksAndPersist(source, taskId, columnId, null);
   }
 
   /** Drop onto a card outline: insert relative to midpoint. */
   function onDropCard(columnId: string, anchorTaskId: string, e: React.DragEvent) {
-    const snap = detailRef.current;
-    if (!snap?.editable) return;
+    e.preventDefault();
+    e.stopPropagation();
     const taskIdRaw = resolveDraggedTaskId(e.dataTransfer)?.trim() || null;
-    setDropTargetColumnId(null);
-    setTaskDropGuide(null);
-    setDragTaskId(null);
-    dragTaskIdRef.current = null;
-    if (!taskIdRaw || !snap) return;
-    /** Dropping onto the card itself has no insertion anchor once the row is stripped. */
-    if (anchorTaskId === taskIdRaw) return;
+    if (!taskIdRaw || anchorTaskId === taskIdRaw) {
+      clearDragState();
+      return;
+    }
 
-    const col = snap.columns.find((c) => c.id === columnId);
+    const source = findBoardContainingTask(boardsDetailRef.current, detailRef.current, taskIdRaw);
+    if (!source?.editable) return;
+
+    const mergedStore = {
+      ...boardsDetailRef.current,
+      ...(detailRef.current ? { [detailRef.current.id]: detailRef.current } : {}),
+    };
+    const destBoardId = findBoardIdForColumn(mergedStore, columnId);
+    const destBoard = destBoardId ? mergedStore[destBoardId] : source;
+    const col = destBoard?.columns.find((c) => c.id === columnId);
     if (!col) return;
 
     const placement = taskCardDropPlacement(e, e.currentTarget as HTMLElement);
     const beforeId = insertAnchorBeforeId(col.tasks, anchorTaskId, placement, taskIdRaw);
 
-    reorderTasksAndPersist(snap, taskIdRaw, columnId, beforeId);
+    reorderTasksAndPersist(source, taskIdRaw, columnId, beforeId);
   }
 
   /** Hits the flex gutter between cards — insert before anchor task without relying on midpoint. */
   function onDropInsertRail(columnId: string, insertBeforeTaskId: string | null, e: React.DragEvent) {
-    const snap = detailRef.current;
-    if (!snap?.editable) return;
+    e.preventDefault();
+    e.stopPropagation();
     const taskIdRaw = resolveDraggedTaskId(e.dataTransfer)?.trim() || null;
-    setDropTargetColumnId(null);
-    setTaskDropGuide(null);
-    setDragTaskId(null);
-    dragTaskIdRef.current = null;
-    if (!taskIdRaw) return;
+    if (!taskIdRaw) {
+      clearDragState();
+      return;
+    }
 
-    reorderTasksAndPersist(snap, taskIdRaw, columnId, insertBeforeTaskId);
+    const source = findBoardContainingTask(boardsDetailRef.current, detailRef.current, taskIdRaw);
+    if (!source?.editable) return;
+
+    reorderTasksAndPersist(source, taskIdRaw, columnId, insertBeforeTaskId);
   }
 
   async function createLabel(name: string, color: string) {
@@ -976,30 +1173,69 @@ export function PlannerClient() {
       )}
 
       {showBoardPicker ? (
-      <div className="flex flex-wrap gap-2">
-        {filteredBoards.map((b) => (
-          <button
-            key={b.id}
-            type="button"
-            onClick={() => setBoardId(b.id)}
-            className={`rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
-              boardId === b.id
-                ? "border-brand-500/40 bg-brand-500/10 text-brand-100"
-                : "border-white/[0.08] bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]"
-            }`}
-            style={{ borderLeftWidth: 4, borderLeftColor: b.color }}
-          >
-            <span className="font-medium">{b.title}</span>
-            {b.isSystem ? (
-              <span className="ml-2 text-[10px] uppercase text-amber-500/80">fixed</span>
-            ) : (
-              <span className="ml-2 text-[10px] uppercase text-slate-500">{b.scope}</span>
-            )}
-          </button>
-        ))}
-        {filteredBoards.length === 0 ? (
-          <p className="text-sm text-slate-500">No boards yet — create one to get started.</p>
-        ) : null}
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {filteredBoards.length > 1 ? (
+            <button
+              type="button"
+              onClick={() => {
+                const next = !allBoardsView;
+                setAllBoardsView(next);
+                if (next) void loadAllBoardDetails();
+              }}
+              className={`rounded-lg border px-3 py-2 text-xs font-medium ${
+                allBoardsView
+                  ? "border-brand-500/40 bg-brand-500/10 text-brand-200"
+                  : "border-white/[0.08] bg-white/[0.03] text-slate-400"
+              }`}
+            >
+              {allBoardsView ? "All boards (on)" : "All boards"}
+            </button>
+          ) : null}
+          {dragTaskId ? (
+            <p className="text-xs text-brand-300">Drop on another board tab or column to move across boards</p>
+          ) : null}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {filteredBoards.map((b) => (
+            <button
+              key={b.id}
+              type="button"
+              onClick={() => {
+                if (!dragTaskId) setBoardId(b.id);
+              }}
+              onDragOver={(e) => {
+                if (!dragTaskId || b.id === boardId || b.kind === "blocharch_outbox") return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+                setDropTargetBoardId(b.id);
+              }}
+              onDragLeave={() => setDropTargetBoardId((prev) => (prev === b.id ? null : prev))}
+              onDrop={(e) => {
+                e.preventDefault();
+                void onDropBoardTab(b.id, e.dataTransfer);
+              }}
+              className={`rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
+                boardId === b.id && !allBoardsView
+                  ? "border-brand-500/40 bg-brand-500/10 text-brand-100"
+                  : dropTargetBoardId === b.id
+                    ? "border-brand-500/50 bg-brand-500/15 text-brand-100 ring-2 ring-brand-500/30"
+                    : "border-white/[0.08] bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]"
+              }`}
+              style={{ borderLeftWidth: 4, borderLeftColor: b.color }}
+            >
+              <span className="font-medium">{b.title}</span>
+              {b.isSystem ? (
+                <span className="ml-2 text-[10px] uppercase text-amber-500/80">fixed</span>
+              ) : (
+                <span className="ml-2 text-[10px] uppercase text-slate-500">{b.scope}</span>
+              )}
+            </button>
+          ))}
+          {filteredBoards.length === 0 ? (
+            <p className="text-sm text-slate-500">No boards yet — create one to get started.</p>
+          ) : null}
+        </div>
       </div>
       ) : null}
 
@@ -1095,7 +1331,27 @@ export function PlannerClient() {
 
       {detail?.kind === "blocharch_outbox" ? <BlocharchOutboxPanel /> : null}
 
-      {detail && detail.kind !== "blocharch_outbox" ? (
+      {allBoardsView && showBoardPicker ? (
+        <div className="space-y-3">
+          {boardsLoading ? (
+            <p className="text-sm text-slate-500">Loading all boards…</p>
+          ) : multiBoardList.length > 0 ? (
+            <MultiBoardKanban
+              boards={multiBoardList as KanbanBoardDetail[]}
+              onMoveTask={moveTaskUniversal}
+              onOpenTask={(task, columnId, openBoardId) => {
+                setBoardId(openBoardId);
+                setEditTask({ ...task, columnId });
+              }}
+              onToggleComplete={(taskId, completed) => void toggleTaskCompleted(taskId, completed)}
+            />
+          ) : (
+            <p className="text-sm text-slate-500">No boards to show.</p>
+          )}
+        </div>
+      ) : null}
+
+      {detail && detail.kind !== "blocharch_outbox" && !allBoardsView ? (
         <>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -1107,8 +1363,8 @@ export function PlannerClient() {
                 {detail.editable ? (
                   <>
                     {" "}
-                    · Drag cards to reorder (drop on the top or bottom half of a card) or move lists; the
-                    board updates instantly and syncs in the background.
+                    · Drag cards between columns and boards (use All boards view or drop on board tabs).
+                    Drop on the top or bottom half of a card to insert above or below.
                     {completedColumnId ? (
                       <>
                         {" "}
@@ -1121,6 +1377,26 @@ export function PlannerClient() {
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
+              {detail.editable ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => void renameBoard(detail.id, detail.title)}
+                    className="rounded-lg border border-white/[0.1] bg-white/[0.05] px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-white/[0.08]"
+                  >
+                    Rename board
+                  </button>
+                  {!detail.isSystem ? (
+                    <button
+                      type="button"
+                      onClick={() => void deleteBoard(detail.id, detail.title)}
+                      className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-300 hover:bg-red-500/15"
+                    >
+                      Delete board
+                    </button>
+                  ) : null}
+                </>
+              ) : null}
               {icsUrl ? (
                 <a
                   href={icsUrl}
@@ -1194,21 +1470,21 @@ export function PlannerClient() {
                     : ""
                 }`}
                 onDragOver={(e) => {
-                  if (!detail.editable || !dragTaskId) return;
+                  if (!detail.editable || !dragTaskIdRef.current) return;
                   e.preventDefault();
                   e.dataTransfer.dropEffect = "move";
-                  setDropTargetColumnId(col.id);
+                  scheduleDragHighlight(col.id, null);
                 }}
                 onDragLeave={(e) => {
-                  if (!detail.editable || !dragTaskId) return;
+                  if (!detail.editable || !dragTaskIdRef.current) return;
                   const related = e.relatedTarget as Node | null;
                   if (related && e.currentTarget.contains(related)) return;
-                  setDropTargetColumnId((prev) => (prev === col.id ? null : prev));
-                  setTaskDropGuide((prev) => (prev?.columnId === col.id ? null : prev));
+                  scheduleDragHighlight(null, null);
                 }}
                 onDrop={(e) => {
                   e.preventDefault();
-                  void onDropColumn(col.id, e.dataTransfer);
+                  e.stopPropagation();
+                  onDropColumn(col.id, e.dataTransfer);
                 }}
               >
                 <EditableColumnHeader
@@ -1221,23 +1497,22 @@ export function PlannerClient() {
                   onReorder={reorderColumns}
                 />
                 <div
-                  className={`flex min-h-[160px] flex-1 flex-col space-y-3 p-2 transition-colors duration-150 ${
+                  className={`flex min-h-[160px] max-h-[min(70vh,720px)] flex-1 flex-col space-y-3 overflow-y-auto overscroll-y-contain p-2 transition-colors duration-150 ${
                     detail.editable && dragTaskId && dropTargetColumnId === col.id
                       ? "rounded-lg bg-brand-500/[0.06]"
                       : ""
                   }`}
                   onDragOver={(e) => {
-                    if (!detail.editable || !dragTaskId || col.tasks.length > 0) return;
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = "move";
-                    setDropTargetColumnId(col.id);
-                    setTaskDropGuide({ columnId: col.id, beforeTaskId: null });
-                  }}
-                  onDrop={(e) => {
-                    if (col.tasks.length > 0) return;
+                    if (!detail.editable || !dragTaskIdRef.current) return;
                     e.preventDefault();
                     e.stopPropagation();
-                    void onDropColumn(col.id, e.dataTransfer);
+                    e.dataTransfer.dropEffect = "move";
+                    scheduleDragHighlight(col.id, { columnId: col.id, beforeTaskId: null });
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onDropColumn(col.id, e.dataTransfer);
                   }}
                 >
                   {col.tasks.map((t) => {
@@ -1280,16 +1555,13 @@ export function PlannerClient() {
                               : "border-transparent bg-transparent hover:border-brand-500/25 hover:bg-brand-500/10"
                           }`}
                           onDragOver={(e) => {
-                            if (!dragTaskId) return;
+                            if (!dragTaskIdRef.current) return;
                             e.preventDefault();
                             e.stopPropagation();
                             e.dataTransfer.dropEffect = "move";
-                            setDropTargetColumnId(col.id);
-                            setTaskDropGuide({ columnId: col.id, beforeTaskId: t.id });
+                            scheduleDragHighlight(col.id, { columnId: col.id, beforeTaskId: t.id });
                           }}
                           onDrop={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
                             onDropInsertRail(col.id, t.id, e);
                           }}
                         />
@@ -1349,31 +1621,28 @@ export function PlannerClient() {
                             dragGhostRef.current = null;
                           }
                           removePlannerDragGhosts();
-                          dragTaskIdRef.current = null;
-                          setDragTaskId(null);
-                          setDropTargetColumnId(null);
-                          setTaskDropGuide(null);
                           suppressNextCardClickRef.current = true;
                         }}
                         onDragOver={(e) => {
-                          if (!detail.editable || !dragTaskId || dragTaskId === t.id) return;
+                          if (!detail.editable || !dragTaskIdRef.current || dragTaskIdRef.current === t.id)
+                            return;
                           e.preventDefault();
                           e.stopPropagation();
                           e.dataTransfer.dropEffect = "move";
-                          setDropTargetColumnId(col.id);
                           const placement = taskCardDropPlacement(e, e.currentTarget as HTMLElement);
                           const guideBeforeId = insertAnchorBeforeId(
                             col.tasks,
                             t.id,
                             placement,
-                            dragTaskId
+                            dragTaskIdRef.current
                           );
-                          setTaskDropGuide({ columnId: col.id, beforeTaskId: guideBeforeId });
+                          scheduleDragHighlight(col.id, {
+                            columnId: col.id,
+                            beforeTaskId: guideBeforeId,
+                          });
                         }}
                         onDrop={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          void onDropCard(col.id, t.id, e);
+                          onDropCard(col.id, t.id, e);
                         }}
                         onClick={() => {
                           if (suppressNextCardClickRef.current) {
@@ -1501,16 +1770,13 @@ export function PlannerClient() {
                           : "border-transparent hover:border-brand-500/25 hover:bg-brand-500/10"
                       }`}
                       onDragOver={(e) => {
-                        if (!dragTaskId) return;
+                        if (!dragTaskIdRef.current) return;
                         e.preventDefault();
                         e.stopPropagation();
                         e.dataTransfer.dropEffect = "move";
-                        setDropTargetColumnId(col.id);
-                        setTaskDropGuide({ columnId: col.id, beforeTaskId: null });
+                        scheduleDragHighlight(col.id, { columnId: col.id, beforeTaskId: null });
                       }}
                       onDrop={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
                         onDropInsertRail(col.id, null, e);
                       }}
                     />

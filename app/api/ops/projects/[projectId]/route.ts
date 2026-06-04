@@ -127,3 +127,15 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 }
+
+export async function DELETE(request: NextRequest, context: RouteContext) {
+  const gate = await requireOpsSession(request);
+  if (gate instanceof NextResponse) return gate;
+
+  const { projectId } = await context.params;
+  const existing = await prisma.opsProject.findUnique({ where: { id: projectId } });
+  if (!existing) return NextResponse.json({ error: "Project not found" }, { status: 404 });
+
+  await prisma.opsProject.delete({ where: { id: projectId } });
+  return NextResponse.json({ ok: true });
+}

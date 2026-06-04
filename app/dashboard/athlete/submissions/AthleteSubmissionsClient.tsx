@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ProgressSlider } from "@/components/ProgressSlider";
 import { PROJECT_PHASE_LABELS, TASK_TYPE_LABELS } from "@/lib/ops-constants";
 
 type AssignedProject = {
@@ -17,6 +18,7 @@ type LineItemForm = {
   projectPhase: string;
   taskType: string;
   hoursWorked: string;
+  completionPercent: number;
   completedSummary: string;
   blockerFlag: boolean;
   blockerNote: string;
@@ -50,6 +52,7 @@ type PastSubmission = {
     completedSummary: string | null;
     blockerFlag: boolean;
     blockerNote: string | null;
+    completionPercent?: number | null;
   }>;
 };
 
@@ -60,6 +63,7 @@ function emptyLine(): LineItemForm {
     projectPhase: "existing_drawings",
     taskType: "plans",
     hoursWorked: "",
+    completionPercent: 0,
     completedSummary: "",
     blockerFlag: false,
     blockerNote: "",
@@ -97,6 +101,7 @@ export function AthleteSubmissionsClient() {
             projectPhase: li.projectPhase,
             taskType: li.taskType,
             hoursWorked: String(li.hoursWorked),
+            completionPercent: li.completionPercent ?? 0,
             completedSummary: li.completedSummary ?? "",
             blockerFlag: li.blockerFlag,
             blockerNote: li.blockerNote ?? "",
@@ -177,6 +182,7 @@ export function AthleteSubmissionsClient() {
             projectPhase: li.projectPhase,
             taskType: li.taskType,
             hoursWorked: Number(li.hoursWorked),
+            completionPercent: li.completionPercent,
             completedSummary: li.completedSummary || null,
             blockerFlag: li.blockerFlag,
             blockerNote: li.blockerNote || null,
@@ -342,6 +348,13 @@ export function AthleteSubmissionsClient() {
                   className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
                 />
               </label>
+              <div className="md:col-span-2">
+                <ProgressSlider
+                  value={li.completionPercent}
+                  onChange={(v) => updateLine(li.key, { completionPercent: v })}
+                  disabled={formLocked}
+                />
+              </div>
               <label className="text-xs text-slate-400 md:col-span-2">
                 What was completed
                 <textarea

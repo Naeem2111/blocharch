@@ -54,8 +54,13 @@ export async function PATCH(request: NextRequest, context: Ctx) {
         where: { id: body.columnId },
         select: { boardId: true },
       });
-      if (!newCol || newCol.boardId !== boardId) {
+      if (!newCol) {
         return NextResponse.json({ error: "Invalid column" }, { status: 400 });
+      }
+      if (newCol.boardId !== boardId) {
+        if (!(await canEditBoard(user, newCol.boardId))) {
+          return NextResponse.json({ error: "Forbidden on target board" }, { status: 403 });
+        }
       }
       data.columnId = body.columnId;
     }

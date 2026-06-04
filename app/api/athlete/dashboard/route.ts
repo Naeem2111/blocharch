@@ -22,6 +22,12 @@ export async function GET(request: NextRequest) {
       currentStatus: { notIn: ["completed", "handed_over"] },
     },
   });
+  const completedProjects = await prisma.opsProject.count({
+    where: {
+      assignedAthleteId: athlete.id,
+      currentStatus: { in: ["completed", "handed_over"] },
+    },
+  });
   const openBlockers = await prisma.opsProject.count({
     where: { assignedAthleteId: athlete.id, blockerFlag: true },
   });
@@ -68,6 +74,7 @@ export async function GET(request: NextRequest) {
     },
     summary,
     activeProjects,
+    completedProjects,
     openBlockers,
     checkInRequests,
     todayHours,

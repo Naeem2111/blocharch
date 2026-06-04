@@ -112,3 +112,18 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 }
+
+export async function DELETE(request: NextRequest, context: RouteContext) {
+  const gate = await requireOpsSession(request);
+  if (gate instanceof NextResponse) return gate;
+
+  const { id } = await context.params;
+  const existing = await prisma.opsClient.findUnique({
+    where: { id },
+    include: { _count: { select: { projects: true } } },
+  });
+  if (!existing) return NextResponse.json({ error: "Client not found" }, { status: 404 });
+
+  await prisma.opsClient.delete({ where: { id } });
+  return NextResponse.json({ ok: true });
+}

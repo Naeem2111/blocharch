@@ -154,6 +154,20 @@ export function OpsProjectsClient() {
     await load();
   }
 
+  async function deleteProject(id: string, name: string) {
+    if (!window.confirm(`Delete project "${name}"? This cannot be undone.`)) return;
+    setError("");
+    const r = await fetch(`/api/ops/projects/${id}`, { method: "DELETE" });
+    const j = await r.json();
+    if (!r.ok) {
+      setError(j.error || "Could not delete");
+      return;
+    }
+    setEditingId(null);
+    setMsg("Project deleted.");
+    await load();
+  }
+
   if (loading) return <p className="text-sm text-slate-500">Loading projects…</p>;
 
   return (
@@ -195,7 +209,11 @@ export function OpsProjectsClient() {
                 <label className="text-xs text-slate-400 md:col-span-2">Notes<textarea value={editForm.notes} onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))} rows={2} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
                 <label className="flex items-center gap-2 text-xs text-slate-400"><input type="checkbox" checked={editForm.blockerFlag} onChange={(e) => setEditForm((f) => ({ ...f, blockerFlag: e.target.checked }))} /> Blocker</label>
                 <label className="flex items-center gap-2 text-xs text-slate-400"><input type="checkbox" checked={editForm.checkInRequested} onChange={(e) => setEditForm((f) => ({ ...f, checkInRequested: e.target.checked }))} /> Check-in requested</label>
-                <div className="flex gap-2 md:col-span-2"><button type="button" onClick={() => void saveEdit(p.id)} className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-slate-950">Save</button><button type="button" onClick={() => setEditingId(null)} className="text-xs text-slate-500">Cancel</button></div>
+                <div className="flex flex-wrap gap-2 md:col-span-2">
+                  <button type="button" onClick={() => void saveEdit(p.id)} className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-slate-950">Save</button>
+                  <button type="button" onClick={() => setEditingId(null)} className="text-xs text-slate-500">Cancel</button>
+                  <button type="button" onClick={() => void deleteProject(p.id, p.name)} className="text-xs text-red-400 hover:text-red-300">Delete project</button>
+                </div>
               </div>
             ) : (
               <div className="flex flex-wrap items-start justify-between gap-2">

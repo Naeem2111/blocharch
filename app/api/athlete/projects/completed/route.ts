@@ -15,11 +15,13 @@ export async function GET(request: NextRequest) {
   const projects = await prisma.opsProject.findMany({
     where: {
       assignedAthleteId: athlete.id,
-      currentStatus: { notIn: ["completed", "handed_over"] },
+      currentStatus: { in: ["completed", "handed_over"] },
     },
-    orderBy: [{ dueDate: "asc" }, { name: "asc" }],
+    orderBy: [{ handoverDate: "desc" }, { updatedAt: "desc" }],
     select: athleteProjectSelect,
   });
 
-  return NextResponse.json({ projects: projects.map(serializeProjectForAthlete) });
+  return NextResponse.json({
+    projects: projects.map(serializeProjectForAthlete),
+  });
 }

@@ -1,6 +1,7 @@
 import type { OpsProjectStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ensureAthleteSystemBoards, ensureProjectBoard } from "@/lib/planner-system-boards";
+import { createAthleteNotification } from "@/lib/ops-athlete-notifications";
 
 const INACTIVE_PROJECT_STATUSES: OpsProjectStatus[] = ["completed", "handed_over"];
 
@@ -48,5 +49,17 @@ export async function syncProjectAfterOpsUpdate(
     await syncProjectBoardOnAssign(projectId);
   } else if (next.assignedAthleteId && isActiveProjectStatus(next.currentStatus)) {
     await syncProjectBoardOnAssign(projectId);
+  }
+
+  const wasActive = isActiveProjectStatus(prev.currentStatus);
+  const nowInactive = !isActiveProjectStatus(next.currentStatus);
+  if (wasActive && nowInactive && next.assignedAthleteId) {
+    await createAthleteNotification({
+      athleteId: next.assignedAthleteId,
+      type: "project_completed",
+      title: `Project completed: ${next.name}`,
+      message: "This project has moved to your Completed Projects list.",
+      linkPath: "/dashboard/athlete/projects/completed",
+    }).catch(() => {});
   }
 }

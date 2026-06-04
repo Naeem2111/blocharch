@@ -15,6 +15,7 @@ import { computeMonthlyHoursSummary, dateOnlyUtc, parseDateOnly } from "@/lib/op
 import { buildDailyHourAlerts, isSubmissionEditable } from "@/lib/ops-alerts";
 import { lockStaleSubmissions } from "@/lib/ops-commercial";
 import { createOpsNotification } from "@/lib/ops-notifications";
+import { syncProjectProgressFromLineItems } from "@/lib/sync-project-progress";
 
 type LineItemInput = {
   clientId: string;
@@ -105,6 +106,7 @@ export async function GET(request: NextRequest) {
         completedSummary: li.completedSummary,
         blockerFlag: li.blockerFlag,
         blockerNote: li.blockerNote,
+        completionPercent: li.completionPercent,
       })),
     })),
   });
@@ -235,6 +237,8 @@ export async function POST(request: NextRequest) {
 
       return created;
     });
+
+    await syncProjectProgressFromLineItems(lineItems).catch(() => {});
 
     if (body.checkInRequested) {
       await createOpsNotification({

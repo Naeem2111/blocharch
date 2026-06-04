@@ -212,3 +212,36 @@
 [data-theme="light"] textarea::placeholder {
   color: #94a3b8;
 }
+
+input.progress-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  border-radius: 9999px;
+  background: linear-gradient(
+    to right,
+    var(--progress-color, #22c55e) 0%,
+    var(--progress-color, #22c55e) var(--progress-pct, 0%),
+    rgb(255 255 255 / 0.08) var(--progress-pct, 0%),
+    rgb(255 255 255 / 0.08) 100%
+  );
+}
+
+input.progress-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--progress-color, #22c55e);
+  border: 2px solid #0f172a;
+  cursor: pointer;
+}
+
+input.progress-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--progress-color, #22c55e);
+  border: 2px solid #0f172a;
+  cursor: pointer;
+}

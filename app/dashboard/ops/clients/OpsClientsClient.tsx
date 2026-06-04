@@ -110,6 +110,20 @@ export function OpsClientsClient() {
     await load();
   }
 
+  async function deleteClient(id: string, name: string) {
+    if (!window.confirm(`Delete client "${name}" and all linked projects? This cannot be undone.`)) return;
+    setError("");
+    const r = await fetch(`/api/ops/clients/${id}`, { method: "DELETE" });
+    const j = await r.json();
+    if (!r.ok) {
+      setError(j.error || "Could not delete");
+      return;
+    }
+    setEditingId(null);
+    setMsg("Client deleted.");
+    await load();
+  }
+
   if (loading) return <p className="text-sm text-slate-500">Loading clients…</p>;
 
   return (
@@ -218,6 +232,7 @@ export function OpsClientsClient() {
                 <div className="flex gap-2 md:col-span-2">
                   <button type="button" onClick={() => void saveEdit(c.id)} className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-slate-950">Save</button>
                   <button type="button" onClick={() => setEditingId(null)} className="text-xs text-slate-500">Cancel</button>
+                  <button type="button" onClick={() => void deleteClient(c.id, c.name)} className="text-xs text-red-400 hover:text-red-300">Delete client</button>
                 </div>
               </div>
             ) : (

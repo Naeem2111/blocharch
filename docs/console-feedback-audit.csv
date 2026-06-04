@@ -1,0 +1,60 @@
+LEGEND,,,
+
+Status,Meaning,
+
+Done,Implemented and usable for the main workflow described in the PDF.,
+
+Partial,Started or partially built; gaps remain vs the PDF spec.,
+
+Missing,Not implemented or placeholder only.,
+
+,,,
+
+#,Topic,Status,Notes
+
+1,Overall console structure (Marketing / Athlete Ops / Planner + Team → athlete),Partial,Sidebar + Team → athlete flow done; polish and depth remain.
+
+2,Console logo / branding (transparent PNG),Partial,Asset path exists; swap PNG file if white box still shows.
+
+3,Kanban board functionality (create/rename/delete; cross-board drag),Done,All boards view (team athlete); drag between boards/columns; board tab drop targets; move API.
+
+4,Blocharch Outbox → athlete Inbox,Done,API + admin Outbox panel + delivery to athlete Blocharch Inbox.
+
+5,Athlete workspace structure,Done,Nav + live pages for dashboard; daily log; projects; completed projects; notifications; book-call; planner.
+
+6,Athlete Blocharch Inbox (fixed),Done,Auto-provisioned; protected from athlete delete.
+
+7,Athlete My Tasks board (fixed),Done,Provisioned via system boards.
+
+8,Active project boards,Done,Sync on assign; active-only on My Projects; completed hidden from active list.
+
+9,Completed board for tasks + restore on untick,Done,Complete/restore API + planner UX.
+
+10,Completed Projects (separate from task Completed board),Done,Lists completed/handed_over projects from ops; athlete notified on status change.
+
+11,Admin notifications (+ email/SMS),Partial,Ops notifications feed + read; athlete notifications in-app; no email/SMS.
+
+12,Book a Call / Check-in requests + Google Calendar,Partial,Full flow built; calendar slots need Google env vars. Athlete notified on approve/decline/counter.
+
+13,All daily submissions + Google Sheet import,Partial,Ops Daily submissions hub with line items; athlete daily log. No Sheet import yet.
+
+14,Progress tracking (visual slider red → green),Done,Slider on daily log; syncs progressPercent to ops projects.
+
+15,Project operations tracker (multi-contact; progress; etc.),Partial,Ops CRUD + progress %; multi-contact fields not full.
+
+16,Project timer / countdown on My Projects,Done,Days active; days remaining; overdue/due-soon on My Projects cards.
+
+17,Marketing map — all 2336 practices,Partial,Display cap removed; still limited by geocoded rows unless import/geocode.
+
+18,User rights / permissions (athlete / manager / admin),Partial,Roles + module gates; manager RBAC not everywhere.
+
+19,Athlete profile (DOB; birthday),Partial,Schema fields exist; birthday automation not wired.
+
+20,Athlete dashboard live stats,Partial,Month/overtime/earnings/today; all-time hours; active vs completed project counts.
+
+21,Ops overview edit/delete control,Partial,Edit + DELETE for clients; athletes; projects.
+
+22,Commercial / analytics data sync accuracy,Partial,Commercial ledger from submissions; needs audit against real numbers.
+
+23,Athlete monthly commercial breakdown (per-athlete P&L),Missing,Commercial is client/summary oriented; not full per-athlete monthly breakdown from PDF.
+

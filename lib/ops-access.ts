@@ -93,6 +93,7 @@ export const athleteProjectSelect = {
   handoverDate: true,
   currentStage: true,
   currentStatus: true,
+  progressPercent: true,
   notes: true,
   blockerFlag: true,
   checkInRequested: true,
