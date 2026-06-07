@@ -2,7 +2,8 @@
  * One-time / periodic backfill: geocode architect addresses and store lat/lng on each row
  * so the map loads instantly without client-side Nominatim churn.
  *
- * Usage: node scripts/geocode-architects.mjs [--limit=500] [--dry-run]
+ * Usage: node scripts/geocode-architects.mjs [--limit=500] [--all] [--dry-run]
+ *   --all     Geocode every practice that has an address (no row limit).
  * Requires DATABASE_URL (load from .env in project root).
  */
 import fs from "node:fs";
@@ -56,8 +57,9 @@ function normalizeAddress(addr) {
     .toLowerCase();
 }
 
+const cachePath = path.join(root, "data", "geocache.json");
+
 function loadGeocache() {
-  const cachePath = path.join(root, "data", "geocache.json");
   try {
     const raw = fs.readFileSync(cachePath, "utf8");
     const j = JSON.parse(raw);
@@ -65,6 +67,11 @@ function loadGeocache() {
   } catch {
     return {};
   }
+}
+
+function saveGeocache(cache) {
+  fs.mkdirSync(path.dirname(cachePath), { recursive: true });
+  fs.writeFileSync(cachePath, JSON.stringify(cache, null, 2), "utf8");
 }
 
 function getUserAgent() {
@@ -102,17 +109,27 @@ async function geocodeAddress(address) {
 
 function parseArgs() {
   const limitArg = process.argv.find((a) => a.startsWith("--limit="));
-  const limit = limitArg ? Math.max(1, parseInt(limitArg.split("=")[1], 10) || 0) : null;
+  const all = process.argv.includes("--all");
+  const limit = limitArg
+    ? Math.max(1, parseInt(limitArg.split("=")[1], 10) || 0)
+    : all
+      ? null
+      : null;
   const dryRun = process.argv.includes("--dry-run");
-  return { limit, dryRun };
+  return { limit, all, dryRun };
 }
 
 loadEnvFile();
-const { limit, dryRun } = parseArgs();
+const { limit, all, dryRun } = parseArgs();
 const prisma = new PrismaClient();
 const geocache = loadGeocache();
+let cacheDirty = false;
 
 async function main() {
+  if (all) {
+    console.log("Mode: geocode all practices with addresses (Nominatim ~1 req/s — expect ~35–45 min for ~2000 rows).");
+  }
+
   const rows = await prisma.architect.findMany({
     where: {
       OR: [{ latitude: null }, { longitude: null }],
@@ -148,6 +165,15 @@ async function main() {
       console.log(`[nominatim] ${row.url.slice(0, 60)}…`);
       point = await geocodeAddress(addr);
       await sleep(1100);
+      if (point && key) {
+        geocache[key] = {
+          lat: point.lat,
+          lng: point.lng,
+          displayName: point.displayName,
+          updatedAt: new Date().toISOString(),
+        };
+        cacheDirty = true;
+      }
     }
 
     if (!point) {
@@ -172,11 +198,25 @@ async function main() {
     });
     updated += 1;
     if (updated % 25 === 0) {
-      console.log(`… ${updated} rows updated`);
+      if (cacheDirty) {
+        saveGeocache(geocache);
+        cacheDirty = false;
+      }
+      const total = await prisma.architect.count({
+        where: { latitude: { not: null }, longitude: { not: null } },
+      });
+      console.log(`… ${updated} rows this run · ${total} total with coordinates in DB`);
     }
   }
 
-  console.log(`Done. Geocoded: ${done}, rows written: ${updated}, skipped (no address / failed): ${skipped}`);
+  if (cacheDirty) saveGeocache(geocache);
+
+  const total = await prisma.architect.count({
+    where: { latitude: { not: null }, longitude: { not: null } },
+  });
+  console.log(
+    `Done. Geocoded: ${done}, rows written: ${updated}, skipped (no address / failed): ${skipped}, DB total with coords: ${total}`
+  );
 }
 
 main()

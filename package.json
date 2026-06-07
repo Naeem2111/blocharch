@@ -14,6 +14,7 @@
     "db:push": "prisma db push",
     "db:seed": "node prisma/seed.mjs",
     "geocode:architects": "node scripts/geocode-architects.mjs",
+    "geocode:architects:all": "node scripts/apply-geocache-to-db.mjs && node scripts/geocode-architects.mjs --all",
     "n8n": "npx n8n",
     "n8n:docker": "docker compose -f docker-compose.n8n.yml up -d"
   },
