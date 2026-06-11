@@ -18,7 +18,7 @@ import {
   type SidebarNavOrder,
 } from "@/lib/sidebar-nav-order";
 
-type NavItem = { href: string; label: string; icon: React.ReactNode };
+type NavItem = { href: string; label: string; icon: React.ReactNode; badgeKey?: string };
 
 type NavSection = {
   id: string;
@@ -98,20 +98,7 @@ const PLANNER_NAV: NavItem[] = [
   },
 ];
 
-const OPS_NAV: NavItem[] = [
-  {
-    href: "/dashboard/ops",
-    label: "Ops overview",
-    icon: (
-      <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5M9 11.25v1.5M12 9v3.75m3-6.75v6.75"
-        />
-      </svg>
-    ),
-  },
+const ONBOARDING_NAV: NavItem[] = [
   {
     href: "/dashboard/ops/clients",
     label: "Clients",
@@ -127,6 +114,22 @@ const OPS_NAV: NavItem[] = [
     icon: (
       <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+      </svg>
+    ),
+  },
+];
+
+const OPS_NAV: NavItem[] = [
+  {
+    href: "/dashboard/ops",
+    label: "Ops overview",
+    icon: (
+      <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5M9 11.25v1.5M12 9v3.75m3-6.75v6.75"
+        />
       </svg>
     ),
   },
@@ -160,6 +163,7 @@ const OPS_NAV: NavItem[] = [
   {
     href: "/dashboard/ops/check-ins",
     label: "Check-in requests",
+    badgeKey: "checkIns",
     icon: (
       <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M18 3v2.25M5.25 9h13.5M4.5 21h15a2.25 2.25 0 002.25-2.25V7.5A2.25 2.25 0 0019.5 5.25h-15a2.25 2.25 0 00-2.25 2.25v11.25A2.25 2.25 0 004.5 21z" />
@@ -169,6 +173,7 @@ const OPS_NAV: NavItem[] = [
   {
     href: "/dashboard/ops/notifications",
     label: "Notifications",
+    badgeKey: "notifications",
     icon: (
       <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
@@ -226,6 +231,43 @@ const ATHLETE_PORTAL_NAV: NavItem[] = [
       </svg>
     ),
   },
+  {
+    href: "/dashboard/athlete/projects/completed",
+    label: "Completed projects",
+    icon: (
+      <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+  },
+  {
+    href: "/dashboard/athlete/notifications",
+    label: "My notifications",
+    badgeKey: "notifications",
+    icon: (
+      <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0" />
+      </svg>
+    ),
+  },
+  {
+    href: "/dashboard/athlete/book-call",
+    label: "Book a call",
+    icon: (
+      <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M18 3v2.25M5.25 9h13.5M4.5 21h15a2.25 2.25 0 002.25-2.25V7.5A2.25 2.25 0 0019.5 5.25h-15a2.25 2.25 0 00-2.25 2.25v11.25A2.25 2.25 0 004.5 21z" />
+      </svg>
+    ),
+  },
+  {
+    href: "/dashboard/planner?area=personal",
+    label: "Project planner",
+    icon: (
+      <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.096-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.58 2.58 0 00-.1-.664M6.75 7.5V9h6V7.5m-6 3h6v3.75H6.75V10.5z" />
+      </svg>
+    ),
+  },
 ];
 
 const ADMIN_NAV: NavItem[] = [
@@ -246,6 +288,7 @@ const ADMIN_NAV: NavItem[] = [
 
 const NAV_SECTIONS: NavSection[] = [
   { id: "marketing", label: "Marketing", module: "marketing", items: MARKETING_NAV },
+  { id: "onboarding", label: "Onboarding", module: "ops", items: ONBOARDING_NAV },
   { id: "ops", label: "Athlete operations", module: "ops", items: OPS_NAV },
   { id: "athlete_portal", label: "My workspace", module: "athlete_portal", items: ATHLETE_PORTAL_NAV },
   { id: "planner", label: "Project planner", module: "planner", items: PLANNER_NAV },
@@ -256,6 +299,7 @@ function navActive(pathname: string, href: string): boolean {
   if (href === "/dashboard") return pathname === "/dashboard";
   if (href === "/dashboard/ops") return pathname === "/dashboard/ops";
   if (href === "/dashboard/athlete") return pathname === "/dashboard/athlete";
+  if (href.startsWith("/dashboard/planner")) return pathname.startsWith("/dashboard/planner");
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
@@ -280,19 +324,36 @@ function DragHandle({ label }: { label: string }) {
   );
 }
 
-function NavLink({ href, label, icon, pathname }: NavItem & { pathname: string }) {
+function NavLink({
+  href,
+  label,
+  icon,
+  pathname,
+  badge,
+  urgent,
+}: NavItem & { pathname: string; badge?: number; urgent?: boolean }) {
   const active = navActive(pathname, href);
+  const showUrgent = urgent && !active && (badge ?? 0) > 0;
   return (
     <Link
       href={href}
       className={`flex min-w-0 flex-1 items-center gap-3 rounded-lg py-2.5 pr-3 text-sm font-medium transition-colors ${
         active
           ? "bg-brand-500/15 text-brand-300 ring-1 ring-brand-500/25"
-          : "text-slate-400 hover:bg-white/[0.04] hover:text-slate-200"
-      }`}
+          : showUrgent
+            ? "bg-red-500/10 text-red-200 ring-1 ring-red-500/35 hover:bg-red-500/15"
+            : "text-slate-400 hover:bg-white/[0.04] hover:text-slate-200"
+      } ${showUrgent ? "animate-pulse" : ""}`}
     >
-      <span className={active ? "text-brand-400" : "text-slate-500"}>{icon}</span>
-      {label}
+      <span className={active ? "text-brand-400" : showUrgent ? "text-red-400" : "text-slate-500"}>
+        {icon}
+      </span>
+      <span className="truncate">{label}</span>
+      {(badge ?? 0) > 0 ? (
+        <span className="ml-auto flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
+          {badge! > 99 ? "99+" : badge}
+        </span>
+      ) : null}
     </Link>
   );
 }
@@ -311,11 +372,15 @@ function DraggableNavItem({
   onDragOver,
   onDrop,
   onDragEnd,
+  badge,
+  urgent,
 }: {
   item: NavItem;
   sectionId: string;
   index: number;
   pathname: string;
+  badge?: number;
+  urgent?: boolean;
   dragging: DragItemState;
   dropIndex: number | null;
   onDragStart: (sectionId: string, index: number) => void;
@@ -357,7 +422,7 @@ function DraggableNavItem({
       >
         <DragHandle label={item.label} />
       </span>
-      <NavLink {...item} pathname={pathname} />
+      <NavLink {...item} pathname={pathname} badge={badge} urgent={urgent} />
     </div>
   );
 }
@@ -455,9 +520,13 @@ function DraggableSectionHeader({
   );
 }
 
+type SidebarBadges = Record<string, number>;
+
 export function DashboardSidebar({ user }: { user: SessionUser }) {
   const pathname = usePathname() || "";
   const [navOrder, setNavOrder] = useState<SidebarNavOrder | null>(null);
+  const [badges, setBadges] = useState<SidebarBadges>({});
+  const [sidebarUrgent, setSidebarUrgent] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const skipSaveRef = useRef(true);
   const [dragItem, setDragItem] = useState<DragItemState>(null);
@@ -471,6 +540,34 @@ export function DashboardSidebar({ user }: { user: SessionUser }) {
     skipSaveRef.current = saved !== null;
     setHydrated(true);
   }, [user.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadBadges() {
+      const urls: string[] = [];
+      if (canAccessModule(user.role, "ops")) urls.push("/api/ops/sidebar-badges");
+      if (canAccessModule(user.role, "athlete_portal")) urls.push("/api/athlete/sidebar-badges");
+      if (!urls.length) return;
+      const results = await Promise.all(urls.map((u) => fetch(u).then((r) => (r.ok ? r.json() : null))));
+      if (cancelled) return;
+      const next: SidebarBadges = {};
+      let urgent = false;
+      for (const j of results) {
+        if (!j) continue;
+        if (j.notifications) next.notifications = (next.notifications ?? 0) + j.notifications;
+        if (j.checkIns) next.checkIns = (next.checkIns ?? 0) + j.checkIns;
+        if (j.urgent) urgent = true;
+      }
+      setBadges(next);
+      setSidebarUrgent(urgent);
+    }
+    void loadBadges();
+    const t = setInterval(() => void loadBadges(), 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [user.role]);
 
   useEffect(() => {
     if (!hydrated || !navOrder) return;
@@ -609,6 +706,8 @@ export function DashboardSidebar({ user }: { user: SessionUser }) {
                   sectionId={section.id}
                   index={itemIndex}
                   pathname={pathname}
+                  badge={item.badgeKey ? badges[item.badgeKey] : undefined}
+                  urgent={sidebarUrgent}
                   dragging={dragItem}
                   dropIndex={dropItemIndex}
                   onDragStart={(sid, idx) => {

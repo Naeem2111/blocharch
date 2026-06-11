@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ProgressSlider } from "@/components/ProgressSlider";
-import { PROJECT_PHASE_LABELS, TASK_TYPE_LABELS } from "@/lib/ops-constants";
+import { DAILY_PROJECT_PHASE_OPTIONS, DAILY_TASK_TYPE_OPTIONS } from "@/lib/ops-daily-form";
 
 type AssignedProject = {
   id: string;
@@ -16,12 +16,10 @@ type LineItemForm = {
   key: string;
   projectId: string;
   projectPhase: string;
-  taskType: string;
+  taskTypes: string[];
   hoursWorked: string;
   completionPercent: number;
   completedSummary: string;
-  blockerFlag: boolean;
-  blockerNote: string;
 };
 
 type CalcPanel = {
@@ -48,10 +46,9 @@ type PastSubmission = {
     projectId: string;
     projectPhase: string;
     taskType: string;
+    taskTypes?: string[];
     hoursWorked: number;
     completedSummary: string | null;
-    blockerFlag: boolean;
-    blockerNote: string | null;
     completionPercent?: number | null;
   }>;
 };
@@ -60,13 +57,11 @@ function emptyLine(): LineItemForm {
   return {
     key: crypto.randomUUID(),
     projectId: "",
-    projectPhase: "existing_drawings",
-    taskType: "plans",
+    projectPhase: "survey_conversion",
+    taskTypes: ["plans"],
     hoursWorked: "",
     completionPercent: 0,
     completedSummary: "",
-    blockerFlag: false,
-    blockerNote: "",
   };
 }
 
@@ -99,12 +94,15 @@ export function AthleteSubmissionsClient() {
             key: crypto.randomUUID(),
             projectId: li.projectId,
             projectPhase: li.projectPhase,
-            taskType: li.taskType,
+            taskTypes:
+              li.taskTypes && li.taskTypes.length > 0
+                ? li.taskTypes
+                : li.taskType
+                  ? [li.taskType]
+                  : ["plans"],
             hoursWorked: String(li.hoursWorked),
             completionPercent: li.completionPercent ?? 0,
             completedSummary: li.completedSummary ?? "",
-            blockerFlag: li.blockerFlag,
-            blockerNote: li.blockerNote ?? "",
           }))
         : [emptyLine()]
     );
@@ -180,12 +178,10 @@ export function AthleteSubmissionsClient() {
             clientId: project.client.id,
             projectId: li.projectId,
             projectPhase: li.projectPhase,
-            taskType: li.taskType,
+            taskTypes: li.taskTypes.length > 0 ? li.taskTypes : ["other"],
             hoursWorked: Number(li.hoursWorked),
             completionPercent: li.completionPercent,
             completedSummary: li.completedSummary || null,
-            blockerFlag: li.blockerFlag,
-            blockerNote: li.blockerNote || null,
           };
         });
 
@@ -248,15 +244,19 @@ export function AthleteSubmissionsClient() {
             ))}
           </select>
         </label>
-        <label className="flex items-end gap-2 pb-2 text-xs text-slate-400">
-          <input
-            type="checkbox"
-            checked={checkInRequested}
-            onChange={(e) => setCheckInRequested(e.target.checked)}
-            className="rounded border-white/20"
-          />
-          Request check-in
-        </label>
+        <div className="flex items-end pb-1">
+          <button
+            type="button"
+            onClick={() => setCheckInRequested((v) => !v)}
+            className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+              checkInRequested
+                ? "bg-brand-600 text-slate-950 ring-2 ring-brand-400"
+                : "bg-white/[0.08] text-slate-200 hover:bg-white/[0.12]"
+            }`}
+          >
+            {checkInRequested ? "✓ Check-in requested" : "Request check-in"}
+          </button>
+        </div>
         <label className="text-xs text-slate-400 md:col-span-3">
           Daily note (optional)
           <textarea
@@ -314,27 +314,46 @@ export function AthleteSubmissionsClient() {
                   onChange={(e) => updateLine(li.key, { projectPhase: e.target.value })}
                   className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
                 >
-                  {Object.entries(PROJECT_PHASE_LABELS).map(([k, label]) => (
-                    <option key={k} value={k}>
-                      {label}
+                  {DAILY_PROJECT_PHASE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
                     </option>
                   ))}
                 </select>
               </label>
-              <label className="text-xs text-slate-400">
-                Task type
-                <select
-                  value={li.taskType}
-                  onChange={(e) => updateLine(li.key, { taskType: e.target.value })}
-                  className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
-                >
-                  {Object.entries(TASK_TYPE_LABELS).map(([k, label]) => (
-                    <option key={k} value={k}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div className="text-xs text-slate-400 md:col-span-2">
+                <p className="mb-2">Task types (select all that apply)</p>
+                <div className="flex flex-wrap gap-2">
+                  {DAILY_TASK_TYPE_OPTIONS.map((opt) => {
+                    const checked = li.taskTypes.includes(opt.value);
+                    return (
+                      <label
+                        key={opt.value}
+                        className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 ring-1 ${
+                          checked
+                            ? "bg-brand-500/15 text-brand-200 ring-brand-500/30"
+                            : "bg-white/[0.03] text-slate-400 ring-white/[0.08]"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          className="sr-only"
+                          checked={checked}
+                          onChange={() => {
+                            const next = checked
+                              ? li.taskTypes.filter((t) => t !== opt.value)
+                              : [...li.taskTypes, opt.value];
+                            updateLine(li.key, {
+                              taskTypes: next.length > 0 ? next : [opt.value],
+                            });
+                          }}
+                        />
+                        {opt.label}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
               <label className="text-xs text-slate-400">
                 Hours worked
                 <input
@@ -364,24 +383,6 @@ export function AthleteSubmissionsClient() {
                   className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
                 />
               </label>
-              <label className="flex items-center gap-2 text-xs text-slate-400">
-                <input
-                  type="checkbox"
-                  checked={li.blockerFlag}
-                  onChange={(e) => updateLine(li.key, { blockerFlag: e.target.checked })}
-                />
-                Blocker flagged
-              </label>
-              {li.blockerFlag ? (
-                <label className="text-xs text-slate-400">
-                  Blocker note
-                  <input
-                    value={li.blockerNote}
-                    onChange={(e) => updateLine(li.key, { blockerNote: e.target.value })}
-                    className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
-                  />
-                </label>
-              ) : null}
               {lines.length > 1 ? (
                 <button
                   type="button"

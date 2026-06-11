@@ -6,6 +6,7 @@ import {
   planBoardIdsForUser,
   requirePlannerSession,
 } from "@/lib/planner-access";
+import { DEFAULT_BOARD_LABELS } from "@/lib/planner-default-labels";
 
 export async function GET(request: NextRequest) {
   const gate = await requirePlannerSession(request);
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest) {
         },
       ],
     },
-    orderBy: [{ scope: "asc" }, { updatedAt: "desc" }],
+    orderBy: [{ sortOrder: "asc" }, { updatedAt: "desc" }],
     select: {
       id: true,
       title: true,
@@ -41,6 +42,7 @@ export async function GET(request: NextRequest) {
       kind: true,
       isSystem: true,
       color: true,
+      sortOrder: true,
       ownerId: true,
       athleteId: true,
       updatedAt: true,
@@ -67,17 +69,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Title required (1–120 characters)" }, { status: 400 });
     }
 
+    const maxOrder = await prisma.plannerBoard.aggregate({
+      where: { ownerId: user.id },
+      _max: { sortOrder: true },
+    });
+    const sortOrder = (maxOrder._max.sortOrder ?? -1) + 1;
+
     const board = await prisma.plannerBoard.create({
       data: {
         title,
         scope,
         color: color || "#6366f1",
+        sortOrder,
         ownerId: user.id,
         columns: {
           create: DEFAULT_PLANNER_COLUMNS.map((c) => ({
             title: c.title,
             color: c.color,
             sortOrder: c.sortOrder,
+          })),
+        },
+        labels: {
+          create: DEFAULT_BOARD_LABELS.map((l) => ({
+            name: l.name,
+            color: l.color,
           })),
         },
       },

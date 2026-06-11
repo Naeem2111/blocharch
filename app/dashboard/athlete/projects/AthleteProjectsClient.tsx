@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { ProjectProgressBar } from "@/components/ProjectProgressBar";
 import {
   COMPLEXITY_LABELS,
   PROJECT_PHASE_LABELS,
@@ -21,7 +22,6 @@ type ProjectRow = {
   handoverDate: string | null;
   progressPercent: number | null;
   notes: string | null;
-  blockerFlag: boolean;
   client: { name: string };
 };
 
@@ -92,12 +92,7 @@ export function AthleteProjectsClient() {
         <article key={p.id} className="card-tool rounded-xl p-5">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
-              <h2 className="font-semibold text-white">
-                {p.name}
-                {p.blockerFlag ? (
-                  <span className="ml-2 rounded bg-red-500/15 px-1.5 py-0.5 text-[10px] text-red-300">Blocker</span>
-                ) : null}
-              </h2>
+              <h2 className="font-semibold text-white">{p.name}</h2>
               <p className="text-xs text-slate-500">
                 {p.client.name} · {p.projectNumber}
               </p>
@@ -113,9 +108,9 @@ export function AthleteProjectsClient() {
                 {timeline.daysActive != null ? `${timeline.daysActive} days active · ` : ""}
                 {timeline.label}
               </p>
-              {p.progressPercent != null ? (
-                <p className="mt-1 text-xs text-slate-400">Progress: {p.progressPercent}%</p>
-              ) : null}
+              <div className="mt-3 max-w-md">
+                <ProjectProgressBar percent={p.progressPercent ?? 0} />
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <span className="rounded-md bg-white/[0.06] px-2 py-1 text-[10px] uppercase text-slate-400">

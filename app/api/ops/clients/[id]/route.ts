@@ -2,7 +2,12 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { OpsPricingTier } from "@prisma/client";
-import { isOpsPricingTier, laneCostForTier } from "@/lib/ops-constants";
+import {
+  clampTierPercent,
+  isOpsPricingTier,
+  laneCostForTier,
+  pricingTierForPercent,
+} from "@/lib/ops-constants";
 import { requireOpsSession } from "@/lib/ops-access";
 import {
   clientInclude,
@@ -57,18 +62,27 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     const commercialData: {
       pricingTier?: OpsPricingTier;
+      tierPercent?: number;
       laneCostGbp?: number;
       activeLaneCount?: number;
       overtimeBillingGbp?: number;
     } = {};
 
-    if (body.pricingTier != null) {
+    if (body.tierPercent != null) {
+      const tierPercent = clampTierPercent(body.tierPercent);
+      commercialData.tierPercent = tierPercent;
+      commercialData.pricingTier = pricingTierForPercent(tierPercent);
+    } else if (body.pricingTier != null) {
       const tier = String(body.pricingTier);
       if (!isOpsPricingTier(tier)) {
         return NextResponse.json({ error: "Invalid pricing tier" }, { status: 400 });
       }
       commercialData.pricingTier = tier;
-      commercialData.laneCostGbp = laneCostForTier(tier);
+    }
+    if (body.laneCostGbp != null) {
+      commercialData.laneCostGbp = Math.max(0, Number(body.laneCostGbp) || 0);
+    } else if (commercialData.pricingTier && body.laneCostGbp === undefined) {
+      commercialData.laneCostGbp = laneCostForTier(commercialData.pricingTier);
     }
     if (body.activeLaneCount != null) {
       commercialData.activeLaneCount = Math.max(1, Math.min(20, Number(body.activeLaneCount) || 1));

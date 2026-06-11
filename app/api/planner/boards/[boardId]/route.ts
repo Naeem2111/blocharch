@@ -104,14 +104,19 @@ export async function PATCH(request: NextRequest, context: Ctx) {
     const title =
       typeof body.title === "string" ? body.title.trim().slice(0, 120) : undefined;
     const color = typeof body.color === "string" ? body.color.trim().slice(0, 32) : undefined;
+    const sortOrder =
+      typeof body.sortOrder === "number" && Number.isFinite(body.sortOrder)
+        ? Math.round(body.sortOrder)
+        : undefined;
 
     const board = await prisma.plannerBoard.update({
       where: { id: boardId },
       data: {
         ...(title !== undefined && title.length > 0 ? { title } : {}),
         ...(color !== undefined ? { color } : {}),
+        ...(sortOrder !== undefined ? { sortOrder } : {}),
       },
-      select: { id: true, title: true, color: true },
+      select: { id: true, title: true, color: true, sortOrder: true },
     });
 
     return NextResponse.json({ board });

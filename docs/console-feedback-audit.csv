@@ -1,60 +1,54 @@
-LEGEND,,,
-
-Status,Meaning,
-
-Done,Implemented and usable for the main workflow described in the PDF.,
-
-Partial,Started or partially built; gaps remain vs the PDF spec.,
-
-Missing,Not implemented or placeholder only.,
-
-,,,
-
-#,Topic,Status,Notes
-
-1,Overall console structure (Marketing / Athlete Ops / Planner + Team → athlete),Partial,Sidebar + Team → athlete flow done; polish and depth remain.
-
-2,Console logo / branding (transparent PNG),Partial,Asset path exists; swap PNG file if white box still shows.
-
-3,Kanban board functionality (create/rename/delete; cross-board drag),Done,All boards view (team athlete); drag between boards/columns; board tab drop targets; move API.
-
-4,Blocharch Outbox → athlete Inbox,Done,API + admin Outbox panel + delivery to athlete Blocharch Inbox.
-
-5,Athlete workspace structure,Done,Nav + live pages for dashboard; daily log; projects; completed projects; notifications; book-call; planner.
-
-6,Athlete Blocharch Inbox (fixed),Done,Auto-provisioned; protected from athlete delete.
-
-7,Athlete My Tasks board (fixed),Done,Provisioned via system boards.
-
-8,Active project boards,Done,Sync on assign; active-only on My Projects; completed hidden from active list.
-
-9,Completed board for tasks + restore on untick,Done,Complete/restore API + planner UX.
-
-10,Completed Projects (separate from task Completed board),Done,Lists completed/handed_over projects from ops; athlete notified on status change.
-
-11,Admin notifications (+ email/SMS),Partial,Ops notifications feed + read; athlete notifications in-app; no email/SMS.
-
-12,Book a Call / Check-in requests + Google Calendar,Partial,Full flow built; calendar slots need Google env vars. Athlete notified on approve/decline/counter.
-
-13,All daily submissions + Google Sheet import,Partial,Ops Daily submissions hub with line items; athlete daily log. No Sheet import yet.
-
-14,Progress tracking (visual slider red → green),Done,Slider on daily log; syncs progressPercent to ops projects.
-
-15,Project operations tracker (multi-contact; progress; etc.),Partial,Ops CRUD + progress %; multi-contact fields not full.
-
-16,Project timer / countdown on My Projects,Done,Days active; days remaining; overdue/due-soon on My Projects cards.
-
-17,Marketing map — all 2336 practices,Partial,Display cap removed; still limited by geocoded rows unless import/geocode.
-
-18,User rights / permissions (athlete / manager / admin),Partial,Roles + module gates; manager RBAC not everywhere.
-
-19,Athlete profile (DOB; birthday),Partial,Schema fields exist; birthday automation not wired.
-
-20,Athlete dashboard live stats,Partial,Month/overtime/earnings/today; all-time hours; active vs completed project counts.
-
-21,Ops overview edit/delete control,Partial,Edit + DELETE for clients; athletes; projects.
-
-22,Commercial / analytics data sync accuracy,Partial,Commercial ledger from submissions; needs audit against real numbers.
-
-23,Athlete monthly commercial breakdown (per-athlete P&L),Missing,Commercial is client/summary oriented; not full per-athlete monthly breakdown from PDF.
-
+LEGEND,,,
+Status,Meaning,
+Done,Implemented and usable for the main workflow described in the PDF(s).,
+Partial,Started or partially built; gaps remain vs the spec.,
+Missing,Not implemented or placeholder only.,
+Source,V1 = Naeem Console Feedback.pdf | V2 = NAEEM CONSOLE FEEDBACK_V2.pdf | Both,
+,,,
+#,Topic,Source,Status,Notes
+1,Overall console structure (Marketing / Athlete Ops / Planner + Team → athlete),V1,Partial,Sidebar + Team → athlete flow done; V2 #18 Onboarding split done.
+2,Console logo / branding (transparent PNG),V1,Partial,Asset path exists; swap PNG if white box still shows.
+3,Kanban create/rename/delete + cross-board drag,V1,Done,Boards API + planner UX + move API.
+4,Blocharch Outbox → athlete Inbox,V1,Done,API + Outbox panel + delivery to Inbox.
+5,Athlete workspace structure,V1,Done,Nav + dashboard; daily log; projects; completed; notifications; book-call; planner.
+6,Athlete Blocharch Inbox (fixed),V1,Done,Auto-provisioned; protected from athlete delete.
+7,Athlete My Tasks board (fixed),V1,Done,Provisioned via system boards.
+8,Active project boards,V1,Done,Sync on assign; active-only on My Projects.
+9,Completed board for tasks + restore on untick,V1,Done,Complete/restore API + planner UX.
+10,Completed Projects (separate from task Completed),V1,Done,Completed/handed_over projects list + athlete notify.
+11,Admin notifications (+ email/SMS),V1,Partial,In-app feeds + sidebar badges; no email/SMS.
+12,Book a Call / Check-in + Google Calendar,V1,Partial,Full flow built; Calendar env + V2 #19 E2E pending credentials.
+13,All daily submissions + Google Sheet import,V1,Partial,Ops hub + athlete log with V2 #13 phases/tasks; no Sheet import.
+14,Progress tracking (visual slider red → green),V1,Done,Slider on daily log; syncs project progressPercent.
+15,Project ops tracker (multi-contact; progress; etc.),V1,Partial,Ops CRUD + progress %; client multi-contact done; project contacts pending.
+16,Project timer / countdown on My Projects,V1,Done,Days active/remaining on project cards.
+17,Marketing map — all 2336 practices,V1,Partial,~792 geocoded pins; backfill continues for remainder.
+18,User rights / permissions (athlete / manager / admin),V1,Partial,Roles + module gates; manager RBAC not everywhere.
+19,Athlete profile (DOB; birthday),V1,Partial,Schema fields exist; birthday automation not wired.
+20,Athlete dashboard live stats,V1,Partial,Month/overtime/earnings; not full PDF list.
+21,Ops overview edit/delete control,V1,Partial,Edit + DELETE for clients/athletes/projects; not all areas.
+22,Commercial / analytics data sync accuracy,V1,Partial,Ledger from submissions; V2 #22 cost split done.
+23,Athlete monthly commercial breakdown (per-athlete P&L),V1,Done,Athlete totals table with lane/overtime split on commercial dashboard.
+V2-1,Board color picker on create,V2,Done,Color input on create board form + API.
+V2-2,Reorder boards left/right,V2,Done,sortOrder on boards + ←/→ controls on board tabs.
+V2-3,Fix drag-and-drop when scrolled,V2,Partial,Auto-scroll near edges during drag; verify in production.
+V2-4,Separate due date + time + AM/PM,V2,Partial,Task modals + check-in forms; slot picker unchanged.
+V2-5,Light/dark theme board text readability,V2,Partial,Theme tokens; card text polish ongoing.
+V2-6,Default labels on every board,V2,Done,Default label seed on board create.
+V2-7,Lead qualify: colored stage dots dropdown,V2,Done,LeadStagePicker with stage colors.
+V2-8,Replace awkward stage dropdown UI,V2,Done,LeadStagePicker in lead nurturing table.
+V2-9,Tier slider 25–40%; lanes; fee/lane; client logo upload,V2,Partial,Tier slider + lane fee UI done; logo upload pending.
+V2-10,Notification when task assigned to athlete,V2,Partial,Athlete notification on Outbox deliver + sidebar badges.
+V2-11,Simplify Outbox → Inbox → athlete boards workflow,V2,Partial,Core flow exists; UX simplification ongoing.
+V2-12,Fix board/column selector white-line bug,V2,Partial,select-console restyled (appearance-none); verify in UI.
+V2-13,Daily tracker: combined phases + multi task type,V2,Done,Combined phase + multi-select task types on daily log.
+V2-14,My Projects progress bar (grey→Blocharch blue),V2,Done,ProjectProgressBar on project cards.
+V2-15,Hide Assignee field for athletes,V2,Done,Hidden for non-admin/manager in planner modals.
+V2-16,Live ops: backup / staging / rollback process,V2,Missing,Neon PITR scripts exist; formal process TBD.
+V2-17,Notifications/check-ins: red badge + urgent tab state,V2,Done,Sidebar unread badges + urgent styling.
+V2-18,Sidebar: Onboarding (Clients/Athletes) vs Athlete Operations,V2,Done,Onboarding section split in sidebar.
+V2-19,Check-in → Google Calendar + Zoom end-to-end,V2,Partial,Needs Google + Zoom credentials; see GOOGLE_CALENDAR_SETUP.md.
+V2-20,Check-in: split date / start / end / AM-PM,V2,Done,DateTimeSplitFields on athlete book-call + ops counter-propose.
+V2-21,Remove Blocker everywhere → Request Check-in,V2,Done,Blocker UI removed; Request check-in prominent.
+V2-22,Commercial: lane cost vs overtime cost split,V2,Done,Split cost lines + athlete monthly breakdown table.
+V2-23,Analytics: calendar due-date view + progress bars,V2,Done,DueDateCalendar month view + progress bars on risk table.

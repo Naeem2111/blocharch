@@ -2,6 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { composeDueAtIso, splitDueAtIso } from "@/lib/planner-due-datetime";
 import { BlocharchOutboxPanel } from "@/components/planner/BlocharchOutboxPanel";
 import { MultiBoardKanban } from "@/components/planner/MultiBoardKanban";
 import {
@@ -10,6 +11,7 @@ import {
   findBoardIdForColumn,
   type KanbanBoardDetail,
 } from "@/lib/planner-board-mutation";
+import { maybeAutoScrollDrag } from "@/lib/planner-drag-scroll";
 import { createDragHighlightScheduler } from "@/lib/planner-drag-ui";
 import { usesAthleteCompletedFlow } from "@/lib/planner-completed";
 
@@ -20,6 +22,7 @@ type BoardSummary = {
   kind?: string;
   isSystem?: boolean;
   color: string;
+  sortOrder: number;
   ownerId: string;
   updatedAt: string;
   owner: { username: string };
@@ -217,6 +220,7 @@ export function PlannerClient() {
   const [newBoardOpen, setNewBoardOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newScope, setNewScope] = useState<"personal" | "team">("personal");
+  const [newBoardColor, setNewBoardColor] = useState("#6366f1");
   const [taskOpen, setTaskOpen] = useState<{ columnId: string } | null>(null);
   const [editTask, setEditTask] = useState<TaskRow & { columnId: string } | null>(null);
   const [dragTaskId, setDragTaskId] = useState<string | null>(null);
@@ -631,7 +635,7 @@ export function PlannerClient() {
     const r = await fetch("/api/planner/boards", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: newTitle, scope: newScope }),
+      body: JSON.stringify({ title: newTitle, scope: newScope, color: newBoardColor }),
     });
     if (!r.ok) return;
     setNewTitle("");
@@ -972,6 +976,33 @@ export function PlannerClient() {
     if (r.ok && boardId) await loadDetail(boardId);
   }
 
+  async function patchBoardApi(id: string, patch: Record<string, unknown>) {
+    return fetch(`/api/planner/boards/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+  }
+
+  async function reorderBoards(fromIdx: number, toIdx: number) {
+    if (toIdx < 0 || toIdx >= filteredBoards.length) return;
+    const a = filteredBoards[fromIdx];
+    const b = filteredBoards[toIdx];
+    if (!a || !b || a.isSystem || b.isSystem) return;
+    const next = [...boards];
+    const ai = next.findIndex((x) => x.id === a.id);
+    const bi = next.findIndex((x) => x.id === b.id);
+    if (ai < 0 || bi < 0) return;
+    next[ai] = { ...b, sortOrder: a.sortOrder };
+    next[bi] = { ...a, sortOrder: b.sortOrder };
+    setBoards(next);
+    const [r1, r2] = await Promise.all([
+      patchBoardApi(a.id, { sortOrder: b.sortOrder }),
+      patchBoardApi(b.id, { sortOrder: a.sortOrder }),
+    ]);
+    if (!r1.ok || !r2.ok) await refreshBoards();
+  }
+
   async function reorderColumns(fromIdx: number, toIdx: number) {
     if (!detail || !boardId || toIdx < 0 || toIdx >= detail.columns.length) return;
     const a = detail.columns[fromIdx];
@@ -1159,6 +1190,15 @@ export function PlannerClient() {
               <option value="team">Team</option>
             </select>
           </label>
+          <label className="text-xs text-slate-400">
+            Board color
+            <input
+              type="color"
+              value={newBoardColor}
+              onChange={(e) => setNewBoardColor(e.target.value)}
+              className="mt-1 block h-10 w-14 cursor-pointer rounded-md border border-white/[0.08] bg-transparent"
+            />
+          </label>
           <button type="submit" className="rounded-lg bg-white/[0.08] px-4 py-2 text-sm text-slate-100">
             Create
           </button>
@@ -1196,10 +1236,32 @@ export function PlannerClient() {
             <p className="text-xs text-brand-300">Drop on another board tab or column to move across boards</p>
           ) : null}
         </div>
-        <div className="flex flex-wrap gap-2">
-          {filteredBoards.map((b) => (
+        <div className="flex flex-wrap items-center gap-2">
+          {filteredBoards.map((b, boardIdx) => (
+            <div key={b.id} className="flex items-center gap-0.5">
+              {!b.isSystem && filteredBoards.length > 1 ? (
+                <div className="flex flex-col gap-0.5">
+                  <button
+                    type="button"
+                    title="Move board left"
+                    disabled={boardIdx === 0 || !!dragTaskId}
+                    onClick={() => void reorderBoards(boardIdx, boardIdx - 1)}
+                    className="rounded px-1 text-[10px] text-slate-500 hover:bg-white/[0.06] hover:text-slate-300 disabled:opacity-30"
+                  >
+                    ←
+                  </button>
+                  <button
+                    type="button"
+                    title="Move board right"
+                    disabled={boardIdx >= filteredBoards.length - 1 || !!dragTaskId}
+                    onClick={() => void reorderBoards(boardIdx, boardIdx + 1)}
+                    className="rounded px-1 text-[10px] text-slate-500 hover:bg-white/[0.06] hover:text-slate-300 disabled:opacity-30"
+                  >
+                    →
+                  </button>
+                </div>
+              ) : null}
             <button
-              key={b.id}
               type="button"
               onClick={() => {
                 if (!dragTaskId) setBoardId(b.id);
@@ -1231,6 +1293,7 @@ export function PlannerClient() {
                 <span className="ml-2 text-[10px] uppercase text-slate-500">{b.scope}</span>
               )}
             </button>
+            </div>
           ))}
           {filteredBoards.length === 0 ? (
             <p className="text-sm text-slate-500">No boards yet — create one to get started.</p>
@@ -1460,7 +1523,10 @@ export function PlannerClient() {
           )}
 
           <div className="flex flex-wrap items-end gap-4">
-          <div className="flex min-w-0 flex-1 gap-4 overflow-x-auto pb-4">
+          <div
+            className="flex min-w-0 flex-1 gap-4 overflow-x-auto pb-4"
+            data-planner-scroll-x
+          >
             {detail.columns.map((col, colIdx) => (
               <div
                 key={col.id}
@@ -1473,6 +1539,7 @@ export function PlannerClient() {
                   if (!detail.editable || !dragTaskIdRef.current) return;
                   e.preventDefault();
                   e.dataTransfer.dropEffect = "move";
+                  maybeAutoScrollDrag(e.clientX, e.clientY);
                   scheduleDragHighlight(col.id, null);
                 }}
                 onDragLeave={(e) => {
@@ -1497,6 +1564,7 @@ export function PlannerClient() {
                   onReorder={reorderColumns}
                 />
                 <div
+                  data-planner-scroll-y
                   className={`flex min-h-[160px] max-h-[min(70vh,720px)] flex-1 flex-col space-y-3 overflow-y-auto overscroll-y-contain p-2 transition-colors duration-150 ${
                     detail.editable && dragTaskId && dropTargetColumnId === col.id
                       ? "rounded-lg bg-brand-500/[0.06]"
@@ -1507,6 +1575,7 @@ export function PlannerClient() {
                     e.preventDefault();
                     e.stopPropagation();
                     e.dataTransfer.dropEffect = "move";
+                    maybeAutoScrollDrag(e.clientX, e.clientY);
                     scheduleDragHighlight(col.id, { columnId: col.id, beforeTaskId: null });
                   }}
                   onDrop={(e) => {
@@ -1859,6 +1928,7 @@ export function PlannerClient() {
             <TaskFormModal
               labels={detail.labels}
               assignees={assignees}
+              showAssignee={currentRole === "admin" || currentRole === "manager"}
               onClose={() => setTaskOpen(null)}
               onSave={async (payload) => {
                 await addTask(taskOpen.columnId, payload);
@@ -1874,6 +1944,7 @@ export function PlannerClient() {
               task={editTask}
               labels={detail.labels}
               assignees={assignees}
+              showAssignee={currentRole === "admin" || currentRole === "manager"}
               onClose={() => setEditTask(null)}
               footerExtra={
                 <div className="mt-5 flex flex-wrap gap-2 border-t border-white/[0.08] pt-4">
@@ -2387,11 +2458,13 @@ function MemberAddForm({
 function TaskFormModal({
   labels,
   assignees,
+  showAssignee = true,
   onClose,
   onSave,
 }: {
   labels: Label[];
   assignees: AssigneeOption[];
+  showAssignee?: boolean;
   onClose: () => void;
   onSave: (p: {
     title: string;
@@ -2407,7 +2480,9 @@ function TaskFormModal({
   const [summary, setSummary] = useState("");
   const [description, setDescription] = useState("");
   const [assigneeId, setAssigneeId] = useState("");
-  const [due, setDue] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [dueTime, setDueTime] = useState("");
+  const [dueAmPm, setDueAmPm] = useState<"AM" | "PM">("AM");
   const [architectUrl, setArchitectUrl] = useState("");
   const [labelIds, setLabelIds] = useState<string[]>([]);
   return (
@@ -2449,30 +2524,55 @@ function TaskFormModal({
               placeholder="Longer checklist, paragraphs, numbered steps...\n\n1. First step\n2. Second step "
             />
           </label>
+          {showAssignee ? (
+            <label className="block text-slate-400">
+              Assignee
+              <select
+                className="select-console mt-1 w-full rounded-lg px-3 py-2 text-sm"
+                value={assigneeId}
+                onChange={(e) => setAssigneeId(e.target.value)}
+              >
+                <option value="">—</option>
+                {assignees.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.username}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           <label className="block text-slate-400">
-            Assignee
-            <select
-              className="select-console mt-1 w-full rounded-lg px-3 py-2 text-sm"
-              value={assigneeId}
-              onChange={(e) => setAssigneeId(e.target.value)}
-            >
-              <option value="">—</option>
-              {assignees.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.username}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block text-slate-400">
-            Due (for calendar sync)
+            Due date
             <input
-              type="datetime-local"
+              type="date"
               className="select-console mt-1 w-full rounded-lg px-3 py-2 text-sm"
-              value={due}
-              onChange={(e) => setDue(e.target.value)}
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
             />
           </label>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block text-slate-400">
+              Time
+              <input
+                type="text"
+                placeholder="10:00"
+                className="select-console mt-1 w-full rounded-lg px-3 py-2 text-sm"
+                value={dueTime}
+                onChange={(e) => setDueTime(e.target.value)}
+              />
+            </label>
+            <label className="block text-slate-400">
+              AM / PM
+              <select
+                className="select-console mt-1 w-full rounded-lg px-3 py-2 text-sm"
+                value={dueAmPm}
+                onChange={(e) => setDueAmPm(e.target.value as "AM" | "PM")}
+              >
+                <option value="AM">AM</option>
+                <option value="PM">PM</option>
+              </select>
+            </label>
+          </div>
           <label className="block text-slate-400">
             Architect / lead URL (integrates with lead nurturing)
             <input
@@ -2510,12 +2610,13 @@ function TaskFormModal({
             type="button"
             onClick={async () => {
               if (!title.trim()) return;
+              const dueIso = composeDueAtIso(dueDate, dueTime, dueAmPm);
               await onSave({
                 title: title.trim(),
                 summary: summary.trim() || null,
                 description: description.trim() ? description : null,
-                assigneeId: assigneeId || null,
-                dueAt: due ? new Date(due).toISOString() : null,
+                assigneeId: showAssignee ? assigneeId || null : null,
+                dueAt: dueIso ? new Date(dueIso).toISOString() : null,
                 architectUrl: architectUrl.trim() || null,
                 labelIds,
               });
@@ -2534,6 +2635,7 @@ function EditTaskModal({
   task,
   labels,
   assignees,
+  showAssignee = true,
   readOnly = false,
   footerExtra,
   onClose,
@@ -2543,23 +2645,25 @@ function EditTaskModal({
   task: TaskRow & { columnId: string };
   labels: Label[];
   assignees: AssigneeOption[];
+  showAssignee?: boolean;
   readOnly?: boolean;
   footerExtra?: ReactNode;
   onClose: () => void;
   onSave: (taskId: string, body: Record<string, unknown>) => Promise<void>;
   onDelete: (taskId: string) => Promise<void>;
 }) {
+  const initialDue = splitDueAtIso(task.dueAt);
   const [title, setTitle] = useState(task.title);
   const [summary, setSummary] = useState(task.summary || "");
   const [description, setDescription] = useState(task.description || "");
   const [assigneeId, setAssigneeId] = useState(task.assigneeId || "");
-  const [due, setDue] = useState(
-    task.dueAt ? task.dueAt.slice(0, 16) : ""
-  );
+  const [dueDate, setDueDate] = useState(initialDue.date);
+  const [dueTime, setDueTime] = useState(initialDue.time);
+  const [dueAmPm, setDueAmPm] = useState<"AM" | "PM">(initialDue.ampm);
   const [architectUrl, setArchitectUrl] = useState(task.architectUrl || "");
   const [labelIds, setLabelIds] = useState(task.labels.map((x) => x.label.id));
 
-  const dueDate = task.dueAt ? new Date(task.dueAt) : null;
+  const dueAtDate = task.dueAt ? new Date(task.dueAt) : null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="dialog">
@@ -2604,32 +2708,59 @@ function EditTaskModal({
               onChange={(e) => setDescription(e.target.value)}
             />
           </label>
+          {showAssignee ? (
+            <label className="block text-slate-400">
+              Assignee
+              <select
+                className="select-console mt-1 w-full rounded-lg px-3 py-2 text-sm disabled:opacity-60"
+                value={assigneeId}
+                disabled={readOnly}
+                onChange={(e) => setAssigneeId(e.target.value)}
+              >
+                <option value="">—</option>
+                {assignees.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.username}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           <label className="block text-slate-400">
-            Assignee
-            <select
-              className="select-console mt-1 w-full rounded-lg px-3 py-2 text-sm disabled:opacity-60"
-              value={assigneeId}
-              disabled={readOnly}
-              onChange={(e) => setAssigneeId(e.target.value)}
-            >
-              <option value="">—</option>
-              {assignees.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.username}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block text-slate-400">
-            Due
+            Due date
             <input
-              type="datetime-local"
+              type="date"
               className="select-console mt-1 w-full rounded-lg px-3 py-2 text-sm disabled:opacity-60"
-              value={due}
+              value={dueDate}
               disabled={readOnly}
-              onChange={(e) => setDue(e.target.value)}
+              onChange={(e) => setDueDate(e.target.value)}
             />
           </label>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block text-slate-400">
+              Time
+              <input
+                type="text"
+                placeholder="10:00"
+                className="select-console mt-1 w-full rounded-lg px-3 py-2 text-sm disabled:opacity-60"
+                value={dueTime}
+                disabled={readOnly}
+                onChange={(e) => setDueTime(e.target.value)}
+              />
+            </label>
+            <label className="block text-slate-400">
+              AM / PM
+              <select
+                className="select-console mt-1 w-full rounded-lg px-3 py-2 text-sm disabled:opacity-60"
+                value={dueAmPm}
+                disabled={readOnly}
+                onChange={(e) => setDueAmPm(e.target.value as "AM" | "PM")}
+              >
+                <option value="AM">AM</option>
+                <option value="PM">PM</option>
+              </select>
+            </label>
+          </div>
           <label className="block text-slate-400">
             Architect / lead URL
             <input
@@ -2662,9 +2793,9 @@ function EditTaskModal({
               ))}
             </div>
           </div>
-          {dueDate ? (
+          {dueAtDate ? (
             <a
-              href={googleEventUrl(title, dueDate)}
+              href={googleEventUrl(title, dueAtDate)}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-block text-sm text-brand-400 hover:underline"
@@ -2694,12 +2825,13 @@ function EditTaskModal({
               <button
                 type="button"
                 onClick={async () => {
+                  const dueIso = composeDueAtIso(dueDate, dueTime, dueAmPm);
                   await onSave(task.id, {
                     title: title.trim(),
                     summary: summary.trim() || null,
                     description: description.trim() ? description : null,
-                    assigneeId: assigneeId || null,
-                    dueAt: due ? new Date(due).toISOString() : null,
+                    assigneeId: showAssignee ? assigneeId || null : undefined,
+                    dueAt: dueIso ? new Date(dueIso).toISOString() : null,
                     architectUrl: architectUrl.trim() || null,
                     labelIds,
                   });

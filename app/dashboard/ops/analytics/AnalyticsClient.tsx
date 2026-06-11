@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { DueDateCalendar } from "@/components/ops/DueDateCalendar";
 import { SimpleBarChart } from "@/components/ops/SimpleBarChart";
+import { ProjectProgressBar } from "@/components/ProjectProgressBar";
 import {
   PROJECT_PHASE_LABELS,
   PROJECT_STATUS_LABELS,
@@ -18,6 +20,16 @@ type AnalyticsData = {
     clientName: string;
     dueDate: string;
     daysUntilDue: number;
+    progressPercent: number;
+    currentStatus: string;
+    assignedAthleteName: string | null;
+  }>;
+  dueDateCalendar: Array<{
+    id: string;
+    name: string;
+    clientName: string;
+    dueDate: string;
+    progressPercent: number;
     currentStatus: string;
     assignedAthleteName: string | null;
   }>;
@@ -139,6 +151,16 @@ export function AnalyticsClient() {
       </div>
 
       <div className="card-tool rounded-xl p-5">
+        <h2 className="text-sm font-semibold text-white">Due date calendar</h2>
+        <p className="mt-1 text-xs text-slate-500">
+          Active projects due in the selected month — progress bars show completion.
+        </p>
+        <div className="mt-4">
+          <DueDateCalendar month={month} projects={data.dueDateCalendar ?? []} />
+        </div>
+      </div>
+
+      <div className="card-tool rounded-xl p-5">
         <h2 className="text-sm font-semibold text-white">Due date risk</h2>
         <p className="mt-1 text-xs text-slate-500">Projects due within 14 days that are not complete.</p>
         {data.dueDateRisk.length === 0 ? (
@@ -152,6 +174,7 @@ export function AnalyticsClient() {
                   <th className="px-3 py-2">Client</th>
                   <th className="px-3 py-2">Due</th>
                   <th className="px-3 py-2">Days</th>
+                  <th className="px-3 py-2 min-w-[120px]">Progress</th>
                   <th className="px-3 py-2">Status</th>
                   <th className="px-3 py-2">Athlete</th>
                 </tr>
@@ -166,6 +189,9 @@ export function AnalyticsClient() {
                       className={`px-3 py-2 tabular-nums ${p.daysUntilDue < 0 ? "text-red-300" : p.daysUntilDue <= 3 ? "text-amber-300" : ""}`}
                     >
                       {p.daysUntilDue < 0 ? `${Math.abs(p.daysUntilDue)}d overdue` : `${p.daysUntilDue}d`}
+                    </td>
+                    <td className="px-3 py-2">
+                      <ProjectProgressBar percent={p.progressPercent} showLabel={false} />
                     </td>
                     <td className="px-3 py-2">
                       {PROJECT_STATUS_LABELS[p.currentStatus as keyof typeof PROJECT_STATUS_LABELS] ?? p.currentStatus}

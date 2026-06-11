@@ -22,12 +22,11 @@ type LineItemInput = {
   projectId: string;
   projectPhase: OpsProjectPhase;
   taskType: OpsTaskType;
+  taskTypes: string[];
   hoursWorked: number;
   completionPercent?: number | null;
   urgencyStatus?: OpsUrgencyStatus;
   completedSummary?: string | null;
-  blockerFlag?: boolean;
-  blockerNote?: string | null;
   notes?: string | null;
 };
 
@@ -40,20 +39,24 @@ function parseLineItems(raw: unknown): LineItemInput[] | null {
     const hoursWorked = Number(o.hoursWorked);
     if (!Number.isFinite(hoursWorked) || hoursWorked <= 0 || hoursWorked > 24) return null;
     const projectPhase = String(o.projectPhase || "");
-    const taskType = String(o.taskType || "");
-    if (!isOpsProjectPhase(projectPhase) || !isOpsTaskType(taskType)) return null;
+    if (!isOpsProjectPhase(projectPhase)) return null;
+    const rawTypes = Array.isArray(o.taskTypes)
+      ? o.taskTypes.map((t) => String(t)).filter((t) => isOpsTaskType(t))
+      : [];
+    const taskType = rawTypes[0] ?? (isOpsTaskType(String(o.taskType || "")) ? String(o.taskType) : "");
+    if (!isOpsTaskType(taskType)) return null;
+    const taskTypes = rawTypes.length > 0 ? rawTypes : [taskType];
     const urgency = String(o.urgencyStatus || "normal");
     items.push({
       clientId: String(o.clientId || "").trim(),
       projectId: String(o.projectId || "").trim(),
       projectPhase,
       taskType,
+      taskTypes,
       hoursWorked,
       completionPercent: o.completionPercent != null ? Number(o.completionPercent) : null,
       urgencyStatus: isOpsUrgencyStatus(urgency) ? urgency : "normal",
       completedSummary: o.completedSummary ? String(o.completedSummary) : null,
-      blockerFlag: Boolean(o.blockerFlag),
-      blockerNote: o.blockerNote ? String(o.blockerNote) : null,
       notes: o.notes ? String(o.notes) : null,
     });
   }
@@ -102,10 +105,9 @@ export async function GET(request: NextRequest) {
         projectNumber: li.project.projectNumber,
         projectPhase: li.projectPhase,
         taskType: li.taskType,
+        taskTypes: li.taskTypes?.length ? li.taskTypes : [li.taskType],
         hoursWorked: Number(li.hoursWorked),
         completedSummary: li.completedSummary,
-        blockerFlag: li.blockerFlag,
-        blockerNote: li.blockerNote,
         completionPercent: li.completionPercent,
       })),
     })),
@@ -169,23 +171,14 @@ export async function POST(request: NextRequest) {
             projectId: li.projectId,
             projectPhase: li.projectPhase,
             taskType: li.taskType,
+            taskTypes: li.taskTypes,
             hoursWorked: li.hoursWorked,
             completionPercent: li.completionPercent ?? null,
             urgencyStatus: (li.urgencyStatus ?? "normal") as OpsUrgencyStatus,
             completedSummary: li.completedSummary,
-            blockerFlag: li.blockerFlag ?? false,
-            blockerNote: li.blockerNote,
             notes: li.notes,
           })),
         });
-        for (const li of lineItems) {
-          if (li.blockerFlag) {
-            await tx.opsProject.update({
-              where: { id: li.projectId },
-              data: { blockerFlag: true },
-            });
-          }
-        }
         return tx.opsDailySubmission.findUniqueOrThrow({
           where: { id: existing.id },
           include: { lineItems: true },
@@ -206,27 +199,17 @@ export async function POST(request: NextRequest) {
               projectId: li.projectId,
               projectPhase: li.projectPhase,
               taskType: li.taskType,
+              taskTypes: li.taskTypes,
               hoursWorked: li.hoursWorked,
               completionPercent: li.completionPercent ?? null,
               urgencyStatus: (li.urgencyStatus ?? "normal") as OpsUrgencyStatus,
               completedSummary: li.completedSummary,
-              blockerFlag: li.blockerFlag ?? false,
-              blockerNote: li.blockerNote,
               notes: li.notes,
             })),
           },
         },
         include: { lineItems: true },
       });
-
-      for (const li of lineItems) {
-        if (li.blockerFlag) {
-          await tx.opsProject.update({
-            where: { id: li.projectId },
-            data: { blockerFlag: true },
-          });
-        }
-      }
 
       if (body.checkInRequested) {
         await tx.opsProject.updateMany({
@@ -248,25 +231,6 @@ export async function POST(request: NextRequest) {
         message: body.dailyNote ? String(body.dailyNote).trim() : null,
         actionRequired: "Review check-in request and respond via Book a Call flow",
       }).catch(() => {});
-    }
-
-    const blockerItems = lineItems.filter((li) => li.blockerFlag);
-    if (blockerItems.length > 0) {
-      const projects = await prisma.opsProject.findMany({
-        where: { id: { in: blockerItems.map((li) => li.projectId) } },
-        select: { id: true, name: true },
-      });
-      const nameById = Object.fromEntries(projects.map((p) => [p.id, p.name]));
-      for (const li of blockerItems) {
-        await createOpsNotification({
-          athleteId: athlete.id,
-          projectId: li.projectId,
-          type: "blocker",
-          title: `Blocker on ${nameById[li.projectId] ?? "project"}`,
-          message: li.blockerNote ?? li.notes ?? null,
-          actionRequired: "Review blocker and follow up with athlete",
-        }).catch(() => {});
-      }
     }
 
     const monthSummary = await athleteMonthlySummary(athlete);

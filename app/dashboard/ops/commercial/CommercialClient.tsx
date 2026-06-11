@@ -31,6 +31,18 @@ type LedgerRow = {
   marginPercent: number;
 };
 
+type AthleteMonthlyRow = {
+  athleteId: string;
+  athleteName: string;
+  hoursWorked: number;
+  overtimeHours: number;
+  revenueGbp: number;
+  basePayGbp: number;
+  overtimePayGbp: number;
+  costGbp: number;
+  marginGbp: number;
+};
+
 type CommercialData = {
   month: string;
   reportingRate: number;
@@ -38,10 +50,13 @@ type CommercialData = {
   totalLaneRevenueGbp: number;
   totalOvertimeRevenueGbp: number;
   totalCostGbp: number;
+  totalLaneCostGbp: number;
+  totalOvertimeCostGbp: number;
   grossMarginGbp: number;
   grossMarginPercent: number;
   clientLanes: ClientLaneRow[];
   rows: LedgerRow[];
+  athleteTotals: AthleteMonthlyRow[];
 };
 
 type ExchangeRate = {
@@ -192,8 +207,14 @@ export function CommercialClient() {
               <p className="mt-1 text-xs text-slate-500">Hours over lane capacity</p>
             </div>
             <div className="card-tool rounded-xl p-4">
-              <p className="text-[10px] uppercase text-slate-500">Athlete cost</p>
-              <p className="mt-1 text-xl font-semibold text-white">£{ledger.totalCostGbp.toLocaleString()}</p>
+              <p className="text-[10px] uppercase text-slate-500">Athlete lane cost</p>
+              <p className="mt-1 text-xl font-semibold text-white">
+                £{ledger.totalLaneCostGbp.toLocaleString()}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                OT cost £{ledger.totalOvertimeCostGbp.toLocaleString()} · total £
+                {ledger.totalCostGbp.toLocaleString()}
+              </p>
             </div>
             <div className="card-tool rounded-xl p-4">
               <p className="text-[10px] uppercase text-slate-500">Gross margin</p>
@@ -313,6 +334,45 @@ export function CommercialClient() {
                 No project hours logged this month — lane billing above still applies for active clients.
               </p>
             ) : null}
+          </div>
+
+          <div className="card-tool overflow-x-auto rounded-xl">
+            <div className="border-b border-white/[0.06] px-4 py-3">
+              <h2 className="text-sm font-semibold text-white">Athlete monthly breakdown</h2>
+              <p className="mt-1 text-xs text-slate-500">
+                Per-athlete earnings, revenue produced, and Blocharch margin for the month.
+              </p>
+            </div>
+            <table className="min-w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-white/[0.06] text-xs uppercase text-slate-500">
+                  <th className="px-4 py-3">Athlete</th>
+                  <th className="px-4 py-3">Hours</th>
+                  <th className="px-4 py-3">OT hrs</th>
+                  <th className="px-4 py-3">Revenue</th>
+                  <th className="px-4 py-3">Lane pay</th>
+                  <th className="px-4 py-3">OT pay</th>
+                  <th className="px-4 py-3">Total pay</th>
+                  <th className="px-4 py-3">Margin</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(ledger.athleteTotals ?? []).map((a) => (
+                  <tr key={a.athleteId} className="border-b border-white/[0.04] text-slate-300">
+                    <td className="px-4 py-2">{a.athleteName}</td>
+                    <td className="px-4 py-2 tabular-nums">{a.hoursWorked}</td>
+                    <td className="px-4 py-2 tabular-nums">{a.overtimeHours}</td>
+                    <td className="px-4 py-2 tabular-nums">£{a.revenueGbp.toLocaleString()}</td>
+                    <td className="px-4 py-2 tabular-nums">£{a.basePayGbp.toLocaleString()}</td>
+                    <td className="px-4 py-2 tabular-nums">£{a.overtimePayGbp.toLocaleString()}</td>
+                    <td className="px-4 py-2 tabular-nums">£{a.costGbp.toLocaleString()}</td>
+                    <td className="px-4 py-2 tabular-nums text-brand-300">
+                      £{a.marginGbp.toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </>
       ) : null}

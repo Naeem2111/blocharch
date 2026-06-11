@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { LeadStagePicker } from "@/components/LeadStagePicker";
 
 const STAGES = [
   "cold",
@@ -291,17 +292,10 @@ export function AutomationClient() {
                       </Link>
                     </td>
                     <td className="px-4 py-3">
-                      <select
+                      <LeadStagePicker
                         value={item.lead.stage}
-                        onChange={(e) => updateLead(item.url, { stage: e.target.value })}
-                        className="select-console rounded px-2 py-1 text-sm"
-                      >
-                        {STAGES.map((s) => (
-                          <option key={s} value={s}>
-                            {s}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={(stage) => updateLead(item.url, { stage })}
+                      />
                     </td>
                     <td className="px-4 py-3">
                       <StarRating

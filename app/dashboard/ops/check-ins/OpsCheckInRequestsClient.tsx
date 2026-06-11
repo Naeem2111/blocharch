@@ -1,6 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import {
+  DateTimeSplitFields,
+  type DateTimeSplitValue,
+} from "@/components/DateTimeSplitFields";
+import { composeDueAtIso, splitDueAtIso } from "@/lib/planner-due-datetime";
 
 type RequestRow = {
   id: string;
@@ -31,11 +36,9 @@ function formatWhen(iso: string) {
   });
 }
 
-function toLocalInput(iso: string | null) {
-  if (!iso) return "";
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+function splitFromIso(iso: string | null): DateTimeSplitValue {
+  if (!iso) return { date: "", time: "", ampm: "AM" };
+  return splitDueAtIso(iso);
 }
 
 export function OpsCheckInRequestsClient() {
@@ -47,8 +50,8 @@ export function OpsCheckInRequestsClient() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [zoomDraft, setZoomDraft] = useState<Record<string, string>>({});
   const [noteDraft, setNoteDraft] = useState<Record<string, string>>({});
-  const [counterStart, setCounterStart] = useState<Record<string, string>>({});
-  const [counterEnd, setCounterEnd] = useState<Record<string, string>>({});
+  const [counterStart, setCounterStart] = useState<Record<string, DateTimeSplitValue>>({});
+  const [counterEnd, setCounterEnd] = useState<Record<string, DateTimeSplitValue>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -207,45 +210,43 @@ export function OpsCheckInRequestsClient() {
                   </div>
                   <div className="rounded-lg bg-white/[0.03] p-3">
                     <p className="text-xs font-medium text-slate-400">Suggest another time</p>
-                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                      <label className="text-xs text-slate-500">
-                        Start
-                        <input
-                          type="datetime-local"
-                          value={counterStart[r.id] ?? toLocalInput(r.counterStartAt)}
-                          onChange={(e) =>
-                            setCounterStart((d) => ({ ...d, [r.id]: e.target.value }))
-                          }
-                          className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-2 py-1.5 text-sm text-white"
-                        />
-                      </label>
-                      <label className="text-xs text-slate-500">
-                        End
-                        <input
-                          type="datetime-local"
-                          value={counterEnd[r.id] ?? toLocalInput(r.counterEndAt)}
-                          onChange={(e) =>
-                            setCounterEnd((d) => ({ ...d, [r.id]: e.target.value }))
-                          }
-                          className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-2 py-1.5 text-sm text-white"
-                        />
-                      </label>
+                    <div className="mt-2 space-y-3">
+                      <DateTimeSplitFields
+                        label="Proposed start"
+                        required
+                        value={counterStart[r.id] ?? splitFromIso(r.counterStartAt)}
+                        onChange={(v) => setCounterStart((d) => ({ ...d, [r.id]: v }))}
+                      />
+                      <DateTimeSplitFields
+                        label="Proposed end"
+                        required
+                        value={counterEnd[r.id] ?? splitFromIso(r.counterEndAt)}
+                        onChange={(v) => setCounterEnd((d) => ({ ...d, [r.id]: v }))}
+                      />
                     </div>
                     <button
                       type="button"
                       disabled={busyId === r.id}
                       className="mt-2 rounded-lg bg-amber-600/80 px-3 py-1.5 text-xs font-semibold text-slate-950"
                       onClick={() => {
-                        const cs = counterStart[r.id];
-                        const ce = counterEnd[r.id];
-                        if (!cs || !ce) {
-                          window.alert("Set proposed start and end");
+                        const cs = counterStart[r.id] ?? splitFromIso(r.counterStartAt);
+                        const ce = counterEnd[r.id] ?? splitFromIso(r.counterEndAt);
+                        const startIso = composeDueAtIso(cs.date, cs.time, cs.ampm);
+                        const endIso = composeDueAtIso(ce.date, ce.time, ce.ampm);
+                        if (!startIso || !endIso) {
+                          window.alert("Set valid proposed start and end times");
+                          return;
+                        }
+                        const start = new Date(startIso);
+                        const end = new Date(endIso);
+                        if (end <= start) {
+                          window.alert("End must be after start");
                           return;
                         }
                         void patch(r.id, {
                           action: "counter",
-                          counterStartAt: new Date(cs).toISOString(),
-                          counterEndAt: new Date(ce).toISOString(),
+                          counterStartAt: start.toISOString(),
+                          counterEndAt: end.toISOString(),
                           adminNote: noteDraft[r.id] ?? r.adminNote,
                           zoomLink: zoomDraft[r.id] ?? r.zoomLink,
                         });

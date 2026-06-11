@@ -1,7 +1,12 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { isOpsPricingTier, laneCostForTier } from "@/lib/ops-constants";
+import {
+  clampTierPercent,
+  isOpsPricingTier,
+  laneCostForTier,
+  pricingTierForPercent,
+} from "@/lib/ops-constants";
 import { requireOpsSession } from "@/lib/ops-access";
 import {
   clientInclude,
@@ -34,8 +39,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Client name required (1–200 characters)" }, { status: 400 });
     }
 
-    const tierRaw = String(body.pricingTier || "tier_30");
-    const pricingTier = isOpsPricingTier(tierRaw) ? tierRaw : "tier_30";
+    const tierPercent = clampTierPercent(body.tierPercent);
+    const tierRaw = String(body.pricingTier || "");
+    const pricingTier = isOpsPricingTier(tierRaw)
+      ? tierRaw
+      : pricingTierForPercent(tierPercent);
+    const laneCostGbp =
+      body.laneCostGbp != null && Number(body.laneCostGbp) > 0
+        ? Number(body.laneCostGbp)
+        : laneCostForTier(pricingTier);
     const activeLaneCount = Math.max(1, Math.min(20, Number(body.activeLaneCount) || 1));
     const contacts = parseContactsFromBody(body) ?? [];
 
@@ -57,7 +69,8 @@ export async function POST(request: NextRequest) {
         commercial: {
           create: {
             pricingTier,
-            laneCostGbp: laneCostForTier(pricingTier),
+            tierPercent,
+            laneCostGbp,
             activeLaneCount,
           },
         },

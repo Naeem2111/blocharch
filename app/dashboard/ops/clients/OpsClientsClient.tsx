@@ -15,7 +15,12 @@ type ClientRow = {
   status: string;
   notes: string | null;
   projectCount: number;
-  commercial: { pricingTier: string; laneCostGbp: number; activeLaneCount: number } | null;
+  commercial: {
+    pricingTier: string;
+    tierPercent: number;
+    laneCostGbp: number;
+    activeLaneCount: number;
+  } | null;
 };
 
 const emptyContact = (): ClientContact => ({ name: "", email: "" });
@@ -25,7 +30,8 @@ const emptyCreate = {
   companyName: "",
   software: "",
   contacts: [emptyContact()],
-  pricingTier: "tier_30",
+  tierPercent: "30",
+  laneCostGbp: "2041",
   activeLaneCount: "1",
 };
 
@@ -101,7 +107,8 @@ export function OpsClientsClient() {
     country: "",
     status: "active",
     notes: "",
-    pricingTier: "tier_30",
+    tierPercent: "30",
+    laneCostGbp: "2041",
     activeLaneCount: "1",
   });
   const [error, setError] = useState("");
@@ -138,7 +145,8 @@ export function OpsClientsClient() {
         companyName: form.companyName,
         software: form.software,
         contacts: contactsPayload(form.contacts),
-        pricingTier: form.pricingTier,
+        tierPercent: Number(form.tierPercent),
+        laneCostGbp: Number(form.laneCostGbp),
         activeLaneCount: Number(form.activeLaneCount),
       }),
     });
@@ -166,7 +174,8 @@ export function OpsClientsClient() {
       country: c.country ?? "",
       status: c.status,
       notes: c.notes ?? "",
-      pricingTier: c.commercial?.pricingTier ?? "tier_30",
+      tierPercent: String(c.commercial?.tierPercent ?? 30),
+      laneCostGbp: String(c.commercial?.laneCostGbp ?? 2041),
       activeLaneCount: String(c.commercial?.activeLaneCount ?? 1),
     });
     setError("");
@@ -187,7 +196,8 @@ export function OpsClientsClient() {
         country: editForm.country,
         status: editForm.status,
         notes: editForm.notes,
-        pricingTier: editForm.pricingTier,
+        tierPercent: Number(editForm.tierPercent),
+        laneCostGbp: Number(editForm.laneCostGbp),
         activeLaneCount: Number(editForm.activeLaneCount),
       }),
     });
@@ -265,17 +275,26 @@ export function OpsClientsClient() {
             onChange={(contacts) => setForm((f) => ({ ...f, contacts }))}
           />
           <label className="text-xs text-slate-400">
-            Pricing tier
-            <select
-              value={form.pricingTier}
-              onChange={(e) => setForm((f) => ({ ...f, pricingTier: e.target.value }))}
-              className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
-            >
-              <option value="tier_25">25%</option>
-              <option value="tier_30">30%</option>
-              <option value="tier_35">35%</option>
-              <option value="tier_40">40%</option>
-            </select>
+            Tier % ({form.tierPercent}%)
+            <input
+              type="range"
+              min={25}
+              max={40}
+              step={1}
+              value={form.tierPercent}
+              onChange={(e) => setForm((f) => ({ ...f, tierPercent: e.target.value }))}
+              className="mt-2 block w-full"
+            />
+          </label>
+          <label className="text-xs text-slate-400">
+            Monthly fee per lane (£)
+            <input
+              type="number"
+              min={0}
+              value={form.laneCostGbp}
+              onChange={(e) => setForm((f) => ({ ...f, laneCostGbp: e.target.value }))}
+              className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+            />
           </label>
           <label className="text-xs text-slate-400">
             Active lanes
@@ -354,17 +373,26 @@ export function OpsClientsClient() {
                   onChange={(contacts) => setEditForm((f) => ({ ...f, contacts }))}
                 />
                 <label className="text-xs text-slate-400">
-                  Tier
-                  <select
-                    value={editForm.pricingTier}
-                    onChange={(e) => setEditForm((f) => ({ ...f, pricingTier: e.target.value }))}
-                    className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
-                  >
-                    <option value="tier_25">25%</option>
-                    <option value="tier_30">30%</option>
-                    <option value="tier_35">35%</option>
-                    <option value="tier_40">40%</option>
-                  </select>
+                  Tier % ({editForm.tierPercent}%)
+                  <input
+                    type="range"
+                    min={25}
+                    max={40}
+                    step={1}
+                    value={editForm.tierPercent}
+                    onChange={(e) => setEditForm((f) => ({ ...f, tierPercent: e.target.value }))}
+                    className="mt-2 block w-full"
+                  />
+                </label>
+                <label className="text-xs text-slate-400">
+                  Monthly fee / lane (£)
+                  <input
+                    type="number"
+                    min={0}
+                    value={editForm.laneCostGbp}
+                    onChange={(e) => setEditForm((f) => ({ ...f, laneCostGbp: e.target.value }))}
+                    className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+                  />
                 </label>
                 <label className="text-xs text-slate-400">
                   Lanes
@@ -410,8 +438,8 @@ export function OpsClientsClient() {
                 <div>
                   <p className="font-medium text-white">{c.name}</p>
                   <p className="text-xs text-slate-500">
-                    {c.commercial?.pricingTier.replace("tier_", "")}% · £
-                    {c.commercial?.laneCostGbp.toLocaleString()} · {c.commercial?.activeLaneCount} lane(s) ·{" "}
+                    {c.commercial?.tierPercent ?? 30}% · £
+                    {c.commercial?.laneCostGbp.toLocaleString()}/lane · {c.commercial?.activeLaneCount} lane(s) ·{" "}
                     {c.projectCount} project(s)
                   </p>
                   {c.software ? <p className="text-xs text-slate-500">Software: {c.software}</p> : null}

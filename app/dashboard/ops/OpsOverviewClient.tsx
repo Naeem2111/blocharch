@@ -44,8 +44,7 @@ export function OpsOverviewClient() {
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
       <StatCard label="Active athletes" value={data.activeAthletes} />
       <StatCard label="Active projects" value={data.activeProjects} />
-      <StatCard label="Open blockers" value={data.openBlockers} sub="Requires admin attention" />
-      <StatCard label="Check-in requests" value={data.checkInRequests} />
+      <StatCard label="Pending check-ins" value={data.checkInRequests} sub="Athletes waiting for a response" />
       <StatCard
         label="Monthly revenue (GBP)"
         value={`£${data.monthlyRevenueGbp.toLocaleString()}`}

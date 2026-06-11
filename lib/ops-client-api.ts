@@ -70,6 +70,7 @@ type ClientWithRelations = {
   contacts: { id: string; name: string; email: string | null; sortOrder: number }[];
   commercial: {
     pricingTier: string;
+    tierPercent: number;
     laneCostGbp: { toNumber?: () => number } | number;
     overtimeBillingGbp: { toNumber?: () => number } | number;
     activeLaneCount: number;
@@ -96,6 +97,7 @@ export function mapClientToJson(c: ClientWithRelations) {
     commercial: c.commercial
       ? {
           pricingTier: c.commercial.pricingTier,
+          tierPercent: c.commercial.tierPercent,
           laneCostGbp: num(c.commercial.laneCostGbp),
           overtimeBillingGbp: num(c.commercial.overtimeBillingGbp),
           activeLaneCount: c.commercial.activeLaneCount,

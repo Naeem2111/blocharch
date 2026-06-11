@@ -175,6 +175,7 @@ model PlannerBoard {
   scope        PlannerBoardScope
   kind         PlannerBoardKind  @default(custom)
   color        String            @default("#6366f1")
+  sortOrder    Int               @default(0) @map("sort_order")
   ownerId      String            @map("owner_id")
   /** Athlete workspace boards (inbox, my tasks, project boards, etc.). */
   athleteId    String?           @map("athlete_id")
@@ -333,6 +334,8 @@ model OpsClientCommercialProfile {
   id                 String         @id @default(uuid())
   clientId           String         @unique @map("client_id")
   pricingTier        OpsPricingTier @default(tier_30) @map("pricing_tier")
+  /** Athlete share of lane revenue (25–40). */
+  tierPercent        Int            @default(30) @map("tier_percent")
   laneCostGbp        Decimal        @map("lane_cost_gbp") @db.Decimal(10, 2)
   overtimeBillingGbp Decimal        @default(20) @map("overtime_billing_gbp") @db.Decimal(10, 2)
   activeLaneCount    Int            @default(1) @map("active_lane_count")
@@ -560,6 +563,7 @@ model OpsSubmissionLineItem {
   projectId         String           @map("project_id")
   projectPhase      OpsProjectPhase  @map("project_phase")
   taskType          OpsTaskType      @map("task_type")
+  taskTypes         String[]         @default([]) @map("task_types")
   hoursWorked       Decimal          @map("hours_worked") @db.Decimal(5, 2)
   completionPercent Int?             @map("completion_percent")
   urgencyStatus     OpsUrgencyStatus @default(normal) @map("urgency_status")

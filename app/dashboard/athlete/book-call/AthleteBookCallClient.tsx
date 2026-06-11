@@ -1,6 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import {
+  DateTimeSplitFields,
+  type DateTimeSplitValue,
+} from "@/components/DateTimeSplitFields";
+import { composeDueAtIso } from "@/lib/planner-due-datetime";
 
 type Project = { id: string; name: string; client: { name: string } };
 type Slot = { start: string; end: string; label: string };
@@ -54,8 +59,16 @@ export function AthleteBookCallClient() {
   const [reason, setReason] = useState("");
   const [contextNotes, setContextNotes] = useState("");
   const [selectedSlot, setSelectedSlot] = useState("");
-  const [customStart, setCustomStart] = useState("");
-  const [customEnd, setCustomEnd] = useState("");
+  const [customStart, setCustomStart] = useState<DateTimeSplitValue>({
+    date: "",
+    time: "",
+    ampm: "AM",
+  });
+  const [customEnd, setCustomEnd] = useState<DateTimeSplitValue>({
+    date: "",
+    time: "",
+    ampm: "AM",
+  });
   const [slotsError, setSlotsError] = useState("");
 
   /** Dropdown when we have generated slots; free-form datetime only as fallback. */
@@ -104,16 +117,17 @@ export function AthleteBookCallClient() {
     let requestedEndAt: string;
 
     if (useManualPicker) {
-      if (!customStart) {
-        setError("Choose a preferred start date and time");
+      const startIso = composeDueAtIso(customStart.date, customStart.time, customStart.ampm);
+      if (!startIso) {
+        setError("Choose a valid preferred start date and time");
         return;
       }
-      const start = new Date(customStart);
-      if (Number.isNaN(start.getTime())) {
-        setError("Invalid start time");
-        return;
+      const start = new Date(startIso);
+      let endIso = composeDueAtIso(customEnd.date, customEnd.time, customEnd.ampm);
+      if (!endIso) {
+        endIso = new Date(start.getTime() + 30 * 60 * 1000).toISOString();
       }
-      const end = customEnd ? new Date(customEnd) : new Date(start.getTime() + 30 * 60 * 1000);
+      const end = new Date(endIso);
       if (Number.isNaN(end.getTime()) || end <= start) {
         setError("End time must be after start time");
         return;
@@ -152,8 +166,8 @@ export function AthleteBookCallClient() {
       setReason("");
       setContextNotes("");
       setSelectedSlot("");
-      setCustomStart("");
-      setCustomEnd("");
+      setCustomStart({ date: "", time: "", ampm: "AM" });
+      setCustomEnd({ date: "", time: "", ampm: "AM" });
       await refresh();
     } finally {
       setSaving(false);
@@ -227,38 +241,23 @@ export function AthleteBookCallClient() {
         </label>
 
         {useManualPicker ? (
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block text-xs text-slate-400">
-              Preferred start <span className="text-red-400">*</span>
-              <input
-                type="datetime-local"
-                required
-                value={customStart}
-                onChange={(e) => {
-                  setCustomStart(e.target.value);
-                  if (e.target.value && !customEnd) {
-                    const s = new Date(e.target.value);
-                    if (!Number.isNaN(s.getTime())) {
-                      const end = new Date(s.getTime() + 30 * 60 * 1000);
-                      const pad = (n: number) => String(n).padStart(2, "0");
-                      setCustomEnd(
-                        `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}T${pad(end.getHours())}:${pad(end.getMinutes())}`
-                      );
-                    }
-                  }
-                }}
-                className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
-              />
-            </label>
-            <label className="block text-xs text-slate-400">
-              Preferred end (optional, default 30 min)
-              <input
-                type="datetime-local"
-                value={customEnd}
-                onChange={(e) => setCustomEnd(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
-              />
-            </label>
+          <div className="space-y-4">
+            <DateTimeSplitFields
+              label="Preferred start"
+              required
+              value={customStart}
+              onChange={(v) => {
+                setCustomStart(v);
+                if (v.date && !customEnd.date) {
+                  setCustomEnd({ ...customEnd, date: v.date });
+                }
+              }}
+            />
+            <DateTimeSplitFields
+              label="Preferred end (optional — defaults to 30 min after start)"
+              value={customEnd}
+              onChange={setCustomEnd}
+            />
           </div>
         ) : (
           <label className="block text-xs text-slate-400">

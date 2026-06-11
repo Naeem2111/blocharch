@@ -105,3 +105,16 @@ export function isOpsUrgencyStatus(v: string): v is OpsUrgencyStatus {
 export function isOpsPricingTier(v: string): v is OpsPricingTier {
   return v in PRICING_TIER_LABELS;
 }
+
+export function clampTierPercent(value: unknown): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 30;
+  return Math.max(25, Math.min(40, Math.round(n)));
+}
+
+export function pricingTierForPercent(percent: number): OpsPricingTier {
+  if (percent <= 27) return "tier_25";
+  if (percent <= 32) return "tier_30";
+  if (percent <= 37) return "tier_35";
+  return "tier_40";
+}

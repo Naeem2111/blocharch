@@ -30,14 +30,9 @@ type MarkerItem = {
   hubDetail?: string;
 };
 
-const STAGE_COLORS: Record<Stage, string> = {
-  cold: "#0ea5e9",
-  no_reply: "#f59e0b",
-  positive_reply: "#22c55e",
-  follow_up_interested: "#10b981",
-  negative_reply: "#ef4444",
-  follow_up_not_interested: "#f97316",
-};
+import { LEAD_STAGE_COLORS } from "@/lib/lead-stage-ui";
+
+const STAGE_COLORS: Record<Stage, string> = LEAD_STAGE_COLORS;
 
 const iconCache = new Map<string, L.DivIcon>();
 

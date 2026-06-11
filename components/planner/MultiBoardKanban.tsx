@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useRef, useState } from "react";
 import type { KanbanBoardDetail, KanbanTaskRow } from "@/lib/planner-board-mutation";
+import { maybeAutoScrollDrag } from "@/lib/planner-drag-scroll";
 import { createDragHighlightScheduler } from "@/lib/planner-drag-ui";
 import { usesAthleteCompletedFlow } from "@/lib/planner-completed";
 
@@ -163,7 +164,7 @@ export function MultiBoardKanban({ boards, onMoveTask, onOpenTask, onToggleCompl
                 <span className="text-[10px] uppercase text-amber-500/80">fixed board</span>
               ) : null}
             </header>
-            <div className="flex gap-3 overflow-x-auto p-3">
+            <div className="flex gap-3 overflow-x-auto p-3" data-planner-scroll-x>
               {board.columns.map((col) => (
                 <div
                   key={col.id}
@@ -174,6 +175,7 @@ export function MultiBoardKanban({ boards, onMoveTask, onOpenTask, onToggleCompl
                     if (!board.editable || !dragTaskIdRef.current) return;
                     e.preventDefault();
                     e.dataTransfer.dropEffect = "move";
+                    maybeAutoScrollDrag(e.clientX, e.clientY);
                     scheduleHighlight(col.id, null);
                   }}
                   onDrop={(e) => {
@@ -189,12 +191,14 @@ export function MultiBoardKanban({ boards, onMoveTask, onOpenTask, onToggleCompl
                     {col.title}
                   </div>
                   <div
+                    data-planner-scroll-y
                     className="flex min-h-[120px] max-h-[min(65vh,640px)] flex-col gap-2 overflow-y-auto overscroll-y-contain p-2"
                     onDragOver={(e) => {
                       if (!board.editable || !dragTaskIdRef.current) return;
                       e.preventDefault();
                       e.stopPropagation();
                       e.dataTransfer.dropEffect = "move";
+                      maybeAutoScrollDrag(e.clientX, e.clientY);
                       scheduleHighlight(col.id, { columnId: col.id, beforeTaskId: null });
                     }}
                     onDrop={(e) => {

@@ -53,6 +53,8 @@ export type CommercialSummary = {
   totalOvertimeRevenueGbp: number;
   totalCostZar: number;
   totalCostGbp: number;
+  totalLaneCostGbp: number;
+  totalOvertimeCostGbp: number;
   grossMarginGbp: number;
   grossMarginPercent: number;
   /** Per-client lane billing — present as soon as client + lanes exist. */
@@ -63,7 +65,10 @@ export type CommercialSummary = {
     athleteId: string;
     athleteName: string;
     hoursWorked: number;
+    overtimeHours: number;
     revenueGbp: number;
+    basePayGbp: number;
+    overtimePayGbp: number;
     costZar: number;
     costGbp: number;
     marginGbp: number;
@@ -192,7 +197,17 @@ export async function buildCommercialLedger(reference: Date): Promise<Commercial
     });
   }
 
-  const athleteCostMap = new Map<string, { costZar: number; costGbp: number }>();
+  const athleteCostMap = new Map<
+    string,
+    {
+      costZar: number;
+      costGbp: number;
+      baseCostGbp: number;
+      overtimeCostGbp: number;
+      monthHours: number;
+      monthOvertimeHours: number;
+    }
+  >();
 
   for (const athlete of athletes) {
     const monthHoursAgg = await prisma.opsDailySubmission.aggregate({
@@ -209,6 +224,10 @@ export async function buildCommercialLedger(reference: Date): Promise<Commercial
     athleteCostMap.set(athlete.id, {
       costZar: summary.totalEarningsZar,
       costGbp: round2(summary.totalEarningsZar / reportingRate),
+      baseCostGbp: round2(summary.baseEarningsZar / reportingRate),
+      overtimeCostGbp: round2(summary.overtimeEarningsZar / reportingRate),
+      monthHours: summary.monthHours,
+      monthOvertimeHours: summary.monthOvertimeHours,
     });
   }
 
@@ -239,8 +258,6 @@ export async function buildCommercialLedger(reference: Date): Promise<Commercial
       athleteName: string;
       hoursWorked: number;
       revenueGbp: number;
-      costZar: number;
-      costGbp: number;
       marginGbp: number;
     }
   >();
@@ -250,8 +267,6 @@ export async function buildCommercialLedger(reference: Date): Promise<Commercial
     if (t) {
       t.hoursWorked += row.hoursWorked;
       t.revenueGbp += row.revenueGbp;
-      t.costZar += row.athleteCostZar;
-      t.costGbp += row.athleteCostGbp;
       t.marginGbp += row.marginGbp;
     } else {
       athleteTotalsMap.set(row.athleteId, {
@@ -259,21 +274,27 @@ export async function buildCommercialLedger(reference: Date): Promise<Commercial
         athleteName: row.athleteName,
         hoursWorked: row.hoursWorked,
         revenueGbp: row.revenueGbp,
-        costZar: row.athleteCostZar,
-        costGbp: row.athleteCostGbp,
         marginGbp: row.marginGbp,
       });
     }
   }
 
-  const athleteTotals = Array.from(athleteTotalsMap.values()).map((t) => ({
-    ...t,
-    hoursWorked: round2(t.hoursWorked),
-    revenueGbp: round2(t.revenueGbp),
-    costZar: round2(t.costZar),
-    costGbp: round2(t.costGbp),
-    marginGbp: round2(t.marginGbp),
-  }));
+  const athleteTotals = Array.from(athleteTotalsMap.values()).map((t) => {
+    const cost = athleteCostMap.get(t.athleteId);
+    const costGbp = cost?.costGbp ?? 0;
+    return {
+      athleteId: t.athleteId,
+      athleteName: t.athleteName,
+      hoursWorked: round2(t.hoursWorked),
+      overtimeHours: round2(cost?.monthOvertimeHours ?? 0),
+      revenueGbp: round2(t.revenueGbp),
+      basePayGbp: round2(cost?.baseCostGbp ?? 0),
+      overtimePayGbp: round2(cost?.overtimeCostGbp ?? 0),
+      costZar: round2(cost?.costZar ?? 0),
+      costGbp: round2(costGbp),
+      marginGbp: round2(t.revenueGbp - costGbp),
+    };
+  });
 
   const totalLaneRevenueGbp = round2(
     clientLanes.reduce((s, c) => s + c.monthlyLaneRevenueGbp, 0)
@@ -286,6 +307,12 @@ export async function buildCommercialLedger(reference: Date): Promise<Commercial
   );
   const totalCostZar = round2(Array.from(athleteCostMap.values()).reduce((s, c) => s + c.costZar, 0));
   const totalCostGbp = round2(totalCostZar / reportingRate);
+  const totalLaneCostGbp = round2(
+    Array.from(athleteCostMap.values()).reduce((s, c) => s + c.baseCostGbp, 0)
+  );
+  const totalOvertimeCostGbp = round2(
+    Array.from(athleteCostMap.values()).reduce((s, c) => s + c.overtimeCostGbp, 0)
+  );
   const grossMarginGbp = round2(totalRevenueGbp - totalCostGbp);
 
   return {
@@ -296,6 +323,8 @@ export async function buildCommercialLedger(reference: Date): Promise<Commercial
     totalOvertimeRevenueGbp,
     totalCostZar,
     totalCostGbp,
+    totalLaneCostGbp,
+    totalOvertimeCostGbp,
     grossMarginGbp,
     grossMarginPercent: totalRevenueGbp > 0 ? round2((grossMarginGbp / totalRevenueGbp) * 100) : 0,
     clientLanes,
@@ -315,6 +344,16 @@ export type AnalyticsPayload = {
     clientName: string;
     dueDate: string;
     daysUntilDue: number;
+    progressPercent: number;
+    currentStatus: string;
+    assignedAthleteName: string | null;
+  }>;
+  dueDateCalendar: Array<{
+    id: string;
+    name: string;
+    clientName: string;
+    dueDate: string;
+    progressPercent: number;
     currentStatus: string;
     assignedAthleteName: string | null;
   }>;
@@ -376,6 +415,18 @@ export async function buildAnalytics(reference: Date): Promise<AnalyticsPayload>
     take: 20,
   });
 
+  const calendarProjects = await prisma.opsProject.findMany({
+    where: {
+      dueDate: { gte: from, lte: to },
+      currentStatus: { notIn: ["completed", "handed_over"] },
+    },
+    include: {
+      client: { select: { name: true } },
+      assignedAthlete: { select: { fullName: true } },
+    },
+    orderBy: { dueDate: "asc" },
+  });
+
   const clientCostMap = new Map<string, number>();
   for (const row of ledger.rows) {
     clientCostMap.set(row.clientId, (clientCostMap.get(row.clientId) ?? 0) + row.athleteCostGbp);
@@ -417,10 +468,20 @@ export async function buildAnalytics(reference: Date): Promise<AnalyticsPayload>
         clientName: p.client.name,
         dueDate: due.toISOString().slice(0, 10),
         daysUntilDue,
+        progressPercent: p.progressPercent ?? 0,
         currentStatus: p.currentStatus,
         assignedAthleteName: p.assignedAthlete?.fullName ?? null,
       };
     }),
+    dueDateCalendar: calendarProjects.map((p) => ({
+      id: p.id,
+      name: p.name,
+      clientName: p.client.name,
+      dueDate: p.dueDate!.toISOString().slice(0, 10),
+      progressPercent: p.progressPercent ?? 0,
+      currentStatus: p.currentStatus,
+      assignedAthleteName: p.assignedAthlete?.fullName ?? null,
+    })),
     profitabilityByClient,
   };
 }
