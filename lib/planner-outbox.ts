@@ -47,7 +47,22 @@ export async function deliverOutboxTaskToInbox(outboxTaskId: string) {
     },
   });
   if (!row) throw new Error("Outbox task not found");
-  if (row.deliveredAt && row.inboxTaskId) return { taskId: row.inboxTaskId, alreadyDelivered: true };
+
+  if (row.inboxTaskId) {
+    const stillThere = await prisma.plannerTask.findUnique({
+      where: { id: row.inboxTaskId },
+      select: { id: true },
+    });
+    if (stillThere) {
+      if (!row.deliveredAt) {
+        await prisma.opsOutboxTask.update({
+          where: { id: row.id },
+          data: { deliveredAt: new Date() },
+        });
+      }
+      return { taskId: row.inboxTaskId, alreadyDelivered: true };
+    }
+  }
 
   const athlete = row.athlete;
   await ensureAthleteSystemBoards(athlete.id, athlete.userId);

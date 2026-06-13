@@ -37,7 +37,7 @@ function parseLineItems(raw: unknown): LineItemInput[] | null {
     if (!row || typeof row !== "object") return null;
     const o = row as Record<string, unknown>;
     const hoursWorked = Number(o.hoursWorked);
-    if (!Number.isFinite(hoursWorked) || hoursWorked <= 0 || hoursWorked > 24) return null;
+    if (!Number.isFinite(hoursWorked) || hoursWorked <= 0) return null;
     const projectPhase = String(o.projectPhase || "");
     if (!isOpsProjectPhase(projectPhase)) return null;
     const rawTypes = Array.isArray(o.taskTypes)
@@ -150,7 +150,7 @@ export async function POST(request: NextRequest) {
 
     const totalHours = lineItems.reduce((sum, li) => sum + li.hoursWorked, 0);
     const wellbeingScore =
-      body.wellbeingScore != null ? Math.max(1, Math.min(5, Number(body.wellbeingScore))) : null;
+      body.wellbeingScore != null ? Math.max(1, Math.min(10, Number(body.wellbeingScore))) : null;
 
     const submission = await prisma.$transaction(async (tx) => {
       if (existing) {

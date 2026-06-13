@@ -51,6 +51,22 @@ export async function GET(request: NextRequest) {
     },
   });
 
+  const ownerKey = ownerUserId ?? user.id;
+  const ownerBoards = boards.filter((b) => b.ownerId === ownerKey);
+  if (ownerBoards.length > 1) {
+    const orders = new Set(ownerBoards.map((b) => b.sortOrder));
+    if (orders.size <= 1) {
+      await Promise.all(
+        ownerBoards.map((b, i) =>
+          prisma.plannerBoard.update({ where: { id: b.id }, data: { sortOrder: i } })
+        )
+      );
+      ownerBoards.forEach((b, i) => {
+        b.sortOrder = i;
+      });
+    }
+  }
+
   return NextResponse.json({ boards });
 }
 

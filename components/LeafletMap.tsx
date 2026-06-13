@@ -170,7 +170,7 @@ export function LeafletMap({
   markers,
   center,
   zoom = 6,
-  heightClassName = "h-[520px]",
+  heightClassName = "h-[min(420px,55vh)] sm:h-[520px]",
   hubRecenterTick = 0,
 }: {
   markers: MarkerItem[];

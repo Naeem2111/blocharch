@@ -6,7 +6,7 @@ import { OpsSubNav } from "./OpsSubNav";
 export function OpsShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || "";
   return (
-    <div className="mx-auto max-w-[min(100vw-2rem,90rem)]">
+    <div className="mx-auto w-full max-w-[90rem]">
       <OpsSubNav pathname={pathname} />
       {children}
     </div>

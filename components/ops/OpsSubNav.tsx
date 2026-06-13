@@ -19,7 +19,7 @@ export const OPS_NAV: OpsNavItem[] = [
 export function OpsSubNav({ pathname }: { pathname: string }) {
   return (
     <nav
-      className="mb-8 flex flex-wrap gap-2 border-b border-white/[0.06] pb-4"
+      className="mb-6 flex gap-2 overflow-x-auto border-b border-white/[0.06] pb-4 [-ms-overflow-style:none] [scrollbar-width:none] md:mb-8 md:flex-wrap md:overflow-visible [&::-webkit-scrollbar]:hidden"
       aria-label="Athlete operations"
     >
       {OPS_NAV.map((item) => {
@@ -31,7 +31,7 @@ export function OpsSubNav({ pathname }: { pathname: string }) {
           <Link
             key={item.href}
             href={item.href}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium ring-1 transition-colors ${
+            className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium ring-1 transition-colors ${
               active
                 ? "bg-brand-500/20 text-brand-200 ring-brand-500/30"
                 : "bg-white/[0.04] text-slate-400 ring-white/[0.08] hover:bg-white/[0.07]"

@@ -1,5 +1,6 @@
 import type { PlannerBoardKind, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { ensureDefaultLabelsOnBoard } from "@/lib/planner-labels-seed";
 
 export const SYSTEM_BOARD_TITLES = {
   blocharch_outbox: "Blocharch Outbox",
@@ -56,6 +57,8 @@ async function createBoardWithColumns(
       color: "#64748b",
     })),
   });
+
+  await ensureDefaultLabelsOnBoard(board.id, tx);
 
   return board;
 }

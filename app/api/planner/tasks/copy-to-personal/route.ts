@@ -4,7 +4,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { canEditBoard, canViewBoard, requirePlannerSession } from "@/lib/planner-access";
 
-/** Duplicate a planner task onto a column on the user’s personal board; stores `linkedFromTaskId`. */
+/** Pull a task onto a personal board. Inbox cards are moved (not duplicated). */
 export async function POST(request: NextRequest) {
   const gate = await requirePlannerSession(request);
   if (gate instanceof NextResponse) return gate;
@@ -27,12 +27,13 @@ export async function POST(request: NextRequest) {
   const source = await prisma.plannerTask.findUnique({
     where: { id: sourceTaskId },
     include: {
-      column: { select: { boardId: true } },
+      column: { include: { board: { select: { id: true, kind: true } } } },
+      labels: true,
     },
   });
   if (!source) return NextResponse.json({ error: "Source task not found" }, { status: 404 });
-  const sourceBoardId = source.column.boardId;
-  if (!(await canViewBoard(user, sourceBoardId))) {
+  const sourceBoard = source.column.board;
+  if (!(await canViewBoard(user, sourceBoard.id))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -59,6 +60,42 @@ export async function POST(request: NextRequest) {
   });
   const sortOrder = (maxOrder._max.sortOrder ?? -1) + 1;
 
+  if (sourceBoard.kind === "blocharch_inbox") {
+    const moved = await prisma.plannerTask.update({
+      where: { id: source.id },
+      data: { columnId: targetColumnId, sortOrder },
+      include: {
+        assignee: { select: { id: true, username: true } },
+        labels: { include: { label: true } },
+        column: { select: { id: true, boardId: true } },
+      },
+    });
+    return NextResponse.json({
+      task: moved,
+      targetBoardId: targetBoard.id,
+      moved: true,
+    });
+  }
+
+  const existingDup = await prisma.plannerTask.findFirst({
+    where: {
+      linkedFromTaskId: source.id,
+      column: { boardId: targetBoard.id },
+    },
+    include: {
+      assignee: { select: { id: true, username: true } },
+      labels: { include: { label: true } },
+      column: { select: { id: true, boardId: true } },
+    },
+  });
+  if (existingDup) {
+    return NextResponse.json({
+      task: existingDup,
+      targetBoardId: targetBoard.id,
+      alreadyExists: true,
+    });
+  }
+
   const created = await prisma.plannerTask.create({
     data: {
       columnId: targetColumnId,
@@ -84,5 +121,6 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     task: created,
     targetBoardId: targetBoard.id,
+    moved: false,
   });
 }

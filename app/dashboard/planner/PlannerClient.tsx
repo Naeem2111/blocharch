@@ -11,9 +11,16 @@ import {
   findBoardIdForColumn,
   type KanbanBoardDetail,
 } from "@/lib/planner-board-mutation";
-import { maybeAutoScrollDrag } from "@/lib/planner-drag-scroll";
+import { startDragAutoScroll, stopDragAutoScroll, trackDragPointer } from "@/lib/planner-drag-scroll";
 import { createDragHighlightScheduler } from "@/lib/planner-drag-ui";
 import { usesAthleteCompletedFlow } from "@/lib/planner-completed";
+
+const FIXED_BOARD_KINDS = new Set([
+  "blocharch_outbox",
+  "blocharch_inbox",
+  "my_tasks",
+  "completed",
+]);
 
 type BoardSummary = {
   id: string;
@@ -286,6 +293,7 @@ export function PlannerClient() {
   }, [dragTaskId]);
 
   function clearDragState() {
+    stopDragAutoScroll();
     dragHighlightRef.current.cancel();
     dragTaskIdRef.current = null;
     setDragTaskId(null);
@@ -988,7 +996,8 @@ export function PlannerClient() {
     if (toIdx < 0 || toIdx >= filteredBoards.length) return;
     const a = filteredBoards[fromIdx];
     const b = filteredBoards[toIdx];
-    if (!a || !b || a.isSystem || b.isSystem) return;
+    if (!a || !b || FIXED_BOARD_KINDS.has(a.kind ?? "custom") || FIXED_BOARD_KINDS.has(b.kind ?? "custom"))
+      return;
     const next = [...boards];
     const ai = next.findIndex((x) => x.id === a.id);
     const bi = next.findIndex((x) => x.id === b.id);
@@ -1239,7 +1248,7 @@ export function PlannerClient() {
         <div className="flex flex-wrap items-center gap-2">
           {filteredBoards.map((b, boardIdx) => (
             <div key={b.id} className="flex items-center gap-0.5">
-              {!b.isSystem && filteredBoards.length > 1 ? (
+              {!FIXED_BOARD_KINDS.has(b.kind ?? "custom") && filteredBoards.length > 1 ? (
                 <div className="flex flex-col gap-0.5">
                   <button
                     type="button"
@@ -1530,7 +1539,7 @@ export function PlannerClient() {
             {detail.columns.map((col, colIdx) => (
               <div
                 key={col.id}
-                className={`flex w-[280px] shrink-0 flex-col rounded-xl border border-white/[0.08] bg-white/[0.02] transition-[box-shadow,background-color,border-color] duration-150 ${
+                className={`flex w-[min(78vw,280px)] shrink-0 flex-col rounded-xl border border-white/[0.08] bg-white/[0.02] transition-[box-shadow,background-color,border-color] duration-150 sm:w-[280px] ${
                   detail.editable && dragTaskId && dropTargetColumnId === col.id
                     ? "border-brand-500/35 bg-brand-500/[0.07] ring-2 ring-brand-500/25"
                     : ""
@@ -1539,7 +1548,8 @@ export function PlannerClient() {
                   if (!detail.editable || !dragTaskIdRef.current) return;
                   e.preventDefault();
                   e.dataTransfer.dropEffect = "move";
-                  maybeAutoScrollDrag(e.clientX, e.clientY);
+                  trackDragPointer(e.clientX, e.clientY);
+                  startDragAutoScroll();
                   scheduleDragHighlight(col.id, null);
                 }}
                 onDragLeave={(e) => {
@@ -1575,7 +1585,8 @@ export function PlannerClient() {
                     e.preventDefault();
                     e.stopPropagation();
                     e.dataTransfer.dropEffect = "move";
-                    maybeAutoScrollDrag(e.clientX, e.clientY);
+                    trackDragPointer(e.clientX, e.clientY);
+                  startDragAutoScroll();
                     scheduleDragHighlight(col.id, { columnId: col.id, beforeTaskId: null });
                   }}
                   onDrop={(e) => {
@@ -1644,6 +1655,7 @@ export function PlannerClient() {
                           suppressNextCardClickRef.current = false;
                           dragTaskIdRef.current = t.id;
                           setDragTaskId(t.id);
+                          startDragAutoScroll();
                           e.dataTransfer.effectAllowed = "move";
                           e.dataTransfer.setData("text/plain", t.id);
                           removePlannerDragGhosts();
@@ -1864,7 +1876,7 @@ export function PlannerClient() {
             ))}
           </div>
             {detail.editable ? (
-              <div className="flex w-[260px] shrink-0 flex-col gap-2 rounded-xl border border-dashed border-white/[0.12] bg-white/[0.02] p-3">
+              <div className="flex w-[min(78vw,260px)] shrink-0 flex-col gap-2 rounded-xl border border-dashed border-white/[0.12] bg-white/[0.02] p-3 sm:w-[260px]">
                 {!addColumnOpen ? (
                   <button
                     type="button"
@@ -2064,7 +2076,10 @@ export function PlannerClient() {
           aria-modal="true"
         >
           <div className="w-full max-w-md rounded-2xl border border-white/[0.1] bg-slate-900 p-6 shadow-xl">
-            <h3 className="text-lg font-semibold text-white">Copy to personal board</h3>
+            <h3 className="text-lg font-semibold text-white">Pull to personal board</h3>
+            <p className="mt-1 text-xs text-slate-500">
+              Cards from Blocharch Inbox are moved (not duplicated). Other boards create a linked copy.
+            </p>
             <p className="mt-1 text-xs text-slate-500">
               Creates a new card on your personal Kanban from:{" "}
               <span className="text-slate-300">{copyModal.title}</span>
@@ -2550,7 +2565,7 @@ function TaskFormModal({
               onChange={(e) => setDueDate(e.target.value)}
             />
           </label>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="block text-slate-400">
               Time
               <input
@@ -2736,7 +2751,7 @@ function EditTaskModal({
               onChange={(e) => setDueDate(e.target.value)}
             />
           </label>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="block text-slate-400">
               Time
               <input

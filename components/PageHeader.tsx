@@ -9,7 +9,7 @@ export function PageHeader({ title, description, badge, className = "" }: PageHe
   return (
     <header className={`mb-0 ${className}`.trim()}>
       <div className="flex flex-wrap items-center gap-2 gap-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-white">{title}</h1>
+        <h1 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">{title}</h1>
         {badge ? (
           <span className="rounded-md bg-brand-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-brand-400 ring-1 ring-brand-500/20">
             {badge}

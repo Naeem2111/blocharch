@@ -12,7 +12,7 @@ export default async function PlannerPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[min(100vw-2rem,90rem)]">
+    <div className="mx-auto w-full max-w-[90rem]">
       <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
         <PageHeader
           title="Project planner"

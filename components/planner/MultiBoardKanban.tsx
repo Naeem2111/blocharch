@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useRef, useState } from "react";
 import type { KanbanBoardDetail, KanbanTaskRow } from "@/lib/planner-board-mutation";
-import { maybeAutoScrollDrag } from "@/lib/planner-drag-scroll";
+import { startDragAutoScroll, stopDragAutoScroll, trackDragPointer } from "@/lib/planner-drag-scroll";
 import { createDragHighlightScheduler } from "@/lib/planner-drag-ui";
 import { usesAthleteCompletedFlow } from "@/lib/planner-completed";
 
@@ -69,6 +69,7 @@ export function MultiBoardKanban({ boards, onMoveTask, onOpenTask, onToggleCompl
   );
 
   function clearDragState() {
+    stopDragAutoScroll();
     dragHighlightRef.current.cancel();
     dragTaskIdRef.current = null;
     setDragTaskId(null);
@@ -168,14 +169,15 @@ export function MultiBoardKanban({ boards, onMoveTask, onOpenTask, onToggleCompl
               {board.columns.map((col) => (
                 <div
                   key={col.id}
-                  className={`flex w-[260px] shrink-0 flex-col rounded-lg border border-white/[0.08] bg-black/20 ${
+                  className={`flex w-[min(72vw,260px)] shrink-0 flex-col rounded-lg border border-white/[0.08] bg-black/20 sm:w-[260px] ${
                     dragTaskId && dropTargetColumnId === col.id ? "ring-2 ring-brand-500/30" : ""
                   }`}
                   onDragOver={(e) => {
                     if (!board.editable || !dragTaskIdRef.current) return;
                     e.preventDefault();
                     e.dataTransfer.dropEffect = "move";
-                    maybeAutoScrollDrag(e.clientX, e.clientY);
+                    trackDragPointer(e.clientX, e.clientY);
+                    startDragAutoScroll();
                     scheduleHighlight(col.id, null);
                   }}
                   onDrop={(e) => {
@@ -198,7 +200,8 @@ export function MultiBoardKanban({ boards, onMoveTask, onOpenTask, onToggleCompl
                       e.preventDefault();
                       e.stopPropagation();
                       e.dataTransfer.dropEffect = "move";
-                      maybeAutoScrollDrag(e.clientX, e.clientY);
+                      trackDragPointer(e.clientX, e.clientY);
+                    startDragAutoScroll();
                       scheduleHighlight(col.id, { columnId: col.id, beforeTaskId: null });
                     }}
                     onDrop={(e) => {
@@ -246,6 +249,7 @@ export function MultiBoardKanban({ boards, onMoveTask, onOpenTask, onToggleCompl
                               if (!board.editable) return;
                               dragTaskIdRef.current = t.id;
                               setDragTaskId(t.id);
+                              startDragAutoScroll();
                               e.dataTransfer.effectAllowed = "move";
                               e.dataTransfer.setData("text/plain", t.id);
                             }}

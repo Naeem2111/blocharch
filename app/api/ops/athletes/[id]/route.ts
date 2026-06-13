@@ -30,7 +30,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (body.email !== undefined) athleteData.email = body.email ? String(body.email).trim() : null;
     if (body.status === "active" || body.status === "inactive") athleteData.status = body.status;
     if (body.baseMonthlyPayZar != null) athleteData.baseMonthlyPayZar = Math.max(0, Number(body.baseMonthlyPayZar) || 0);
-    if (body.monthlyHourCap != null) athleteData.monthlyHourCap = Math.max(1, Math.min(400, Number(body.monthlyHourCap) || 160));
+    if (body.monthlyHourCap != null)
+      athleteData.monthlyHourCap = Math.max(1, Math.round(Number(body.monthlyHourCap) || 160));
     if (body.overtimeRateZar != null) athleteData.overtimeRateZar = Math.max(0, Number(body.overtimeRateZar) || 0);
     if (body.blocharchStartDate != null) {
       const d = parseDateOnly(String(body.blocharchStartDate));

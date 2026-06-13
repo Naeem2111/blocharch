@@ -331,12 +331,14 @@ function NavLink({
   pathname,
   badge,
   urgent,
-}: NavItem & { pathname: string; badge?: number; urgent?: boolean }) {
+  onNavigate,
+}: NavItem & { pathname: string; badge?: number; urgent?: boolean; onNavigate?: () => void }) {
   const active = navActive(pathname, href);
   const showUrgent = urgent && !active && (badge ?? 0) > 0;
   return (
     <Link
       href={href}
+      onClick={onNavigate}
       className={`flex min-w-0 flex-1 items-center gap-3 rounded-lg py-2.5 pr-3 text-sm font-medium transition-colors ${
         active
           ? "bg-brand-500/15 text-brand-300 ring-1 ring-brand-500/25"
@@ -374,6 +376,7 @@ function DraggableNavItem({
   onDragEnd,
   badge,
   urgent,
+  onNavigate,
 }: {
   item: NavItem;
   sectionId: string;
@@ -387,6 +390,7 @@ function DraggableNavItem({
   onDragOver: (sectionId: string, index: number) => void;
   onDrop: (sectionId: string, index: number) => void;
   onDragEnd: () => void;
+  onNavigate?: () => void;
 }) {
   const isDragging =
     dragging?.sectionId === sectionId && dragging.index === index;
@@ -413,6 +417,7 @@ function DraggableNavItem({
       ) : null}
       <span
         draggable
+        className="hidden lg:inline"
         onDragStart={(e) => {
           e.dataTransfer.effectAllowed = "move";
           e.dataTransfer.setData("application/x-sidebar-item", `${sectionId}:${index}`);
@@ -422,7 +427,7 @@ function DraggableNavItem({
       >
         <DragHandle label={item.label} />
       </span>
-      <NavLink {...item} pathname={pathname} badge={badge} urgent={urgent} />
+      <NavLink {...item} pathname={pathname} badge={badge} urgent={urgent} onNavigate={onNavigate} />
     </div>
   );
 }
@@ -495,6 +500,7 @@ function DraggableSectionHeader({
       <div className="flex items-center gap-0.5">
         <span
           draggable
+          className="hidden lg:inline"
           onDragStart={(e) => {
             e.dataTransfer.effectAllowed = "move";
             e.dataTransfer.setData("application/x-sidebar-section", String(index));
@@ -522,7 +528,15 @@ function DraggableSectionHeader({
 
 type SidebarBadges = Record<string, number>;
 
-export function DashboardSidebar({ user }: { user: SessionUser }) {
+export function DashboardSidebar({
+  user,
+  mobileOpen = false,
+  onNavigate,
+}: {
+  user: SessionUser;
+  mobileOpen?: boolean;
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname() || "";
   const [navOrder, setNavOrder] = useState<SidebarNavOrder | null>(null);
   const [badges, setBadges] = useState<SidebarBadges>({});
@@ -651,7 +665,11 @@ export function DashboardSidebar({ user }: { user: SessionUser }) {
   };
 
   return (
-    <aside className="flex w-[260px] min-h-screen flex-shrink-0 flex-col border-r border-white/[0.06] bg-[var(--bg-sidebar)]">
+    <aside
+      className={`fixed inset-y-0 left-0 z-50 flex w-[min(85vw,280px)] flex-col border-r border-white/[0.06] bg-[var(--bg-sidebar)] transition-transform duration-200 ease-out lg:relative lg:z-auto lg:w-[260px] lg:min-h-screen lg:flex-shrink-0 lg:translate-x-0 ${
+        mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+      }`}
+    >
       <div className="border-b border-white/[0.06] px-4 py-5">
         <BrandMark />
         <p className="mt-3 text-xs leading-relaxed text-slate-500">
@@ -669,8 +687,8 @@ export function DashboardSidebar({ user }: { user: SessionUser }) {
           </span>
         </a>
       </div>
-      <nav className="flex-1 space-y-1 p-3" aria-label="Main">
-        <p className="px-1 pb-2 text-[10px] text-slate-600">
+      <nav className="flex-1 space-y-1 overflow-y-auto overscroll-y-contain p-3" aria-label="Main">
+        <p className="hidden px-1 pb-2 text-[10px] text-slate-600 lg:block">
           Drag <span className="text-slate-500">⋮⋮</span> to reorder sections and links. Saved for your account on this device.
         </p>
         {visibleSections.map((section, sectionIndex) => {
@@ -722,6 +740,7 @@ export function DashboardSidebar({ user }: { user: SessionUser }) {
                     setDragItem(null);
                     setDropItemIndex(null);
                   }}
+                  onNavigate={onNavigate}
                 />
               ))}
             </div>

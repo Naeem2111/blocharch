@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { MiniMonthCalendar } from "@/components/MiniMonthCalendar";
 import { ProgressSlider } from "@/components/ProgressSlider";
 import { DAILY_PROJECT_PHASE_OPTIONS, DAILY_TASK_TYPE_OPTIONS } from "@/lib/ops-daily-form";
 
@@ -74,17 +75,21 @@ export function AthleteSubmissionsClient() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [calc, setCalc] = useState<CalcPanel | null>(null);
-  const [wellbeingScore, setWellbeingScore] = useState("3");
+  const [wellbeingScore, setWellbeingScore] = useState("5");
   const [checkInRequested, setCheckInRequested] = useState(false);
   const [dailyNote, setDailyNote] = useState("");
   const [lines, setLines] = useState<LineItemForm[]>([emptyLine()]);
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [formLocked, setFormLocked] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
   function applySubmission(sub: PastSubmission, notify?: string) {
+    setEditingId(sub.id);
     setSelectedDate(sub.submissionDate);
-    setWellbeingScore(String(sub.wellbeingScore ?? 3));
+    setCalendarMonth(sub.submissionDate.slice(0, 7));
+    setWellbeingScore(String(sub.wellbeingScore ?? 5));
     setCheckInRequested(sub.checkInRequested);
     setDailyNote(sub.dailyNote ?? "");
     setFormLocked(!sub.editable);
@@ -120,7 +125,9 @@ export function AthleteSubmissionsClient() {
   }
 
   function resetToToday() {
+    setEditingId(null);
     setSelectedDate(today);
+    setCalendarMonth(today.slice(0, 7));
     setWellbeingScore("3");
     setCheckInRequested(false);
     setDailyNote("");
@@ -148,6 +155,39 @@ export function AthleteSubmissionsClient() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const submissionMarks = useMemo(
+    () =>
+      pastSubmissions.map((s) => ({
+        date: s.submissionDate,
+        label: `${s.totalHours}h logged`,
+        color: s.lockedAt ? "#64748b" : "#3b82f6",
+      })),
+    [pastSubmissions]
+  );
+
+  function onPickDate(date: string) {
+    setSelectedDate(date);
+    setCalendarMonth(date.slice(0, 7));
+    const sub = pastSubmissions.find((s) => s.submissionDate === date);
+    if (sub?.editable) {
+      applySubmission(sub);
+      return;
+    }
+    if (sub && !sub.editable) {
+      setError("This submission is locked. Ask admin to unlock it under Commercial.");
+      setFormLocked(true);
+      applySubmission(sub);
+      return;
+    }
+    setEditingId(null);
+    setFormLocked(false);
+    setWellbeingScore("5");
+    setCheckInRequested(false);
+    setDailyNote("");
+    setLines([emptyLine()]);
+    setError("");
+  }
 
   const todayHoursPreview = lines.reduce((sum, li) => sum + (Number(li.hoursWorked) || 0), 0);
 
@@ -221,30 +261,58 @@ export function AthleteSubmissionsClient() {
   return (
     <div className="space-y-8">
     <form onSubmit={submit} className="space-y-6">
-      <div className="card-tool grid gap-4 rounded-xl p-4 md:grid-cols-3">
+      <div className="card-tool grid gap-4 rounded-xl p-4 lg:grid-cols-[1fr,minmax(220px,280px)]">
+        <div className="grid gap-4 md:grid-cols-3">
         <label className="text-xs text-slate-400">
           Date
           <input
-            readOnly
+            type="date"
             value={selectedDate}
-            className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-slate-300"
+            onChange={(e) => onPickDate(e.target.value)}
+            className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
           />
         </label>
         <label className="text-xs text-slate-400">
-          Wellbeing (1–5)
+          Wellbeing (1–10)
           <select
             value={wellbeingScore}
             onChange={(e) => setWellbeingScore(e.target.value)}
+            disabled={formLocked}
             className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
           >
-            {[1, 2, 3, 4, 5].map((n) => (
+            {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
               <option key={n} value={n}>
                 {n}
               </option>
             ))}
           </select>
         </label>
-        <div className="flex items-end pb-1">
+        </div>
+        <div className="border-t border-white/[0.06] pt-4 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
+          <label className="text-xs text-slate-400">
+            Month
+            <input
+              type="month"
+              value={calendarMonth}
+              onChange={(e) => setCalendarMonth(e.target.value)}
+              className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+            />
+          </label>
+          <MiniMonthCalendar
+            className="mt-3"
+            month={calendarMonth}
+            marks={submissionMarks}
+            selectedDate={selectedDate}
+            onSelectDate={onPickDate}
+          />
+          <p className="mt-2 text-[10px] text-slate-600">
+            Blue dots = logged days. Tap a day to edit or create an entry.
+          </p>
+        </div>
+      </div>
+
+      <div className="card-tool grid gap-4 rounded-xl p-4 md:grid-cols-3">
+        <div className="flex items-end pb-1 md:col-span-3">
           <button
             type="button"
             onClick={() => setCheckInRequested((v) => !v)}
@@ -359,10 +427,10 @@ export function AthleteSubmissionsClient() {
                 <input
                   type="number"
                   min={0.25}
-                  max={24}
                   step={0.25}
                   required
                   value={li.hoursWorked}
+                  disabled={formLocked}
                   onChange={(e) => updateLine(li.key, { hoursWorked: e.target.value })}
                   className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
                 />
@@ -439,7 +507,7 @@ export function AthleteSubmissionsClient() {
         disabled={saving || projects.length === 0 || formLocked}
         className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-brand-500 disabled:opacity-50"
       >
-        {saving ? "Saving…" : "Save daily log"}
+        {saving ? "Saving…" : editingId ? "Update daily log" : "Save daily log"}
       </button>
     </form>
 

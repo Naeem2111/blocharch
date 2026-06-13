@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { DashboardSidebar } from "@/components/DashboardSidebar";
+import { DashboardShell } from "@/components/DashboardShell";
 import { ThemeBootstrap } from "@/components/ThemeBootstrap";
 import { getSession } from "@/lib/auth";
 
@@ -14,10 +14,9 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="flex min-h-screen">
+    <>
       <ThemeBootstrap theme={session.user.theme} />
-      <DashboardSidebar user={session.user} />
-      <main className="app-main flex-1 overflow-auto p-6 sm:p-8 lg:p-10">{children}</main>
-    </div>
+      <DashboardShell user={session.user}>{children}</DashboardShell>
+    </>
   );
 }

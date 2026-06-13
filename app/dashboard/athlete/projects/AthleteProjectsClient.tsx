@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { MiniMonthCalendar } from "@/components/MiniMonthCalendar";
 import { ProjectProgressBar } from "@/components/ProjectProgressBar";
 import {
   COMPLEXITY_LABELS,
   PROJECT_PHASE_LABELS,
   PROJECT_STATUS_LABELS,
 } from "@/lib/ops-constants";
+import { daysUntilDueFromIso, projectDueColor } from "@/lib/project-color-scale";
 import { computeProjectTimeline } from "@/lib/project-timeline";
 
 type ProjectRow = {
@@ -33,6 +35,7 @@ export function AthleteProjectsClient() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date().toISOString().slice(0, 7));
 
   const load = useCallback(async () => {
     const r = await fetch("/api/athlete/projects");
@@ -44,6 +47,21 @@ export function AthleteProjectsClient() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const dueMarks = useMemo(
+    () =>
+      projects
+        .filter((p) => p.dueDate)
+        .map((p) => {
+          const days = daysUntilDueFromIso(p.dueDate);
+          return {
+            date: p.dueDate!,
+            label: `${p.name} due`,
+            color: projectDueColor(days),
+          };
+        }),
+    [projects]
+  );
 
   function startEdit(p: ProjectRow) {
     setEditingId(p.id);
@@ -79,6 +97,40 @@ export function AthleteProjectsClient() {
   if (loading) return <p className="text-sm text-slate-500">Loading projects…</p>;
 
   return (
+    <div className="space-y-6">
+      <div className="card-tool rounded-xl p-5">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <h2 className="text-sm font-semibold text-white">Project due dates</h2>
+          <label className="text-xs text-slate-400">
+            Month
+            <input
+              type="month"
+              value={calendarMonth}
+              onChange={(e) => setCalendarMonth(e.target.value)}
+              className="mt-1 block rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+            />
+          </label>
+        </div>
+        <MiniMonthCalendar className="mt-4" month={calendarMonth} marks={dueMarks} />
+        <div className="mt-3 flex flex-wrap gap-3 text-[10px] text-slate-500">
+          <span className="flex items-center gap-1">
+            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "#22c55e" }} /> 14+ days
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "#3b82f6" }} /> 8–14 days
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "#eab308" }} /> 4–7 days
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "#f97316" }} /> 1–3 days
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "#ef4444" }} /> Overdue
+          </span>
+        </div>
+      </div>
+
     <div className="space-y-4">
       {msg ? <p className="text-sm text-brand-300">{msg}</p> : null}
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
@@ -88,8 +140,14 @@ export function AthleteProjectsClient() {
           dueDate: p.dueDate,
           handoverDate: p.handoverDate,
         });
+        const daysUntil = daysUntilDueFromIso(p.dueDate);
+        const accent = projectDueColor(daysUntil);
         return (
-        <article key={p.id} className="card-tool rounded-xl p-5">
+        <article
+          key={p.id}
+          className="card-tool rounded-xl p-5"
+          style={{ borderLeftWidth: 4, borderLeftColor: accent }}
+        >
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
               <h2 className="font-semibold text-white">{p.name}</h2>
@@ -220,6 +278,7 @@ export function AthleteProjectsClient() {
       {projects.length === 0 ? (
         <p className="text-sm text-slate-500">No projects assigned yet. Ask your admin to assign projects to you.</p>
       ) : null}
+    </div>
     </div>
   );
 }

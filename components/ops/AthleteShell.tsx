@@ -6,7 +6,7 @@ import { AthleteSubNav } from "./AthleteSubNav";
 export function AthleteShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || "";
   return (
-    <div className="mx-auto max-w-[min(100vw-2rem,90rem)]">
+    <div className="mx-auto w-full max-w-[90rem]">
       <AthleteSubNav pathname={pathname} />
       {children}
     </div>
