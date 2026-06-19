@@ -146,7 +146,7 @@ export async function loadPracticesForMap(): Promise<{
   let picked =
     cap > 0
       ? [...withCoords, ...withoutCoords].slice(0, Math.max(cap, withCoords.length))
-      : [...withCoords, ...withoutCoords.slice(0, 400)];
+      : [...withCoords, ...withoutCoords];
 
   const hubSlug = focalAnchor.slug;
   if (hubSlug && cap > 0) {

@@ -41,7 +41,9 @@ export default async function DashboardPage() {
         <div className="card-tool rounded-2xl p-5">
           <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Map coordinates</p>
           <p className="mt-2 text-3xl font-semibold tabular-nums text-slate-200">{mapReady}</p>
-          <p className="mt-1 text-xs text-slate-500">Stored for map view</p>
+          <p className="mt-1 text-xs text-slate-500">
+            Geocoded in database (of {total} in directory)
+          </p>
         </div>
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

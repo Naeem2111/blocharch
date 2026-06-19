@@ -6,15 +6,9 @@ import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import L from "leaflet";
 import "leaflet.markercluster";
 import { MapContainer, TileLayer, useMap, Circle } from "react-leaflet";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
-type Stage =
-  | "cold"
-  | "no_reply"
-  | "positive_reply"
-  | "follow_up_interested"
-  | "negative_reply"
-  | "follow_up_not_interested";
+type Stage = LeadStage;
 
 type MarkerItem = {
   id: string;
@@ -31,6 +25,8 @@ type MarkerItem = {
 };
 
 import { LEAD_STAGE_COLORS } from "@/lib/lead-stage-ui";
+import type { LeadStage } from "@/lib/leads";
+import { buildMapPinStageSelectHtml } from "@/lib/map-pin-popup";
 
 const STAGE_COLORS: Record<Stage, string> = LEAD_STAGE_COLORS;
 
@@ -120,9 +116,17 @@ function HubRecenterController({
   return null;
 }
 
-function MapClusterLayer({ markers }: { markers: MarkerItem[] }) {
+function MapClusterLayer({
+  markers,
+  onStageChange,
+}: {
+  markers: MarkerItem[];
+  onStageChange?: (slug: string, stage: Stage) => void;
+}) {
   const map = useMap();
   const sig = useMemo(() => markerSignature(markers), [markers]);
+  const onStageChangeRef = useRef(onStageChange);
+  onStageChangeRef.current = onStageChange;
 
   useEffect(() => {
     if (!markers.length) return;
@@ -151,8 +155,25 @@ function MapClusterLayer({ markers }: { markers: MarkerItem[] }) {
             ? `<a class="text-sm text-sky-600 underline" href="${escapeHtml(m.href)}" target="_blank" rel="noopener noreferrer">Website</a>`
             : `<a class="text-sm text-sky-600 underline" href="${escapeHtml(m.href)}">View practice</a>`
           : "",
+        !m.hub && onStageChangeRef.current
+          ? buildMapPinStageSelectHtml(m.id, m.stage)
+          : "",
       ].filter(Boolean);
       marker.bindPopup(lines.join(""));
+      if (!m.hub && onStageChangeRef.current) {
+        marker.on("popupopen", () => {
+          const sel = marker
+            .getPopup()
+            ?.getElement()
+            ?.querySelector(".map-pin-stage-select") as HTMLSelectElement | null;
+          if (!sel) return;
+          sel.value = m.stage;
+          sel.onchange = () => {
+            const next = sel.value as Stage;
+            onStageChangeRef.current?.(m.id, next);
+          };
+        });
+      }
       mcg.addLayer(marker);
     }
 
@@ -172,6 +193,7 @@ export function LeafletMap({
   zoom = 6,
   heightClassName = "h-[min(420px,55vh)] sm:h-[520px]",
   hubRecenterTick = 0,
+  onStageChange,
 }: {
   markers: MarkerItem[];
   center: { lat: number; lng: number };
@@ -179,6 +201,8 @@ export function LeafletMap({
   heightClassName?: string;
   /** Bump (e.g. `setTick((n) => n + 1)`) to animate the map back to `center` / `zoom` (hub focal pin). */
   hubRecenterTick?: number;
+  /** Called when a pin popup stage dropdown changes (slug = practice slug). */
+  onStageChange?: (slug: string, stage: Stage) => void;
 }) {
   const mapCenter = useMemo(() => [center.lat, center.lng] as [number, number], [center.lat, center.lng]);
 
@@ -194,7 +218,9 @@ export function LeafletMap({
         <MapViewController center={mapCenter} zoom={zoom} />
         <HubRecenterController tick={hubRecenterTick} mapCenter={mapCenter} zoom={zoom} />
         {markers.some((m) => m.hub && m.hubDetail) ? <HubRadiusLayer markers={markers} /> : null}
-        {markers.length > 0 ? <MapClusterLayer markers={markers} /> : null}
+        {markers.length > 0 ? (
+          <MapClusterLayer markers={markers} onStageChange={onStageChange} />
+        ) : null}
       </MapContainer>
       <style jsx>{`
         :global(.lead-stage-pin-wrap) {

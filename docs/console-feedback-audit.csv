@@ -7,12 +7,12 @@ Source,AUDIT = Naeem Dashboard Audit 15.06.2026.pdf | V1/V2 = prior feedback PDF
 ,,,
 Section,Topic,Source,Status,Notes
 MARKETING,Overview layout & styling,AUDIT,Done,No design changes requested.
-MARKETING,Overview map coordinates count reflects all geocoded practices,AUDIT,Partial,Count may still show ~792; full geocode backfill pending (~2336 addressed).
+MARKETING,Overview map coordinates count reflects all geocoded practices,AUDIT,Done,Overview shows geocoded count of total directory.
 MARKETING,Map visual quality & London pins,AUDIT,Done,Layout and pin styling approved.
-MARKETING,Map — load all leads (~3000 practices geocoded),AUDIT,Partial,~792 mapped; geocode scripts exist; majority still ungeocoded.
-MARKETING,Map — default all pins to Cold,AUDIT,Partial,Ungeocoded practices default cold; verify all loaded pins.
-MARKETING,Map — manual status dropdown per pin (6 stages),AUDIT,Missing,No per-pin stage picker on map click.
-MARKETING,Map — live status update + pin colour change,AUDIT,Partial,Stage colours exist; map pin update UX not wired.
+MARKETING,Map — load all leads (~3000 practices geocoded),AUDIT,Partial,Full directory on map; geocode:architects:all backfill running.
+MARKETING,Map — default all pins to Cold,AUDIT,Done,Practices without lead row default to cold.
+MARKETING,Map — manual status dropdown per pin (6 stages),AUDIT,Done,Stage select in pin popup.
+MARKETING,Map — live status update + pin colour change,AUDIT,Done,Stage PATCH updates pin colour live.
 MARKETING,Practices directory (2336 total),AUDIT,Done,Table layout and count correct; no changes needed.
 MARKETING,Lead Nurturing — remove Activate workflow button,AUDIT,Done,Workflow UI removed from AutomationClient.
 MARKETING,Lead Nurturing — remove n8n/workflow text,AUDIT,Done,n8n copy removed from nurturing page.

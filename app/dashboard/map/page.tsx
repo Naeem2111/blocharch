@@ -7,8 +7,8 @@ export default async function MapPage() {
   const { practices, initialGeocodes, focalAnchor } = await loadPracticesForMap();
 
   const mapBlurb = hubUsesIconStudio(focalAnchor)
-    ? `Nearest practices to Icon Architects (5 Plato Place, St Dionis Road, London SW6 4TU) — up to ${practices.length} on the map, prioritised by proximity. Zoom out for broader geography.`
-    : `Practices nearest to ${focalAnchor.name} — up to ${practices.length} on the map. Zoom out for broader geography.`;
+    ? `All ${practices.length} directory practices with addresses — pins default to Cold until you change stage. Click a pin to update stage; colour updates live. Geocoding runs in batches for practices without stored coordinates.`
+    : `All ${practices.length} practices with addresses near ${focalAnchor.name}. Pins default to Cold; click a pin to change stage.`;
 
   return (
     <div className="mx-auto max-w-7xl">

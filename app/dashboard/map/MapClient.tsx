@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MAP_PRACTICE_DISPLAY_LIMIT, type MapPracticeStage } from "@/lib/map-practices";
 
 import { hubUsesIconStudio, type MapHubAnchor } from "@/lib/map-hub";
@@ -60,6 +60,8 @@ export function MapClient({
 
   const [pinSearchInput, setPinSearchInput] = useState("");
   const [pinFilter, setPinFilter] = useState("");
+  const [stageBySlug, setStageBySlug] = useState<Record<string, MapPracticeStage>>({});
+  const [stageError, setStageError] = useState<string | null>(null);
   /** Increment to tell LeafletMap to fly back to the focal hub coordinates. */
   const [hubRecenterTick, setHubRecenterTick] = useState(0);
 
@@ -75,6 +77,42 @@ export function MapClient({
   useEffect(() => {
     setResults({ ...initialGeocodes });
   }, [initialGeocodes, initialKey]);
+
+  useEffect(() => {
+    setStageBySlug((prev) => {
+      const next = { ...prev };
+      for (const p of practices) {
+        if (!(p.slug in next)) next[p.slug] = p.stage;
+      }
+      return next;
+    });
+  }, [practiceKey, practices]);
+
+  const updateStage = useCallback(
+    async (slug: string, stage: MapPracticeStage) => {
+      setStageError(null);
+      let previous: MapPracticeStage = "cold";
+      setStageBySlug((prev) => {
+        previous = prev[slug] ?? practices.find((p) => p.slug === slug)?.stage ?? "cold";
+        return { ...prev, [slug]: stage };
+      });
+      try {
+        const res = await fetch(`/api/leads/${encodeURIComponent(slug)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ stage }),
+        });
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          throw new Error((j as { error?: string }).error || "Could not save stage");
+        }
+      } catch (e) {
+        setStageBySlug((prev) => ({ ...prev, [slug]: previous }));
+        setStageError(e instanceof Error ? e.message : "Could not save stage");
+      }
+    },
+    [practices]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -170,7 +208,7 @@ export function MapClient({
         name: p.name,
         lat,
         lng,
-        stage: p.stage,
+        stage: stageBySlug[p.slug] ?? p.stage,
         subtitle:
           isHub && focalAnchor
             ? undefined
@@ -184,7 +222,7 @@ export function MapClient({
       });
     }
     return out;
-  }, [practices, results, focalAnchor]);
+  }, [practices, results, focalAnchor, stageBySlug]);
 
   const markers = useMemo(() => {
     const list = [...markersBase];
@@ -353,6 +391,11 @@ export function MapClient({
           {geocodeError}
         </p>
       )}
+      {stageError && (
+        <p className="text-red-400/90 text-sm rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2">
+          {stageError}
+        </p>
+      )}
       {hasActiveFilter && filteredMarkers.length === 0 ? (
         <div className="card-tool flex h-[520px] flex-col items-center justify-center rounded-2xl ring-1 ring-white/[0.06] px-6 text-center">
           <p className="text-slate-400 text-sm">
@@ -382,11 +425,14 @@ export function MapClient({
             center={center}
             zoom={initialZoom}
             hubRecenterTick={hubRecenterTick}
+            onStageChange={updateStage}
           />
         </div>
       )}
       <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
-        <p className="text-xs uppercase tracking-wide text-slate-500 mb-2">Automation stage colors</p>
+        <p className="text-xs uppercase tracking-wide text-slate-500 mb-2">
+          Lead stage colours — click a pin to change stage
+        </p>
         {hubUsesIconStudio(focalAnchor) ? (
           <p className="text-xs text-slate-500 mb-3">
             Large amber glow — Blocharch focal point: {focalAnchor.name} at 5 Plato Place, St Dionis Road, London SW6 4TU (
