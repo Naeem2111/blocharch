@@ -1,7 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { COMPLEXITY_LABELS, PROJECT_PHASE_LABELS, PROJECT_STATUS_LABELS } from "@/lib/ops-constants";
+import { ProjectProgressBar } from "@/components/ProjectProgressBar";
+import {
+  COMPLEXITY_LABELS,
+  PROJECT_PHASE_LABELS,
+  PROJECT_STATUS_LABELS,
+} from "@/lib/ops-constants";
+import { daysUntilDueFromIso, projectDueColor } from "@/lib/project-color-scale";
+import { computeProjectTimeline } from "@/lib/project-timeline";
 
 type ClientOption = { id: string; name: string };
 type AthleteOption = { id: string; fullName: string; athleteCode: string };
@@ -22,8 +29,7 @@ type ProjectRow = {
   dueDate: string | null;
   handoverDate: string | null;
   notes: string | null;
-  blockerFlag: boolean;
-  checkInRequested: boolean;
+  progressPercent: number | null;
 };
 
 const emptyCreate = {
@@ -60,8 +66,6 @@ export function OpsProjectsClient() {
     dueDate: "",
     handoverDate: "",
     notes: "",
-    blockerFlag: false,
-    checkInRequested: false,
   });
 
   const load = useCallback(async () => {
@@ -123,8 +127,6 @@ export function OpsProjectsClient() {
       dueDate: p.dueDate ?? "",
       handoverDate: p.handoverDate ?? "",
       notes: p.notes ?? "",
-      blockerFlag: p.blockerFlag,
-      checkInRequested: p.checkInRequested,
     });
     setError("");
     setMsg("");
@@ -194,8 +196,20 @@ export function OpsProjectsClient() {
       )}
 
       <div className="space-y-3">
-        {projects.map((p) => (
-          <div key={p.id} className="card-tool rounded-xl p-4">
+        {projects.map((p) => {
+          const timeline = computeProjectTimeline({
+            startDate: p.startDate,
+            dueDate: p.dueDate,
+            handoverDate: p.handoverDate,
+          });
+          const daysUntil = daysUntilDueFromIso(p.dueDate);
+          const accent = projectDueColor(daysUntil);
+          return (
+          <article
+            key={p.id}
+            className="card-tool rounded-xl p-4"
+            style={{ borderLeftWidth: 4, borderLeftColor: accent }}
+          >
             {editingId === p.id ? (
               <div className="grid gap-3 md:grid-cols-2">
                 <label className="text-xs text-slate-400">Name<input value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
@@ -205,10 +219,8 @@ export function OpsProjectsClient() {
                 <label className="text-xs text-slate-400">Stage<select value={editForm.currentStage} onChange={(e) => setEditForm((f) => ({ ...f, currentStage: e.target.value }))} className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm">{Object.entries(PROJECT_PHASE_LABELS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
                 <label className="text-xs text-slate-400">Status<select value={editForm.currentStatus} onChange={(e) => setEditForm((f) => ({ ...f, currentStatus: e.target.value }))} className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm">{Object.entries(PROJECT_STATUS_LABELS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
                 <label className="text-xs text-slate-400">Due<input type="date" value={editForm.dueDate} onChange={(e) => setEditForm((f) => ({ ...f, dueDate: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
-                <label className="text-xs text-slate-400">Handover<input type="date" value={editForm.handoverDate} onChange={(e) => setEditForm((f) => ({ ...f, handoverDate: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
+                <label className="text-xs text-slate-400">Handover<input type="date" value={editForm.handoverDate} onChange={(e) => setEditForm((f) => ({ ...f, handoverDate: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.04] px-3 py-2 text-sm text-white" /></label>
                 <label className="text-xs text-slate-400 md:col-span-2">Notes<textarea value={editForm.notes} onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))} rows={2} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
-                <label className="flex items-center gap-2 text-xs text-slate-400"><input type="checkbox" checked={editForm.blockerFlag} onChange={(e) => setEditForm((f) => ({ ...f, blockerFlag: e.target.checked }))} /> Blocker</label>
-                <label className="flex items-center gap-2 text-xs text-slate-400"><input type="checkbox" checked={editForm.checkInRequested} onChange={(e) => setEditForm((f) => ({ ...f, checkInRequested: e.target.checked }))} /> Check-in requested</label>
                 <div className="flex flex-wrap gap-2 md:col-span-2">
                   <button type="button" onClick={() => void saveEdit(p.id)} className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-slate-950">Save</button>
                   <button type="button" onClick={() => setEditingId(null)} className="text-xs text-slate-500">Cancel</button>
@@ -218,15 +230,38 @@ export function OpsProjectsClient() {
             ) : (
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
-                  <p className="font-medium text-white">{p.name}{p.blockerFlag ? <span className="ml-2 rounded bg-red-500/15 px-1.5 py-0.5 text-[10px] text-red-300">Blocker</span> : null}</p>
-                  <p className="text-xs text-slate-500">{p.clientName} · {p.projectNumber} · {p.assignedAthleteName ?? "Unassigned"}</p>
-                  <p className="text-xs text-slate-500">{PROJECT_PHASE_LABELS[p.currentStage]} · {PROJECT_STATUS_LABELS[p.currentStatus]}{p.dueDate ? ` · Due ${p.dueDate}` : ""}</p>
+                  <h2 className="font-semibold text-white">{p.name}</h2>
+                  <p className="text-xs text-slate-500">
+                    {p.clientName} · {p.projectNumber} · {p.assignedAthleteName ?? "Unassigned"}
+                  </p>
+                  <p
+                    className={`mt-2 text-xs ${
+                      timeline.isOverdue
+                        ? "text-red-300"
+                        : timeline.isDueSoon
+                          ? "text-amber-300"
+                          : "text-slate-500"
+                    }`}
+                  >
+                    {PROJECT_PHASE_LABELS[p.currentStage]} · {PROJECT_STATUS_LABELS[p.currentStatus]}
+                    {timeline.daysActive != null ? ` · ${timeline.daysActive} days active` : ""}
+                    {timeline.label ? ` · ${timeline.label}` : ""}
+                  </p>
+                  <div className="mt-3 max-w-md">
+                    <ProjectProgressBar percent={p.progressPercent ?? 0} />
+                  </div>
                 </div>
-                <button type="button" onClick={() => startEdit(p)} className="text-xs text-brand-300 hover:text-brand-200">Edit</button>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-md bg-white/[0.06] px-2 py-1 text-[10px] uppercase text-slate-400">
+                    {COMPLEXITY_LABELS[p.complexity]}
+                  </span>
+                  <button type="button" onClick={() => startEdit(p)} className="text-xs text-brand-300 hover:text-brand-200">Edit</button>
+                </div>
               </div>
             )}
-          </div>
-        ))}
+          </article>
+          );
+        })}
         {projects.length === 0 ? <p className="text-sm text-slate-500">No projects yet.</p> : null}
       </div>
       {error && !open ? <p className="text-sm text-red-400">{error}</p> : null}

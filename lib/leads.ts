@@ -81,7 +81,7 @@ export async function getOrCreateLead(practiceUrl: string): Promise<LeadRecord> 
 
 export async function updateLead(
   practiceUrl: string,
-  updates: Partial<Pick<LeadRecord, "stage" | "rating" | "notes" | "lastEmailedAt">>
+  updates: Partial<Pick<LeadRecord, "stage" | "rating" | "notes">> & { lastEmailedAt?: string | null }
 ): Promise<LeadRecord> {
   const current = await getOrCreateLead(practiceUrl);
   const next: LeadRecord = {
@@ -90,6 +90,10 @@ export async function updateLead(
     stage: updates.stage && LEAD_STAGES.includes(updates.stage) ? updates.stage : current.stage,
     rating:
       updates.rating !== undefined ? clampRating(updates.rating) : current.rating,
+    lastEmailedAt:
+      updates.lastEmailedAt !== undefined
+        ? updates.lastEmailedAt || undefined
+        : current.lastEmailedAt,
   };
   await prisma.lead.upsert({
     where: { architectUrl: practiceUrl },

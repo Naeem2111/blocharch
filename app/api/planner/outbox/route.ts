@@ -1,11 +1,9 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import type { OpsOutboxPriority } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { isApprovedLabelName } from "@/lib/planner-approved-labels";
 import { requirePlannerSession } from "@/lib/planner-access";
 import { createAndDeliverOutboxTask } from "@/lib/planner-outbox";
-
-const PRIORITIES: OpsOutboxPriority[] = ["low", "normal", "high", "urgent"];
 
 export async function GET(request: NextRequest) {
   const gate = await requirePlannerSession(request);
@@ -39,7 +37,7 @@ export async function GET(request: NextRequest) {
       title: r.title,
       description: r.description,
       dueAt: r.dueAt?.toISOString() ?? null,
-      priority: r.priority,
+      labelName: r.labelName,
       notes: r.notes,
       deliveredAt: r.deliveredAt?.toISOString() ?? null,
       inboxTaskId: r.inboxTaskId,
@@ -64,8 +62,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Athlete is required" }, { status: 400 });
     }
 
-    const priorityRaw = String(body.priority || "normal").trim() as OpsOutboxPriority;
-    const priority = PRIORITIES.includes(priorityRaw) ? priorityRaw : "normal";
+    const labelRaw = body.labelName != null ? String(body.labelName).trim() : "";
+    const labelName = labelRaw && isApprovedLabelName(labelRaw) ? labelRaw : null;
 
     let dueAt: Date | null = null;
     if (body.dueAt) {
@@ -80,7 +78,7 @@ export async function POST(request: NextRequest) {
       title: body.title != null ? String(body.title) : null,
       description: body.description != null ? String(body.description) : null,
       dueAt,
-      priority,
+      labelName,
       notes: body.notes != null ? String(body.notes) : null,
       attachments: body.attachments,
     });

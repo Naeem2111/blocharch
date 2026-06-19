@@ -40,6 +40,7 @@ export async function GET(request: NextRequest) {
       handoverDate: p.handoverDate?.toISOString().slice(0, 10) ?? null,
       currentStage: p.currentStage,
       currentStatus: p.currentStatus,
+      progressPercent: p.progressPercent,
       notes: p.notes,
       blockerFlag: p.blockerFlag,
       checkInRequested: p.checkInRequested,

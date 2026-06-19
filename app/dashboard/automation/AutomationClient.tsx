@@ -22,13 +22,6 @@ interface LeadItem {
   lead: { stage: string; rating: number; notes?: string; lastEmailedAt?: string };
 }
 
-interface Template {
-  id: string;
-  name: string;
-  subject: string;
-  body: string;
-}
-
 function slugFromUrl(url: string): string {
   const m = url.match(/\/practice\/([^/]+)\/?$/);
   return m ? m[1] : "";
@@ -46,6 +39,14 @@ function formatEmailedAt(iso?: string): string {
   } catch {
     return iso;
   }
+}
+
+function toDatetimeLocalValue(iso?: string): string {
+  if (!iso?.trim()) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function truncateNote(s: string, max: number): string {
@@ -70,7 +71,7 @@ function StarRating({
           key={n}
           type="button"
           disabled={disabled}
-          onClick={() => onChange(n)}
+          onClick={() => onChange(value === n ? 0 : n)}
           className={`p-0.5 rounded transition-colors ${
             disabled ? "cursor-not-allowed opacity-60" : "hover:scale-110"
           } ${value >= n ? "text-amber-400" : "text-slate-600"}`}
@@ -90,11 +91,8 @@ export function AutomationClient() {
   const [page, setPage] = useState(1);
   const [data, setData] = useState<{ items: LeadItem[]; total: number; totalPages: number } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [templates, setTemplates] = useState<Template[]>([]);
-  const [selectedTemplate, setSelectedTemplate] = useState("intro");
-  const [selectedUrls, setSelectedUrls] = useState<Set<string>>(new Set());
-  const [activating, setActivating] = useState(false);
-  const [activationResult, setActivationResult] = useState<string | null>(null);
+  const [editingEmailed, setEditingEmailed] = useState<string | null>(null);
+  const [emailedDraft, setEmailedDraft] = useState("");
 
   useEffect(() => {
     setLoading(true);
@@ -109,13 +107,10 @@ export function AutomationClient() {
       .finally(() => setLoading(false));
   }, [stage, page]);
 
-  useEffect(() => {
-    fetch("/api/templates")
-      .then((r) => r.json())
-      .then(setTemplates);
-  }, []);
-
-  async function updateLead(practiceUrl: string, updates: { stage?: string; rating?: number; notes?: string }) {
+  async function updateLead(
+    practiceUrl: string,
+    updates: { stage?: string; rating?: number; notes?: string; lastEmailedAt?: string | null }
+  ) {
     const slug = slugFromUrl(practiceUrl);
     const res = await fetch(`/api/leads/${encodeURIComponent(slug)}`, {
       method: "PATCH",
@@ -144,61 +139,28 @@ export function AutomationClient() {
     }
   }
 
-  function toggleSelect(url: string) {
-    setSelectedUrls((prev) => {
-      const next = new Set(prev);
-      if (next.has(url)) next.delete(url);
-      else next.add(url);
-      return next;
-    });
+  function startEditEmailed(url: string, current?: string) {
+    setEditingEmailed(url);
+    setEmailedDraft(toDatetimeLocalValue(current));
   }
 
-  function toggleSelectAll() {
-    if (!data) return;
-    if (selectedUrls.size === data.items.length) {
-      setSelectedUrls(new Set());
-    } else {
-      setSelectedUrls(new Set(data.items.map((i) => i.url)));
-    }
-  }
-
-  async function activateWorkflow() {
-    setActivating(true);
-    setActivationResult(null);
-    try {
-      const res = await fetch("/api/workflow/trigger", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          practiceUrls: selectedUrls.size > 0 ? Array.from(selectedUrls) : undefined,
-          templateId: selectedTemplate,
-          markAsContacted: true,
-        }),
-      });
-      const json = await res.json();
-      if (res.ok) {
-        setActivationResult(`Processed ${json.processed} leads. ${json.webhookCalled ? "Webhook called." : "Set N8N_WEBHOOK_URL to send to n8n."}`);
-        setSelectedUrls(new Set());
-        if (data) setData({ ...data, items: [...data.items] }); // refresh
-      } else {
-        setActivationResult(`Error: ${json.error || "Unknown"}`);
-      }
-    } catch (e) {
-      setActivationResult(`Error: ${String(e)}`);
-    } finally {
-      setActivating(false);
-    }
+  async function saveEmailed(url: string) {
+    const iso = emailedDraft ? new Date(emailedDraft).toISOString() : null;
+    await updateLead(url, { lastEmailedAt: iso });
+    setEditingEmailed(null);
   }
 
   return (
     <div className="space-y-8">
-      {/* Stage filter + workflow */}
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-2">
           <span className="text-slate-400 text-sm">Stage:</span>
           <select
             value={stage}
-            onChange={(e) => { setStage(e.target.value); setPage(1); }}
+            onChange={(e) => {
+              setStage(e.target.value);
+              setPage(1);
+            }}
             className="select-console rounded-lg px-3 py-2 text-sm"
           >
             <option value="">All</option>
@@ -209,41 +171,12 @@ export function AutomationClient() {
             ))}
           </select>
         </div>
-        <div className="h-6 w-px bg-white/[0.08]" />
-        <div className="flex items-center gap-2">
-          <span className="text-slate-400 text-sm">Template:</span>
-          <select
-            value={selectedTemplate}
-            onChange={(e) => setSelectedTemplate(e.target.value)}
-            className="select-console rounded-lg px-3 py-2 text-sm"
-          >
-            {templates.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <button
-          onClick={activateWorkflow}
-          disabled={activating}
-          className="rounded-lg bg-gradient-to-r from-brand-500 to-brand-600 px-4 py-2 text-sm font-semibold text-slate-950 shadow-lg shadow-brand/25 transition-opacity hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {activating ? "Processing…" : "Activate workflow"}
-        </button>
-        {activationResult && (
-          <span className="text-slate-400 text-sm">{activationResult}</span>
-        )}
       </div>
 
       <p className="text-slate-500 text-sm">
-        Select leads to email (or leave unselected to process first 50 with email). Activate will apply the chosen
-        template and mark them as contacted. Set <code className="text-brand-400">N8N_WEBHOOK_URL</code> in .env to send
-        to n8n. When n8n sends mail, it can POST to <code className="text-brand-400">/api/n8n/lead-event</code> so notes
-        and &quot;last emailed&quot; update here (see workflow file).
+        Track lead stage, star rating, and last contact date. Click a star again to clear the rating.
       </p>
 
-      {/* Leads table */}
       {loading ? (
         <p className="text-slate-400 py-8">Loading…</p>
       ) : data ? (
@@ -255,14 +188,6 @@ export function AutomationClient() {
             <table className="w-full">
               <thead>
                 <tr className="bg-white/[0.04] text-left text-sm text-slate-400">
-                  <th className="px-4 py-3 w-10">
-                    <input
-                      type="checkbox"
-                      checked={data.items.length > 0 && selectedUrls.size === data.items.length}
-                      onChange={toggleSelectAll}
-                      className="rounded border-white/20 bg-white/[0.03] accent-brand-500"
-                    />
-                  </th>
                   <th className="px-4 py-3 font-medium">Name</th>
                   <th className="px-4 py-3 font-medium">Stage</th>
                   <th className="px-4 py-3 font-medium">Rating</th>
@@ -276,14 +201,6 @@ export function AutomationClient() {
                 {data.items.map((item) => (
                   <tr key={item.url} className="transition-colors hover:bg-white/[0.03]">
                     <td className="px-4 py-3">
-                      <input
-                        type="checkbox"
-                        checked={selectedUrls.has(item.url)}
-                        onChange={() => toggleSelect(item.url)}
-                        className="rounded border-white/20 bg-white/[0.03] accent-brand-500"
-                      />
-                    </td>
-                    <td className="px-4 py-3">
                       <Link
                         href={`/dashboard/practices/${encodeURIComponent(item.slug)}`}
                         className="font-medium text-white hover:text-brand-400"
@@ -294,7 +211,7 @@ export function AutomationClient() {
                     <td className="px-4 py-3">
                       <LeadStagePicker
                         value={item.lead.stage}
-                        onChange={(stage) => updateLead(item.url, { stage })}
+                        onChange={(s) => updateLead(item.url, { stage: s })}
                       />
                     </td>
                     <td className="px-4 py-3">
@@ -312,8 +229,42 @@ export function AutomationClient() {
                         "—"
                       )}
                     </td>
-                    <td className="px-4 py-3 text-slate-400 text-xs whitespace-nowrap" title={item.lead.lastEmailedAt}>
-                      {formatEmailedAt(item.lead.lastEmailedAt)}
+                    <td className="px-4 py-3 text-slate-400 text-xs whitespace-nowrap">
+                      {editingEmailed === item.url ? (
+                        <div className="flex flex-col gap-1">
+                          <input
+                            type="datetime-local"
+                            value={emailedDraft}
+                            onChange={(e) => setEmailedDraft(e.target.value)}
+                            className="rounded border border-white/[0.08] bg-white/[0.04] px-2 py-1 text-xs text-white"
+                          />
+                          <div className="flex gap-1">
+                            <button
+                              type="button"
+                              onClick={() => void saveEmailed(item.url)}
+                              className="text-brand-400 hover:text-brand-300"
+                            >
+                              Save
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditingEmailed(null)}
+                              className="text-slate-500"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => startEditEmailed(item.url, item.lead.lastEmailedAt)}
+                          className="text-left hover:text-brand-300"
+                          title="Click to edit"
+                        >
+                          {formatEmailedAt(item.lead.lastEmailedAt)}
+                        </button>
+                      )}
                     </td>
                     <td
                       className="px-4 py-3 text-slate-400 text-xs max-w-[14rem]"

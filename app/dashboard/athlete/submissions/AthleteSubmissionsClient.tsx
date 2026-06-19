@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { MiniMonthCalendar } from "@/components/MiniMonthCalendar";
 import { ProgressSlider } from "@/components/ProgressSlider";
+import { CheckInRequestModal } from "@/components/athlete/CheckInRequestModal";
 import { DAILY_PROJECT_PHASE_OPTIONS, DAILY_TASK_TYPE_OPTIONS } from "@/lib/ops-daily-form";
 
 type AssignedProject = {
@@ -18,6 +19,7 @@ type LineItemForm = {
   projectId: string;
   projectPhase: string;
   taskTypes: string[];
+  taskTypeOther: string;
   hoursWorked: string;
   completionPercent: number;
   completedSummary: string;
@@ -51,6 +53,7 @@ type PastSubmission = {
     hoursWorked: number;
     completedSummary: string | null;
     completionPercent?: number | null;
+    notes?: string | null;
   }>;
 };
 
@@ -60,6 +63,7 @@ function emptyLine(): LineItemForm {
     projectId: "",
     projectPhase: "survey_conversion",
     taskTypes: ["plans"],
+    taskTypeOther: "",
     hoursWorked: "",
     completionPercent: 0,
     completedSummary: "",
@@ -76,7 +80,7 @@ export function AthleteSubmissionsClient() {
   const [success, setSuccess] = useState("");
   const [calc, setCalc] = useState<CalcPanel | null>(null);
   const [wellbeingScore, setWellbeingScore] = useState("5");
-  const [checkInRequested, setCheckInRequested] = useState(false);
+  const [checkInModalOpen, setCheckInModalOpen] = useState(false);
   const [dailyNote, setDailyNote] = useState("");
   const [lines, setLines] = useState<LineItemForm[]>([emptyLine()]);
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -90,7 +94,6 @@ export function AthleteSubmissionsClient() {
     setSelectedDate(sub.submissionDate);
     setCalendarMonth(sub.submissionDate.slice(0, 7));
     setWellbeingScore(String(sub.wellbeingScore ?? 5));
-    setCheckInRequested(sub.checkInRequested);
     setDailyNote(sub.dailyNote ?? "");
     setFormLocked(!sub.editable);
     setLines(
@@ -108,6 +111,8 @@ export function AthleteSubmissionsClient() {
             hoursWorked: String(li.hoursWorked),
             completionPercent: li.completionPercent ?? 0,
             completedSummary: li.completedSummary ?? "",
+            taskTypeOther:
+              li.taskTypes?.includes("other") && li.notes ? String(li.notes) : "",
           }))
         : [emptyLine()]
     );
@@ -128,8 +133,7 @@ export function AthleteSubmissionsClient() {
     setEditingId(null);
     setSelectedDate(today);
     setCalendarMonth(today.slice(0, 7));
-    setWellbeingScore("3");
-    setCheckInRequested(false);
+    setWellbeingScore("5");
     setDailyNote("");
     setLines([emptyLine()]);
     setFormLocked(false);
@@ -183,7 +187,6 @@ export function AthleteSubmissionsClient() {
     setEditingId(null);
     setFormLocked(false);
     setWellbeingScore("5");
-    setCheckInRequested(false);
     setDailyNote("");
     setLines([emptyLine()]);
     setError("");
@@ -214,14 +217,19 @@ export function AthleteSubmissionsClient() {
         .map((li) => {
           const project = projects.find((p) => p.id === li.projectId);
           if (!project) throw new Error("Invalid project");
+          const taskTypes = li.taskTypes.length > 0 ? li.taskTypes : ["other"];
+          if (taskTypes.includes("other") && !li.taskTypeOther.trim()) {
+            throw new Error("Please describe the “Other” task type for each entry that uses it");
+          }
           return {
             clientId: project.client.id,
             projectId: li.projectId,
             projectPhase: li.projectPhase,
-            taskTypes: li.taskTypes.length > 0 ? li.taskTypes : ["other"],
+            taskTypes,
             hoursWorked: Number(li.hoursWorked),
             completionPercent: li.completionPercent,
             completedSummary: li.completedSummary || null,
+            notes: taskTypes.includes("other") ? li.taskTypeOther.trim() : null,
           };
         });
 
@@ -236,7 +244,6 @@ export function AthleteSubmissionsClient() {
         body: JSON.stringify({
           submissionDate: selectedDate,
           wellbeingScore: Number(wellbeingScore),
-          checkInRequested,
           dailyNote,
           lineItems,
         }),
@@ -315,14 +322,11 @@ export function AthleteSubmissionsClient() {
         <div className="flex items-end pb-1 md:col-span-3">
           <button
             type="button"
-            onClick={() => setCheckInRequested((v) => !v)}
-            className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
-              checkInRequested
-                ? "bg-brand-600 text-slate-950 ring-2 ring-brand-400"
-                : "bg-white/[0.08] text-slate-200 hover:bg-white/[0.12]"
-            }`}
+            onClick={() => setCheckInModalOpen(true)}
+            disabled={formLocked}
+            className="rounded-lg bg-white/[0.08] px-4 py-2 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/[0.12] disabled:opacity-50"
           >
-            {checkInRequested ? "✓ Check-in requested" : "Request check-in"}
+            Request check-in (Book a Call)
           </button>
         </div>
         <label className="text-xs text-slate-400 md:col-span-3">
@@ -421,6 +425,19 @@ export function AthleteSubmissionsClient() {
                     );
                   })}
                 </div>
+                {li.taskTypes.includes("other") ? (
+                  <label className="text-xs text-slate-400 md:col-span-2">
+                    Specify “Other” <span className="text-red-400">*</span>
+                    <input
+                      required
+                      value={li.taskTypeOther}
+                      disabled={formLocked}
+                      onChange={(e) => updateLine(li.key, { taskTypeOther: e.target.value })}
+                      className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+                      placeholder="Describe the task type"
+                    />
+                  </label>
+                ) : null}
               </div>
               <label className="text-xs text-slate-400">
                 Hours worked
@@ -549,6 +566,17 @@ export function AthleteSubmissionsClient() {
           </ul>
         )}
       </div>
+      <CheckInRequestModal
+        open={checkInModalOpen}
+        onClose={() => setCheckInModalOpen(false)}
+        onSuccess={() => setSuccess("Check-in request submitted.")}
+        source="daily_log"
+        projects={projects.map((p) => ({
+          id: p.id,
+          name: p.name,
+          client: { name: p.client.name },
+        }))}
+      />
     </div>
   );
 }

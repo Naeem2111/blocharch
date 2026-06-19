@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { APPROVED_PLANNER_LABELS } from "@/lib/planner-approved-labels";
 
 type AthleteOption = { id: string; fullName: string; athleteCode: string };
 type ProjectOption = { id: string; name: string; clientName: string; assignedAthleteId: string | null };
@@ -9,12 +10,10 @@ type OutboxRow = {
   athleteName: string;
   projectName: string | null;
   title: string | null;
-  priority: string;
+  labelName: string | null;
   deliveredAt: string | null;
   createdAt: string;
 };
-
-const PRIORITIES = ["low", "normal", "high", "urgent"] as const;
 
 const emptyForm = {
   athleteId: "",
@@ -22,7 +21,7 @@ const emptyForm = {
   title: "",
   description: "",
   dueAt: "",
-  priority: "normal" as (typeof PRIORITIES)[number],
+  labelName: APPROVED_PLANNER_LABELS[0].name as string,
   notes: "",
 };
 
@@ -97,7 +96,7 @@ export function BlocharchOutboxPanel() {
           title: form.title || null,
           description: form.description || null,
           dueAt: form.dueAt || null,
-          priority: form.priority,
+          labelName: form.labelName,
           notes: form.notes || null,
         }),
       });
@@ -160,20 +159,15 @@ export function BlocharchOutboxPanel() {
         </label>
 
         <label className="text-xs text-slate-400">
-          Priority
+          Label
           <select
-            value={form.priority}
-            onChange={(e) =>
-              setForm((f) => ({
-                ...f,
-                priority: e.target.value as (typeof PRIORITIES)[number],
-              }))
-            }
+            value={form.labelName}
+            onChange={(e) => setForm((f) => ({ ...f, labelName: e.target.value }))}
             className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
           >
-            {PRIORITIES.map((p) => (
-              <option key={p} value={p}>
-                {p.charAt(0).toUpperCase() + p.slice(1)}
+            {APPROVED_PLANNER_LABELS.map((l) => (
+              <option key={l.name} value={l.name}>
+                {l.name}
               </option>
             ))}
           </select>
@@ -219,39 +213,41 @@ export function BlocharchOutboxPanel() {
           />
         </label>
 
-        <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
+        {error ? <p className="text-sm text-red-400 sm:col-span-2">{error}</p> : null}
+        {success ? <p className="text-sm text-brand-300 sm:col-span-2">{success}</p> : null}
+
+        <div className="sm:col-span-2">
           <button
             type="submit"
             disabled={saving}
             className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-amber-500 disabled:opacity-50"
           >
-            {saving ? "Assigning…" : "Assign to athlete Inbox"}
+            {saving ? "Assigning…" : "Assign to athlete"}
           </button>
-          {error ? <p className="text-sm text-red-400">{error}</p> : null}
-          {success ? <p className="text-sm text-emerald-400">{success}</p> : null}
         </div>
       </form>
 
-      <div>
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Recent assignments</h3>
-        {history.length === 0 ? (
-          <p className="mt-2 text-sm text-slate-500">No assignments yet.</p>
-        ) : (
+      {history.length > 0 ? (
+        <div>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Recent assignments</h3>
           <ul className="mt-2 divide-y divide-white/[0.06] rounded-lg border border-white/[0.06]">
             {history.map((row) => (
-              <li key={row.id} className="flex flex-wrap justify-between gap-2 px-3 py-2 text-sm">
-                <span className="text-slate-200">
-                  {row.title || "Untitled"} → {row.athleteName}
-                  {row.projectName ? ` · ${row.projectName}` : ""}
+              <li key={row.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
+                <span className="text-slate-300">
+                  {row.title || "Task"} → {row.athleteName}
+                  {row.projectName ? ` (${row.projectName})` : ""}
                 </span>
                 <span className="text-xs text-slate-500">
-                  {row.deliveredAt ? "Delivered" : "Pending"} · {new Date(row.createdAt).toLocaleString()}
+                  {row.labelName ? (
+                    <span className="mr-2 rounded bg-white/[0.06] px-1.5 py-0.5">{row.labelName}</span>
+                  ) : null}
+                  {row.deliveredAt ? "Delivered" : "Pending"}
                 </span>
               </li>
             ))}
           </ul>
-        )}
-      </div>
+        </div>
+      ) : null}
     </section>
   );
 }

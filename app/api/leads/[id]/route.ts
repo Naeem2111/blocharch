@@ -24,7 +24,7 @@ export async function PATCH(
   }
 
   const body = await request.json().catch(() => ({}));
-  const updates: { stage?: LeadStage; rating?: number; notes?: string; lastEmailedAt?: string } = {};
+  const updates: { stage?: LeadStage; rating?: number; notes?: string; lastEmailedAt?: string | null } = {};
 
   if (body.stage && LEAD_STAGES.includes(body.stage)) {
     updates.stage = body.stage as LeadStage;
@@ -35,8 +35,9 @@ export async function PATCH(
   if (typeof body.notes === "string") {
     updates.notes = body.notes;
   }
-  if (typeof body.lastEmailedAt === "string" && body.lastEmailedAt.trim()) {
-    updates.lastEmailedAt = body.lastEmailedAt.trim();
+  if (typeof body.lastEmailedAt === "string") {
+    const trimmed = body.lastEmailedAt.trim();
+    updates.lastEmailedAt = trimmed ? trimmed : null;
   }
 
   const lead = await updateLead(url, updates);

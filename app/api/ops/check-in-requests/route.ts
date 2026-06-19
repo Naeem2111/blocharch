@@ -21,6 +21,8 @@ export async function GET(request: NextRequest) {
   let where: Prisma.OpsCheckInRequestWhereInput | undefined;
   if (status === "pending") {
     where = { status: { in: pendingStatuses } };
+  } else if (status === "scheduled") {
+    where = { status: { in: ["approved", "confirmed"] } };
   } else if (status && status !== "all") {
     where = { status: status as OpsCheckInStatus };
   }

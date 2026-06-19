@@ -1,21 +1,16 @@
 import type { OpsOutboxPriority } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { createAthleteNotification } from "@/lib/ops-athlete-notifications";
+import { isApprovedLabelName } from "@/lib/planner-approved-labels";
+import { ensureDefaultLabelsOnBoard } from "@/lib/planner-labels-seed";
 import { ensureAthleteSystemBoards } from "@/lib/planner-system-boards";
-
-const PRIORITY_LABEL: Record<OpsOutboxPriority, string> = {
-  low: "Low",
-  normal: "Normal",
-  high: "High",
-  urgent: "Urgent",
-};
 
 function buildInboxDescription(input: {
   description: string | null;
   notes: string | null;
   projectName: string | null;
   clientName: string | null;
-  priority: OpsOutboxPriority;
+  labelName: string | null;
   dueAt: Date | null;
   attachments: unknown;
 }): string {
@@ -25,7 +20,7 @@ function buildInboxDescription(input: {
   if (input.projectName) {
     meta.push(`Project: ${input.projectName}${input.clientName ? ` (${input.clientName})` : ""}`);
   }
-  meta.push(`Priority: ${PRIORITY_LABEL[input.priority]}`);
+  if (input.labelName) meta.push(`Label: ${input.labelName}`);
   if (input.dueAt) {
     meta.push(`Due: ${input.dueAt.toISOString().slice(0, 10)}`);
   }
@@ -35,6 +30,24 @@ function buildInboxDescription(input: {
   }
   if (meta.length) parts.push(meta.join("\n"));
   return parts.join("\n\n") || "Assigned from Blocharch Outbox";
+}
+
+async function attachLabelToTask(boardId: string, taskId: string, labelName: string | null) {
+  if (!labelName || !isApprovedLabelName(labelName)) return;
+  await ensureDefaultLabelsOnBoard(boardId);
+  const label = await prisma.plannerLabel.findFirst({
+    where: { boardId, name: labelName },
+    select: { id: true },
+  });
+  if (!label) return;
+  const existing = await prisma.plannerTaskLabel.findUnique({
+    where: { taskId_labelId: { taskId, labelId: label.id } },
+  });
+  if (!existing) {
+    await prisma.plannerTaskLabel.create({
+      data: { taskId, labelId: label.id },
+    });
+  }
 }
 
 /** Creates a card on the athlete Blocharch Inbox and marks the outbox row delivered. */
@@ -92,7 +105,7 @@ export async function deliverOutboxTaskToInbox(outboxTaskId: string) {
     notes: row.notes,
     projectName: row.project?.name ?? null,
     clientName: row.project?.client?.name ?? null,
-    priority: row.priority,
+    labelName: row.labelName,
     dueAt: row.dueAt,
     attachments: row.attachments,
   });
@@ -107,9 +120,14 @@ export async function deliverOutboxTaskToInbox(outboxTaskId: string) {
       customFields: {
         outboxTaskId: row.id,
         source: "blocharch_outbox",
+        labelName: row.labelName,
       },
     },
   });
+
+  if (row.labelName) {
+    await attachLabelToTask(inboxBoard.id, task.id, row.labelName);
+  }
 
   await prisma.opsOutboxTask.update({
     where: { id: row.id },
@@ -139,6 +157,7 @@ export async function createAndDeliverOutboxTask(input: {
   description?: string | null;
   dueAt?: Date | null;
   priority?: OpsOutboxPriority;
+  labelName?: string | null;
   notes?: string | null;
   attachments?: unknown;
 }) {
@@ -157,6 +176,9 @@ export async function createAndDeliverOutboxTask(input: {
     if (!project) throw new Error("Project not assigned to this athlete");
   }
 
+  const labelName =
+    input.labelName && isApprovedLabelName(input.labelName) ? input.labelName : null;
+
   const row = await prisma.opsOutboxTask.create({
     data: {
       createdByUserId: input.createdByUserId,
@@ -166,6 +188,7 @@ export async function createAndDeliverOutboxTask(input: {
       description: input.description?.trim() ?? null,
       dueAt: input.dueAt ?? null,
       priority: input.priority ?? "normal",
+      labelName,
       notes: input.notes?.trim() ?? null,
       attachments:
         input.attachments === undefined || input.attachments === null

@@ -11,6 +11,7 @@ export function serializeCheckInRequest(
 ) {
   return {
     id: row.id,
+    source: row.source,
     athleteId: row.athleteId,
     athleteName: row.athlete.fullName,
     athleteCode: row.athlete.athleteCode,

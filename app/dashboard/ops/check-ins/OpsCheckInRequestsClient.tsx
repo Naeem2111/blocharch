@@ -9,6 +9,7 @@ import { composeDueAtIso, splitDueAtIso } from "@/lib/planner-due-datetime";
 
 type RequestRow = {
   id: string;
+  source: string;
   athleteName: string;
   athleteCode: string;
   projectName: string | null;
@@ -46,7 +47,7 @@ export function OpsCheckInRequestsClient() {
   const [pendingCount, setPendingCount] = useState(0);
   const [calendarConnected, setCalendarConnected] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<"pending" | "all">("pending");
+  const [filter, setFilter] = useState<"pending" | "scheduled" | "all">("pending");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [zoomDraft, setZoomDraft] = useState<Record<string, string>>({});
   const [noteDraft, setNoteDraft] = useState<Record<string, string>>({});
@@ -55,7 +56,12 @@ export function OpsCheckInRequestsClient() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const q = filter === "pending" ? "?status=pending" : "";
+    const q =
+      filter === "pending"
+        ? "?status=pending"
+        : filter === "scheduled"
+          ? "?status=scheduled"
+          : "";
     const r = await fetch(`/api/ops/check-in-requests${q}`);
     const j = await r.json().catch(() => ({}));
     if (r.ok) {
@@ -107,6 +113,17 @@ export function OpsCheckInRequestsClient() {
           </button>
           <button
             type="button"
+            onClick={() => setFilter("scheduled")}
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium ring-1 ${
+              filter === "scheduled"
+                ? "bg-brand-500/20 text-brand-200 ring-brand-500/30"
+                : "bg-white/[0.04] text-slate-400 ring-white/[0.08]"
+            }`}
+          >
+            Scheduled meetings
+          </button>
+          <button
+            type="button"
             onClick={() => setFilter("all")}
             className={`rounded-lg px-3 py-1.5 text-xs font-medium ring-1 ${
               filter === "all"
@@ -145,6 +162,9 @@ export function OpsCheckInRequestsClient() {
                   ) : null}
                   <p className="mt-2 text-sm text-brand-200/90">
                     Requested: {formatWhen(r.requestedStartAt)}
+                  </p>
+                  <p className="mt-1 text-[10px] text-slate-500">
+                    Source: {r.source === "daily_log" ? "Daily Log" : "Book a Call"}
                   </p>
                   <p className="text-[10px] uppercase text-slate-600">{r.status}</p>
                 </div>

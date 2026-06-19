@@ -471,6 +471,7 @@ model OpsOutboxTask {
   description     String?           @db.Text
   dueAt           DateTime?         @map("due_at")
   priority        OpsOutboxPriority @default(normal)
+  labelName       String?           @map("label_name")
   notes           String?           @db.Text
   attachments     Json?
   inboxBoardId    String?           @map("inbox_board_id")
@@ -510,6 +511,7 @@ model OpsNotification {
 /** Athlete Book a Call → admin Check-In Requests (Google Calendar when configured). */
 model OpsCheckInRequest {
   id               String           @id @default(uuid())
+  source           String           @default("book_a_call") @map("source")
   athleteId        String           @map("athlete_id")
   projectId        String?          @map("project_id")
   reason           String

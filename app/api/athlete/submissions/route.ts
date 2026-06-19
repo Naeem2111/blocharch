@@ -109,6 +109,7 @@ export async function GET(request: NextRequest) {
         hoursWorked: Number(li.hoursWorked),
         completedSummary: li.completedSummary,
         completionPercent: li.completionPercent,
+        notes: li.notes,
       })),
     })),
   });
@@ -126,6 +127,15 @@ export async function POST(request: NextRequest) {
     const lineItems = parseLineItems(body.lineItems);
     if (!lineItems) {
       return NextResponse.json({ error: "At least one valid project entry is required" }, { status: 400 });
+    }
+
+    for (const li of lineItems) {
+      if (li.taskTypes.includes("other") && !li.notes?.trim()) {
+        return NextResponse.json(
+          { error: "Please specify what “Other” task type means for each entry that uses it" },
+          { status: 400 }
+        );
+      }
     }
 
     await lockStaleSubmissions(athlete.id);

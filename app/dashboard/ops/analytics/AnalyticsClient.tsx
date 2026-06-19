@@ -191,7 +191,7 @@ export function AnalyticsClient() {
                       {p.daysUntilDue < 0 ? `${Math.abs(p.daysUntilDue)}d overdue` : `${p.daysUntilDue}d`}
                     </td>
                     <td className="px-3 py-2">
-                      <ProjectProgressBar percent={p.progressPercent} showLabel={false} />
+                      <ProjectProgressBar percent={p.progressPercent} showLabel />
                     </td>
                     <td className="px-3 py-2">
                       {PROJECT_STATUS_LABELS[p.currentStatus as keyof typeof PROJECT_STATUS_LABELS] ?? p.currentStatus}

@@ -440,15 +440,17 @@ export function PlannerClient() {
   }, [refreshTodos]);
 
   const filteredBoards = useMemo(() => {
+    const hideCompleted = (b: BoardSummary) => b.kind !== "completed";
     if (area === "personal" && currentUserId) {
       return boards.filter(
         (b) =>
+          hideCompleted(b) &&
           b.ownerId === currentUserId &&
           (b.scope === "personal" || b.kind === "blocharch_outbox")
       );
     }
     if (area === "team" && athleteUserId) {
-      return boards.filter((b) => b.ownerId === athleteUserId);
+      return boards.filter((b) => hideCompleted(b) && b.ownerId === athleteUserId);
     }
     return [];
   }, [boards, area, currentUserId, athleteUserId]);
@@ -1313,94 +1315,6 @@ export function PlannerClient() {
 
       {showBoardPicker ? (
       <>
-      <section className="card-tool rounded-xl p-4" aria-labelledby="planner-cross-todos-heading">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h3 id="planner-cross-todos-heading" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Cross-board todos
-            </h3>
-            <p className="mt-1 max-w-xl text-[11px] leading-relaxed text-slate-600">
-              Pins tasks from any board you can see. Check them off privately here; originals stay on their Kanban.
-              Copy a team card onto your{" "}
-              <span className="text-slate-500">personal</span> board to move it locally.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              setBrowseQ("");
-              setLinkKanbanModalOpen(true);
-            }}
-            className="shrink-0 rounded-lg bg-white/[0.08] px-3 py-2 text-xs font-medium text-slate-200 ring-1 ring-white/[0.08] hover:bg-white/[0.12]"
-          >
-            + Link task…
-          </button>
-        </div>
-        {plannerTodos.length === 0 ? (
-          <p className="mt-3 text-sm text-slate-500">
-            Nothing here yet — open a Kanban card and use <span className="text-slate-400">Todo</span>, or browse with
-            &quot;Link task&quot;.
-          </p>
-        ) : (
-          <ul className="mt-3 space-y-2">
-            {plannerTodos.map((row) => {
-              const b = row.task.column.board;
-              return (
-                <li
-                  key={row.id}
-                  className="flex flex-wrap items-start gap-x-3 gap-y-2 rounded-lg border border-white/[0.06] bg-black/20 px-3 py-2"
-                >
-                  <label className="flex shrink-0 cursor-pointer items-start gap-2 pt-0.5">
-                    <input
-                      type="checkbox"
-                      checked={row.completed}
-                      className="mt-1 rounded border-white/20 bg-white/[0.06] text-brand-500"
-                      onChange={(e) => {
-                        void (async () => {
-                          await fetch(`/api/planner/todos/${encodeURIComponent(row.id)}`, {
-                            method: "PATCH",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ completed: e.target.checked }),
-                          }).then(async (rs) => {
-                            if (!rs.ok) return;
-                            await refreshTodos();
-                          });
-                        })();
-                      }}
-                    />
-                  </label>
-                  <div className="min-w-0 flex-1">
-                    <button
-                      type="button"
-                      className={`text-left text-sm font-medium ${row.completed ? "text-slate-500 line-through" : "text-white hover:text-brand-100"}`}
-                      onClick={() => void navigateBoardAndFocusTask(b.id, row.task.id)}
-                    >
-                      {row.task.title}
-                    </button>
-                    <p className="text-[10px] text-slate-500">
-                      [{b.scope}] {b.title} · {row.task.column.title}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    title="Remove from list only"
-                    onClick={() =>
-                      void (async () => {
-                        await fetch(`/api/planner/todos/${encodeURIComponent(row.id)}`, { method: "DELETE" });
-                        await refreshTodos();
-                      })()
-                    }
-                    className="shrink-0 text-[11px] text-slate-500 hover:text-red-400"
-                  >
-                    Remove
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
-
       {detail?.kind === "blocharch_outbox" ? <BlocharchOutboxPanel /> : null}
 
       {allBoardsView && showBoardPicker ? (

@@ -74,6 +74,7 @@ export async function POST(request: NextRequest) {
         requestedStartAt,
         requestedEndAt,
         status: "pending",
+        source: body.source === "daily_log" ? "daily_log" : "book_a_call",
       },
       include: checkInInclude,
     });
