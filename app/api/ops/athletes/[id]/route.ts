@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/password";
 import { requireOpsSession } from "@/lib/ops-access";
 import { parseDateOnly } from "@/lib/ops-hours";
+import { parseImageUrlField } from "@/lib/image-url";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -37,6 +38,16 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       const d = parseDateOnly(String(body.blocharchStartDate));
       if (!d) return NextResponse.json({ error: "Invalid start date" }, { status: 400 });
       athleteData.blocharchStartDate = d;
+    }
+    if (body.profilePhotoUrl !== undefined) {
+      try {
+        athleteData.profilePhotoUrl = parseImageUrlField(body.profilePhotoUrl) ?? null;
+      } catch (e) {
+        return NextResponse.json(
+          { error: e instanceof Error ? e.message : "Invalid profile photo URL" },
+          { status: 400 }
+        );
+      }
     }
 
     const userData: { disabled?: boolean; passwordHash?: string } = {};
@@ -76,6 +87,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         monthlyHourCap: athlete.monthlyHourCap,
         overtimeRateZar: Number(athlete.overtimeRateZar),
         blocharchStartDate: athlete.blocharchStartDate.toISOString().slice(0, 10),
+        profilePhotoUrl: athlete.profilePhotoUrl,
         projectCount: athlete._count.projects,
       },
     });

@@ -6,7 +6,7 @@
   "scripts": {
     "postinstall": "prisma generate",
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && prisma db push && next build",
     "build:full": "prisma generate && next build",
     "start": "next start",
     "scrape": "python scrape_architects.py",

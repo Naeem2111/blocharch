@@ -29,6 +29,7 @@ export async function GET(request: NextRequest) {
       fullName: a.fullName,
       athleteCode: a.athleteCode,
       username: a.user.username,
+      profilePhotoUrl: a.profilePhotoUrl,
       activeProjects: a._count.projects,
     })),
   });

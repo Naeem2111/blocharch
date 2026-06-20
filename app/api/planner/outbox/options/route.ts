@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     prisma.opsAthlete.findMany({
       where: { status: "active" },
       orderBy: { fullName: "asc" },
-      select: { id: true, fullName: true, athleteCode: true },
+      select: { id: true, fullName: true, athleteCode: true, profilePhotoUrl: true },
     }),
     prisma.opsProject.findMany({
       where: {

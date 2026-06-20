@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { canEditBoard, requirePlannerSession } from "@/lib/planner-access";
+import { relocateTaskToLabelLinkedColumn } from "@/lib/planner-label-column";
 
 const TASK_SUMMARY_MAX = 2_000;
 const TASK_DESCRIPTION_MAX = 50_000;
@@ -94,6 +95,7 @@ export async function PATCH(request: NextRequest, context: Ctx) {
           skipDuplicates: true,
         });
       }
+      await relocateTaskToLabelLinkedColumn(taskId);
     }
 
     const task = await prisma.plannerTask.findUnique({

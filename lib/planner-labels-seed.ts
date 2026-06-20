@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_BOARD_LABELS } from "@/lib/planner-default-labels";
+import { APPROVED_LABEL_NAMES } from "@/lib/planner-approved-labels";
 
 type Tx = Prisma.TransactionClient;
 
@@ -17,4 +18,16 @@ export async function ensureDefaultLabelsOnBoard(boardId: string, tx: Tx = prism
       data: { boardId, name: l.name, color: l.color },
     });
   }
+}
+
+/** Remove legacy labels not in the approved set (15.06 audit). */
+export async function purgeUnapprovedBoardLabels(boardId: string, tx: Tx = prisma) {
+  const stale = await tx.plannerLabel.findMany({
+    where: { boardId, name: { notIn: [...APPROVED_LABEL_NAMES] } },
+    select: { id: true },
+  });
+  if (!stale.length) return;
+  const ids = stale.map((l) => l.id);
+  await tx.plannerTaskLabel.deleteMany({ where: { labelId: { in: ids } } });
+  await tx.plannerLabel.deleteMany({ where: { id: { in: ids } } });
 }

@@ -13,7 +13,8 @@ import {
 } from "@/lib/planner-board-mutation";
 import { startDragAutoScroll, stopDragAutoScroll, trackDragPointer } from "@/lib/planner-drag-scroll";
 import { createDragHighlightScheduler } from "@/lib/planner-drag-ui";
-import { usesAthleteCompletedFlow } from "@/lib/planner-completed";
+import { APPROVED_PLANNER_LABELS } from "@/lib/planner-approved-labels";
+import { ClientAvatar } from "@/components/ops/ClientAvatar";
 
 const FIXED_BOARD_KINDS = new Set([
   "blocharch_outbox",
@@ -42,6 +43,7 @@ type TeamAthleteRow = {
   fullName: string;
   athleteCode: string;
   username: string;
+  profilePhotoUrl: string | null;
   activeProjects: number;
 };
 
@@ -70,6 +72,7 @@ type ColumnRow = {
   title: string;
   color: string;
   sortOrder: number;
+  linkedLabelName?: string | null;
   tasks: TaskRow[];
 };
 
@@ -98,26 +101,6 @@ type BoardDetail = {
 };
 
 type AssigneeOption = { id: string; username: string; role: string };
-
-type PlannerTodoDTO = {
-  id: string;
-  completed: boolean;
-  sortOrder: number;
-  task: {
-    id: string;
-    title: string;
-    summary: string | null;
-    column: { title: string; board: { id: string; title: string; scope: string } };
-  };
-};
-
-type BrowseTaskRow = {
-  id: string;
-  title: string;
-  boardTitle: string;
-  scope: string;
-  columnTitle: string;
-};
 
 function resolveBacklogColumnId(columns: ColumnRow[]): string | null {
   const named = columns.find((c) => /^backlog\b/i.test(c.title.trim()));
@@ -242,6 +225,8 @@ export function PlannerClient() {
   const [addColumnOpen, setAddColumnOpen] = useState(false);
   const [newColTitle, setNewColTitle] = useState("");
   const [newColColor, setNewColColor] = useState("#64748b");
+  const [newColLinkedLabel, setNewColLinkedLabel] = useState("");
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [currentRole, setCurrentRole] = useState<"admin" | "manager" | "user" | null>(null);
@@ -250,16 +235,9 @@ export function PlannerClient() {
   const [teamAthletes, setTeamAthletes] = useState<TeamAthleteRow[]>([]);
   const [teamAthletesLoading, setTeamAthletesLoading] = useState(false);
   const [selectedAthleteName, setSelectedAthleteName] = useState<string | null>(null);
-  const [plannerTodos, setPlannerTodos] = useState<PlannerTodoDTO[]>([]);
-  const [linkKanbanModalOpen, setLinkKanbanModalOpen] = useState(false);
-  const [browseQ, setBrowseQ] = useState("");
-  const [browseBusy, setBrowseBusy] = useState(false);
-  const [browseRows, setBrowseRows] = useState<BrowseTaskRow[]>([]);
-  const [copyModal, setCopyModal] = useState<{ taskId: string; title: string } | null>(null);
-  const [copyBoardId, setCopyBoardId] = useState<string | null>(null);
-  const [copyColumns, setCopyColumns] = useState<Array<{ id: string; title: string }>>([]);
-  const [copyColumnId, setCopyColumnId] = useState<string | null>(null);
-  const [copySaving, setCopySaving] = useState(false);
+  const [moveModal, setMoveModal] = useState<{ taskId: string; title: string } | null>(null);
+  const [moveBoardId, setMoveBoardId] = useState<string | null>(null);
+  const [moveSaving, setMoveSaving] = useState(false);
   const [allBoardsView, setAllBoardsView] = useState(false);
   const [boardDetailsById, setBoardDetailsById] = useState<Record<string, BoardDetail>>({});
   const [dropTargetBoardId, setDropTargetBoardId] = useState<string | null>(null);
@@ -334,14 +312,6 @@ export function PlannerClient() {
     [detail]
   );
 
-  const athleteCompletedFlow = useMemo(
-    () =>
-      detail?.athleteId && detail.kind
-        ? usesAthleteCompletedFlow(detail.kind, detail.athleteId)
-        : false,
-    [detail]
-  );
-
   async function toggleTaskCompleted(taskId: string, completed: boolean) {
     const r = await fetch(`/api/planner/tasks/${encodeURIComponent(taskId)}/complete`, {
       method: "POST",
@@ -379,12 +349,6 @@ export function PlannerClient() {
     setDetail(typed);
     setBoardDetailsById((prev) => ({ ...prev, [id]: typed }));
     return typed;
-  }, []);
-
-  const refreshTodos = useCallback(async () => {
-    const r = await fetch("/api/planner/todos");
-    const j = await r.json().catch(() => ({}));
-    if (r.ok) setPlannerTodos((j.todos as PlannerTodoDTO[]) ?? []);
   }, []);
 
   useEffect(() => {
@@ -440,10 +404,6 @@ export function PlannerClient() {
     }
   }, [currentRole, area, router]);
 
-  useEffect(() => {
-    refreshTodos().catch(() => {});
-  }, [refreshTodos]);
-
   const filteredBoards = useMemo(() => {
     const hideCompleted = (b: BoardSummary) => b.kind !== "completed";
     if (area === "personal" && currentUserId) {
@@ -459,6 +419,12 @@ export function PlannerClient() {
     }
     return [];
   }, [boards, area, currentUserId, athleteUserId]);
+
+  const inboxMoveTargets = useMemo(() => {
+    return filteredBoards.filter(
+      (b) => b.kind !== "blocharch_inbox" && b.kind !== "blocharch_outbox"
+    );
+  }, [filteredBoards]);
 
   const loadAllBoardDetails = useCallback(async () => {
     const ids = filteredBoards
@@ -540,13 +506,6 @@ export function PlannerClient() {
     else if (!showBoardPicker) setDetail(null);
   }, [boardId, loadDetail, showBoardPicker]);
 
-  const personalOwnedBoards = useMemo(() => {
-    if (!currentUserId) return [];
-    return boards.filter((b) => b.scope === "personal" && b.ownerId === currentUserId);
-  }, [boards, currentUserId]);
-
-  const todoTaskIdSet = useMemo(() => new Set(plannerTodos.map((x) => x.task.id)), [plannerTodos]);
-
   async function navigateBoardAndFocusTask(targetBoardId: string, taskId: string) {
     setBoardId(targetBoardId);
     const bd = await loadDetail(targetBoardId);
@@ -560,95 +519,69 @@ export function PlannerClient() {
     }
   }
 
-  async function addTaskToMyTodo(taskIdLink: string) {
-    const r = await fetch("/api/planner/todos", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId: taskIdLink }),
-    });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) {
-      window.alert((j as { error?: string }).error || "Could not add to your list");
-      return;
-    }
-    await refreshTodos();
+  function openInboxMoveModal(taskId: string, taskTitle: string) {
+    const firstBoard = inboxMoveTargets[0]?.id ?? null;
+    setMoveModal({ taskId, title: taskTitle });
+    setMoveBoardId(firstBoard);
   }
 
-  function openPersonalCopyModal(taskId: string, taskTitle: string) {
-    const firstBoard = personalOwnedBoards[0]?.id ?? null;
-    setCopyModal({ taskId, title: taskTitle });
-    setCopyBoardId(firstBoard);
-  }
-
-  async function confirmCopyToPersonalBoard() {
-    if (!copyModal?.taskId || !copyColumnId) return;
-    setCopySaving(true);
+  async function confirmMoveToBoard() {
+    if (!moveModal?.taskId || !moveBoardId) return;
+    setMoveSaving(true);
     try {
-      const r = await fetch("/api/planner/tasks/copy-to-personal", {
+      const r = await fetch("/api/planner/tasks/move-to-board", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          sourceTaskId: copyModal.taskId,
-          targetColumnId: copyColumnId,
+          sourceTaskId: moveModal.taskId,
+          targetBoardId: moveBoardId,
         }),
       });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) {
-        window.alert((j as { error?: string }).error || "Could not copy to personal board");
+        window.alert((j as { error?: string }).error || "Could not move to board");
         return;
       }
-      const targetBid = typeof j.targetBoardId === "string" ? j.targetBoardId : null;
-      setCopyModal(null);
-      if (targetBid) setBoardId(targetBid);
+      const targetBid = typeof j.targetBoardId === "string" ? j.targetBoardId : moveBoardId;
+      setMoveModal(null);
+      setBoardId(targetBid);
       await refreshBoards();
-      if (targetBid) await loadDetail(targetBid);
-      await refreshTodos();
+      await loadDetail(targetBid);
     } finally {
-      setCopySaving(false);
+      setMoveSaving(false);
     }
   }
 
-  useEffect(() => {
-    if (!linkKanbanModalOpen) return;
-    let cancelled = false;
-    const h = window.setTimeout(async () => {
-      setBrowseBusy(true);
-      try {
-        const qs = browseQ.trim() ? `?q=${encodeURIComponent(browseQ.trim())}` : "";
-        const r = await fetch(`/api/planner/tasks/browse${qs}`);
-        const j = await r.json().catch(() => ({}));
-        if (!cancelled && r.ok) setBrowseRows((j.tasks as BrowseTaskRow[]) ?? []);
-      } finally {
-        if (!cancelled) setBrowseBusy(false);
-      }
-    }, 300);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(h);
-    };
-  }, [linkKanbanModalOpen, browseQ]);
+  function nudgeTask(taskId: string, direction: "up" | "down" | "left" | "right") {
+    const snap = detailRef.current;
+    if (!snap?.editable) return;
 
-  useEffect(() => {
-    if (!copyModal || !copyBoardId) {
-      setCopyColumns([]);
-      setCopyColumnId(null);
-      return;
+    let colIndex = -1;
+    let taskIndex = -1;
+    let colId = "";
+    for (let ci = 0; ci < snap.columns.length; ci++) {
+      const ti = snap.columns[ci]!.tasks.findIndex((t) => t.id === taskId);
+      if (ti >= 0) {
+        colIndex = ci;
+        taskIndex = ti;
+        colId = snap.columns[ci]!.id;
+        break;
+      }
     }
-    let cancelled = false;
-    (async () => {
-      const r = await fetch(`/api/planner/boards/${encodeURIComponent(copyBoardId)}`);
-      const j = await r.json().catch(() => null);
-      if (cancelled || !r.ok || !j) return;
-      const bd = j as BoardDetail;
-      const cols = bd.columns.map((c) => ({ id: c.id, title: c.title }));
-      setCopyColumns(cols);
-      const bl = resolveBacklogColumnId(bd.columns);
-      setCopyColumnId(bl ?? cols[0]?.id ?? null);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [copyModal, copyBoardId]);
+    if (colIndex < 0) return;
+
+    const col = snap.columns[colIndex]!;
+    if (direction === "up" && taskIndex > 0) {
+      reorderTasksAndPersist(snap, taskId, colId, col.tasks[taskIndex - 1]!.id);
+    } else if (direction === "down" && taskIndex < col.tasks.length - 1) {
+      const beforeId = col.tasks[taskIndex + 2]?.id ?? null;
+      reorderTasksAndPersist(snap, taskId, colId, beforeId);
+    } else if (direction === "left" && colIndex > 0) {
+      reorderTasksAndPersist(snap, taskId, snap.columns[colIndex - 1]!.id, null);
+    } else if (direction === "right" && colIndex < snap.columns.length - 1) {
+      reorderTasksAndPersist(snap, taskId, snap.columns[colIndex + 1]!.id, null);
+    }
+  }
 
   async function createBoard(e: React.FormEvent) {
     e.preventDefault();
@@ -1048,11 +981,16 @@ export function PlannerClient() {
     const r = await fetch(`/api/planner/boards/${encodeURIComponent(boardId)}/columns`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: newColTitle.trim(), color: newColColor }),
+      body: JSON.stringify({
+        title: newColTitle.trim(),
+        color: newColColor,
+        linkedLabelName: newColLinkedLabel || null,
+      }),
     });
     if (r.ok) {
       setNewColTitle("");
       setNewColColor("#64748b");
+      setNewColLinkedLabel("");
       setAddColumnOpen(false);
       await loadDetail(boardId);
     }
@@ -1130,12 +1068,15 @@ export function PlannerClient() {
                   <button
                     type="button"
                     onClick={() => goPlanner({ area: "team", athlete: a.userId })}
-                    className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-left transition-colors hover:bg-white/[0.06]"
+                    className="flex w-full items-center gap-3 rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-left transition-colors hover:bg-white/[0.06]"
                   >
-                    <span className="font-medium text-slate-100">{a.fullName}</span>
-                    <span className="mt-1 block text-xs text-slate-500">
-                      {a.athleteCode} · {a.activeProjects} active project
-                      {a.activeProjects === 1 ? "" : "s"}
+                    <ClientAvatar name={a.fullName} logoUrl={a.profilePhotoUrl} size={36} />
+                    <span className="min-w-0">
+                      <span className="block font-medium text-slate-100">{a.fullName}</span>
+                      <span className="mt-0.5 block text-xs text-slate-500">
+                        {a.athleteCode} · {a.activeProjects} active project
+                        {a.activeProjects === 1 ? "" : "s"}
+                      </span>
                     </span>
                   </button>
                 </li>
@@ -1521,17 +1462,14 @@ export function PlannerClient() {
                 >
                   {col.tasks.map((t) => {
                     const descPreview = taskCardDescriptionPreview(t.description);
-                    const onCompletedBoard =
-                      detail.kind === "completed" && !!detail.athleteId;
                     const showDoneTick =
                       detail.editable &&
-                      (onCompletedBoard ||
-                        athleteCompletedFlow ||
-                        (completedColumnId !== null && detail.columns.length >= 2));
-                    const isInDoneColumn =
-                      onCompletedBoard || athleteCompletedFlow
-                        ? detail.kind === "completed"
-                        : col.id === completedColumnId;
+                      completedColumnId !== null &&
+                      detail.columns.length >= 2;
+                    const isInDoneColumn = col.id === completedColumnId;
+                    const isSelected = selectedTaskId === t.id;
+                    const showInboxMove =
+                      detail.kind === "blocharch_inbox" && detail.editable && inboxMoveTargets.length > 0;
                     const showInsertLine =
                       detail.editable &&
                       dragTaskId &&
@@ -1654,16 +1592,20 @@ export function PlannerClient() {
                             suppressNextCardClickRef.current = false;
                             return;
                           }
+                          setSelectedTaskId(t.id);
                           setEditTask({ ...t, columnId: col.id });
                         }}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === " ") {
                             e.preventDefault();
+                            setSelectedTaskId(t.id);
                             setEditTask({ ...t, columnId: col.id });
                           }
                         }}
                         className={`w-full rounded-lg border border-white/[0.06] bg-white/[0.04] p-3 text-left text-sm text-slate-200 outline-none transition-[opacity,transform,box-shadow] duration-150 hover:bg-white/[0.07] focus-visible:ring-2 focus-visible:ring-brand-500/50 ${
                           detail.editable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
+                        } ${
+                          isSelected ? "ring-2 ring-brand-500/45 bg-brand-500/[0.08]" : ""
                         } ${
                           dragTaskId === t.id
                             ? "opacity-35 scale-[0.985] shadow-inner ring-1 ring-brand-500/30"
@@ -1688,19 +1630,7 @@ export function PlannerClient() {
                                 }
                                 onChange={(e) => {
                                   e.stopPropagation();
-                                  if (athleteCompletedFlow || onCompletedBoard) {
-                                    void toggleTaskCompleted(t.id, e.target.checked);
-                                    return;
-                                  }
-                                  const snap = detailRef.current;
-                                  const doneId = completedColumnId;
-                                  const firstId = snap?.columns[0]?.id;
-                                  if (!doneId || !firstId || !snap) return;
-                                  if (e.target.checked) {
-                                    reorderTasksAndPersist(snap, t.id, doneId, null);
-                                  } else {
-                                    reorderTasksAndPersist(snap, t.id, firstId, null);
-                                  }
+                                  void toggleTaskCompleted(t.id, e.target.checked);
                                 }}
                                 className="h-3.5 w-3.5 rounded border-white/20 bg-white/[0.06] text-brand-500 focus:ring-brand-500"
                               />
@@ -1731,33 +1661,43 @@ export function PlannerClient() {
                                 ))}
                               </div>
                             ) : null}
-                            <div
-                              className="mt-2 flex flex-wrap gap-2"
-                              onClick={(e) => e.stopPropagation()}
-                              onPointerDown={(e) => e.stopPropagation()}
-                              onKeyDown={(e) => e.stopPropagation()}
-                              role="group"
-                              aria-label="Cross-board shortcuts"
-                            >
-                              <button
-                                type="button"
-                                disabled={todoTaskIdSet.has(t.id)}
-                                onClick={() => void addTaskToMyTodo(t.id)}
-                                className="rounded-md border border-white/[0.1] px-2 py-1 text-[10px] font-medium text-brand-300 hover:bg-brand-500/15 disabled:cursor-not-allowed disabled:opacity-40"
+                            {detail.editable && isSelected ? (
+                              <div
+                                className="mt-2 flex flex-wrap items-center gap-1"
+                                onClick={(e) => e.stopPropagation()}
+                                onPointerDown={(e) => e.stopPropagation()}
+                                role="group"
+                                aria-label="Move task"
                               >
-                                {todoTaskIdSet.has(t.id) ? "On checklist" : "Todo"}
-                              </button>
-                              {personalOwnedBoards.length > 0 ? (
+                                <span className="mr-1 text-[10px] text-slate-500">Move:</span>
+                                {(["up", "down", "left", "right"] as const).map((dir) => (
+                                  <button
+                                    key={dir}
+                                    type="button"
+                                    title={`Move ${dir}`}
+                                    onClick={() => nudgeTask(t.id, dir)}
+                                    className="rounded border border-white/[0.1] px-1.5 py-0.5 text-[10px] text-slate-300 hover:bg-white/[0.08]"
+                                  >
+                                    {dir === "up" ? "↑" : dir === "down" ? "↓" : dir === "left" ? "←" : "→"}
+                                  </button>
+                                ))}
+                              </div>
+                            ) : null}
+                            {showInboxMove ? (
+                              <div
+                                className="mt-2"
+                                onClick={(e) => e.stopPropagation()}
+                                onPointerDown={(e) => e.stopPropagation()}
+                              >
                                 <button
                                   type="button"
-                                  onClick={() => openPersonalCopyModal(t.id, t.title)}
-                                  className="rounded-md border border-white/[0.1] px-2 py-1 text-[10px] font-medium text-slate-300 hover:bg-white/[0.08]"
-                                  title={`Copy onto your ${personalOwnedBoards.length === 1 ? `"${personalOwnedBoards[0]!.title}"` : "personal"} board`}
+                                  onClick={() => openInboxMoveModal(t.id, t.title)}
+                                  className="rounded-md border border-brand-500/30 bg-brand-500/10 px-2 py-1 text-[10px] font-medium text-brand-200 hover:bg-brand-500/20"
                                 >
-                                  Personal board…
+                                  Move to board…
                                 </button>
-                              ) : null}
-                            </div>
+                              </div>
+                            ) : null}
                           </div>
                         </div>
                       </div>
@@ -1836,6 +1776,21 @@ export function PlannerClient() {
                         />
                       </label>
                     </div>
+                    <label className="text-xs text-slate-500">
+                      Link to label (optional)
+                      <select
+                        value={newColLinkedLabel}
+                        onChange={(e) => setNewColLinkedLabel(e.target.value)}
+                        className="select-console mt-1 block w-full rounded-md px-2 py-1.5 text-sm"
+                      >
+                        <option value="">None — manual column</option>
+                        {APPROVED_PLANNER_LABELS.map((l) => (
+                          <option key={l.name} value={l.name}>
+                            {l.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                     <div className="flex gap-2">
                       <button
                         type="submit"
@@ -1881,37 +1836,20 @@ export function PlannerClient() {
               labels={detail.labels}
               assignees={assignees}
               showAssignee={currentRole === "admin" || currentRole === "manager"}
-              onClose={() => setEditTask(null)}
-              footerExtra={
-                <div className="mt-5 flex flex-wrap gap-2 border-t border-white/[0.08] pt-4">
-                  <button
-                    type="button"
-                    disabled={todoTaskIdSet.has(editTask.id)}
-                    onClick={() => void addTaskToMyTodo(editTask.id)}
-                    className="rounded-lg border border-white/[0.1] px-3 py-1.5 text-xs font-medium text-brand-300 hover:bg-brand-500/15 disabled:opacity-40"
-                  >
-                    {todoTaskIdSet.has(editTask.id) ? "On checklist" : "Add to checklist"}
-                  </button>
-                  {personalOwnedBoards.length > 0 ? (
-                    <button
-                      type="button"
-                      onClick={() => openPersonalCopyModal(editTask.id, editTask.title)}
-                      className="rounded-lg border border-white/[0.1] px-3 py-1.5 text-xs font-medium text-slate-300 hover:bg-white/[0.08]"
-                    >
-                      Copy to personal board…
-                    </button>
-                  ) : null}
-                </div>
-              }
+              onClose={() => {
+                setEditTask(null);
+                setSelectedTaskId(null);
+              }}
               onSave={async (taskId, payload) => {
                 await patchTask(taskId, payload);
                 setEditTask(null);
+                setSelectedTaskId(null);
               }}
               onDelete={async (taskId) => {
                 await fetch(`/api/planner/tasks/${encodeURIComponent(taskId)}`, { method: "DELETE" });
                 setEditTask(null);
+                setSelectedTaskId(null);
                 if (boardId) await loadDetail(boardId);
-                await refreshTodos();
               }}
             />
           )}
@@ -1920,143 +1858,52 @@ export function PlannerClient() {
       </>
       ) : null}
 
-      {linkKanbanModalOpen ? (
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="link-kanban-title"
-        >
-          <div className="max-h-[85vh] w-full max-w-lg overflow-hidden rounded-2xl border border-white/[0.1] bg-slate-900 shadow-xl">
-            <div className="border-b border-white/[0.08] p-4">
-              <h3 id="link-kanban-title" className="text-lg font-semibold text-white">
-                Link a task to your checklist
-              </h3>
-              <p className="mt-1 text-xs text-slate-500">
-                Search every board you can access. Adds a reference without moving the card.
-              </p>
-              <input
-                type="search"
-                value={browseQ}
-                onChange={(e) => setBrowseQ(e.target.value)}
-                placeholder="Search task title…"
-                className="mt-3 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white placeholder-slate-500"
-                autoFocus
-              />
-            </div>
-            <div className="max-h-[50vh] overflow-y-auto p-2">
-              {browseBusy ? (
-                <p className="p-4 text-sm text-slate-500">Searching…</p>
-              ) : browseRows.length === 0 ? (
-                <p className="p-4 text-sm text-slate-500">No tasks found.</p>
-              ) : (
-                <ul className="space-y-1">
-                  {browseRows.map((row) => (
-                    <li
-                      key={row.id}
-                      className="flex items-start justify-between gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2"
-                    >
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-slate-100">{row.title}</p>
-                        <p className="text-[10px] text-slate-500">
-                          [{row.scope}] {row.boardTitle} · {row.columnTitle}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        disabled={todoTaskIdSet.has(row.id)}
-                        onClick={() =>
-                          void (async () => {
-                            await addTaskToMyTodo(row.id);
-                            setLinkKanbanModalOpen(false);
-                          })()
-                        }
-                        className="shrink-0 rounded-md bg-brand-600 px-2 py-1 text-[11px] font-semibold text-slate-950 disabled:opacity-40"
-                      >
-                        {todoTaskIdSet.has(row.id) ? "Added" : "Add"}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-            <div className="flex justify-end border-t border-white/[0.08] p-3">
-              <button
-                type="button"
-                onClick={() => setLinkKanbanModalOpen(false)}
-                className="rounded-lg px-4 py-2 text-sm text-slate-400 hover:text-white"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {copyModal ? (
+      {moveModal ? (
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4"
           role="dialog"
           aria-modal="true"
         >
           <div className="w-full max-w-md rounded-2xl border border-white/[0.1] bg-slate-900 p-6 shadow-xl">
-            <h3 className="text-lg font-semibold text-white">Pull to personal board</h3>
+            <h3 className="text-lg font-semibold text-white">Move to board</h3>
             <p className="mt-1 text-xs text-slate-500">
-              Cards from Blocharch Inbox are moved (not duplicated). Other boards create a linked copy.
+              Route this inbox task to a working board. It will land in the column linked to its
+              label, or the default column if none matches.
             </p>
-            <p className="mt-1 text-xs text-slate-500">
-              Creates a new card on your personal Kanban from:{" "}
-              <span className="text-slate-300">{copyModal.title}</span>
-            </p>
-            {personalOwnedBoards.length === 0 ? (
-              <p className="mt-4 text-sm text-amber-400/90">Create a personal board first.</p>
+            <p className="mt-2 text-sm text-slate-300">{moveModal.title}</p>
+            {inboxMoveTargets.length === 0 ? (
+              <p className="mt-4 text-sm text-amber-400/90">No destination boards available.</p>
             ) : (
-              <>
-                <label className="mt-4 block text-xs text-slate-400">
-                  Personal board
-                  <select
-                    value={copyBoardId ?? ""}
-                    onChange={(e) => setCopyBoardId(e.target.value || null)}
-                    className="select-console mt-1 block w-full rounded-lg px-3 py-2 text-sm"
-                  >
-                    {personalOwnedBoards.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.title}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="mt-3 block text-xs text-slate-400">
-                  Column
-                  <select
-                    value={copyColumnId ?? ""}
-                    onChange={(e) => setCopyColumnId(e.target.value || null)}
-                    className="select-console mt-1 block w-full rounded-lg px-3 py-2 text-sm"
-                  >
-                    {copyColumns.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.title}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </>
+              <label className="mt-4 block text-xs text-slate-400">
+                Destination board
+                <select
+                  value={moveBoardId ?? ""}
+                  onChange={(e) => setMoveBoardId(e.target.value || null)}
+                  className="select-console mt-1 block w-full rounded-lg px-3 py-2 text-sm"
+                >
+                  {inboxMoveTargets.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
             )}
             <div className="mt-6 flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setCopyModal(null)}
+                onClick={() => setMoveModal(null)}
                 className="rounded-lg px-4 py-2 text-sm text-slate-400 hover:text-white"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                disabled={copySaving || !copyColumnId || personalOwnedBoards.length === 0}
-                onClick={() => void confirmCopyToPersonalBoard()}
+                disabled={moveSaving || !moveBoardId || inboxMoveTargets.length === 0}
+                onClick={() => void confirmMoveToBoard()}
                 className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-40"
               >
-                {copySaving ? "Copying…" : "Copy"}
+                {moveSaving ? "Moving…" : "Move"}
               </button>
             </div>
           </div>
@@ -2086,11 +1933,13 @@ function EditableColumnHeader({
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(column.title);
   const [color, setColor] = useState(column.color);
+  const [linkedLabel, setLinkedLabel] = useState(column.linkedLabelName ?? "");
 
   useEffect(() => {
     setTitle(column.title);
     setColor(column.color);
-  }, [column.id, column.title, column.color]);
+    setLinkedLabel(column.linkedLabelName ?? "");
+  }, [column.id, column.title, column.color, column.linkedLabelName]);
 
   const canMoveLeft = colIndex > 0;
   const canMoveRight = colIndex < totalColumns - 1;
@@ -2129,6 +1978,21 @@ function EditableColumnHeader({
               className="h-7 w-12 cursor-pointer rounded border-0 bg-transparent"
             />
           </label>
+          <label className="mb-2 block text-xs text-slate-500">
+            Link to label (optional)
+            <select
+              value={linkedLabel}
+              onChange={(e) => setLinkedLabel(e.target.value)}
+              className="select-console mt-1 block w-full rounded px-2 py-1 text-sm"
+            >
+              <option value="">None — manual column</option>
+              {APPROVED_PLANNER_LABELS.map((l) => (
+                <option key={l.name} value={l.name}>
+                  {l.name}
+                </option>
+              ))}
+            </select>
+          </label>
           <div className="flex gap-1">
             <button
               type="button"
@@ -2142,7 +2006,11 @@ function EditableColumnHeader({
               onClick={async () => {
                 const t = title.trim();
                 if (!t) return;
-                await onPatch(column.id, { title: t, color });
+                await onPatch(column.id, {
+                  title: t,
+                  color,
+                  linkedLabelName: linkedLabel || null,
+                });
                 setEditing(false);
               }}
               className="rounded bg-brand-600 px-2 py-1 text-xs font-semibold text-slate-950"
@@ -2161,7 +2029,14 @@ function EditableColumnHeader({
       style={{ borderTopWidth: 3, borderTopColor: column.color }}
     >
       <div className="flex items-start justify-between gap-1">
-        <p className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-200">{column.title}</p>
+        <p className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-200">
+          {column.title}
+          {column.linkedLabelName ? (
+            <span className="ml-1 text-[10px] font-normal text-brand-400/90">
+              · {column.linkedLabelName}
+            </span>
+          ) : null}
+        </p>
         <div className="flex shrink-0 items-center gap-0.5">
           <button
             type="button"

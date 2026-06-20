@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { ClientAvatar } from "@/components/ops/ClientAvatar";
+import { ImageUrlField } from "@/components/ops/ImageUrlField";
 
 type AthleteRow = {
   id: string;
@@ -9,6 +11,7 @@ type AthleteRow = {
   athleteCode: string;
   email: string | null;
   status: string;
+  profilePhotoUrl: string | null;
   baseMonthlyPayZar: number;
   monthlyHourCap: number;
   overtimeRateZar: number;
@@ -28,6 +31,7 @@ export function OpsAthletesClient() {
     password: "",
     email: "",
     blocharchStartDate: new Date().toISOString().slice(0, 10),
+    profilePhotoUrl: "",
   });
   const [editForm, setEditForm] = useState({
     fullName: "",
@@ -38,6 +42,7 @@ export function OpsAthletesClient() {
     overtimeRateZar: "200",
     blocharchStartDate: "",
     password: "",
+    profilePhotoUrl: "",
   });
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
@@ -59,7 +64,10 @@ export function OpsAthletesClient() {
     const r = await fetch("/api/ops/athletes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify({
+        ...form,
+        profilePhotoUrl: form.profilePhotoUrl.trim() || null,
+      }),
     });
     const j = await r.json();
     if (!r.ok) {
@@ -67,7 +75,15 @@ export function OpsAthletesClient() {
       return;
     }
     setOpen(false);
-    setForm({ fullName: "", athleteCode: "", username: "", password: "", email: "", blocharchStartDate: new Date().toISOString().slice(0, 10) });
+    setForm({
+      fullName: "",
+      athleteCode: "",
+      username: "",
+      password: "",
+      email: "",
+      blocharchStartDate: new Date().toISOString().slice(0, 10),
+      profilePhotoUrl: "",
+    });
     await load();
   }
 
@@ -82,6 +98,7 @@ export function OpsAthletesClient() {
       overtimeRateZar: String(a.overtimeRateZar),
       blocharchStartDate: a.blocharchStartDate,
       password: "",
+      profilePhotoUrl: a.profilePhotoUrl ?? "",
     });
     setError("");
     setMsg("");
@@ -97,6 +114,7 @@ export function OpsAthletesClient() {
       monthlyHourCap: Number(editForm.monthlyHourCap),
       overtimeRateZar: Number(editForm.overtimeRateZar),
       blocharchStartDate: editForm.blocharchStartDate,
+      profilePhotoUrl: editForm.profilePhotoUrl.trim() || null,
     };
     if (editForm.password.trim()) body.password = editForm.password.trim();
 
@@ -129,6 +147,12 @@ export function OpsAthletesClient() {
 
       {open && (
         <form onSubmit={createAthlete} className="card-tool grid gap-3 rounded-xl p-4 md:grid-cols-2">
+          <ImageUrlField
+            label="Profile photo"
+            displayName={form.fullName || "New athlete"}
+            value={form.profilePhotoUrl}
+            onChange={(profilePhotoUrl) => setForm((f) => ({ ...f, profilePhotoUrl }))}
+          />
           <label className="text-xs text-slate-400">Full name<input required value={form.fullName} onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
           <label className="text-xs text-slate-400">Athlete code<input required value={form.athleteCode} onChange={(e) => setForm((f) => ({ ...f, athleteCode: e.target.value.toUpperCase() }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
           <label className="text-xs text-slate-400">Username<input required value={form.username} onChange={(e) => setForm((f) => ({ ...f, username: e.target.value.toLowerCase() }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
@@ -148,6 +172,12 @@ export function OpsAthletesClient() {
           <div key={a.id} className="card-tool rounded-xl p-4">
             {editingId === a.id ? (
               <div className="grid gap-3 md:grid-cols-2">
+                <ImageUrlField
+                  label="Profile photo"
+                  displayName={editForm.fullName || a.fullName}
+                  value={editForm.profilePhotoUrl}
+                  onChange={(profilePhotoUrl) => setEditForm((f) => ({ ...f, profilePhotoUrl }))}
+                />
                 <label className="text-xs text-slate-400">Full name<input value={editForm.fullName} onChange={(e) => setEditForm((f) => ({ ...f, fullName: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
                 <label className="text-xs text-slate-400">Status<select value={editForm.status} onChange={(e) => setEditForm((f) => ({ ...f, status: e.target.value }))} className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
                 <label className="text-xs text-slate-400">Email<input value={editForm.email} onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
@@ -163,9 +193,12 @@ export function OpsAthletesClient() {
               </div>
             ) : (
               <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <p className="font-medium text-white">{a.fullName} <span className="text-slate-500">({a.athleteCode})</span></p>
-                  <p className="text-xs text-slate-500">{a.username} · {a.monthlyHourCap}h cap · R{a.baseMonthlyPayZar.toLocaleString()} · {a.projectCount} projects</p>
+                <div className="flex min-w-0 items-start gap-3">
+                  <ClientAvatar name={a.fullName} logoUrl={a.profilePhotoUrl} size={40} />
+                  <div>
+                    <p className="font-medium text-white">{a.fullName} <span className="text-slate-500">({a.athleteCode})</span></p>
+                    <p className="text-xs text-slate-500">{a.username} · {a.monthlyHourCap}h cap · R{a.baseMonthlyPayZar.toLocaleString()} · {a.projectCount} projects</p>
+                  </div>
                 </div>
                 <button type="button" onClick={() => startEdit(a)} className="text-xs text-brand-300 hover:text-brand-200">Edit</button>
               </div>

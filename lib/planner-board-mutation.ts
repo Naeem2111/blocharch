@@ -21,6 +21,7 @@ export type KanbanColumnRow = {
   title: string;
   color: string;
   sortOrder: number;
+  linkedLabelName?: string | null;
   tasks: KanbanTaskRow[];
 };
 

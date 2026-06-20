@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
-import { ClientLogoUpload, uploadClientLogo } from "@/components/ops/ClientLogoUpload";
+import { ImageUrlField } from "@/components/ops/ImageUrlField";
 
 type ClientContact = { id?: string; name: string; email: string };
 
@@ -36,6 +36,7 @@ const emptyCreate = {
   tierPercent: "30",
   laneCostGbp: "2041",
   activeLaneCount: "1",
+  logoUrl: "",
 };
 
 function ContactFields({
@@ -113,11 +114,10 @@ export function OpsClientsClient() {
     tierPercent: "30",
     laneCostGbp: "2041",
     activeLaneCount: "1",
+    logoUrl: "",
   });
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
-  const [createLogoFile, setCreateLogoFile] = useState<File | null>(null);
-  const [editLogoUrl, setEditLogoUrl] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const r = await fetch("/api/ops/clients");
@@ -153,6 +153,7 @@ export function OpsClientsClient() {
         tierPercent: Number(form.tierPercent),
         laneCostGbp: Number(form.laneCostGbp),
         activeLaneCount: Number(form.activeLaneCount),
+        logoUrl: form.logoUrl.trim() || null,
       }),
     });
     const j = await r.json();
@@ -160,14 +161,9 @@ export function OpsClientsClient() {
       setError(j.error || "Could not create client");
       return;
     }
-    const newId = j.client?.id as string | undefined;
-    if (newId && createLogoFile) {
-      await uploadClientLogo(newId, createLogoFile);
-    }
     setOpen(false);
     setForm(emptyCreate);
-    setCreateLogoFile(null);
-    setMsg(newId && createLogoFile ? "Client created with logo." : "Client created.");
+    setMsg("Client created.");
     await load();
   }
 
@@ -188,8 +184,8 @@ export function OpsClientsClient() {
       tierPercent: String(c.commercial?.tierPercent ?? 30),
       laneCostGbp: String(c.commercial?.laneCostGbp ?? 2041),
       activeLaneCount: String(c.commercial?.activeLaneCount ?? 1),
+      logoUrl: c.logoUrl ?? "",
     });
-    setEditLogoUrl(c.logoUrl);
     setError("");
     setMsg("");
   }
@@ -211,6 +207,7 @@ export function OpsClientsClient() {
         tierPercent: Number(editForm.tierPercent),
         laneCostGbp: Number(editForm.laneCostGbp),
         activeLaneCount: Number(editForm.activeLaneCount),
+        logoUrl: editForm.logoUrl.trim() || null,
       }),
     });
     const j = await r.json();
@@ -265,10 +262,12 @@ export function OpsClientsClient() {
               className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
             />
           </label>
-          <ClientLogoUpload
-            clientName={form.name || "New client"}
-            pendingFile={createLogoFile}
-            onPendingFile={setCreateLogoFile}
+          <ImageUrlField
+            label="Client logo"
+            hint="Paste a direct image link. Shown as a circle in Commercial and client lists."
+            displayName={form.name || "New client"}
+            value={form.logoUrl}
+            onChange={(logoUrl) => setForm((f) => ({ ...f, logoUrl }))}
           />
           <label className="text-xs text-slate-400">
             Company
@@ -329,7 +328,7 @@ export function OpsClientsClient() {
             <button type="submit" className="rounded-lg bg-white/[0.08] px-4 py-2 text-sm text-slate-100">
               Create client
             </button>
-            <button type="button" onClick={() => { setOpen(false); setCreateLogoFile(null); }} className="text-sm text-slate-500">
+            <button type="button" onClick={() => setOpen(false)} className="text-sm text-slate-500">
               Cancel
             </button>
           </div>
@@ -349,18 +348,11 @@ export function OpsClientsClient() {
                     className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
                   />
                 </label>
-                <ClientLogoUpload
-                  clientId={c.id}
-                  clientName={editForm.name || c.name}
-                  logoUrl={editLogoUrl}
-                  onUploaded={(url) => {
-                    setEditLogoUrl(url);
-                    setMsg("Logo updated.");
-                  }}
-                  onRemoved={() => {
-                    setEditLogoUrl(null);
-                    setMsg("Logo removed.");
-                  }}
+                <ImageUrlField
+                  label="Client logo"
+                  displayName={editForm.name || c.name}
+                  value={editForm.logoUrl}
+                  onChange={(logoUrl) => setEditForm((f) => ({ ...f, logoUrl }))}
                 />
                 <label className="text-xs text-slate-400">
                   Status

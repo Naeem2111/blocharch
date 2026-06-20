@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/password";
 import { requireOpsSession } from "@/lib/ops-access";
 import { parseDateOnly } from "@/lib/ops-hours";
+import { parseImageUrlField } from "@/lib/image-url";
 import { ensureAthleteSystemBoards } from "@/lib/planner-system-boards";
 
 export async function GET(request: NextRequest) {
@@ -32,6 +33,7 @@ export async function GET(request: NextRequest) {
       monthlyHourCap: a.monthlyHourCap,
       overtimeRateZar: Number(a.overtimeRateZar),
       blocharchStartDate: a.blocharchStartDate.toISOString().slice(0, 10),
+      profilePhotoUrl: a.profilePhotoUrl,
       projectCount: a._count.projects,
       submissionCount: a._count.submissions,
     })),
@@ -74,6 +76,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Athlete code already exists" }, { status: 400 });
     }
 
+    let profilePhotoUrl: string | null | undefined;
+    try {
+      profilePhotoUrl = parseImageUrlField(body.profilePhotoUrl);
+    } catch (e) {
+      return NextResponse.json(
+        { error: e instanceof Error ? e.message : "Invalid profile photo URL" },
+        { status: 400 }
+      );
+    }
+
     const userId = randomUUID();
     const athlete = await prisma.$transaction(async (tx) => {
       await tx.user.create({
@@ -96,6 +108,7 @@ export async function POST(request: NextRequest) {
           baseMonthlyPayZar: body.baseMonthlyPayZar ?? 20000,
           monthlyHourCap: body.monthlyHourCap ?? 160,
           overtimeRateZar: body.overtimeRateZar ?? 200,
+          ...(profilePhotoUrl !== undefined ? { profilePhotoUrl } : {}),
         },
       });
       await ensureAthleteSystemBoards(created.id, userId, tx);

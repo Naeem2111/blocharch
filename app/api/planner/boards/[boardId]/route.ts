@@ -8,6 +8,10 @@ import {
   requirePlannerSession,
 } from "@/lib/planner-access";
 import { isProtectedSystemBoard } from "@/lib/planner-system-boards";
+import {
+  ensureDefaultLabelsOnBoard,
+  purgeUnapprovedBoardLabels,
+} from "@/lib/planner-labels-seed";
 
 type Ctx = { params: Promise<{ boardId: string }> };
 
@@ -20,6 +24,9 @@ export async function GET(request: NextRequest, context: Ctx) {
   if (!(await canViewBoard(user, boardId))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+
+  await purgeUnapprovedBoardLabels(boardId);
+  await ensureDefaultLabelsOnBoard(boardId);
 
   const board = await prisma.plannerBoard.findUnique({
     where: { id: boardId },

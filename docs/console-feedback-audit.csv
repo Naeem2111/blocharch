@@ -43,19 +43,19 @@ OPS,Analytics — client logo next to client name,AUDIT,Partial,Name only in ana
 OPS,Check-ins — Pending/Unscheduled (red) vs Scheduled (green),AUDIT,Done,Red left border for pending; green for scheduled/approved.
 PLANNER,Board create/rename/delete,AUDIT,Done,Approved.
 PLANNER,Remove Cross-board To-dos (admin + athlete),AUDIT,Done,Section removed from PlannerClient.
-PLANNER,Reliable drag-and-drop + scroll,AUDIT,Partial,RAF auto-scroll added; still reported glitching; no arrow fallback.
-PLANNER,Labels simplified to 5 only (This Week / Tomorrow / Urgent / Urgent Today / Waiting),AUDIT,Done,planner-approved-labels.ts seeds 5 labels only.
-PLANNER,Custom column colour + optional label link,AUDIT,Partial,Column colour on create; no labelId link on columns.
-PLANNER,Column-to-label auto-move logic,AUDIT,Missing,Tasks do not auto-move when label matches linked column.
-PLANNER,Done column per board (not separate Completed board),AUDIT,Partial,Done column works; fixed Completed board still exists (audit says remove).
+PLANNER,Reliable drag-and-drop + scroll,AUDIT,Partial,RAF auto-scroll retained; arrow fallback (↑↓←→) on selected task card.
+PLANNER,Labels simplified to 5 only (This Week / Tomorrow / Urgent / Urgent Today / Waiting),AUDIT,Done,planner-approved-labels.ts + purgeUnapprovedBoardLabels on board load.
+PLANNER,Custom column colour + optional label link,AUDIT,Done,linkedLabelName on PlannerColumn; create/edit column UI.
+PLANNER,Column-to-label auto-move logic,AUDIT,Done,relocateTaskToLabelLinkedColumn on label PATCH + column link change + inbox move-to-board.
+PLANNER,Done column per board (not separate Completed board),AUDIT,Done,setPlannerTaskCompleted always uses same-board Done column; athlete Completed board flow disabled.
 PLANNER,Remove fixed Completed board tab,AUDIT,Done,completed kind filtered from board tabs.
 PLANNER,Board reorder (movable boards),AUDIT,Done,sortOrder + arrows; project boards movable.
 OUTBOX,Blocharch Outbox assignment fields,AUDIT,Done,Athlete/project/title/description/due/notes working.
 OUTBOX,Priority → approved label field on assign,AUDIT,Done,Label dropdown replaces priority on outbox form.
 OUTBOX,Athlete notification + red badges on assign,AUDIT,Done,Notification + inbox badge + pulse on planner nav.
-OUTBOX,Inbox single receiving column,AUDIT,Partial,Delivered to backlog column; inbox may have multiple default columns.
-OUTBOX,Inbox move-not-copy to athlete board,AUDIT,Done,copy-to-personal moves from blocharch_inbox.
-OUTBOX,Athlete dropdown to move task to another board,AUDIT,Partial,Pull to personal modal exists; no explicit board picker dropdown on inbox cards.
+OUTBOX,Inbox single receiving column,AUDIT,Done,Inbox board uses single Blocharch Inbox/backlog receiving column.
+OUTBOX,Inbox move-not-copy to athlete board,AUDIT,Done,move-to-board API moves from blocharch_inbox with label-column placement.
+OUTBOX,Athlete dropdown to move task to another board,AUDIT,Done,Move to board… button + modal on inbox task cards.
 ONBOARDING,Clients — layout,AUDIT,Done,Client manager approved.
 ONBOARDING,Clients — logo upload (512px circular 32–40px display),AUDIT,Done,Upload on create + edit in OpsClientsClient; shown in Commercial.
 ONBOARDING,Athletes — layout,AUDIT,Done,No major changes needed.

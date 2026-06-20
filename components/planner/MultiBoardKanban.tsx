@@ -4,7 +4,6 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import type { KanbanBoardDetail, KanbanTaskRow } from "@/lib/planner-board-mutation";
 import { startDragAutoScroll, stopDragAutoScroll, trackDragPointer } from "@/lib/planner-drag-scroll";
 import { createDragHighlightScheduler } from "@/lib/planner-drag-ui";
-import { usesAthleteCompletedFlow } from "@/lib/planner-completed";
 
 function taskCardDescriptionPreview(description: string | null): string | null {
   const body = (description ?? "").trim();
@@ -145,10 +144,6 @@ export function MultiBoardKanban({ boards, onMoveTask, onOpenTask, onToggleCompl
     <div className="flex gap-4 overflow-x-auto pb-4">
       {boards.map((board) => {
         const completedColumnId = resolveCompletedColumnId(board.columns);
-        const athleteCompletedFlow =
-          !!board.athleteId && board.kind
-            ? usesAthleteCompletedFlow(board.kind, board.athleteId)
-            : false;
 
         return (
           <section
@@ -216,16 +211,11 @@ export function MultiBoardKanban({ boards, onMoveTask, onOpenTask, onToggleCompl
                         dragTaskId !== t.id &&
                         taskDropGuide?.columnId === col.id &&
                         taskDropGuide.beforeTaskId === t.id;
-                      const onCompletedBoard = board.kind === "completed" && !!board.athleteId;
                       const showDoneTick =
                         board.editable &&
-                        (onCompletedBoard ||
-                          athleteCompletedFlow ||
-                          (completedColumnId !== null && board.columns.length >= 2));
-                      const isInDoneColumn =
-                        onCompletedBoard || athleteCompletedFlow
-                          ? board.kind === "completed"
-                          : col.id === completedColumnId;
+                        completedColumnId !== null &&
+                        board.columns.length >= 2;
+                      const isInDoneColumn = col.id === completedColumnId;
 
                       return (
                         <Fragment key={t.id}>

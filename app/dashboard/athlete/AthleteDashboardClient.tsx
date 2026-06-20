@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { ClientAvatar } from "@/components/ops/ClientAvatar";
 
 type OpsAlert = {
   code: string;
@@ -11,7 +12,13 @@ type OpsAlert = {
 };
 
 type DashboardData = {
-  profile: { fullName: string; athleteCode: string; blocharchStartDate: string; monthlyHourCap: number };
+  profile: {
+    fullName: string;
+    athleteCode: string;
+    profilePhotoUrl: string | null;
+    blocharchStartDate: string;
+    monthlyHourCap: number;
+  };
   summary: {
     lifetimeHours: number;
     monthHours: number;
@@ -112,10 +119,15 @@ export function AthleteDashboardClient() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="card-tool rounded-xl p-5">
           <h2 className="text-sm font-semibold text-white">Profile</h2>
-          <p className="mt-2 text-sm text-slate-400">
-            {profile.fullName} · {profile.athleteCode}
-          </p>
-          <p className="text-xs text-slate-500">Started {profile.blocharchStartDate}</p>
+          <div className="mt-3 flex items-center gap-3">
+            <ClientAvatar name={profile.fullName} logoUrl={profile.profilePhotoUrl} size={48} />
+            <div>
+              <p className="text-sm text-slate-300">
+                {profile.fullName} · {profile.athleteCode}
+              </p>
+              <p className="text-xs text-slate-500">Started {profile.blocharchStartDate}</p>
+            </div>
+          </div>
         </div>
         <div className="card-tool rounded-xl p-5">
           <div className="flex items-center justify-between gap-2">

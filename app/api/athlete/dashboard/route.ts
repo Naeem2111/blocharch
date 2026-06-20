@@ -81,6 +81,7 @@ export async function GET(request: NextRequest) {
     profile: {
       fullName: athlete.fullName,
       athleteCode: athlete.athleteCode,
+      profilePhotoUrl: athlete.profilePhotoUrl,
       blocharchStartDate: athlete.blocharchStartDate.toISOString().slice(0, 10),
       status: athlete.status,
       monthlyHourCap: athlete.monthlyHourCap,

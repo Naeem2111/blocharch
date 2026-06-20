@@ -9,6 +9,7 @@ import {
   pricingTierForPercent,
 } from "@/lib/ops-constants";
 import { requireOpsSession } from "@/lib/ops-access";
+import { parseImageUrlField } from "@/lib/image-url";
 import { removeClientLogoFiles } from "@/lib/client-logo-storage";
 import {
   clientInclude,
@@ -39,6 +40,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       country?: string | null;
       status?: "active" | "inactive";
       notes?: string | null;
+      logoUrl?: string | null;
     } = {};
 
     if (body.name != null) {
@@ -58,6 +60,20 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (body.country !== undefined) clientData.country = body.country ? String(body.country).trim() : null;
     if (body.notes !== undefined) clientData.notes = body.notes ? String(body.notes).trim() : null;
     if (body.status === "active" || body.status === "inactive") clientData.status = body.status;
+
+    if (body.logoUrl !== undefined) {
+      try {
+        clientData.logoUrl = parseImageUrlField(body.logoUrl) ?? null;
+      } catch (e) {
+        return NextResponse.json(
+          { error: e instanceof Error ? e.message : "Invalid logo URL" },
+          { status: 400 }
+        );
+      }
+      if (!clientData.logoUrl?.startsWith("/uploads/")) {
+        await removeClientLogoFiles(id);
+      }
+    }
 
     const contacts = parseContactsFromBody(body);
 

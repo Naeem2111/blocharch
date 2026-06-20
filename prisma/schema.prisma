@@ -212,11 +212,13 @@ model PlannerBoardMember {
 }
 
 model PlannerColumn {
-  id        String @id @default(uuid())
-  boardId   String @map("board_id")
-  title     String
-  color     String @default("#64748b")
-  sortOrder Int    @default(0) @map("sort_order")
+  id              String  @id @default(uuid())
+  boardId         String  @map("board_id")
+  title           String
+  color           String  @default("#64748b")
+  sortOrder       Int     @default(0) @map("sort_order")
+  /** When set, tasks with this approved label auto-move into this column. */
+  linkedLabelName String? @map("linked_label_name")
 
   board PlannerBoard @relation(fields: [boardId], references: [id], onDelete: Cascade)
   tasks PlannerTask[]
@@ -360,6 +362,8 @@ model OpsAthlete {
   overtimeRateZar  Decimal          @default(200) @map("overtime_rate_zar") @db.Decimal(10, 2)
   blocharchStartDate DateTime       @map("blocharch_start_date") @db.Date
   status           OpsAthleteStatus @default(active)
+  /** Direct link to profile photo (http/https). */
+  profilePhotoUrl  String?          @map("profile_photo_url")
   createdAt        DateTime         @default(now()) @map("created_at")
   updatedAt        DateTime         @updatedAt @map("updated_at")
 

@@ -2,8 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { APPROVED_PLANNER_LABELS } from "@/lib/planner-approved-labels";
+import { ClientAvatar } from "@/components/ops/ClientAvatar";
 
-type AthleteOption = { id: string; fullName: string; athleteCode: string };
+type AthleteOption = {
+  id: string;
+  fullName: string;
+  athleteCode: string;
+  profilePhotoUrl: string | null;
+};
 type ProjectOption = { id: string; name: string; clientName: string; assignedAthleteId: string | null };
 type OutboxRow = {
   id: string;
@@ -45,11 +51,19 @@ export function BlocharchOutboxPanel() {
       ([opts]) => {
         if (opts.athletes) {
           setAthletes(
-            opts.athletes.map((x: { id: string; fullName: string; athleteCode: string }) => ({
-              id: x.id,
-              fullName: x.fullName,
-              athleteCode: x.athleteCode,
-            }))
+            opts.athletes.map(
+              (x: {
+                id: string;
+                fullName: string;
+                athleteCode: string;
+                profilePhotoUrl: string | null;
+              }) => ({
+                id: x.id,
+                fullName: x.fullName,
+                athleteCode: x.athleteCode,
+                profilePhotoUrl: x.profilePhotoUrl,
+              })
+            )
           );
         }
         if (opts.projects) {
@@ -76,6 +90,8 @@ export function BlocharchOutboxPanel() {
   const projectOptions = form.athleteId
     ? projects.filter((p) => p.assignedAthleteId === form.athleteId)
     : projects;
+
+  const selectedAthlete = athletes.find((a) => a.id === form.athleteId) ?? null;
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -127,19 +143,28 @@ export function BlocharchOutboxPanel() {
       <form onSubmit={onSubmit} className="grid gap-4 sm:grid-cols-2">
         <label className="text-xs text-slate-400 sm:col-span-2">
           Athlete <span className="text-red-400">*</span>
-          <select
-            required
-            value={form.athleteId}
-            onChange={(e) => setForm((f) => ({ ...f, athleteId: e.target.value, projectId: "" }))}
-            className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
-          >
-            <option value="">Select athlete…</option>
-            {athletes.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.fullName} ({a.athleteCode})
-              </option>
-            ))}
-          </select>
+          <div className="mt-1 flex items-center gap-2">
+            {selectedAthlete ? (
+              <ClientAvatar
+                name={selectedAthlete.fullName}
+                logoUrl={selectedAthlete.profilePhotoUrl}
+                size={32}
+              />
+            ) : null}
+            <select
+              required
+              value={form.athleteId}
+              onChange={(e) => setForm((f) => ({ ...f, athleteId: e.target.value, projectId: "" }))}
+              className="select-console block min-w-0 flex-1 rounded-md px-3 py-2 text-sm"
+            >
+              <option value="">Select athlete…</option>
+              {athletes.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.fullName} ({a.athleteCode})
+                </option>
+              ))}
+            </select>
+          </div>
         </label>
 
         <label className="text-xs text-slate-400">

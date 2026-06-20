@@ -8,6 +8,7 @@ import {
   pricingTierForPercent,
 } from "@/lib/ops-constants";
 import { requireOpsSession } from "@/lib/ops-access";
+import { parseImageUrlField } from "@/lib/image-url";
 import {
   clientInclude,
   mapClientToJson,
@@ -51,6 +52,16 @@ export async function POST(request: NextRequest) {
     const activeLaneCount = Math.max(1, Math.min(20, Number(body.activeLaneCount) || 1));
     const contacts = parseContactsFromBody(body) ?? [];
 
+    let logoUrl: string | null | undefined;
+    try {
+      logoUrl = parseImageUrlField(body.logoUrl);
+    } catch (e) {
+      return NextResponse.json(
+        { error: e instanceof Error ? e.message : "Invalid logo URL" },
+        { status: 400 }
+      );
+    }
+
     const client = await prisma.opsClient.create({
       data: {
         name,
@@ -59,6 +70,7 @@ export async function POST(request: NextRequest) {
         phone: body.phone ? String(body.phone).trim() : null,
         country: body.country ? String(body.country).trim() : null,
         notes: body.notes ? String(body.notes).trim() : null,
+        ...(logoUrl !== undefined ? { logoUrl } : {}),
         contacts: {
           create: contacts.map((c, i) => ({
             name: c.name,

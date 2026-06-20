@@ -2,6 +2,10 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { canEditBoard, requirePlannerSession } from "@/lib/planner-access";
+import {
+  parseLinkedLabelName,
+  syncBoardLabelLinkedTasks,
+} from "@/lib/planner-label-column";
 
 type Ctx = { params: Promise<{ boardId: string }> };
 
@@ -19,8 +23,12 @@ export async function POST(request: NextRequest, context: Ctx) {
     const body = await request.json();
     const title = String(body.title || "").trim();
     const color = typeof body.color === "string" ? body.color.trim() : "#64748b";
+    const linkedLabelName = parseLinkedLabelName(body.linkedLabelName);
     if (title.length < 1 || title.length > 80) {
       return NextResponse.json({ error: "Title 1–80 characters" }, { status: 400 });
+    }
+    if (body.linkedLabelName !== undefined && body.linkedLabelName !== null && body.linkedLabelName !== "" && linkedLabelName === null) {
+      return NextResponse.json({ error: "Invalid linked label" }, { status: 400 });
     }
 
     const maxOrder = await prisma.plannerColumn.aggregate({
@@ -35,9 +43,18 @@ export async function POST(request: NextRequest, context: Ctx) {
         title,
         color: color.slice(0, 32) || "#64748b",
         sortOrder,
+        ...(linkedLabelName !== undefined ? { linkedLabelName } : {}),
       },
-      select: { id: true, title: true, color: true, sortOrder: true },
+      select: {
+        id: true,
+        title: true,
+        color: true,
+        sortOrder: true,
+        linkedLabelName: true,
+      },
     });
+
+    if (linkedLabelName) await syncBoardLabelLinkedTasks(boardId);
 
     return NextResponse.json({ column }, { status: 201 });
   } catch {
