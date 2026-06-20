@@ -9,6 +9,7 @@ import {
   pricingTierForPercent,
 } from "@/lib/ops-constants";
 import { requireOpsSession } from "@/lib/ops-access";
+import { removeClientLogoFiles } from "@/lib/client-logo-storage";
 import {
   clientInclude,
   mapClientToJson,
@@ -141,6 +142,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
   });
   if (!existing) return NextResponse.json({ error: "Client not found" }, { status: 404 });
 
+  await removeClientLogoFiles(id);
   await prisma.opsClient.delete({ where: { id } });
   return NextResponse.json({ ok: true });
 }

@@ -13,6 +13,7 @@ export { LANE_MONTHLY_HOURS };
 export type ClientLaneCommercialRow = {
   clientId: string;
   clientName: string;
+  clientLogoUrl: string | null;
   clientStatus: string;
   pricingTier: string;
   laneCostGbp: number;
@@ -35,6 +36,7 @@ export type CommercialLedgerRow = {
   athleteCode: string;
   clientId: string;
   clientName: string;
+  clientLogoUrl: string | null;
   /** Hours on this client's projects (usage tracking). */
   hoursWorked: number;
   /** Share of client lane + overtime revenue attributed by hours. */
@@ -155,6 +157,7 @@ export async function buildCommercialLedger(reference: Date): Promise<Commercial
     clientLanes.push({
       clientId: client.id,
       clientName: client.name,
+      clientLogoUrl: client.logoUrl,
       clientStatus: client.status,
       pricingTier: commercial.pricingTier,
       laneCostGbp,
@@ -188,6 +191,7 @@ export async function buildCommercialLedger(reference: Date): Promise<Commercial
       athleteCode: athlete.athleteCode,
       clientId: client.id,
       clientName: client.name,
+      clientLogoUrl: client.logoUrl,
       hoursWorked: round2(hoursWorked),
       revenueGbp,
       athleteCostZar: 0,

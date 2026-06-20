@@ -303,6 +303,7 @@ model OpsClient {
   software    String?         @db.Text
   phone       String?
   country     String?
+  logoUrl     String?         @map("logo_url")
   status      OpsClientStatus @default(active)
   notes       String?         @db.Text
   createdAt   DateTime        @default(now()) @map("created_at")

@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ClientAvatar } from "@/components/ops/ClientAvatar";
 import { LANE_MONTHLY_HOURS } from "@/lib/ops-constants";
 
 type ClientLaneRow = {
   clientId: string;
   clientName: string;
+  clientLogoUrl: string | null;
   clientStatus: string;
   pricingTier: string;
   laneCostGbp: number;
@@ -24,6 +26,7 @@ type LedgerRow = {
   athleteName: string;
   athleteCode: string;
   clientName: string;
+  clientLogoUrl: string | null;
   hoursWorked: number;
   revenueGbp: number;
   athleteCostGbp: number;
@@ -253,7 +256,10 @@ export function CommercialClient() {
                 {ledger.clientLanes.map((lane) => (
                   <tr key={lane.clientId} className="border-b border-white/[0.04] text-slate-300">
                     <td className="px-4 py-2">
-                      {lane.clientName}
+                      <span className="inline-flex items-center gap-2">
+                        <ClientAvatar name={lane.clientName} logoUrl={lane.clientLogoUrl} size={32} />
+                        {lane.clientName}
+                      </span>
                       {lane.clientStatus !== "active" ? (
                         <span className="ml-1 text-xs text-amber-400">({lane.clientStatus})</span>
                       ) : null}
@@ -318,7 +324,12 @@ export function CommercialClient() {
                       {row.athleteName}
                       <span className="ml-1 text-slate-500">({row.athleteCode})</span>
                     </td>
-                    <td className="px-4 py-2">{row.clientName}</td>
+                    <td className="px-4 py-2">
+                      <span className="inline-flex items-center gap-2">
+                        <ClientAvatar name={row.clientName} logoUrl={row.clientLogoUrl} size={32} />
+                        {row.clientName}
+                      </span>
+                    </td>
                     <td className="px-4 py-2 tabular-nums">{row.hoursWorked}</td>
                     <td className="px-4 py-2 tabular-nums">£{row.revenueGbp.toLocaleString()}</td>
                     <td className="px-4 py-2 tabular-nums">£{row.athleteCostGbp.toLocaleString()}</td>

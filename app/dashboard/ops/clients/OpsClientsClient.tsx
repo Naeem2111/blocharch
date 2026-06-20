@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { ClientAvatar } from "@/components/ops/ClientAvatar";
+import { ClientLogoUpload, uploadClientLogo } from "@/components/ops/ClientLogoUpload";
 
 type ClientContact = { id?: string; name: string; email: string };
 
@@ -14,6 +16,7 @@ type ClientRow = {
   country: string | null;
   status: string;
   notes: string | null;
+  logoUrl: string | null;
   projectCount: number;
   commercial: {
     pricingTier: string;
@@ -113,6 +116,8 @@ export function OpsClientsClient() {
   });
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
+  const [createLogoFile, setCreateLogoFile] = useState<File | null>(null);
+  const [editLogoUrl, setEditLogoUrl] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const r = await fetch("/api/ops/clients");
@@ -155,8 +160,14 @@ export function OpsClientsClient() {
       setError(j.error || "Could not create client");
       return;
     }
+    const newId = j.client?.id as string | undefined;
+    if (newId && createLogoFile) {
+      await uploadClientLogo(newId, createLogoFile);
+    }
     setOpen(false);
     setForm(emptyCreate);
+    setCreateLogoFile(null);
+    setMsg(newId && createLogoFile ? "Client created with logo." : "Client created.");
     await load();
   }
 
@@ -178,6 +189,7 @@ export function OpsClientsClient() {
       laneCostGbp: String(c.commercial?.laneCostGbp ?? 2041),
       activeLaneCount: String(c.commercial?.activeLaneCount ?? 1),
     });
+    setEditLogoUrl(c.logoUrl);
     setError("");
     setMsg("");
   }
@@ -253,6 +265,11 @@ export function OpsClientsClient() {
               className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
             />
           </label>
+          <ClientLogoUpload
+            clientName={form.name || "New client"}
+            pendingFile={createLogoFile}
+            onPendingFile={setCreateLogoFile}
+          />
           <label className="text-xs text-slate-400">
             Company
             <input
@@ -312,7 +329,7 @@ export function OpsClientsClient() {
             <button type="submit" className="rounded-lg bg-white/[0.08] px-4 py-2 text-sm text-slate-100">
               Create client
             </button>
-            <button type="button" onClick={() => setOpen(false)} className="text-sm text-slate-500">
+            <button type="button" onClick={() => { setOpen(false); setCreateLogoFile(null); }} className="text-sm text-slate-500">
               Cancel
             </button>
           </div>
@@ -332,6 +349,19 @@ export function OpsClientsClient() {
                     className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
                   />
                 </label>
+                <ClientLogoUpload
+                  clientId={c.id}
+                  clientName={editForm.name || c.name}
+                  logoUrl={editLogoUrl}
+                  onUploaded={(url) => {
+                    setEditLogoUrl(url);
+                    setMsg("Logo updated.");
+                  }}
+                  onRemoved={() => {
+                    setEditLogoUrl(null);
+                    setMsg("Logo removed.");
+                  }}
+                />
                 <label className="text-xs text-slate-400">
                   Status
                   <select
@@ -435,7 +465,9 @@ export function OpsClientsClient() {
               </div>
             ) : (
               <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
+                <div className="flex min-w-0 items-start gap-3">
+                  <ClientAvatar name={c.name} logoUrl={c.logoUrl} size={40} />
+                  <div>
                   <p className="font-medium text-white">{c.name}</p>
                   <p className="text-xs text-slate-500">
                     {c.commercial?.tierPercent ?? 30}% · £
@@ -449,6 +481,7 @@ export function OpsClientsClient() {
                       {ct.email ? ` · ${ct.email}` : ""}
                     </p>
                   ))}
+                  </div>
                 </div>
                 <button
                   type="button"

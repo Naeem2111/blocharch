@@ -30,8 +30,8 @@ OPS,Project form — remove Blocker checkbox,AUDIT,Done,Removed from edit form.
 OPS,Project form — remove Check-in requested checkbox,AUDIT,Done,Removed from edit form.
 OPS,Commercial — layout & calculations,AUDIT,Done,Lane revenue/cost/margin breakdown approved.
 OPS,Commercial — live vs manual GBP/ZAR exchange rate,AUDIT,Missing,No live rate fetch toggle; manual rate only.
-OPS,Commercial — circular client logo next to name,AUDIT,Missing,No logoUrl on clients; no ClientAvatar component.
-OPS,Commercial — client logo upload on onboarding,AUDIT,Missing,OpsClientsClient has no logo upload field.
+OPS,Commercial — circular client logo next to name,AUDIT,Done,ClientAvatar on Commercial lane + ledger tables.
+OPS,Commercial — client logo upload on onboarding,AUDIT,Done,Same upload flow on Clients onboarding page.
 OPS,Check-ins — unify Book a Call + Daily Log checkbox into Check-in Requests,AUDIT,Done,CheckInRequestModal from daily log.
 OPS,Check-ins — remove admin Notifications section,AUDIT,Done,Removed from Ops sub-nav.
 OPS,Check-ins — Scheduled Meetings tab (reversible),AUDIT,Done,Scheduled meetings filter tab added.
@@ -39,7 +39,7 @@ OPS,Check-ins — source label (Book a Call vs Daily Log),AUDIT,Done,source on s
 OPS,Analytics — due date risk progress % as text,AUDIT,Done,showLabel on analytics progress bars.
 OPS,Analytics — month filter & charts,AUDIT,Done,Hours by phase/client/athlete + profitability working.
 OPS,Analytics — hours by phase accumulates over time (not monthly reset),AUDIT,Partial,Verify buildAnalytics uses cumulative not month-only for phase totals.
-OPS,Analytics — client logo next to client name,AUDIT,Missing,Depends on client logo upload.
+OPS,Analytics — client logo next to client name,AUDIT,Partial,Name only in analytics tables; Commercial shows logos.
 OPS,Check-ins — Pending/Unscheduled (red) vs Scheduled (green),AUDIT,Done,Red left border for pending; green for scheduled/approved.
 PLANNER,Board create/rename/delete,AUDIT,Done,Approved.
 PLANNER,Remove Cross-board To-dos (admin + athlete),AUDIT,Done,Section removed from PlannerClient.
@@ -57,7 +57,7 @@ OUTBOX,Inbox single receiving column,AUDIT,Partial,Delivered to backlog column; 
 OUTBOX,Inbox move-not-copy to athlete board,AUDIT,Done,copy-to-personal moves from blocharch_inbox.
 OUTBOX,Athlete dropdown to move task to another board,AUDIT,Partial,Pull to personal modal exists; no explicit board picker dropdown on inbox cards.
 ONBOARDING,Clients — layout,AUDIT,Done,Client manager approved.
-ONBOARDING,Clients — logo upload (512px circular 32–40px display),AUDIT,Missing,No logo field or storage on OpsClient.
+ONBOARDING,Clients — logo upload (512px circular 32–40px display),AUDIT,Done,Upload on create + edit in OpsClientsClient; shown in Commercial.
 ONBOARDING,Athletes — layout,AUDIT,Done,No major changes needed.
 ONBOARDING,Athletes — optional profile picture upload,AUDIT,Missing,No avatar upload on athlete profile.
 WORKSPACE,My Workspace — no changes needed,AUDIT,Done,Approved as-is.

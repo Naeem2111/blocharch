@@ -38,5 +38,9 @@ out/
 data/geocache.json
 data/users.json
 
+# Uploaded client logos (stored on disk at runtime)
+public/uploads/clients/*
+!public/uploads/clients/.gitkeep
+
 # Vercel
 .vercel
