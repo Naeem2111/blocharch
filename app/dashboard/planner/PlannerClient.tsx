@@ -217,7 +217,9 @@ export function PlannerClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const area = searchParams.get("area");
-  const athleteUserId = searchParams.get("athlete");
+  const athleteParam = searchParams.get("athlete");
+  const focusBoardId = searchParams.get("board");
+  const focusTaskId = searchParams.get("task");
 
   const [boards, setBoards] = useState<BoardSummary[]>([]);
   const [boardId, setBoardId] = useState<string | null>(null);
@@ -243,6 +245,8 @@ export function PlannerClient() {
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [currentRole, setCurrentRole] = useState<"admin" | "manager" | "user" | null>(null);
+  /** Resolves athlete portal sidebar link `athlete=me` to the signed-in user id. */
+  const athleteUserId = athleteParam === "me" ? currentUserId : athleteParam;
   const [teamAthletes, setTeamAthletes] = useState<TeamAthleteRow[]>([]);
   const [teamAthletesLoading, setTeamAthletesLoading] = useState(false);
   const [selectedAthleteName, setSelectedAthleteName] = useState<string | null>(null);
@@ -356,7 +360,8 @@ export function PlannerClient() {
 
   const canUseTeamRoster = currentRole === "admin" || currentRole === "manager";
   const showHub = !area;
-  const showTeamRoster = area === "team" && !athleteUserId && canUseTeamRoster;
+  const showTeamRoster =
+    area === "team" && !athleteUserId && athleteParam !== "me" && canUseTeamRoster;
   const showBoardPicker = area === "personal" || (area === "team" && !!athleteUserId);
 
   const refreshBoards = useCallback(async () => {
@@ -513,6 +518,11 @@ export function PlannerClient() {
         .then((j) => setAssignees(j.users || [])),
     ]).finally(() => setLoading(false));
   }, [refreshBoards]);
+
+  useEffect(() => {
+    if (!focusTaskId || !focusBoardId || boards.length === 0) return;
+    void navigateBoardAndFocusTask(focusBoardId, focusTaskId);
+  }, [focusBoardId, focusTaskId, boards.length]);
 
   useEffect(() => {
     if (!showBoardPicker) {

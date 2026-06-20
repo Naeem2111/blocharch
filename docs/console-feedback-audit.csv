@@ -9,7 +9,7 @@ Section,Topic,Source,Status,Notes
 MARKETING,Overview layout & styling,AUDIT,Done,No design changes requested.
 MARKETING,Overview map coordinates count reflects all geocoded practices,AUDIT,Done,Overview shows geocoded count of total directory.
 MARKETING,Map visual quality & London pins,AUDIT,Done,Layout and pin styling approved.
-MARKETING,Map — load all leads (~3000 practices geocoded),AUDIT,Partial,Postcode-fallback geocoder added; backfill re-running (~808+ mapped).
+MARKETING,Map — load all leads (~3000 practices geocoded),AUDIT,Done,Bulk postcodes.io backfill; 2228/2242 practices with addresses mapped.
 MARKETING,Map — default all pins to Cold,AUDIT,Done,Practices without lead row default to cold.
 MARKETING,Map — manual status dropdown per pin (6 stages),AUDIT,Done,Stage select in pin popup.
 MARKETING,Map — live status update + pin colour change,AUDIT,Done,Stage PATCH updates pin colour live.
@@ -23,7 +23,7 @@ OPS,Ops Overview layout & cards,AUDIT,Done,Structure approved.
 OPS,Ops sub-nav: remove Clients/Athletes; add Daily submissions,AUDIT,Done,OpsSubNav updated; Daily submissions tab added.
 OPS,Ops sub-nav order: Overview / Daily submissions / Projects / Commercial / Check-ins / Notifications / Analytics,AUDIT,Done,Notifications removed; order matches audit.
 OPS,Daily Submissions — layout & log display,AUDIT,Done,Ops submissions hub working.
-OPS,Daily Submissions — required field when task type Other,AUDIT,Missing,No follow-up popup/field for Other task type.
+OPS,Daily Submissions — required field when task type Other,AUDIT,Done,Ops hub shows Other explanation from line item notes.
 OPS,Projects — admin cards match athlete My Projects design,AUDIT,Done,Colour border + progress bar on OpsProjectsClient.
 OPS,Projects — due-date colour scale on admin cards,AUDIT,Done,project-color-scale on ops project cards.
 OPS,Project form — remove Blocker checkbox,AUDIT,Done,Removed from edit form.
@@ -40,7 +40,7 @@ OPS,Analytics — due date risk progress % as text,AUDIT,Done,showLabel on analy
 OPS,Analytics — month filter & charts,AUDIT,Done,Hours by phase/client/athlete + profitability working.
 OPS,Analytics — hours by phase accumulates over time (not monthly reset),AUDIT,Partial,Verify buildAnalytics uses cumulative not month-only for phase totals.
 OPS,Analytics — client logo next to client name,AUDIT,Missing,Depends on client logo upload.
-OPS,Check-ins — Pending/Unscheduled (red) vs Scheduled (green),AUDIT,Partial,Status flow exists but not simplified Pending→Scheduled per audit.
+OPS,Check-ins — Pending/Unscheduled (red) vs Scheduled (green),AUDIT,Done,Red left border for pending; green for scheduled/approved.
 PLANNER,Board create/rename/delete,AUDIT,Done,Approved.
 PLANNER,Remove Cross-board To-dos (admin + athlete),AUDIT,Done,Section removed from PlannerClient.
 PLANNER,Reliable drag-and-drop + scroll,AUDIT,Partial,RAF auto-scroll added; still reported glitching; no arrow fallback.
@@ -52,7 +52,7 @@ PLANNER,Remove fixed Completed board tab,AUDIT,Done,completed kind filtered from
 PLANNER,Board reorder (movable boards),AUDIT,Done,sortOrder + arrows; project boards movable.
 OUTBOX,Blocharch Outbox assignment fields,AUDIT,Done,Athlete/project/title/description/due/notes working.
 OUTBOX,Priority → approved label field on assign,AUDIT,Done,Label dropdown replaces priority on outbox form.
-OUTBOX,Athlete notification + red badges on assign,AUDIT,Partial,Notification created; planner tab flash not fully wired.
+OUTBOX,Athlete notification + red badges on assign,AUDIT,Done,Notification + inbox badge + pulse on planner nav.
 OUTBOX,Inbox single receiving column,AUDIT,Partial,Delivered to backlog column; inbox may have multiple default columns.
 OUTBOX,Inbox move-not-copy to athlete board,AUDIT,Done,copy-to-personal moves from blocharch_inbox.
 OUTBOX,Athlete dropdown to move task to another board,AUDIT,Partial,Pull to personal modal exists; no explicit board picker dropdown on inbox cards.
@@ -63,15 +63,15 @@ ONBOARDING,Athletes — optional profile picture upload,AUDIT,Missing,No avatar 
 WORKSPACE,My Workspace — no changes needed,AUDIT,Done,Approved as-is.
 WORKSPACE,Sidebar hide/unhide sections,AUDIT,Missing,Collapse exists; no Hide + Show hidden sections at footer.
 ATHLETE,Dashboard layout & stats cards,AUDIT,Done,Hours/earnings/projects approved.
-ATHLETE,Dashboard Alerts sync with unread notifications,AUDIT,Missing,Alerts card shows generic text; not synced to notification feed.
+ATHLETE,Dashboard Alerts sync with unread notifications,AUDIT,Done,Unread notifications merged into dashboard alerts with links.
 ATHLETE,Daily Log layout & smart calculation,AUDIT,Done,Calendar/edit/wellbeing 1-10/hours approved in recent work.
 ATHLETE,Daily Log — check-in opens Book a Call form modal,AUDIT,Done,CheckInRequestModal from daily log.
 ATHLETE,Daily Log — Other task type requires explanation,AUDIT,Done,Required Other field + API validation.
 ATHLETE,My Projects cards & due-date calendar,AUDIT,Done,Colour scale + calendar + progress bar implemented.
 ATHLETE,Completed Projects at 100% progress,AUDIT,Partial,Completed projects list exists; auto-move at 100% may need verification.
 ATHLETE,Completed Projects — reversible (back to My Projects),AUDIT,Partial,Untick/restore flow needs verification vs audit spec.
-ATHLETE,Notifications → deep link to Blocharch Inbox task,AUDIT,Partial,Notification created on assign; deep link to task TBD.
-ATHLETE,Inbox flash/highlight on new assignment,AUDIT,Missing,No visual flash on Blocharch Inbox tab.
+ATHLETE,Notifications → deep link to Blocharch Inbox task,AUDIT,Done,linkPath opens team planner on inbox board + task.
+ATHLETE,Inbox flash/highlight on new assignment,AUDIT,Done,Inbox badge + red pulse on athlete planner nav item.
 ATHLETE,Simplify athlete sidebar (single My Workspace; no duplicate Planner section),AUDIT,Partial,Onboarding split done; athlete may still see duplicate planner nav entries.
 PLATFORM,Mobile-friendly console (collapsible sidebar),AUDIT,Done,DashboardShell + drawer nav shipped f6ffcad.
 PLATFORM,Explicit viewport meta,AUDIT,Done,viewport export in app/layout.tsx.

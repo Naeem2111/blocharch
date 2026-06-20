@@ -13,6 +13,7 @@ export type OpsAlert = {
   message: string;
   value?: number;
   threshold?: number;
+  linkPath?: string;
 };
 
 export function buildDailyHourAlerts(totalHours: number): OpsAlert[] {

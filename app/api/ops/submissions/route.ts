@@ -41,11 +41,13 @@ export async function GET(request: NextRequest) {
         clientName: li.client.name,
         projectPhase: li.projectPhase,
         taskType: li.taskType,
+        taskTypes: li.taskTypes?.length ? li.taskTypes : [li.taskType],
         hoursWorked: Number(li.hoursWorked),
         completionPercent: li.completionPercent,
         blockerFlag: li.blockerFlag,
         blockerNote: li.blockerNote,
         completedSummary: li.completedSummary,
+        notes: li.notes,
       })),
     })),
   });

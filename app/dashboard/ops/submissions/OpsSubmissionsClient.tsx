@@ -8,11 +8,13 @@ type LineItem = {
   clientName: string;
   projectPhase: string;
   taskType: string;
+  taskTypes?: string[];
   hoursWorked: number;
   completionPercent: number | null;
   blockerFlag: boolean;
   blockerNote: string | null;
   completedSummary: string | null;
+  notes: string | null;
 };
 
 type Submission = {
@@ -27,6 +29,13 @@ type Submission = {
   lockedAt: string | null;
   lineItems: LineItem[];
 };
+
+function taskTypeLabel(li: LineItem): string {
+  const types = li.taskTypes?.length ? li.taskTypes : [li.taskType];
+  return types
+    .map((t) => TASK_TYPE_LABELS[t as keyof typeof TASK_TYPE_LABELS] ?? t)
+    .join(", ");
+}
 
 export function OpsSubmissionsClient() {
   const [rows, setRows] = useState<Submission[]>([]);
@@ -76,17 +85,26 @@ export function OpsSubmissionsClient() {
             ) : null}
             {s.dailyNote ? <p className="mt-2 text-sm text-slate-400">{s.dailyNote}</p> : null}
             <ul className="mt-4 space-y-3 border-t border-white/[0.06] pt-4">
-              {s.lineItems.map((li, i) => (
+              {s.lineItems.map((li, i) => {
+                const types = li.taskTypes?.length ? li.taskTypes : [li.taskType];
+                const hasOther = types.includes("other");
+                return (
                 <li key={i} className="text-sm">
                   <p className="font-medium text-slate-200">
                     {li.clientName} — {li.projectName}
                   </p>
                   <p className="text-xs text-slate-500">
                     {PROJECT_PHASE_LABELS[li.projectPhase as keyof typeof PROJECT_PHASE_LABELS] ?? li.projectPhase}{" "}
-                    · {TASK_TYPE_LABELS[li.taskType as keyof typeof TASK_TYPE_LABELS] ?? li.taskType} ·{" "}
-                    {li.hoursWorked}h
+                    · {taskTypeLabel(li)} · {li.hoursWorked}h
                     {li.completionPercent != null ? ` · ${li.completionPercent}% progress` : ""}
                   </p>
+                  {hasOther && li.notes ? (
+                    <p className="mt-1 text-xs text-brand-200/90">
+                      Other: {li.notes}
+                    </p>
+                  ) : hasOther ? (
+                    <p className="mt-1 text-xs text-amber-300">Other task type — no explanation provided</p>
+                  ) : null}
                   {li.completedSummary ? (
                     <p className="mt-1 text-xs text-slate-400">{li.completedSummary}</p>
                   ) : null}
@@ -96,7 +114,8 @@ export function OpsSubmissionsClient() {
                     </p>
                   ) : null}
                 </li>
-              ))}
+                );
+              })}
             </ul>
           </article>
         ))

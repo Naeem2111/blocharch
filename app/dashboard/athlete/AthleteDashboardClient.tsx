@@ -7,6 +7,7 @@ type OpsAlert = {
   code: string;
   severity: "info" | "warning" | "critical";
   message: string;
+  linkPath?: string;
 };
 
 type DashboardData = {
@@ -22,6 +23,7 @@ type DashboardData = {
   completedProjects: number;
   openBlockers: number;
   checkInRequests: number;
+  unreadNotificationCount: number;
   todayHours: number;
   alerts: OpsAlert[];
   recentSubmissions: Array<{ submissionDate: string; totalHours: number; lockedAt: string | null }>;
@@ -116,14 +118,27 @@ export function AthleteDashboardClient() {
           <p className="text-xs text-slate-500">Started {profile.blocharchStartDate}</p>
         </div>
         <div className="card-tool rounded-xl p-5">
-          <h2 className="text-sm font-semibold text-white">Alerts</h2>
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-white">Alerts</h2>
+            {data.unreadNotificationCount ? (
+              <Link href="/dashboard/athlete/notifications" className="text-xs text-brand-400 hover:text-brand-300">
+                {data.unreadNotificationCount} unread →
+              </Link>
+            ) : null}
+          </div>
           {data.alerts.length === 0 ? (
             <p className="mt-2 text-sm text-slate-500">No active alerts.</p>
           ) : (
             <ul className="mt-3 space-y-2">
               {data.alerts.map((a) => (
                 <li key={a.code} className={`text-sm ${severityClass[a.severity]}`}>
-                  {a.message}
+                  {a.linkPath ? (
+                    <Link href={a.linkPath} className="hover:underline">
+                      {a.message}
+                    </Link>
+                  ) : (
+                    a.message
+                  )}
                 </li>
               ))}
             </ul>

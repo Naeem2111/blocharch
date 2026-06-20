@@ -7,6 +7,7 @@ import {
   buildCheckInAlert,
   buildDailyHourAlerts,
   buildMonthlyCapAlert,
+  type OpsAlertSeverity,
 } from "@/lib/ops-alerts";
 import { dateOnlyUtc } from "@/lib/ops-hours";
 
@@ -31,8 +32,14 @@ export async function GET(request: NextRequest) {
   const openBlockers = await prisma.opsProject.count({
     where: { assignedAthleteId: athlete.id, blockerFlag: true },
   });
-  const checkInRequests = await prisma.opsProject.count({
-    where: { assignedAthleteId: athlete.id, checkInRequested: true },
+  const checkInRequests = await prisma.opsCheckInRequest.count({
+    where: { athleteId: athlete.id, status: { in: ["pending", "counter_proposed"] } },
+  });
+
+  const unreadNotifications = await prisma.opsAthleteNotification.findMany({
+    where: { athleteId: athlete.id, readAt: null },
+    orderBy: { createdAt: "desc" },
+    take: 8,
   });
 
   const today = dateOnlyUtc(new Date());
@@ -49,6 +56,12 @@ export async function GET(request: NextRequest) {
     buildMonthlyCapAlert(summary.monthHours, athlete.monthlyHourCap),
     buildBlockerAlert(openBlockers),
     buildCheckInAlert(checkInRequests),
+    ...unreadNotifications.map((n) => ({
+      code: `notification_${n.id}`,
+      severity: (n.type === "task_assigned" ? "warning" : "info") as OpsAlertSeverity,
+      message: n.message ? `${n.title} — ${n.message}` : n.title,
+      linkPath: n.linkPath ?? "/dashboard/athlete/notifications",
+    })),
   ].filter(Boolean);
 
   const recentSubmissions = await prisma.opsDailySubmission.findMany({
@@ -77,6 +90,7 @@ export async function GET(request: NextRequest) {
     completedProjects,
     openBlockers,
     checkInRequests,
+    unreadNotificationCount: unreadNotifications.length,
     todayHours,
     alerts,
     recentSubmissions: recentSubmissions.map((s) => ({

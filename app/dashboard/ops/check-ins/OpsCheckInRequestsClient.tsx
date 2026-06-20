@@ -37,6 +37,28 @@ function formatWhen(iso: string) {
   });
 }
 
+function checkInStatusMeta(status: string): { label: string; cardClass: string; badgeClass: string } {
+  if (status === "pending" || status === "counter_proposed") {
+    return {
+      label: status === "counter_proposed" ? "Pending — new time suggested" : "Pending",
+      cardClass: "border-l-4 border-l-red-500/70",
+      badgeClass: "bg-red-500/15 text-red-300",
+    };
+  }
+  if (status === "approved" || status === "confirmed") {
+    return {
+      label: status === "confirmed" ? "Scheduled" : "Scheduled (approved)",
+      cardClass: "border-l-4 border-l-emerald-500/70",
+      badgeClass: "bg-emerald-500/15 text-emerald-300",
+    };
+  }
+  return {
+    label: status.replace(/_/g, " "),
+    cardClass: "border-l-4 border-l-slate-600/50",
+    badgeClass: "bg-white/[0.06] text-slate-400",
+  };
+}
+
 function splitFromIso(iso: string | null): DateTimeSplitValue {
   if (!iso) return { date: "", time: "", ampm: "AM" };
   return splitDueAtIso(iso);
@@ -142,8 +164,10 @@ export function OpsCheckInRequestsClient() {
         <p className="text-sm text-slate-500">No check-in requests.</p>
       ) : (
         <ul className="space-y-4">
-          {rows.map((r) => (
-            <li key={r.id} className="card-tool rounded-xl p-4">
+          {rows.map((r) => {
+            const statusMeta = checkInStatusMeta(r.status);
+            return (
+            <li key={r.id} className={`card-tool rounded-xl p-4 ${statusMeta.cardClass}`}>
               <div className="flex flex-wrap justify-between gap-2">
                 <div>
                   <p className="font-semibold text-white">
@@ -166,7 +190,9 @@ export function OpsCheckInRequestsClient() {
                   <p className="mt-1 text-[10px] text-slate-500">
                     Source: {r.source === "daily_log" ? "Daily Log" : "Book a Call"}
                   </p>
-                  <p className="text-[10px] uppercase text-slate-600">{r.status}</p>
+                  <span className={`mt-2 inline-block rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase ${statusMeta.badgeClass}`}>
+                    {statusMeta.label}
+                  </span>
                 </div>
                 {r.googleEventLink ? (
                   <a
@@ -296,7 +322,8 @@ export function OpsCheckInRequestsClient() {
                 </div>
               ) : null}
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </div>

@@ -12,6 +12,8 @@ import { PrismaClient } from "@prisma/client";
 import {
   buildGeocodeQueries,
   getBestAddressFromFields,
+  primaryUkPostcode,
+  formatUkPostcode,
 } from "../lib/geo/geocode-candidates.mjs";
 
 const root = process.cwd();
@@ -98,7 +100,26 @@ async function nominatimSearch(query, { countrycodes } = {}) {
   return { lat, lng, displayName: first.display_name };
 }
 
-async function geocodeWithFallback(address, practiceName) {
+async function geocodeWithFallback(address, practiceName, { postcodeOnly = false } = {}) {
+  if (postcodeOnly) {
+    const pc = primaryUkPostcode(address);
+    if (!pc) return null;
+    const queries = [
+      `${formatUkPostcode(pc)}, United Kingdom`,
+      formatUkPostcode(pc),
+    ];
+    for (let i = 0; i < queries.length; i++) {
+      let point = await nominatimSearch(queries[i], { countrycodes: "gb" });
+      if (!point) {
+        await sleep(1100);
+        point = await nominatimSearch(queries[i]);
+      }
+      if (point) return point;
+      if (i < queries.length - 1) await sleep(1100);
+    }
+    return null;
+  }
+
   const queries = buildGeocodeQueries(address, practiceName);
   for (let i = 0; i < queries.length; i++) {
     let point = await nominatimSearch(queries[i], { countrycodes: "gb" });
@@ -121,18 +142,23 @@ function parseArgs() {
       ? null
       : null;
   const dryRun = process.argv.includes("--dry-run");
-  return { limit, all, dryRun };
+  const postcodeOnly = process.argv.includes("--postcode-only");
+  return { limit, all, dryRun, postcodeOnly };
 }
 
 loadEnvFile();
-const { limit, all, dryRun } = parseArgs();
+const { limit, all, dryRun, postcodeOnly } = parseArgs();
 const prisma = new PrismaClient();
 const geocache = loadGeocache();
 let cacheDirty = false;
 
 async function main() {
   if (all) {
-    console.log("Mode: geocode all practices with addresses (postcode fallbacks; ~1 req/s).");
+    console.log(
+      postcodeOnly
+        ? "Mode: postcode-only Nominatim (~1 req/s)."
+        : "Mode: geocode all practices with addresses (postcode fallbacks; ~1 req/s)."
+    );
   }
 
   const rows = await prisma.architect.findMany({
@@ -169,7 +195,7 @@ async function main() {
       point = { lat: Number(cached.lat), lng: Number(cached.lng), displayName: cached.displayName };
     } else {
       console.log(`[nominatim] ${row.name.slice(0, 40)}…`);
-      point = await geocodeWithFallback(addr, row.name);
+      point = await geocodeWithFallback(addr, row.name, { postcodeOnly });
       if (point && key) {
         geocache[key] = {
           lat: point.lat,

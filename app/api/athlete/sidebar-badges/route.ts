@@ -8,23 +8,22 @@ export async function GET(request: NextRequest) {
   if (gate instanceof NextResponse) return gate;
   const { athlete } = gate;
 
-  const [unreadNotifications, inboxTasks] = await Promise.all([
+  const [unreadNotifications, unreadInboxTasks] = await Promise.all([
     prisma.opsAthleteNotification.count({
       where: { athleteId: athlete.id, readAt: null },
     }),
-    prisma.plannerTask.count({
+    prisma.opsAthleteNotification.count({
       where: {
-        column: {
-          board: { athleteId: athlete.id, kind: "blocharch_inbox" },
-        },
-        createdAt: { gte: new Date(Date.now() - 7 * 86400000) },
+        athleteId: athlete.id,
+        readAt: null,
+        type: "task_assigned",
       },
     }),
   ]);
 
   return NextResponse.json({
     notifications: unreadNotifications,
-    inboxRecent: inboxTasks,
+    inbox: unreadInboxTasks,
     urgent: unreadNotifications > 0,
   });
 }
