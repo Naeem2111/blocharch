@@ -1,26 +1,24 @@
 import { NextRequest } from "next/server";
 import { getBestAddressFromFields } from "@/lib/address-display";
-import { geocodeAddress } from "@/lib/geo/nominatim";
+import { geocodeWithFallback } from "@/lib/geo/nominatim";
 import { getCachedGeocode, normalizeAddress } from "@/lib/geo/store";
 import { prisma } from "@/lib/prisma";
 
-/** Vercel / long-running: uncached Nominatim calls are sequential (~1.1s each). */
+/** Vercel / long-running: uncached Nominatim calls use postcode fallbacks (~1.1s each). */
 export const maxDuration = 60;
 
-function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
-async function buildAddressToArchitectIdMap(): Promise<Map<string, string>> {
-  const map = new Map<string, string>();
+async function buildAddressContextMap(): Promise<
+  Map<string, { id: string; name: string }>
+> {
+  const map = new Map<string, { id: string; name: string }>();
   const rows = await prisma.architect.findMany({
     where: { OR: [{ latitude: null }, { longitude: null }] },
-    select: { id: true, address: true, description: true },
+    select: { id: true, name: true, address: true, description: true },
   });
   for (const row of rows) {
     const addr = getBestAddressFromFields(row.address ?? "", row.description ?? "");
     if (!addr) continue;
-    map.set(normalizeAddress(addr), row.id);
+    map.set(normalizeAddress(addr), { id: row.id, name: row.name });
   }
   return map;
 }
@@ -28,12 +26,12 @@ async function buildAddressToArchitectIdMap(): Promise<Map<string, string>> {
 async function persistGeocodeToDb(
   address: string,
   point: { lat: number; lng: number },
-  idByAddress: Map<string, string>
+  ctxByAddress: Map<string, { id: string; name: string }>
 ) {
-  const id = idByAddress.get(normalizeAddress(address));
-  if (!id) return;
+  const ctx = ctxByAddress.get(normalizeAddress(address));
+  if (!ctx) return;
   await prisma.architect.update({
-    where: { id },
+    where: { id: ctx.id },
     data: {
       latitude: point.lat,
       longitude: point.lng,
@@ -54,24 +52,26 @@ export async function POST(request: NextRequest) {
 
   const results: Record<string, { lat: number; lng: number; displayName?: string; cached: boolean }> = {};
   const missing: string[] = [];
-  const idByAddress = persist ? await buildAddressToArchitectIdMap() : new Map();
+  const ctxByAddress = persist ? await buildAddressContextMap() : new Map();
 
-  // Respect Nominatim policy: max ~1 req/sec. Only geocode uncached addresses, sequentially.
   for (const addr of unique) {
     const cached = getCachedGeocode(addr);
     if (cached) {
       results[addr] = { ...cached, cached: true };
-      if (persist) await persistGeocodeToDb(addr, cached, idByAddress);
+      if (persist) await persistGeocodeToDb(addr, cached, ctxByAddress);
       continue;
     }
-    const point = await geocodeAddress(addr);
+    const ctx = ctxByAddress.get(normalizeAddress(addr));
+    const point = await geocodeWithFallback(addr, {
+      practiceName: ctx?.name,
+      sleepMs: 1100,
+    });
     if (!point) {
       missing.push(addr);
     } else {
       results[addr] = { ...point, cached: false };
-      if (persist) await persistGeocodeToDb(addr, point, idByAddress);
+      if (persist) await persistGeocodeToDb(addr, point, ctxByAddress);
     }
-    await sleep(1100);
   }
 
   return Response.json({ results, missing, count: unique.length });

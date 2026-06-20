@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { geocodeAddress } from "@/lib/geo/nominatim";
+import { geocodeWithFallback } from "@/lib/geo/nominatim";
 import { getCachedGeocode } from "@/lib/geo/store";
 
 export async function GET(request: NextRequest) {
@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     return Response.json({ address, ...cached, cached: true });
   }
 
-  const point = await geocodeAddress(address);
+  const point = await geocodeWithFallback(address);
   if (!point) {
     return Response.json({ address, found: false }, { status: 404 });
   }

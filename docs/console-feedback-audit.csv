@@ -9,7 +9,7 @@ Section,Topic,Source,Status,Notes
 MARKETING,Overview layout & styling,AUDIT,Done,No design changes requested.
 MARKETING,Overview map coordinates count reflects all geocoded practices,AUDIT,Done,Overview shows geocoded count of total directory.
 MARKETING,Map visual quality & London pins,AUDIT,Done,Layout and pin styling approved.
-MARKETING,Map — load all leads (~3000 practices geocoded),AUDIT,Partial,Full directory on map; geocode:architects:all backfill running.
+MARKETING,Map — load all leads (~3000 practices geocoded),AUDIT,Partial,Postcode-fallback geocoder added; backfill re-running (~808+ mapped).
 MARKETING,Map — default all pins to Cold,AUDIT,Done,Practices without lead row default to cold.
 MARKETING,Map — manual status dropdown per pin (6 stages),AUDIT,Done,Stage select in pin popup.
 MARKETING,Map — live status update + pin colour change,AUDIT,Done,Stage PATCH updates pin colour live.

@@ -9,6 +9,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { PrismaClient } from "@prisma/client";
+import {
+  buildGeocodeQueries,
+  getBestAddressFromFields,
+} from "../lib/geo/geocode-candidates.mjs";
 
 const root = process.cwd();
 
@@ -34,20 +38,6 @@ function loadEnvFile() {
   } catch {
     /* no .env */
   }
-}
-
-function getBestAddressFromFields(address, description) {
-  const direct = String(address || "").trim();
-  if (direct) return direct;
-  const desc = String(description || "").trim();
-  if (!desc) return null;
-  const m = desc.match(
-    /\bAddresses?\b\s+([\s\S]*?)(?=\bContact\b|\bEmail\b|\bWebsite\b|\bTwitter\b|\bInstagram\b|\bLinkedIn\b|\bFacebook\b|\bBack to Results\b|$)/i
-  );
-  if (!m?.[1]) return null;
-  const extracted = m[1].replace(/\s+/g, " ").trim();
-  if (!extracted) return null;
-  return extracted.length > 160 ? extracted.slice(0, 160) : extracted;
 }
 
 function normalizeAddress(addr) {
@@ -85,11 +75,12 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-async function geocodeAddress(address) {
+async function nominatimSearch(query, { countrycodes } = {}) {
   const url = new URL("https://nominatim.openstreetmap.org/search");
   url.searchParams.set("format", "json");
   url.searchParams.set("limit", "1");
-  url.searchParams.set("q", address);
+  url.searchParams.set("q", query);
+  if (countrycodes) url.searchParams.set("countrycodes", countrycodes);
 
   const res = await fetch(url.toString(), {
     headers: {
@@ -105,6 +96,20 @@ async function geocodeAddress(address) {
   const lng = Number(first.lon);
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
   return { lat, lng, displayName: first.display_name };
+}
+
+async function geocodeWithFallback(address, practiceName) {
+  const queries = buildGeocodeQueries(address, practiceName);
+  for (let i = 0; i < queries.length; i++) {
+    let point = await nominatimSearch(queries[i], { countrycodes: "gb" });
+    if (!point) {
+      await sleep(1100);
+      point = await nominatimSearch(queries[i]);
+    }
+    if (point) return point;
+    if (i < queries.length - 1) await sleep(1100);
+  }
+  return null;
 }
 
 function parseArgs() {
@@ -127,7 +132,7 @@ let cacheDirty = false;
 
 async function main() {
   if (all) {
-    console.log("Mode: geocode all practices with addresses (Nominatim ~1 req/s — expect ~35–45 min for ~2000 rows).");
+    console.log("Mode: geocode all practices with addresses (postcode fallbacks; ~1 req/s).");
   }
 
   const rows = await prisma.architect.findMany({
@@ -137,6 +142,7 @@ async function main() {
     select: {
       id: true,
       url: true,
+      name: true,
       address: true,
       description: true,
     },
@@ -162,9 +168,8 @@ async function main() {
     if (cached?.lat != null && cached?.lng != null) {
       point = { lat: Number(cached.lat), lng: Number(cached.lng), displayName: cached.displayName };
     } else {
-      console.log(`[nominatim] ${row.url.slice(0, 60)}…`);
-      point = await geocodeAddress(addr);
-      await sleep(1100);
+      console.log(`[nominatim] ${row.name.slice(0, 40)}…`);
+      point = await geocodeWithFallback(addr, row.name);
       if (point && key) {
         geocache[key] = {
           lat: point.lat,

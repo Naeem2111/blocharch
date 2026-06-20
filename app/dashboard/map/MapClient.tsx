@@ -296,9 +296,9 @@ export function MapClient({
   } else if (practicesWithDbCoords > 0 && pendingGeocode > 0) {
     statusExtra = ` ${practicesWithDbCoords} from database; geocoding ${pendingGeocode} more (nearest-first queue)${loading ? `…${geocodeProgress}` : ""}.`;
   } else if (pendingGeocode > 0 && loading) {
-    statusExtra = ` Geocoding…${geocodeProgress}`;
+    statusExtra = ` Geocoding…${geocodeProgress} (uses postcode fallbacks for approximate pins).`;
   } else if (pendingGeocode > 0) {
-    statusExtra = ` ${pendingGeocode} without stored coordinates — run npm run geocode:architects to backfill.`;
+    statusExtra = ` ${pendingGeocode} without stored coordinates — pins placed by postcode when geocoded.`;
   }
 
   const pinCount = markers.filter((m) => m.id !== MAP_FOCAL_SYNTHETIC_ID).length;

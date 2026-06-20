@@ -1,31 +1,38 @@
-import { setCachedGeocode, type GeoPoint, normalizeAddress, getCachedGeocode } from "@/lib/geo/store";
+import {
+  buildGeocodeQueries,
+  getBestAddressFromFields,
+  normalizeSpaces,
+} from "@/lib/geo/uk-address";
+import { getCachedGeocode, setCachedGeocode, type GeoPoint, normalizeAddress } from "@/lib/geo/store";
 
 function getUserAgent(): string {
-  // Nominatim requires a descriptive UA; allow override via env.
   return (
     process.env.GEOCODER_USER_AGENT ||
     "blocarch-dashboard (Next.js) - contact: set GEOCODER_USER_AGENT"
   );
 }
 
-export async function geocodeAddress(address: string): Promise<GeoPoint | null> {
-  const normalized = normalizeAddress(address);
-  if (!normalized) return null;
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
-  const cached = getCachedGeocode(normalized);
-  if (cached) return cached;
-
+async function nominatimSearch(
+  query: string,
+  options?: { countrycodes?: string }
+): Promise<GeoPoint | null> {
   const url = new URL("https://nominatim.openstreetmap.org/search");
   url.searchParams.set("format", "json");
   url.searchParams.set("limit", "1");
-  url.searchParams.set("q", address);
+  url.searchParams.set("q", query);
+  if (options?.countrycodes) {
+    url.searchParams.set("countrycodes", options.countrycodes);
+  }
 
   const res = await fetch(url.toString(), {
     headers: {
       "User-Agent": getUserAgent(),
       "Accept-Language": "en",
     },
-    // Helps Next/Vercel avoid caching at the edge unexpectedly
     cache: "no-store",
   });
 
@@ -40,7 +47,46 @@ export async function geocodeAddress(address: string): Promise<GeoPoint | null> 
     displayName: first.display_name,
   };
   if (!Number.isFinite(point.lat) || !Number.isFinite(point.lng)) return null;
-
-  setCachedGeocode(address, point);
   return point;
 }
+
+/** Single-query geocode (legacy). */
+export async function geocodeAddress(address: string): Promise<GeoPoint | null> {
+  return geocodeWithFallback(address);
+}
+
+/**
+ * Try full address then postcode / town fallbacks for approximate UK pins.
+ * Respects Nominatim rate limit with ~1.1s between attempts.
+ */
+export async function geocodeWithFallback(
+  address: string,
+  context?: { practiceName?: string; sleepMs?: number }
+): Promise<GeoPoint | null> {
+  const cleaned = normalizeSpaces(address);
+  if (!cleaned) return null;
+
+  const cacheKey = normalizeAddress(cleaned);
+  const cached = getCachedGeocode(cacheKey);
+  if (cached) return cached;
+
+  const pause = context?.sleepMs ?? 1100;
+  const queries = buildGeocodeQueries(cleaned, context?.practiceName);
+
+  for (const q of queries) {
+    let point = await nominatimSearch(q, { countrycodes: "gb" });
+    if (!point) {
+      await sleep(pause);
+      point = await nominatimSearch(q);
+    }
+    if (point) {
+      setCachedGeocode(cacheKey, point);
+      return point;
+    }
+    await sleep(pause);
+  }
+
+  return null;
+}
+
+export { getBestAddressFromFields };
