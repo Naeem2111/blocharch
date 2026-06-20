@@ -3,22 +3,34 @@ type ClientAvatarProps = {
   logoUrl?: string | null;
   size?: number;
   className?: string;
+  /** contain fits full logos inside the box; cover fills circular profile photos. */
+  objectFit?: "contain" | "cover";
 };
 
-export function ClientAvatar({ name, logoUrl, size = 36, className = "" }: ClientAvatarProps) {
+export function ClientAvatar({
+  name,
+  logoUrl,
+  size = 36,
+  className = "",
+  objectFit = "contain",
+}: ClientAvatarProps) {
   const style = { width: size, height: size };
   const initial = (name.trim()[0] ?? "?").toUpperCase();
 
   if (logoUrl) {
     return (
-      <img
-        src={logoUrl}
-        alt=""
-        width={size}
-        height={size}
-        className={`shrink-0 rounded-full object-cover ring-1 ring-white/10 ${className}`}
+      <span
+        className={`inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/[0.06] ring-1 ring-white/10 ${className}`}
         style={style}
-      />
+      >
+        <img
+          src={logoUrl}
+          alt=""
+          width={size}
+          height={size}
+          className={`h-full w-full ${objectFit === "cover" ? "object-cover" : "object-contain p-1"}`}
+        />
+      </span>
     );
   }
 

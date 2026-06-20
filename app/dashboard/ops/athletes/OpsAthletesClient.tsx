@@ -194,7 +194,7 @@ export function OpsAthletesClient() {
             ) : (
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="flex min-w-0 items-start gap-3">
-                  <ClientAvatar name={a.fullName} logoUrl={a.profilePhotoUrl} size={40} />
+                  <ClientAvatar name={a.fullName} logoUrl={a.profilePhotoUrl} size={40} objectFit="cover" />
                   <div>
                     <p className="font-medium text-white">{a.fullName} <span className="text-slate-500">({a.athleteCode})</span></p>
                     <p className="text-xs text-slate-500">{a.username} · {a.monthlyHourCap}h cap · R{a.baseMonthlyPayZar.toLocaleString()} · {a.projectCount} projects</p>

@@ -1098,7 +1098,7 @@ export function PlannerClient() {
                     onClick={() => goPlanner({ area: "team", athlete: a.userId })}
                     className="flex w-full items-center gap-3 rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-left transition-colors hover:bg-white/[0.06]"
                   >
-                    <ClientAvatar name={a.fullName} logoUrl={a.profilePhotoUrl} size={36} />
+                    <ClientAvatar name={a.fullName} logoUrl={a.profilePhotoUrl} size={36} objectFit="cover" />
                     <span className="min-w-0">
                       <span className="block font-medium text-slate-100">{a.fullName}</span>
                       <span className="mt-0.5 block text-xs text-slate-500">

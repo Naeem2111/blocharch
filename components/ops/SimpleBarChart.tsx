@@ -1,7 +1,12 @@
+"use client";
+
+import { ClientAvatar } from "@/components/ops/ClientAvatar";
+
 type BarItem = {
   label: string;
   value: number;
   sublabel?: string;
+  imageUrl?: string | null;
 };
 
 type SimpleBarChartProps = {
@@ -23,8 +28,13 @@ export function SimpleBarChart({ items, valueSuffix = "", maxValue }: SimpleBarC
         const pct = Math.max(4, (item.value / max) * 100);
         return (
           <div key={item.label}>
-            <div className="mb-1 flex items-baseline justify-between gap-2 text-xs">
-              <span className="truncate text-slate-300">{item.label}</span>
+            <div className="mb-1 flex items-center justify-between gap-2 text-xs">
+              <span className="flex min-w-0 items-center gap-2 truncate text-slate-300">
+                {item.imageUrl ? (
+                  <ClientAvatar name={item.label} logoUrl={item.imageUrl} size={22} />
+                ) : null}
+                <span className="truncate">{item.label}</span>
+              </span>
               <span className="shrink-0 tabular-nums text-slate-400">
                 {item.value.toFixed(1)}
                 {valueSuffix}

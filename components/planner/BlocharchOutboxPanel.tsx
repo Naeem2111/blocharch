@@ -148,6 +148,7 @@ export function BlocharchOutboxPanel() {
               <ClientAvatar
                 name={selectedAthlete.fullName}
                 logoUrl={selectedAthlete.profilePhotoUrl}
+                objectFit="cover"
                 size={32}
               />
             ) : null}

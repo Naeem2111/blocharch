@@ -120,7 +120,7 @@ export function AthleteDashboardClient() {
         <div className="card-tool rounded-xl p-5">
           <h2 className="text-sm font-semibold text-white">Profile</h2>
           <div className="mt-3 flex items-center gap-3">
-            <ClientAvatar name={profile.fullName} logoUrl={profile.profilePhotoUrl} size={48} />
+            <ClientAvatar name={profile.fullName} logoUrl={profile.profilePhotoUrl} size={48} objectFit="cover" />
             <div>
               <p className="text-sm text-slate-300">
                 {profile.fullName} · {profile.athleteCode}

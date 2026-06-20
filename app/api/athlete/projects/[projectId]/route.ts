@@ -12,6 +12,9 @@ import {
 } from "@/lib/ops-access";
 import { syncProjectAfterOpsUpdate } from "@/lib/planner-project-sync";
 
+/** Progress when a completed project is moved back to active work. */
+const REACTIVATION_PROGRESS_PERCENT = 50;
+
 type RouteContext = { params: Promise<{ projectId: string }> };
 
 export async function PATCH(request: NextRequest, context: RouteContext) {
@@ -30,6 +33,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const data: {
       currentStage?: typeof project.currentStage;
       currentStatus?: typeof project.currentStatus;
+      progressPercent?: number;
       notes?: string | null;
     } = {};
 
@@ -60,6 +64,12 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         );
       }
       data.currentStatus = status;
+      if (wasCompleted && status === "in_progress") {
+        const pct = project.progressPercent;
+        if (pct != null && pct >= 100) {
+          data.progressPercent = REACTIVATION_PROGRESS_PERCENT;
+        }
+      }
     }
 
     if (body.notes !== undefined) {

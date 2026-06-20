@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DueDateCalendar } from "@/components/ops/DueDateCalendar";
 import { SimpleBarChart } from "@/components/ops/SimpleBarChart";
+import { ClientAvatar } from "@/components/ops/ClientAvatar";
 import { ProjectProgressBar } from "@/components/ProjectProgressBar";
 import {
   PROJECT_PHASE_LABELS,
@@ -12,12 +13,13 @@ import {
 type AnalyticsData = {
   month: string;
   hoursByPhase: Array<{ phase: string; hours: number }>;
-  hoursByClient: Array<{ clientId: string; clientName: string; hours: number }>;
+  hoursByClient: Array<{ clientId: string; clientName: string; clientLogoUrl: string | null; hours: number }>;
   hoursByAthlete: Array<{ athleteId: string; athleteName: string; hours: number }>;
   dueDateRisk: Array<{
     id: string;
     name: string;
     clientName: string;
+    clientLogoUrl: string | null;
     dueDate: string;
     daysUntilDue: number;
     progressPercent: number;
@@ -28,6 +30,7 @@ type AnalyticsData = {
     id: string;
     name: string;
     clientName: string;
+    clientLogoUrl: string | null;
     dueDate: string;
     progressPercent: number;
     currentStatus: string;
@@ -36,6 +39,7 @@ type AnalyticsData = {
   profitabilityByClient: Array<{
     clientId: string;
     clientName: string;
+    clientLogoUrl: string | null;
     revenueGbp: number;
     costGbp: number;
     marginGbp: number;
@@ -87,6 +91,7 @@ export function AnalyticsClient() {
       (data?.hoursByClient ?? []).slice(0, 8).map((c) => ({
         label: c.clientName,
         value: c.hours,
+        imageUrl: c.clientLogoUrl,
       })),
     [data]
   );
@@ -142,6 +147,7 @@ export function AnalyticsClient() {
               items={data.profitabilityByClient.slice(0, 8).map((c) => ({
                 label: c.clientName,
                 value: c.marginGbp,
+                imageUrl: c.clientLogoUrl,
                 sublabel: `${c.marginPercent}% margin · £${c.revenueGbp} rev`,
               }))}
               valueSuffix=""
@@ -183,7 +189,12 @@ export function AnalyticsClient() {
                 {data.dueDateRisk.map((p) => (
                   <tr key={p.id} className="border-b border-white/[0.04] text-slate-300">
                     <td className="px-3 py-2">{p.name}</td>
-                    <td className="px-3 py-2">{p.clientName}</td>
+                    <td className="px-3 py-2">
+                      <span className="inline-flex items-center gap-2">
+                        <ClientAvatar name={p.clientName} logoUrl={p.clientLogoUrl} size={24} />
+                        {p.clientName}
+                      </span>
+                    </td>
                     <td className="px-3 py-2">{p.dueDate}</td>
                     <td
                       className={`px-3 py-2 tabular-nums ${p.daysUntilDue < 0 ? "text-red-300" : p.daysUntilDue <= 3 ? "text-amber-300" : ""}`}

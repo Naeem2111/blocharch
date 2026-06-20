@@ -41,7 +41,7 @@ export function CompletedProjectsClient() {
   async function reactivate(projectId: string, name: string) {
     if (
       !window.confirm(
-        `Move "${name}" back to My Projects? You can keep logging daily work and updating progress.`
+        `Move "${name}" back to My Projects? Progress will reset from 100% to 50% so you can keep logging daily work.`
       )
     ) {
       return;
@@ -93,9 +93,11 @@ export function CompletedProjectsClient() {
               <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-white/[0.1] bg-white/[0.03] px-3 py-2 text-xs text-slate-300 hover:bg-white/[0.06]">
                 <input
                   type="checkbox"
-                  checked
+                  checked={false}
                   disabled={busyId === p.id}
-                  onChange={() => void reactivate(p.id, p.name)}
+                  onChange={(e) => {
+                    if (e.target.checked) void reactivate(p.id, p.name);
+                  }}
                   className="h-3.5 w-3.5 rounded border-white/20 bg-white/[0.06] text-brand-500"
                 />
                 <span>Still in progress</span>

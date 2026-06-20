@@ -1,12 +1,14 @@
 "use client";
 
 import { useMemo } from "react";
+import { ClientAvatar } from "@/components/ops/ClientAvatar";
 import { ProjectProgressBar } from "@/components/ProjectProgressBar";
 
 type CalendarProject = {
   id: string;
   name: string;
   clientName: string;
+  clientLogoUrl?: string | null;
   dueDate: string;
   progressPercent: number;
   assignedAthleteName: string | null;
@@ -75,7 +77,12 @@ export function DueDateCalendar({
                         className="rounded bg-white/[0.04] px-1 py-0.5"
                         title={`${p.name} · ${p.clientName}`}
                       >
-                        <p className="truncate text-[10px] font-medium text-slate-200">{p.name}</p>
+                        <p className="flex items-center gap-1 truncate text-[10px] font-medium text-slate-200">
+                          {p.clientLogoUrl ? (
+                            <ClientAvatar name={p.clientName} logoUrl={p.clientLogoUrl} size={14} />
+                          ) : null}
+                          <span className="truncate">{p.name}</span>
+                        </p>
                         <ProjectProgressBar percent={p.progressPercent} showLabel={false} />
                       </li>
                     ))}

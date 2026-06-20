@@ -346,12 +346,13 @@ export async function buildCommercialLedger(reference: Date): Promise<Commercial
 export type AnalyticsPayload = {
   month: string;
   hoursByPhase: Array<{ phase: string; hours: number }>;
-  hoursByClient: Array<{ clientId: string; clientName: string; hours: number }>;
+  hoursByClient: Array<{ clientId: string; clientName: string; clientLogoUrl: string | null; hours: number }>;
   hoursByAthlete: Array<{ athleteId: string; athleteName: string; hours: number }>;
   dueDateRisk: Array<{
     id: string;
     name: string;
     clientName: string;
+    clientLogoUrl: string | null;
     dueDate: string;
     daysUntilDue: number;
     progressPercent: number;
@@ -362,6 +363,7 @@ export type AnalyticsPayload = {
     id: string;
     name: string;
     clientName: string;
+    clientLogoUrl: string | null;
     dueDate: string;
     progressPercent: number;
     currentStatus: string;
@@ -370,6 +372,7 @@ export type AnalyticsPayload = {
   profitabilityByClient: Array<{
     clientId: string;
     clientName: string;
+    clientLogoUrl: string | null;
     revenueGbp: number;
     costGbp: number;
     marginGbp: number;
@@ -386,12 +389,12 @@ export async function buildAnalytics(reference: Date): Promise<AnalyticsPayload>
     where: { submission: { submissionDate: { gte: from, lte: to } } },
     include: {
       submission: { include: { athlete: true } },
-      client: { select: { id: true, name: true } },
+      client: { select: { id: true, name: true, logoUrl: true } },
     },
   });
 
   const phaseMap = new Map<string, number>();
-  const clientHoursMap = new Map<string, { name: string; hours: number }>();
+  const clientHoursMap = new Map<string, { name: string; logoUrl: string | null; hours: number }>();
   const athleteHoursMap = new Map<string, { name: string; hours: number }>();
 
   for (const li of lineItems) {
@@ -400,7 +403,7 @@ export async function buildAnalytics(reference: Date): Promise<AnalyticsPayload>
 
     const ch = clientHoursMap.get(li.clientId);
     if (ch) ch.hours += hours;
-    else clientHoursMap.set(li.clientId, { name: li.client.name, hours });
+    else clientHoursMap.set(li.clientId, { name: li.client.name, logoUrl: li.client.logoUrl, hours });
 
     const ah = athleteHoursMap.get(li.submission.athleteId);
     if (ah) ah.hours += hours;
@@ -418,7 +421,7 @@ export async function buildAnalytics(reference: Date): Promise<AnalyticsPayload>
       currentStatus: { notIn: ["completed", "handed_over"] },
     },
     include: {
-      client: { select: { name: true } },
+      client: { select: { name: true, logoUrl: true } },
       assignedAthlete: { select: { fullName: true } },
     },
     orderBy: { dueDate: "asc" },
@@ -431,7 +434,7 @@ export async function buildAnalytics(reference: Date): Promise<AnalyticsPayload>
       currentStatus: { notIn: ["completed", "handed_over"] },
     },
     include: {
-      client: { select: { name: true } },
+      client: { select: { name: true, logoUrl: true } },
       assignedAthlete: { select: { fullName: true } },
     },
     orderBy: { dueDate: "asc" },
@@ -450,6 +453,7 @@ export async function buildAnalytics(reference: Date): Promise<AnalyticsPayload>
       return {
         clientId: lane.clientId,
         clientName: lane.clientName,
+        clientLogoUrl: lane.clientLogoUrl,
         revenueGbp,
         costGbp,
         marginGbp,
@@ -464,7 +468,12 @@ export async function buildAnalytics(reference: Date): Promise<AnalyticsPayload>
       .map(([phase, hours]) => ({ phase, hours: round2(hours) }))
       .sort((a, b) => b.hours - a.hours),
     hoursByClient: Array.from(clientHoursMap.entries())
-      .map(([clientId, v]) => ({ clientId, clientName: v.name, hours: round2(v.hours) }))
+      .map(([clientId, v]) => ({
+        clientId,
+        clientName: v.name,
+        clientLogoUrl: v.logoUrl,
+        hours: round2(v.hours),
+      }))
       .sort((a, b) => b.hours - a.hours),
     hoursByAthlete: Array.from(athleteHoursMap.entries())
       .map(([athleteId, v]) => ({ athleteId, athleteName: v.name, hours: round2(v.hours) }))
@@ -476,6 +485,7 @@ export async function buildAnalytics(reference: Date): Promise<AnalyticsPayload>
         id: p.id,
         name: p.name,
         clientName: p.client.name,
+        clientLogoUrl: p.client.logoUrl,
         dueDate: due.toISOString().slice(0, 10),
         daysUntilDue,
         progressPercent: p.progressPercent ?? 0,
@@ -487,6 +497,7 @@ export async function buildAnalytics(reference: Date): Promise<AnalyticsPayload>
       id: p.id,
       name: p.name,
       clientName: p.client.name,
+      clientLogoUrl: p.client.logoUrl,
       dueDate: p.dueDate!.toISOString().slice(0, 10),
       progressPercent: p.progressPercent ?? 0,
       currentStatus: p.currentStatus,
