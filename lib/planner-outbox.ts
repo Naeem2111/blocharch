@@ -143,7 +143,7 @@ export async function deliverOutboxTaskToInbox(outboxTaskId: string) {
     type: "task_assigned",
     title: title,
     message: row.project?.name ? `Project: ${row.project.name}` : "New work in your Blocharch Inbox",
-    linkPath: `/dashboard/planner?area=team&athlete=${athlete.userId}&board=${inboxBoard.id}&task=${task.id}`,
+    linkPath: `/dashboard/planner?area=team&athlete=me&board=${inboxBoard.id}&task=${task.id}`,
   }).catch(() => {});
 
   return { taskId: task.id, alreadyDelivered: false };

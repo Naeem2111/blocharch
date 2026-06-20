@@ -590,7 +590,11 @@ export function DashboardSidebar({
   );
 
   const visibleSections = useMemo(() => {
-    const filtered = NAV_SECTIONS.filter((section) => canAccessModule(user.role, section.module));
+    const filtered = NAV_SECTIONS.filter((section) => {
+      if (!canAccessModule(user.role, section.module)) return false;
+      if (section.id === "planner" && user.role === "user") return false;
+      return true;
+    });
     const ordered = applySectionOrder(filtered, navOrder?.sections);
     return ordered.map((section) => ({
       ...section,

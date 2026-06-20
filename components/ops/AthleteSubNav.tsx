@@ -12,7 +12,7 @@ export const ATHLETE_NAV: AthleteNavItem[] = [
   { href: "/dashboard/athlete/projects/completed", label: "Completed projects" },
   { href: "/dashboard/athlete/notifications", label: "My notifications" },
   { href: "/dashboard/athlete/book-call", label: "Book a call" },
-  { href: "/dashboard/planner?area=personal", label: "Project planner" },
+  { href: "/dashboard/planner?area=team&athlete=me", label: "Project planner" },
 ];
 
 export function AthleteSubNav({ pathname }: { pathname: string }) {

@@ -62,4 +62,10 @@ export async function syncProjectAfterOpsUpdate(
       linkPath: "/dashboard/athlete/projects/completed",
     }).catch(() => {});
   }
+
+  const wasInactive = !isActiveProjectStatus(prev.currentStatus);
+  const nowActive = isActiveProjectStatus(next.currentStatus);
+  if (wasInactive && nowActive && next.assignedAthleteId) {
+    await syncProjectBoardOnAssign(projectId);
+  }
 }

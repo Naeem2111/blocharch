@@ -110,7 +110,13 @@ export function AthleteNotificationsClient() {
                     </button>
                   ) : null}
                   {n.linkPath ? (
-                    <Link href={n.linkPath} className="text-xs font-medium text-brand-400 hover:text-brand-300">
+                    <Link
+                      href={n.linkPath}
+                      onClick={() => {
+                        if (!n.readAt) void markRead(n.id);
+                      }}
+                      className="text-xs font-medium text-brand-400 hover:text-brand-300"
+                    >
                       Open →
                     </Link>
                   ) : null}

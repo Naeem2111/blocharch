@@ -10,6 +10,7 @@ import {
   requireAthletePortalSession,
   serializeProjectForAthlete,
 } from "@/lib/ops-access";
+import { syncProjectAfterOpsUpdate } from "@/lib/planner-project-sync";
 
 type RouteContext = { params: Promise<{ projectId: string }> };
 
@@ -45,6 +46,19 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       if (!isOpsProjectStatus(status)) {
         return NextResponse.json({ error: "Invalid project status" }, { status: 400 });
       }
+      const wasCompleted = project.currentStatus === "completed" || project.currentStatus === "handed_over";
+      if (wasCompleted && status !== "in_progress") {
+        return NextResponse.json(
+          { error: "Reactivate completed projects by setting status to In Progress" },
+          { status: 400 }
+        );
+      }
+      if (!wasCompleted && (status === "completed" || status === "handed_over")) {
+        return NextResponse.json(
+          { error: "Projects complete automatically at 100% progress in the Daily Log" },
+          { status: 400 }
+        );
+      }
       data.currentStatus = status;
     }
 
@@ -61,6 +75,22 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       data,
       select: athleteProjectSelect,
     });
+
+    if (data.currentStatus !== undefined) {
+      await syncProjectAfterOpsUpdate(
+        projectId,
+        {
+          assignedAthleteId: project.assignedAthleteId,
+          currentStatus: project.currentStatus,
+          name: project.name,
+        },
+        {
+          assignedAthleteId: athlete.id,
+          currentStatus: updated.currentStatus,
+          name: updated.name,
+        }
+      );
+    }
 
     return NextResponse.json({ project: serializeProjectForAthlete(updated) });
   } catch {
