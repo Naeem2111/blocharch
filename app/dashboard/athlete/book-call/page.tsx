@@ -6,7 +6,7 @@ export default function BookCallPage() {
     <div>
       <PageHeader
         title="Book a call"
-        description="Request a check-in slot from Jethro’s calendar — project, reason, preferred time, and notes."
+        description="Request a check-in — same form as Daily Log. Jethro arranges the meeting and marks it scheduled."
       />
       <AthleteBookCallClient />
     </div>

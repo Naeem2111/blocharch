@@ -29,11 +29,11 @@ OPS,Projects — due-date colour scale on admin cards,AUDIT,Done,project-color-s
 OPS,Project form — remove Blocker checkbox,AUDIT,Done,Removed from edit form.
 OPS,Project form — remove Check-in requested checkbox,AUDIT,Done,Removed from edit form.
 OPS,Commercial — layout & calculations,AUDIT,Done,Lane revenue/cost/margin breakdown approved.
-OPS,Commercial — live vs manual GBP/ZAR exchange rate,AUDIT,Missing,No live rate fetch toggle; manual rate only.
+OPS,Commercial — live vs manual GBP/ZAR exchange rate,AUDIT,Done,Manual/live toggle on Commercial; live via Frankfurter API.
 OPS,Commercial — circular client logo next to name,AUDIT,Done,ClientAvatar on Commercial lane + ledger tables.
 OPS,Commercial — client logo upload on onboarding,AUDIT,Done,Same upload flow on Clients onboarding page.
 OPS,Check-ins — unify Book a Call + Daily Log checkbox into Check-in Requests,AUDIT,Done,CheckInRequestModal from daily log.
-OPS,Check-ins — remove admin Notifications section,AUDIT,Done,Removed from Ops sub-nav.
+OPS,Check-ins — remove admin Notifications section,AUDIT,Done,Removed from sidebar; /ops/notifications redirects to check-ins.
 OPS,Check-ins — Scheduled Meetings tab (reversible),AUDIT,Done,Scheduled meetings filter tab added.
 OPS,Check-ins — source label (Book a Call vs Daily Log),AUDIT,Done,source on schema + request cards.
 OPS,Analytics — due date risk progress % as text,AUDIT,Done,showLabel on analytics progress bars.

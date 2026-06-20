@@ -1,14 +1,6 @@
-import { PageHeader } from "@/components/PageHeader";
-import { OpsNotificationsClient } from "./OpsNotificationsClient";
+import { redirect } from "next/navigation";
 
+/** Ops notifications removed — all check-ins live under Check-in requests. */
 export default function OpsNotificationsPage() {
-  return (
-    <div>
-      <PageHeader
-        title="My notifications"
-        description="Check-in requests, blockers, reviews, and other athlete items that need your attention."
-      />
-      <OpsNotificationsClient />
-    </div>
-  );
+  redirect("/dashboard/ops/check-ins");
 }

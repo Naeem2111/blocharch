@@ -27,6 +27,60 @@ export async function PATCH(request: NextRequest, context: Ctx) {
     const adminNote = body.adminNote != null ? String(body.adminNote).trim() : undefined;
     const zoomLink = body.zoomLink != null ? String(body.zoomLink).trim() : undefined;
 
+    if (action === "set_status") {
+      const status = String(body.status || "").trim();
+
+      if (status === "scheduled") {
+        if (["approved", "confirmed"].includes(existing.status)) {
+          return NextResponse.json({ request: serializeCheckInRequest(existing) });
+        }
+
+        const row = await prisma.opsCheckInRequest.update({
+          where: { id },
+          data: {
+            status: "approved",
+            resolvedByUserId: user.id,
+            resolvedAt: new Date(),
+          },
+          include: {
+            athlete: { select: { id: true, fullName: true, athleteCode: true, email: true } },
+            project: { include: { client: { select: { name: true } } } },
+          },
+        });
+
+        await createAthleteNotification({
+          athleteId: row.athlete.id,
+          type: "check_in_update",
+          title: "Check-in scheduled",
+          message: null,
+          linkPath: "/dashboard/athlete/book-call",
+        }).catch(() => {});
+
+        return NextResponse.json({ request: serializeCheckInRequest(row) });
+      }
+
+      if (status === "pending") {
+        if (["pending", "counter_proposed"].includes(existing.status)) {
+          return NextResponse.json({ request: serializeCheckInRequest(existing) });
+        }
+        const row = await prisma.opsCheckInRequest.update({
+          where: { id },
+          data: {
+            status: "pending",
+            resolvedByUserId: null,
+            resolvedAt: null,
+          },
+          include: {
+            athlete: { select: { id: true, fullName: true, athleteCode: true, email: true } },
+            project: { include: { client: { select: { name: true } } } },
+          },
+        });
+        return NextResponse.json({ request: serializeCheckInRequest(row) });
+      }
+
+      return NextResponse.json({ error: "status must be pending or scheduled" }, { status: 400 });
+    }
+
     if (action === "decline") {
       const row = await prisma.opsCheckInRequest.update({
         where: { id },

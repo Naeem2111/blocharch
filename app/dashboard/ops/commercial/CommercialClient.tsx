@@ -49,6 +49,9 @@ type AthleteMonthlyRow = {
 type CommercialData = {
   month: string;
   reportingRate: number;
+  appliedRate: number;
+  costConversionMode: "manual" | "live";
+  liveRate: number | null;
   totalRevenueGbp: number;
   totalLaneRevenueGbp: number;
   totalOvertimeRevenueGbp: number;
@@ -70,6 +73,14 @@ type ExchangeRate = {
   activeFlag: boolean;
 };
 
+type CommercialSettings = {
+  costConversionMode: "manual" | "live";
+  appliedRate: number;
+  reportingRate: number;
+  storedLiveRate: number | null;
+  liveQuote: { gbpToZarRate: number; asOf: string; source: string } | null;
+};
+
 type AdminSubmission = {
   id: string;
   athleteName: string;
@@ -88,6 +99,7 @@ export function CommercialClient() {
   const [month, setMonth] = useState(currentMonth());
   const [ledger, setLedger] = useState<CommercialData | null>(null);
   const [rates, setRates] = useState<ExchangeRate[]>([]);
+  const [fxSettings, setFxSettings] = useState<CommercialSettings | null>(null);
   const [submissions, setSubmissions] = useState<AdminSubmission[]>([]);
   const [loading, setLoading] = useState(true);
   const [rateForm, setRateForm] = useState({ effectiveMonth: currentMonth(), gbpToZarRate: "24", rateType: "reporting" });
@@ -96,17 +108,20 @@ export function CommercialClient() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [cr, rr, sr] = await Promise.all([
+    const [cr, rr, sr, fx] = await Promise.all([
       fetch(`/api/ops/commercial?month=${month}`),
       fetch("/api/ops/exchange-rates"),
       fetch("/api/ops/submissions"),
+      fetch("/api/ops/commercial-settings"),
     ]);
     const cj = await cr.json();
     const rj = await rr.json();
     const sj = await sr.json();
+    const fj = await fx.json();
     if (cr.ok) setLedger(cj);
     if (rr.ok) setRates(rj.rates || []);
     if (sr.ok) setSubmissions(sj.submissions || []);
+    if (fx.ok) setFxSettings(fj);
     setLoading(false);
   }, [month]);
 
@@ -114,14 +129,27 @@ export function CommercialClient() {
     void load();
   }, [load]);
 
-  const liveRate = useMemo(
-    () => rates.find((r) => r.rateType === "live" && r.activeFlag && r.effectiveMonth === month),
-    [rates, month]
-  );
   const reportingRate = useMemo(
     () => rates.find((r) => r.rateType === "reporting" && r.activeFlag && r.effectiveMonth === month),
     [rates, month]
   );
+
+  async function setCostMode(mode: "manual" | "live") {
+    setError("");
+    setMsg("");
+    const r = await fetch("/api/ops/commercial-settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ costConversionMode: mode }),
+    });
+    const j = await r.json();
+    if (!r.ok) {
+      setError(j.error || "Could not update conversion mode");
+      return;
+    }
+    setMsg(mode === "live" ? "Using live GBP→ZAR for athlete costs." : "Using manual reporting rate for athlete costs.");
+    void load();
+  }
 
   async function addRate(e: React.FormEvent) {
     e.preventDefault();
@@ -186,8 +214,9 @@ export function CommercialClient() {
         </label>
         {ledger ? (
           <p className="text-xs text-slate-500">
-            Reporting rate: £1 = R{ledger.reportingRate.toFixed(2)}
-            {liveRate ? ` · Live: R${liveRate.gbpToZarRate}` : ""}
+            Athlete costs: £1 = R{ledger.appliedRate.toFixed(2)} (
+            {ledger.costConversionMode === "live" ? "live" : "manual reporting"})
+            {ledger.liveRate != null ? ` · Live ref R${ledger.liveRate.toFixed(2)}` : ""}
           </p>
         ) : null}
       </div>
@@ -392,11 +421,42 @@ export function CommercialClient() {
         <div className="card-tool rounded-xl p-5">
           <h2 className="text-sm font-semibold text-white">Exchange rates</h2>
           <p className="mt-1 text-xs text-slate-500">
-            Reporting rates lock ledger history. Live rates are for reference only.
+            Choose manual reporting rate or live market rate when converting athlete ZAR pay to GBP.
           </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => void setCostMode("manual")}
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium ring-1 ${
+                (fxSettings?.costConversionMode ?? ledger?.costConversionMode) === "manual"
+                  ? "bg-brand-500/20 text-brand-200 ring-brand-500/30"
+                  : "bg-white/[0.04] text-slate-400 ring-white/[0.08]"
+              }`}
+            >
+              Manual reporting rate
+            </button>
+            <button
+              type="button"
+              onClick={() => void setCostMode("live")}
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium ring-1 ${
+                (fxSettings?.costConversionMode ?? ledger?.costConversionMode) === "live"
+                  ? "bg-brand-500/20 text-brand-200 ring-brand-500/30"
+                  : "bg-white/[0.04] text-slate-400 ring-white/[0.08]"
+              }`}
+            >
+              Live market rate
+            </button>
+          </div>
+          {fxSettings?.liveQuote ? (
+            <p className="mt-2 text-sm text-slate-300">
+              Live now: £1 = R{fxSettings.liveQuote.gbpToZarRate} ({fxSettings.liveQuote.asOf})
+            </p>
+          ) : (
+            <p className="mt-2 text-sm text-amber-300">Live quote unavailable — using stored or reporting rate.</p>
+          )}
           {reportingRate ? (
             <p className="mt-2 text-sm text-slate-300">
-              Active reporting ({month}): £1 = R{reportingRate.gbpToZarRate}
+              Manual reporting ({month}): £1 = R{reportingRate.gbpToZarRate}
             </p>
           ) : (
             <p className="mt-2 text-sm text-amber-300">No reporting rate set — using default R24.</p>

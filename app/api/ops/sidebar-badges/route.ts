@@ -7,16 +7,12 @@ export async function GET(request: NextRequest) {
   const gate = await requireOpsSession(request);
   if (gate instanceof NextResponse) return gate;
 
-  const [unreadNotifications, pendingCheckIns] = await Promise.all([
-    prisma.opsNotification.count({ where: { readAt: null } }),
-    prisma.opsCheckInRequest.count({
-      where: { status: { in: ["pending", "counter_proposed"] } },
-    }),
-  ]);
+  const pendingCheckIns = await prisma.opsCheckInRequest.count({
+    where: { status: { in: ["pending", "counter_proposed"] } },
+  });
 
   return NextResponse.json({
-    notifications: unreadNotifications,
     checkIns: pendingCheckIns,
-    urgent: unreadNotifications + pendingCheckIns > 0,
+    urgent: pendingCheckIns > 0,
   });
 }

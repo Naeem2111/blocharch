@@ -2,8 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAthletePortalSession } from "@/lib/ops-access";
-import { notifyAdminNewCheckIn, serializeCheckInRequest } from "@/lib/check-in-requests";
-import { formatSlotLabel, getGoogleCalendarConfig } from "@/lib/google-calendar";
+import { serializeCheckInRequest } from "@/lib/check-in-requests";
 
 const checkInInclude = {
   athlete: { select: { fullName: true, athleteCode: true, email: true } },
@@ -56,13 +55,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid slot duration" }, { status: 400 });
     }
 
-    if (projectId) {
-      const project = await prisma.opsProject.findFirst({
-        where: { id: projectId, assignedAthleteId: athlete.id },
-      });
-      if (!project) {
-        return NextResponse.json({ error: "Project not found on your account" }, { status: 400 });
-      }
+    if (!projectId) {
+      return NextResponse.json({ error: "Project is required" }, { status: 400 });
+    }
+
+    const project = await prisma.opsProject.findFirst({
+      where: { id: projectId, assignedAthleteId: athlete.id },
+    });
+    if (!project) {
+      return NextResponse.json({ error: "Project not found on your account" }, { status: 400 });
     }
 
     const row = await prisma.opsCheckInRequest.create({
@@ -78,18 +79,6 @@ export async function POST(request: NextRequest) {
       },
       include: checkInInclude,
     });
-
-    const tz = getGoogleCalendarConfig()?.timezone ?? "Europe/London";
-    const slotLabel = formatSlotLabel(requestedStartAt, requestedEndAt, tz);
-
-    await notifyAdminNewCheckIn(
-      athlete.id,
-      athlete.fullName,
-      projectId,
-      row.project?.name ?? null,
-      reason,
-      slotLabel
-    );
 
     return NextResponse.json({ request: serializeCheckInRequest(row) }, { status: 201 });
   } catch {

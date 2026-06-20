@@ -5,7 +5,7 @@ import {
   monthlyLaneRevenueGbp,
 } from "@/lib/ops-constants";
 import { computeMonthlyHoursSummary, monthEndUtc, monthStartUtc } from "@/lib/ops-hours";
-import { getReportingRateOrDefault } from "@/lib/ops-exchange";
+import { getCostConversionSnapshot } from "@/lib/ops-exchange";
 import { OPS_ALERT_THRESHOLDS, submissionEditCutoffUtc } from "@/lib/ops-alerts";
 
 export { LANE_MONTHLY_HOURS };
@@ -50,6 +50,9 @@ export type CommercialLedgerRow = {
 export type CommercialSummary = {
   month: string;
   reportingRate: number;
+  appliedRate: number;
+  costConversionMode: "manual" | "live";
+  liveRate: number | null;
   totalRevenueGbp: number;
   totalLaneRevenueGbp: number;
   totalOvertimeRevenueGbp: number;
@@ -88,7 +91,7 @@ function dateOnlyUtc(date: Date): Date {
 export async function buildCommercialLedger(reference: Date): Promise<CommercialSummary> {
   const from = monthStartUtc(reference);
   const to = monthEndUtc(reference);
-  const reportingRate = await getReportingRateOrDefault(reference);
+  const { appliedRate, reportingRate, mode, liveRate } = await getCostConversionSnapshot(reference);
 
   const [clients, lineItems, athletes] = await Promise.all([
     prisma.opsClient.findMany({
@@ -227,9 +230,9 @@ export async function buildCommercialLedger(reference: Date): Promise<Commercial
     });
     athleteCostMap.set(athlete.id, {
       costZar: summary.totalEarningsZar,
-      costGbp: round2(summary.totalEarningsZar / reportingRate),
-      baseCostGbp: round2(summary.baseEarningsZar / reportingRate),
-      overtimeCostGbp: round2(summary.overtimeEarningsZar / reportingRate),
+      costGbp: round2(summary.totalEarningsZar / appliedRate),
+      baseCostGbp: round2(summary.baseEarningsZar / appliedRate),
+      overtimeCostGbp: round2(summary.overtimeEarningsZar / appliedRate),
       monthHours: summary.monthHours,
       monthOvertimeHours: summary.monthOvertimeHours,
     });
@@ -310,7 +313,7 @@ export async function buildCommercialLedger(reference: Date): Promise<Commercial
     clientLanes.reduce((s, c) => s + c.totalClientRevenueGbp, 0)
   );
   const totalCostZar = round2(Array.from(athleteCostMap.values()).reduce((s, c) => s + c.costZar, 0));
-  const totalCostGbp = round2(totalCostZar / reportingRate);
+  const totalCostGbp = round2(totalCostZar / appliedRate);
   const totalLaneCostGbp = round2(
     Array.from(athleteCostMap.values()).reduce((s, c) => s + c.baseCostGbp, 0)
   );
@@ -322,6 +325,9 @@ export async function buildCommercialLedger(reference: Date): Promise<Commercial
   return {
     month: from.toISOString().slice(0, 7),
     reportingRate,
+    appliedRate,
+    costConversionMode: mode,
+    liveRate,
     totalRevenueGbp,
     totalLaneRevenueGbp,
     totalOvertimeRevenueGbp,

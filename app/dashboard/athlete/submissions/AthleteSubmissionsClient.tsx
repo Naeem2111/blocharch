@@ -81,6 +81,7 @@ export function AthleteSubmissionsClient() {
   const [calc, setCalc] = useState<CalcPanel | null>(null);
   const [wellbeingScore, setWellbeingScore] = useState("5");
   const [checkInModalOpen, setCheckInModalOpen] = useState(false);
+  const [checkInDetailsSubmitted, setCheckInDetailsSubmitted] = useState(false);
   const [dailyNote, setDailyNote] = useState("");
   const [lines, setLines] = useState<LineItemForm[]>([emptyLine()]);
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -95,6 +96,7 @@ export function AthleteSubmissionsClient() {
     setCalendarMonth(sub.submissionDate.slice(0, 7));
     setWellbeingScore(String(sub.wellbeingScore ?? 5));
     setDailyNote(sub.dailyNote ?? "");
+    setCheckInDetailsSubmitted(!!sub.checkInRequested);
     setFormLocked(!sub.editable);
     setLines(
       sub.lineItems.length > 0
@@ -135,6 +137,7 @@ export function AthleteSubmissionsClient() {
     setCalendarMonth(today.slice(0, 7));
     setWellbeingScore("5");
     setDailyNote("");
+    setCheckInDetailsSubmitted(false);
     setLines([emptyLine()]);
     setFormLocked(false);
     setError("");
@@ -188,6 +191,7 @@ export function AthleteSubmissionsClient() {
     setFormLocked(false);
     setWellbeingScore("5");
     setDailyNote("");
+    setCheckInDetailsSubmitted(false);
     setLines([emptyLine()]);
     setError("");
   }
@@ -245,6 +249,7 @@ export function AthleteSubmissionsClient() {
           submissionDate: selectedDate,
           wellbeingScore: Number(wellbeingScore),
           dailyNote,
+          checkInRequested: checkInDetailsSubmitted,
           lineItems,
         }),
       });
@@ -319,16 +324,25 @@ export function AthleteSubmissionsClient() {
       </div>
 
       <div className="card-tool grid gap-4 rounded-xl p-4 md:grid-cols-3">
-        <div className="flex items-end pb-1 md:col-span-3">
-          <button
-            type="button"
-            onClick={() => setCheckInModalOpen(true)}
+        <label className="flex items-center gap-2 text-sm text-slate-300 md:col-span-3">
+          <input
+            type="checkbox"
+            checked={checkInDetailsSubmitted}
             disabled={formLocked}
-            className="rounded-lg bg-white/[0.08] px-4 py-2 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/[0.12] disabled:opacity-50"
-          >
-            Request check-in (Book a Call)
-          </button>
-        </div>
+            onChange={(e) => {
+              if (e.target.checked) {
+                setCheckInModalOpen(true);
+              } else {
+                setCheckInDetailsSubmitted(false);
+              }
+            }}
+            className="rounded border-white/20"
+          />
+          Check-in required
+          {checkInDetailsSubmitted ? (
+            <span className="text-xs text-brand-300">— details submitted</span>
+          ) : null}
+        </label>
         <label className="text-xs text-slate-400 md:col-span-3">
           Daily note (optional)
           <textarea
@@ -569,7 +583,10 @@ export function AthleteSubmissionsClient() {
       <CheckInRequestModal
         open={checkInModalOpen}
         onClose={() => setCheckInModalOpen(false)}
-        onSuccess={() => setSuccess("Check-in request submitted.")}
+        onSuccess={() => {
+          setCheckInDetailsSubmitted(true);
+          setSuccess("Check-in request submitted.");
+        }}
         source="daily_log"
         projects={projects.map((p) => ({
           id: p.id,

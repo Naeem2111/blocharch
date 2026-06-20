@@ -596,3 +596,11 @@ model OpsExchangeRate {
   @@index([effectiveMonth, rateType, activeFlag])
   @@map("ops_exchange_rates")
 }
+
+model OpsAppSetting {
+  key       String   @id
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("ops_app_settings")
+}

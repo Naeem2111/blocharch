@@ -14,7 +14,6 @@ import {
 import { computeMonthlyHoursSummary, dateOnlyUtc, parseDateOnly } from "@/lib/ops-hours";
 import { buildDailyHourAlerts, isSubmissionEditable } from "@/lib/ops-alerts";
 import { lockStaleSubmissions } from "@/lib/ops-commercial";
-import { createOpsNotification } from "@/lib/ops-notifications";
 import { syncProjectProgressFromLineItems } from "@/lib/sync-project-progress";
 
 type LineItemInput = {
@@ -232,16 +231,6 @@ export async function POST(request: NextRequest) {
     });
 
     await syncProjectProgressFromLineItems(lineItems).catch(() => {});
-
-    if (body.checkInRequested) {
-      await createOpsNotification({
-        athleteId: athlete.id,
-        type: "check_in_request",
-        title: `${athlete.fullName} requested a check-in`,
-        message: body.dailyNote ? String(body.dailyNote).trim() : null,
-        actionRequired: "Review check-in request and respond via Book a Call flow",
-      }).catch(() => {});
-    }
 
     const monthSummary = await athleteMonthlySummary(athlete);
     const todayHours = Number(submission.totalHours);

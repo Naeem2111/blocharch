@@ -93,6 +93,10 @@ export function CheckInRequestModal({
       setError("Reason is required");
       return;
     }
+    if (!projectId) {
+      setError("Project is required");
+      return;
+    }
 
     let requestedStartAt: string;
     let requestedEndAt: string;
@@ -175,13 +179,14 @@ export function CheckInRequestModal({
         ) : (
           <form onSubmit={submit} className="mt-4 space-y-4">
             <label className="block text-xs text-slate-400">
-              Project (optional)
+              Project <span className="text-red-400">*</span>
               <select
+                required
                 value={projectId}
                 onChange={(e) => setProjectId(e.target.value)}
                 className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
               >
-                <option value="">General</option>
+                <option value="">Select project…</option>
                 {projects.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.client?.name ? `${p.client.name} — ` : ""}

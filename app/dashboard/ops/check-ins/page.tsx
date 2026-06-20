@@ -6,7 +6,7 @@ export default function OpsCheckInsPage() {
     <div>
       <PageHeader
         title="Check-in requests"
-        description="Book a Call requests from athletes — approve, decline, suggest another time, and add Zoom links to Google Calendar."
+        description="Unified check-in requests from Book a Call and Daily Log — mark Pending / Unscheduled or Scheduled after you arrange the meeting."
       />
       <OpsCheckInRequestsClient />
     </div>
