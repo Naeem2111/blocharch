@@ -307,6 +307,8 @@ model OpsClient {
   country     String?
   logoUrl     String?         @map("logo_url")
   logoBgColor String?         @map("logo_bg_color")
+  /** Initials text on logo circle when no image: light (white) or dark (black). */
+  logoTextTone String?         @map("logo_text_tone")
   status      OpsClientStatus @default(active)
   notes       String?         @db.Text
   createdAt   DateTime        @default(now()) @map("created_at")
@@ -366,6 +368,7 @@ model OpsAthlete {
   /** Direct link to profile photo (http/https or /uploads/…). */
   profilePhotoUrl      String?          @map("profile_photo_url")
   profilePhotoBgColor  String?          @map("profile_photo_bg_color")
+  profilePhotoTextTone String?          @map("profile_photo_text_tone")
   createdAt        DateTime         @default(now()) @map("created_at")
   updatedAt        DateTime         @updatedAt @map("updated_at")
 

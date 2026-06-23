@@ -3,6 +3,8 @@
 import { useRef, useState } from "react";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
 import { AvatarColorPicker } from "@/components/ops/AvatarColorPicker";
+import { AvatarTextTonePicker } from "@/components/ops/AvatarTextTonePicker";
+import type { AvatarTextTone } from "@/lib/avatar-text-tone";
 import { DEFAULT_AVATAR_BG } from "@/lib/hex-color";
 
 type AvatarUploadFieldProps = {
@@ -10,8 +12,10 @@ type AvatarUploadFieldProps = {
   displayName: string;
   photoUrl: string;
   backgroundColor: string;
+  textTone: AvatarTextTone;
   onPhotoUrlChange: (url: string) => void;
   onBackgroundColorChange: (hex: string) => void;
+  onTextToneChange: (tone: AvatarTextTone) => void;
   /** When set, enables PNG/file upload to this endpoint. */
   uploadPath?: string;
   objectFit?: "contain" | "cover";
@@ -23,8 +27,10 @@ export function AvatarUploadField({
   displayName,
   photoUrl,
   backgroundColor,
+  textTone,
   onPhotoUrlChange,
   onBackgroundColorChange,
+  onTextToneChange,
   uploadPath,
   objectFit = "cover",
   hint = "Upload a PNG or image file, or paste a direct link. Initials show until a photo is set.",
@@ -70,6 +76,7 @@ export function AvatarUploadField({
           name={displayName}
           logoUrl={previewUrl}
           backgroundColor={bg}
+          textTone={textTone}
           size={56}
           objectFit={objectFit}
         />
@@ -111,6 +118,7 @@ export function AvatarUploadField({
             onChange={onBackgroundColorChange}
             hint="Used behind transparent PNGs and for initials."
           />
+          <AvatarTextTonePicker value={textTone} onChange={onTextToneChange} />
         </div>
       </div>
     </div>

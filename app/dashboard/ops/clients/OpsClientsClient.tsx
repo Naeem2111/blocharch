@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
 import { AvatarColorPicker } from "@/components/ops/AvatarColorPicker";
+import { AvatarTextTonePicker } from "@/components/ops/AvatarTextTonePicker";
 import { ImageUrlField } from "@/components/ops/ImageUrlField";
+import type { AvatarTextTone } from "@/lib/avatar-text-tone";
+import { asAvatarTextTone, DEFAULT_AVATAR_TEXT_TONE } from "@/lib/avatar-text-tone";
 import { DEFAULT_AVATAR_BG } from "@/lib/hex-color";
 
 type ClientContact = { id?: string; name: string; email: string };
@@ -20,6 +23,7 @@ type ClientRow = {
   notes: string | null;
   logoUrl: string | null;
   logoBgColor: string | null;
+  logoTextTone: string | null;
   projectCount: number;
   commercial: {
     pricingTier: string;
@@ -94,6 +98,7 @@ const emptyCreate = {
   activeLaneCount: "1",
   logoUrl: "",
   logoBgColor: "#ffffff",
+  logoTextTone: DEFAULT_AVATAR_TEXT_TONE as AvatarTextTone,
 };
 
 function ContactFields({
@@ -173,6 +178,7 @@ export function OpsClientsClient() {
     activeLaneCount: "1",
     logoUrl: "",
     logoBgColor: DEFAULT_AVATAR_BG,
+    logoTextTone: DEFAULT_AVATAR_TEXT_TONE as AvatarTextTone,
   });
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
@@ -213,6 +219,7 @@ export function OpsClientsClient() {
         activeLaneCount: Number(form.activeLaneCount),
         logoUrl: form.logoUrl.trim() || null,
         logoBgColor: form.logoBgColor || null,
+        logoTextTone: form.logoTextTone,
       }),
     });
     const j = await r.json();
@@ -245,6 +252,7 @@ export function OpsClientsClient() {
       activeLaneCount: String(c.commercial?.activeLaneCount ?? 1),
       logoUrl: c.logoUrl ?? "",
       logoBgColor: c.logoBgColor ?? DEFAULT_AVATAR_BG,
+      logoTextTone: (asAvatarTextTone(c.logoTextTone) ?? DEFAULT_AVATAR_TEXT_TONE) as AvatarTextTone,
     });
     setError("");
     setMsg("");
@@ -269,6 +277,7 @@ export function OpsClientsClient() {
         activeLaneCount: Number(editForm.activeLaneCount),
         logoUrl: editForm.logoUrl.trim() || null,
         logoBgColor: editForm.logoBgColor || null,
+        logoTextTone: editForm.logoTextTone,
       }),
     });
     const j = await r.json();
@@ -328,6 +337,8 @@ export function OpsClientsClient() {
             hint="Paste a direct image link or upload a file after saving. Shown as a circle in Commercial and client lists."
             displayName={form.name || "New client"}
             value={form.logoUrl}
+            backgroundColor={form.logoBgColor}
+            textTone={form.logoTextTone}
             onChange={(logoUrl) => setForm((f) => ({ ...f, logoUrl }))}
           />
           <AvatarColorPicker
@@ -335,6 +346,10 @@ export function OpsClientsClient() {
             value={form.logoBgColor}
             onChange={(logoBgColor) => setForm((f) => ({ ...f, logoBgColor }))}
             hint="Colour behind transparent PNG logos."
+          />
+          <AvatarTextTonePicker
+            value={form.logoTextTone}
+            onChange={(logoTextTone) => setForm((f) => ({ ...f, logoTextTone }))}
           />
           <label className="text-xs text-slate-400">
             Company
@@ -419,6 +434,8 @@ export function OpsClientsClient() {
                   label="Client logo"
                   displayName={editForm.name || c.name}
                   value={editForm.logoUrl}
+                  backgroundColor={editForm.logoBgColor}
+                  textTone={editForm.logoTextTone}
                   onChange={(logoUrl) => setEditForm((f) => ({ ...f, logoUrl }))}
                 />
                 <ClientLogoUpload
@@ -429,6 +446,10 @@ export function OpsClientsClient() {
                   label="Logo circle background"
                   value={editForm.logoBgColor}
                   onChange={(logoBgColor) => setEditForm((f) => ({ ...f, logoBgColor }))}
+                />
+                <AvatarTextTonePicker
+                  value={editForm.logoTextTone}
+                  onChange={(logoTextTone) => setEditForm((f) => ({ ...f, logoTextTone }))}
                 />
                 <label className="text-xs text-slate-400">
                   Status
@@ -538,6 +559,7 @@ export function OpsClientsClient() {
                     name={c.name}
                     logoUrl={c.logoUrl}
                     backgroundColor={c.logoBgColor}
+                    textTone={asAvatarTextTone(c.logoTextTone)}
                     size={40}
                   />
                   <div>

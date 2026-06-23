@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
       username: a.user.username,
       profilePhotoUrl: a.profilePhotoUrl,
       profilePhotoBgColor: a.profilePhotoBgColor,
+      profilePhotoTextTone: a.profilePhotoTextTone,
       activeProjects: a._count.projects,
     })),
   });

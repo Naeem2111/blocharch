@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { AvatarTextTone } from "@/lib/avatar-text-tone";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
 
 type ImageUrlFieldProps = {
@@ -9,6 +10,8 @@ type ImageUrlFieldProps = {
   displayName: string;
   value: string;
   onChange: (url: string) => void;
+  backgroundColor?: string | null;
+  textTone?: AvatarTextTone | null;
   disabled?: boolean;
 };
 
@@ -18,6 +21,8 @@ export function ImageUrlField({
   displayName,
   value,
   onChange,
+  backgroundColor,
+  textTone,
   disabled = false,
 }: ImageUrlFieldProps) {
   const [draft, setDraft] = useState(value);
@@ -46,7 +51,13 @@ export function ImageUrlField({
 
   return (
     <div className="flex flex-wrap items-start gap-3 md:col-span-2">
-      <ClientAvatar name={displayName} logoUrl={previewUrl} size={48} />
+      <ClientAvatar
+        name={displayName}
+        logoUrl={previewUrl}
+        backgroundColor={backgroundColor}
+        textTone={textTone}
+        size={48}
+      />
       <div className="min-w-0 flex-1 space-y-1">
         <p className="text-xs font-medium text-slate-400">{label}</p>
         {hint ? <p className="text-[11px] text-slate-500">{hint}</p> : null}

@@ -3,12 +3,15 @@
 import { useMemo } from "react";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
 import { ProjectProgressBar } from "@/components/ProjectProgressBar";
+import { asAvatarTextTone } from "@/lib/avatar-text-tone";
 
 type CalendarProject = {
   id: string;
   name: string;
   clientName: string;
   clientLogoUrl?: string | null;
+  clientLogoBgColor?: string | null;
+  clientLogoTextTone?: string | null;
   dueDate: string;
   progressPercent: number;
   assignedAthleteName: string | null;
@@ -78,8 +81,14 @@ export function DueDateCalendar({
                         title={`${p.name} · ${p.clientName}`}
                       >
                         <p className="due-date-calendar-event-title flex items-center gap-1 truncate text-[10px] font-medium text-slate-200">
-                          {p.clientLogoUrl ? (
-                            <ClientAvatar name={p.clientName} logoUrl={p.clientLogoUrl} size={14} />
+                          {p.clientLogoUrl || p.clientLogoBgColor ? (
+                            <ClientAvatar
+                              name={p.clientName}
+                              logoUrl={p.clientLogoUrl}
+                              backgroundColor={p.clientLogoBgColor}
+                              textTone={asAvatarTextTone(p.clientLogoTextTone)}
+                              size={14}
+                            />
                           ) : null}
                           <span className="truncate">{p.name}</span>
                         </p>

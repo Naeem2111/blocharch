@@ -17,6 +17,8 @@ export type ClientLaneCommercialRow = {
   clientId: string;
   clientName: string;
   clientLogoUrl: string | null;
+  clientLogoBgColor: string | null;
+  clientLogoTextTone: string | null;
   clientStatus: string;
   pricingTier: string;
   laneCostGbp: number;
@@ -40,6 +42,8 @@ export type CommercialLedgerRow = {
   clientId: string;
   clientName: string;
   clientLogoUrl: string | null;
+  clientLogoBgColor: string | null;
+  clientLogoTextTone: string | null;
   /** Hours on this client's projects (usage tracking). */
   hoursWorked: number;
   /** Share of client lane + overtime revenue attributed by hours. */
@@ -81,7 +85,91 @@ export type CommercialSummary = {
     costGbp: number;
     marginGbp: number;
   }>;
+  clientFilter?: string | null;
 };
+
+export function filterCommercialLedgerByClient(
+  ledger: CommercialSummary,
+  clientId: string
+): CommercialSummary {
+  const clientLanes = ledger.clientLanes.filter((l) => l.clientId === clientId);
+  const rows = ledger.rows.filter((r) => r.clientId === clientId);
+  const fullTotalsByAthlete = new Map(ledger.athleteTotals.map((a) => [a.athleteId, a]));
+
+  const athleteAgg = new Map<
+    string,
+    {
+      athleteId: string;
+      athleteName: string;
+      hoursWorked: number;
+      revenueGbp: number;
+      costGbp: number;
+      marginGbp: number;
+    }
+  >();
+
+  for (const row of rows) {
+    const t = athleteAgg.get(row.athleteId);
+    if (t) {
+      t.hoursWorked += row.hoursWorked;
+      t.revenueGbp += row.revenueGbp;
+      t.costGbp += row.athleteCostGbp;
+      t.marginGbp += row.marginGbp;
+    } else {
+      athleteAgg.set(row.athleteId, {
+        athleteId: row.athleteId,
+        athleteName: row.athleteName,
+        hoursWorked: row.hoursWorked,
+        revenueGbp: row.revenueGbp,
+        costGbp: row.athleteCostGbp,
+        marginGbp: row.marginGbp,
+      });
+    }
+  }
+
+  const athleteTotals = Array.from(athleteAgg.values()).map((t) => {
+    const full = fullTotalsByAthlete.get(t.athleteId);
+    const share = full && full.costGbp > 0 ? t.costGbp / full.costGbp : 1;
+    return {
+      athleteId: t.athleteId,
+      athleteName: t.athleteName,
+      hoursWorked: round2(t.hoursWorked),
+      overtimeHours: round2((full?.overtimeHours ?? 0) * share),
+      revenueGbp: round2(t.revenueGbp),
+      basePayGbp: round2((full?.basePayGbp ?? t.costGbp) * share),
+      overtimePayGbp: round2((full?.overtimePayGbp ?? 0) * share),
+      costZar: round2((full?.costZar ?? 0) * share),
+      costGbp: round2(t.costGbp),
+      marginGbp: round2(t.marginGbp),
+    };
+  });
+
+  const totalLaneRevenueGbp = round2(clientLanes.reduce((s, c) => s + c.monthlyLaneRevenueGbp, 0));
+  const totalOvertimeRevenueGbp = round2(clientLanes.reduce((s, c) => s + c.overtimeRevenueGbp, 0));
+  const totalRevenueGbp = round2(clientLanes.reduce((s, c) => s + c.totalClientRevenueGbp, 0));
+  const totalCostGbp = round2(athleteTotals.reduce((s, a) => s + a.costGbp, 0));
+  const totalCostZar = round2(athleteTotals.reduce((s, a) => s + a.costZar, 0));
+  const totalLaneCostGbp = round2(athleteTotals.reduce((s, a) => s + a.basePayGbp, 0));
+  const totalOvertimeCostGbp = round2(athleteTotals.reduce((s, a) => s + a.overtimePayGbp, 0));
+  const grossMarginGbp = round2(totalRevenueGbp - totalCostGbp);
+
+  return {
+    ...ledger,
+    clientFilter: clientId,
+    totalRevenueGbp,
+    totalLaneRevenueGbp,
+    totalOvertimeRevenueGbp,
+    totalCostZar,
+    totalCostGbp,
+    totalLaneCostGbp,
+    totalOvertimeCostGbp,
+    grossMarginGbp,
+    grossMarginPercent: totalRevenueGbp > 0 ? round2((grossMarginGbp / totalRevenueGbp) * 100) : 0,
+    clientLanes,
+    rows,
+    athleteTotals,
+  };
+}
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -164,6 +252,8 @@ export async function buildCommercialLedger(reference: Date): Promise<Commercial
       clientId: client.id,
       clientName: client.name,
       clientLogoUrl: client.logoUrl,
+      clientLogoBgColor: client.logoBgColor,
+      clientLogoTextTone: client.logoTextTone,
       clientStatus: client.status,
       pricingTier: commercial.pricingTier,
       laneCostGbp,
@@ -198,6 +288,8 @@ export async function buildCommercialLedger(reference: Date): Promise<Commercial
       clientId: client.id,
       clientName: client.name,
       clientLogoUrl: client.logoUrl,
+      clientLogoBgColor: client.logoBgColor,
+      clientLogoTextTone: client.logoTextTone,
       hoursWorked: round2(hoursWorked),
       revenueGbp,
       athleteCostZar: 0,
@@ -349,13 +441,15 @@ export async function buildCommercialLedger(reference: Date): Promise<Commercial
 export type AnalyticsPayload = {
   month: string;
   hoursByPhase: Array<{ phase: string; hours: number }>;
-  hoursByClient: Array<{ clientId: string; clientName: string; clientLogoUrl: string | null; hours: number }>;
+  hoursByClient: Array<{ clientId: string; clientName: string; clientLogoUrl: string | null; clientLogoBgColor: string | null; clientLogoTextTone: string | null; hours: number }>;
   hoursByAthlete: Array<{ athleteId: string; athleteName: string; hours: number }>;
   dueDateRisk: Array<{
     id: string;
     name: string;
     clientName: string;
     clientLogoUrl: string | null;
+    clientLogoBgColor: string | null;
+    clientLogoTextTone: string | null;
     dueDate: string;
     daysUntilDue: number;
     progressPercent: number;
@@ -367,6 +461,8 @@ export type AnalyticsPayload = {
     name: string;
     clientName: string;
     clientLogoUrl: string | null;
+    clientLogoBgColor: string | null;
+    clientLogoTextTone: string | null;
     dueDate: string;
     progressPercent: number;
     currentStatus: string;
@@ -376,6 +472,8 @@ export type AnalyticsPayload = {
     clientId: string;
     clientName: string;
     clientLogoUrl: string | null;
+    clientLogoBgColor: string | null;
+    clientLogoTextTone: string | null;
     revenueGbp: number;
     costGbp: number;
     marginGbp: number;
@@ -407,12 +505,12 @@ export async function buildAnalytics(
     where: lineItemWhere,
     include: {
       submission: { include: { athlete: true } },
-      client: { select: { id: true, name: true, logoUrl: true } },
+      client: { select: { id: true, name: true, logoUrl: true, logoBgColor: true, logoTextTone: true } },
     },
   });
 
   const phaseMap = new Map<string, number>();
-  const clientHoursMap = new Map<string, { name: string; logoUrl: string | null; hours: number }>();
+  const clientHoursMap = new Map<string, { name: string; logoUrl: string | null; logoBgColor: string | null; logoTextTone: string | null; hours: number }>();
   const athleteHoursMap = new Map<string, { name: string; hours: number }>();
 
   for (const li of lineItems) {
@@ -421,7 +519,7 @@ export async function buildAnalytics(
 
     const ch = clientHoursMap.get(li.clientId);
     if (ch) ch.hours += hours;
-    else clientHoursMap.set(li.clientId, { name: li.client.name, logoUrl: li.client.logoUrl, hours });
+    else clientHoursMap.set(li.clientId, { name: li.client.name, logoUrl: li.client.logoUrl, logoBgColor: li.client.logoBgColor, logoTextTone: li.client.logoTextTone, hours });
 
     const ah = athleteHoursMap.get(li.submission.athleteId);
     if (ah) ah.hours += hours;
@@ -441,7 +539,7 @@ export async function buildAnalytics(
       ...projectClientFilter,
     },
     include: {
-      client: { select: { name: true, logoUrl: true } },
+      client: { select: { name: true, logoUrl: true, logoBgColor: true, logoTextTone: true } },
       assignedAthlete: { select: { fullName: true } },
     },
     orderBy: { dueDate: "asc" },
@@ -455,7 +553,7 @@ export async function buildAnalytics(
       ...projectClientFilter,
     },
     include: {
-      client: { select: { name: true, logoUrl: true } },
+      client: { select: { name: true, logoUrl: true, logoBgColor: true, logoTextTone: true } },
       assignedAthlete: { select: { fullName: true } },
     },
     orderBy: { dueDate: "asc" },
@@ -477,6 +575,8 @@ export async function buildAnalytics(
         clientId: lane.clientId,
         clientName: lane.clientName,
         clientLogoUrl: lane.clientLogoUrl,
+        clientLogoBgColor: lane.clientLogoBgColor,
+        clientLogoTextTone: lane.clientLogoTextTone,
         revenueGbp,
         costGbp,
         marginGbp,
@@ -497,6 +597,8 @@ export async function buildAnalytics(
         clientId,
         clientName: v.name,
         clientLogoUrl: v.logoUrl,
+        clientLogoBgColor: v.logoBgColor,
+        clientLogoTextTone: v.logoTextTone,
         hours: round2(v.hours),
       }))
       .sort((a, b) => b.hours - a.hours),
@@ -511,6 +613,8 @@ export async function buildAnalytics(
         name: p.name,
         clientName: p.client.name,
         clientLogoUrl: p.client.logoUrl,
+        clientLogoBgColor: p.client.logoBgColor,
+        clientLogoTextTone: p.client.logoTextTone,
         dueDate: due.toISOString().slice(0, 10),
         daysUntilDue,
         progressPercent: p.progressPercent ?? 0,
@@ -523,6 +627,8 @@ export async function buildAnalytics(
       name: p.name,
       clientName: p.client.name,
       clientLogoUrl: p.client.logoUrl,
+      clientLogoBgColor: p.client.logoBgColor,
+      clientLogoTextTone: p.client.logoTextTone,
       dueDate: p.dueDate!.toISOString().slice(0, 10),
       progressPercent: p.progressPercent ?? 0,
       currentStatus: p.currentStatus,

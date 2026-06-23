@@ -23,6 +23,7 @@ import {
   type NudgeDirection,
 } from "@/lib/planner-task-nudge";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
+import { asAvatarTextTone } from "@/lib/avatar-text-tone";
 
 const FIXED_BOARD_KINDS = new Set([
   "blocharch_outbox",
@@ -53,6 +54,7 @@ type TeamAthleteRow = {
   username: string;
   profilePhotoUrl: string | null;
   profilePhotoBgColor?: string | null;
+  profilePhotoTextTone?: string | null;
   activeProjects: number;
 };
 
@@ -1095,7 +1097,7 @@ export function PlannerClient() {
                     onClick={() => goPlanner({ area: "team", athlete: a.userId })}
                     className="flex w-full items-center gap-3 rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-left transition-colors hover:bg-white/[0.06]"
                   >
-                    <ClientAvatar name={a.fullName} logoUrl={a.profilePhotoUrl} backgroundColor={a.profilePhotoBgColor} size={36} objectFit="cover" />
+                    <ClientAvatar name={a.fullName} logoUrl={a.profilePhotoUrl} backgroundColor={a.profilePhotoBgColor} textTone={asAvatarTextTone(a.profilePhotoTextTone)} size={36} objectFit="cover" />
                     <span className="min-w-0">
                       <span className="block font-medium text-slate-100">{a.fullName}</span>
                       <span className="mt-0.5 block text-xs text-slate-500">
@@ -1338,6 +1340,7 @@ export function PlannerClient() {
                     {" "}
                     · Drag cards between columns and boards (use All boards view or drop on board tabs).
                     Use the ↑↓←→ pad on each card (or arrow keys when focused) if drag-and-drop is unreliable.
+                    Single-click selects a card; double-click opens it.
                     {completedColumnId ? (
                       <>
                         {" "}
@@ -1632,6 +1635,11 @@ export function PlannerClient() {
                             return;
                           }
                           setSelectedTaskId(t.id);
+                        }}
+                        onDoubleClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setSelectedTaskId(t.id);
                           setEditTask({ ...t, columnId: col.id });
                         }}
                         onKeyDown={(e) => {
@@ -1650,14 +1658,17 @@ export function PlannerClient() {
                               return;
                             }
                           }
-                          if (e.key === "Enter" || e.key === " ") {
+                          if (e.key === "Enter") {
                             e.preventDefault();
-                            setSelectedTaskId(t.id);
-                            setEditTask({ ...t, columnId: col.id });
+                            if (isSelected) {
+                              setEditTask({ ...t, columnId: col.id });
+                            } else {
+                              setSelectedTaskId(t.id);
+                            }
                           }
                         }}
                         className={`planner-task-card w-full rounded-lg border border-white/[0.06] bg-white/[0.04] p-3 text-left text-sm text-slate-200 outline-none transition-[opacity,transform,box-shadow] duration-150 hover:bg-white/[0.07] focus-visible:ring-2 focus-visible:ring-brand-500/50 ${
-                          detail.editable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
+                          detail.editable ? "cursor-pointer" : "cursor-pointer"
                         } ${
                           isSelected ? "ring-2 ring-brand-500/45 bg-brand-500/[0.08]" : ""
                         } ${

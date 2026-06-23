@@ -63,6 +63,7 @@ export function MultiBoardKanban({
   onNudgeTask,
 }: Props) {
   const [dragTaskId, setDragTaskId] = useState<string | null>(null);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [dropTargetColumnId, setDropTargetColumnId] = useState<string | null>(null);
   const [taskDropGuide, setTaskDropGuide] = useState<{
     columnId: string;
@@ -230,6 +231,8 @@ export function MultiBoardKanban({
                           ? taskNudgeAvailability(board.columns, t.id)
                           : null;
 
+                      const isSelected = selectedTaskId === t.id;
+
                       return (
                         <Fragment key={t.id}>
                           {showInsertLine ? (
@@ -276,7 +279,13 @@ export function MultiBoardKanban({
                               });
                             }}
                             onDrop={(e) => handleDropCard(col.id, t.id, e)}
-                            onClick={() => onOpenTask(t, col.id, board.id)}
+                            onClick={() => setSelectedTaskId(t.id)}
+                            onDoubleClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setSelectedTaskId(t.id);
+                              onOpenTask(t, col.id, board.id);
+                            }}
                             onKeyDown={(e) => {
                               if (board.editable && onNudgeTask) {
                                 const keyMap: Record<string, NudgeDirection> = {
@@ -290,12 +299,21 @@ export function MultiBoardKanban({
                                   e.preventDefault();
                                   e.stopPropagation();
                                   onNudgeTask(board.id, t.id, dir);
+                                  return;
+                                }
+                              }
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                if (isSelected) {
+                                  onOpenTask(t, col.id, board.id);
+                                } else {
+                                  setSelectedTaskId(t.id);
                                 }
                               }
                             }}
-                            className={`planner-task-card cursor-grab rounded-lg border border-white/[0.06] bg-white/[0.04] p-2 text-left text-sm active:cursor-grabbing ${
-                              dragTaskId === t.id ? "opacity-40" : "hover:bg-white/[0.07]"
-                            }`}
+                            className={`planner-task-card cursor-pointer rounded-lg border border-white/[0.06] bg-white/[0.04] p-2 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50 ${
+                              isSelected ? "ring-2 ring-brand-500/45 bg-brand-500/[0.08]" : ""
+                            } ${dragTaskId === t.id ? "opacity-40" : "hover:bg-white/[0.07]"}`}
                           >
                             <div className="flex gap-2">
                               {showDoneTick && onToggleComplete ? (

@@ -67,10 +67,12 @@ OUTBOX,Athlete dropdown to move task to another board,AUDIT,Done,Move to board�
 ONBOARDING,Clients — layout,AUDIT,Done,Client manager approved.
 ONBOARDING,Clients — logo upload (512px circular 32–40px display),AUDIT,Done,Upload on create + edit in OpsClientsClient; shown in Commercial.
 ONBOARDING,Clients — logo circle background colour picker,AUDIT,Done,logoBgColor on OpsClient + AvatarColorPicker in onboarding.
+ONBOARDING,Clients — initials text colour (light/dark when no logo),AUDIT,Done,logoTextTone + AvatarTextTonePicker; white or black initials on circle bg.
 ONBOARDING,Clients — Save/New Client light theme buttons,AUDIT,Done,btn-brand-primary utility for light contrast.
 ONBOARDING,Athletes — layout,AUDIT,Done,No major changes needed.
 ONBOARDING,Athletes — optional profile picture upload,AUDIT,Done,POST /api/ops/athletes/[id]/photo + AvatarUploadField; initials fallback JB.
 ONBOARDING,Athletes — profile circle background colour,AUDIT,Done,profilePhotoBgColor + colour picker on athlete onboarding.
+ONBOARDING,Athletes — initials text colour (light/dark when no photo),AUDIT,Done,profilePhotoTextTone + AvatarTextTonePicker in AvatarUploadField.
 WORKSPACE,My Workspace — no changes needed,AUDIT,Done,Approved as-is.
 WORKSPACE,My Workspace light theme selected states,AUDIT,Done,Planner tab + button light-theme classes shared with workspace.
 WORKSPACE,Sidebar hide/unhide sections,AUDIT,Missing,Collapse exists; no Hide + Show hidden sections at footer.

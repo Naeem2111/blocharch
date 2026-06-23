@@ -7,6 +7,7 @@ import { requireOpsSession } from "@/lib/ops-access";
 import { parseDateOnly } from "@/lib/ops-hours";
 import { parseImageUrlField } from "@/lib/image-url";
 import { parseHexColor } from "@/lib/hex-color";
+import { parseAvatarTextTone } from "@/lib/avatar-text-tone";
 import { ensureAthleteSystemBoards } from "@/lib/planner-system-boards";
 
 export async function GET(request: NextRequest) {
@@ -36,6 +37,7 @@ export async function GET(request: NextRequest) {
       blocharchStartDate: a.blocharchStartDate.toISOString().slice(0, 10),
       profilePhotoUrl: a.profilePhotoUrl,
       profilePhotoBgColor: a.profilePhotoBgColor,
+      profilePhotoTextTone: a.profilePhotoTextTone,
       projectCount: a._count.projects,
       submissionCount: a._count.submissions,
     })),
@@ -97,6 +99,15 @@ export async function POST(request: NextRequest) {
       profilePhotoBgColor = parsed;
     }
 
+    let profilePhotoTextTone: string | null | undefined;
+    if (body.profilePhotoTextTone !== undefined) {
+      const parsed = parseAvatarTextTone(body.profilePhotoTextTone);
+      if (body.profilePhotoTextTone !== null && body.profilePhotoTextTone !== "" && parsed === null) {
+        return NextResponse.json({ error: "Profile text colour must be light or dark" }, { status: 400 });
+      }
+      profilePhotoTextTone = parsed;
+    }
+
     const userId = randomUUID();
     const athlete = await prisma.$transaction(async (tx) => {
       await tx.user.create({
@@ -121,6 +132,7 @@ export async function POST(request: NextRequest) {
           overtimeRateZar: body.overtimeRateZar ?? 200,
           ...(profilePhotoUrl !== undefined ? { profilePhotoUrl } : {}),
           ...(profilePhotoBgColor !== undefined ? { profilePhotoBgColor } : {}),
+          ...(profilePhotoTextTone !== undefined ? { profilePhotoTextTone } : {}),
         },
       });
       await ensureAthleteSystemBoards(created.id, userId, tx);

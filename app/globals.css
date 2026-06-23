@@ -504,7 +504,7 @@ input.progress-slider::-moz-range-thumb {
   --tw-ring-color: rgb(16 185 129 / 0.45) !important;
 }
 
-[data-theme="light"] .avatar-circle:not([style*="background-color"]) {
+[data-theme="light"] .avatar-circle:not(.avatar-circle-custom):not([style*="background-color"]) {
   background-color: rgb(241 245 249 / 1) !important;
   color: #475569 !important;
   --tw-ring-color: rgb(203 213 225 / 0.95) !important;

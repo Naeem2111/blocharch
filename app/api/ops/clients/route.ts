@@ -10,6 +10,7 @@ import {
 import { requireOpsSession } from "@/lib/ops-access";
 import { parseImageUrlField } from "@/lib/image-url";
 import { parseHexColor } from "@/lib/hex-color";
+import { parseAvatarTextTone } from "@/lib/avatar-text-tone";
 import {
   clientInclude,
   mapClientToJson,
@@ -72,6 +73,15 @@ export async function POST(request: NextRequest) {
       logoBgColor = parsed;
     }
 
+    let logoTextTone: string | null | undefined;
+    if (body.logoTextTone !== undefined) {
+      const parsed = parseAvatarTextTone(body.logoTextTone);
+      if (body.logoTextTone !== null && body.logoTextTone !== "" && parsed === null) {
+        return NextResponse.json({ error: "Logo text colour must be light or dark" }, { status: 400 });
+      }
+      logoTextTone = parsed;
+    }
+
     const client = await prisma.opsClient.create({
       data: {
         name,
@@ -82,6 +92,7 @@ export async function POST(request: NextRequest) {
         notes: body.notes ? String(body.notes).trim() : null,
         ...(logoUrl !== undefined ? { logoUrl } : {}),
         ...(logoBgColor !== undefined ? { logoBgColor } : {}),
+        ...(logoTextTone !== undefined ? { logoTextTone } : {}),
         contacts: {
           create: contacts.map((c, i) => ({
             name: c.name,

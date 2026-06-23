@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
+import { asAvatarTextTone } from "@/lib/avatar-text-tone";
 
 type OpsAlert = {
   code: string;
@@ -16,6 +17,8 @@ type DashboardData = {
     fullName: string;
     athleteCode: string;
     profilePhotoUrl: string | null;
+    profilePhotoBgColor: string | null;
+    profilePhotoTextTone: string | null;
     blocharchStartDate: string;
     monthlyHourCap: number;
   };
@@ -132,7 +135,14 @@ export function AthleteDashboardClient() {
         <div className="card-tool rounded-xl p-5">
           <h2 className="text-sm font-semibold text-white">Profile</h2>
           <div className="mt-3 flex items-center gap-3">
-            <ClientAvatar name={profile.fullName} logoUrl={profile.profilePhotoUrl} size={48} objectFit="cover" />
+            <ClientAvatar
+              name={profile.fullName}
+              logoUrl={profile.profilePhotoUrl}
+              backgroundColor={profile.profilePhotoBgColor}
+              textTone={asAvatarTextTone(profile.profilePhotoTextTone)}
+              size={48}
+              objectFit="cover"
+            />
             <div>
               <p className="text-sm text-slate-300">
                 {profile.fullName} · {profile.athleteCode}

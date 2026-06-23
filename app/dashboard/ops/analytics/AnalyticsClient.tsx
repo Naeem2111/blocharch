@@ -5,12 +5,19 @@ import { DueDateCalendar } from "@/components/ops/DueDateCalendar";
 import { SimpleBarChart } from "@/components/ops/SimpleBarChart";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
 import { ProjectProgressBar } from "@/components/ProjectProgressBar";
+import { asAvatarTextTone } from "@/lib/avatar-text-tone";
 import {
   PROJECT_PHASE_LABELS,
   PROJECT_STATUS_LABELS,
 } from "@/lib/ops-constants";
 
-type ClientOption = { id: string; name: string; logoUrl: string | null };
+type ClientOption = {
+  id: string;
+  name: string;
+  logoUrl: string | null;
+  logoBgColor: string | null;
+  logoTextTone: string | null;
+};
 
 type BeatenDeadlinesByAthlete = {
   athleteId: string;
@@ -32,13 +39,15 @@ type AnalyticsData = {
   month: string;
   clientFilter: string | null;
   hoursByPhase: Array<{ phase: string; hours: number }>;
-  hoursByClient: Array<{ clientId: string; clientName: string; clientLogoUrl: string | null; hours: number }>;
+  hoursByClient: Array<{ clientId: string; clientName: string; clientLogoUrl: string | null; clientLogoBgColor: string | null; clientLogoTextTone: string | null; hours: number }>;
   hoursByAthlete: Array<{ athleteId: string; athleteName: string; hours: number }>;
   dueDateRisk: Array<{
     id: string;
     name: string;
     clientName: string;
     clientLogoUrl: string | null;
+    clientLogoBgColor: string | null;
+    clientLogoTextTone: string | null;
     dueDate: string;
     daysUntilDue: number;
     progressPercent: number;
@@ -50,6 +59,8 @@ type AnalyticsData = {
     name: string;
     clientName: string;
     clientLogoUrl: string | null;
+    clientLogoBgColor: string | null;
+    clientLogoTextTone: string | null;
     dueDate: string;
     progressPercent: number;
     currentStatus: string;
@@ -59,6 +70,8 @@ type AnalyticsData = {
     clientId: string;
     clientName: string;
     clientLogoUrl: string | null;
+    clientLogoBgColor: string | null;
+    clientLogoTextTone: string | null;
     revenueGbp: number;
     costGbp: number;
     marginGbp: number;
@@ -86,10 +99,12 @@ export function AnalyticsClient() {
       .then((j) => {
         if (j.clients) {
           setClients(
-            j.clients.map((c: { id: string; name: string; logoUrl?: string | null }) => ({
+            j.clients.map((c: { id: string; name: string; logoUrl?: string | null; logoBgColor?: string | null; logoTextTone?: string | null }) => ({
               id: c.id,
               name: c.name,
               logoUrl: c.logoUrl ?? null,
+              logoBgColor: c.logoBgColor ?? null,
+              logoTextTone: c.logoTextTone ?? null,
             }))
           );
         }
@@ -138,6 +153,8 @@ export function AnalyticsClient() {
         label: c.clientName,
         value: c.hours,
         imageUrl: c.clientLogoUrl,
+        imageBgColor: c.clientLogoBgColor,
+        imageTextTone: c.clientLogoTextTone,
       })),
     [data]
   );
@@ -205,7 +222,13 @@ export function AnalyticsClient() {
         </label>
         {selectedClient ? (
           <p className="flex items-center gap-2 pb-2 text-xs text-slate-400">
-            <ClientAvatar name={selectedClient.name} logoUrl={selectedClient.logoUrl} size={22} />
+            <ClientAvatar
+              name={selectedClient.name}
+              logoUrl={selectedClient.logoUrl}
+              backgroundColor={selectedClient.logoBgColor}
+              textTone={asAvatarTextTone(selectedClient.logoTextTone)}
+              size={22}
+            />
             Filtering analytics to {selectedClient.name}
           </p>
         ) : null}
@@ -247,6 +270,8 @@ export function AnalyticsClient() {
                 label: c.clientName,
                 value: c.marginGbp,
                 imageUrl: c.clientLogoUrl,
+                imageBgColor: c.clientLogoBgColor,
+                imageTextTone: c.clientLogoTextTone,
                 sublabel: `${c.marginPercent}% margin · £${c.revenueGbp} rev`,
               }))}
               valueSuffix=""
@@ -335,7 +360,13 @@ export function AnalyticsClient() {
                     <td className="px-3 py-2">{p.name}</td>
                     <td className="px-3 py-2">
                       <span className="inline-flex items-center gap-2">
-                        <ClientAvatar name={p.clientName} logoUrl={p.clientLogoUrl} size={24} />
+                        <ClientAvatar
+                          name={p.clientName}
+                          logoUrl={p.clientLogoUrl}
+                          backgroundColor={p.clientLogoBgColor}
+                          textTone={asAvatarTextTone(p.clientLogoTextTone)}
+                          size={24}
+                        />
                         {p.clientName}
                       </span>
                     </td>

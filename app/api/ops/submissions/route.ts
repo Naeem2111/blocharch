@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
       lineItems: {
         include: {
           project: { select: { name: true } },
-          client: { select: { name: true, logoUrl: true } },
+          client: { select: { name: true, logoUrl: true, logoBgColor: true, logoTextTone: true } },
         },
       },
     },
@@ -44,6 +44,8 @@ export async function GET(request: NextRequest) {
         projectName: li.project.name,
         clientName: li.client.name,
         clientLogoUrl: li.client.logoUrl,
+        clientLogoBgColor: li.client.logoBgColor,
+        clientLogoTextTone: li.client.logoTextTone,
         projectPhase: li.projectPhase,
         taskType: li.taskType,
         taskTypes: li.taskTypes?.length ? li.taskTypes : [li.taskType],

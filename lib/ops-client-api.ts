@@ -67,6 +67,7 @@ type ClientWithRelations = {
   country: string | null;
   logoUrl: string | null;
   logoBgColor: string | null;
+  logoTextTone: string | null;
   status: string;
   notes: string | null;
   contacts: { id: string; name: string; email: string | null; sortOrder: number }[];
@@ -95,6 +96,7 @@ export function mapClientToJson(c: ClientWithRelations) {
     country: c.country,
     logoUrl: c.logoUrl,
     logoBgColor: c.logoBgColor,
+    logoTextTone: c.logoTextTone,
     status: c.status,
     notes: c.notes,
     projectCount: c._count.projects,

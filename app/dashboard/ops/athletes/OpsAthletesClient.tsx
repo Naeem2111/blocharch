@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
 import { AvatarUploadField } from "@/components/ops/AvatarUploadField";
+import type { AvatarTextTone } from "@/lib/avatar-text-tone";
+import { asAvatarTextTone, DEFAULT_AVATAR_TEXT_TONE } from "@/lib/avatar-text-tone";
 import { DEFAULT_AVATAR_BG } from "@/lib/hex-color";
 
 type AthleteRow = {
@@ -14,6 +16,7 @@ type AthleteRow = {
   status: string;
   profilePhotoUrl: string | null;
   profilePhotoBgColor: string | null;
+  profilePhotoTextTone: string | null;
   baseMonthlyPayZar: number;
   monthlyHourCap: number;
   overtimeRateZar: number;
@@ -35,6 +38,7 @@ export function OpsAthletesClient() {
     blocharchStartDate: new Date().toISOString().slice(0, 10),
     profilePhotoUrl: "",
     profilePhotoBgColor: DEFAULT_AVATAR_BG,
+    profilePhotoTextTone: DEFAULT_AVATAR_TEXT_TONE as AvatarTextTone,
   });
   const [editForm, setEditForm] = useState({
     fullName: "",
@@ -47,6 +51,7 @@ export function OpsAthletesClient() {
     password: "",
     profilePhotoUrl: "",
     profilePhotoBgColor: DEFAULT_AVATAR_BG,
+    profilePhotoTextTone: DEFAULT_AVATAR_TEXT_TONE as AvatarTextTone,
   });
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
@@ -72,6 +77,7 @@ export function OpsAthletesClient() {
         ...form,
         profilePhotoUrl: form.profilePhotoUrl.trim() || null,
         profilePhotoBgColor: form.profilePhotoBgColor || null,
+        profilePhotoTextTone: form.profilePhotoTextTone,
       }),
     });
     const j = await r.json();
@@ -89,6 +95,7 @@ export function OpsAthletesClient() {
       blocharchStartDate: new Date().toISOString().slice(0, 10),
       profilePhotoUrl: "",
       profilePhotoBgColor: DEFAULT_AVATAR_BG,
+      profilePhotoTextTone: DEFAULT_AVATAR_TEXT_TONE as AvatarTextTone,
     });
     await load();
   }
@@ -106,6 +113,8 @@ export function OpsAthletesClient() {
       password: "",
       profilePhotoUrl: a.profilePhotoUrl ?? "",
       profilePhotoBgColor: a.profilePhotoBgColor ?? DEFAULT_AVATAR_BG,
+      profilePhotoTextTone: (asAvatarTextTone(a.profilePhotoTextTone) ??
+        DEFAULT_AVATAR_TEXT_TONE) as AvatarTextTone,
     });
     setError("");
     setMsg("");
@@ -123,6 +132,7 @@ export function OpsAthletesClient() {
       blocharchStartDate: editForm.blocharchStartDate,
       profilePhotoUrl: editForm.profilePhotoUrl.trim() || null,
       profilePhotoBgColor: editForm.profilePhotoBgColor || null,
+      profilePhotoTextTone: editForm.profilePhotoTextTone,
     };
     if (editForm.password.trim()) body.password = editForm.password.trim();
 
@@ -164,9 +174,13 @@ export function OpsAthletesClient() {
             displayName={form.fullName || "New athlete"}
             photoUrl={form.profilePhotoUrl}
             backgroundColor={form.profilePhotoBgColor}
+            textTone={form.profilePhotoTextTone}
             onPhotoUrlChange={(profilePhotoUrl) => setForm((f) => ({ ...f, profilePhotoUrl }))}
             onBackgroundColorChange={(profilePhotoBgColor) =>
               setForm((f) => ({ ...f, profilePhotoBgColor }))
+            }
+            onTextToneChange={(profilePhotoTextTone) =>
+              setForm((f) => ({ ...f, profilePhotoTextTone }))
             }
             hint="Initials appear until a photo is uploaded (edit after create to upload a file)."
           />
@@ -194,11 +208,15 @@ export function OpsAthletesClient() {
                   displayName={editForm.fullName || a.fullName}
                   photoUrl={editForm.profilePhotoUrl}
                   backgroundColor={editForm.profilePhotoBgColor}
+                  textTone={editForm.profilePhotoTextTone}
                   onPhotoUrlChange={(profilePhotoUrl) =>
                     setEditForm((f) => ({ ...f, profilePhotoUrl }))
                   }
                   onBackgroundColorChange={(profilePhotoBgColor) =>
                     setEditForm((f) => ({ ...f, profilePhotoBgColor }))
+                  }
+                  onTextToneChange={(profilePhotoTextTone) =>
+                    setEditForm((f) => ({ ...f, profilePhotoTextTone }))
                   }
                   uploadPath={`/api/ops/athletes/${a.id}/photo`}
                 />
@@ -222,6 +240,7 @@ export function OpsAthletesClient() {
                     name={a.fullName}
                     logoUrl={a.profilePhotoUrl}
                     backgroundColor={a.profilePhotoBgColor}
+                    textTone={asAvatarTextTone(a.profilePhotoTextTone)}
                     size={40}
                     objectFit="cover"
                   />

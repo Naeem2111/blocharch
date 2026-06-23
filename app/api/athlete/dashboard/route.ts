@@ -128,6 +128,8 @@ export async function GET(request: NextRequest) {
       fullName: athlete.fullName,
       athleteCode: athlete.athleteCode,
       profilePhotoUrl: athlete.profilePhotoUrl,
+      profilePhotoBgColor: athlete.profilePhotoBgColor,
+      profilePhotoTextTone: athlete.profilePhotoTextTone,
       blocharchStartDate: athlete.blocharchStartDate.toISOString().slice(0, 10),
       status: athlete.status,
       monthlyHourCap: athlete.monthlyHourCap,

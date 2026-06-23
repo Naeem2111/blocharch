@@ -11,6 +11,7 @@ import {
 import { requireOpsSession } from "@/lib/ops-access";
 import { parseImageUrlField } from "@/lib/image-url";
 import { parseHexColor } from "@/lib/hex-color";
+import { parseAvatarTextTone } from "@/lib/avatar-text-tone";
 import { removeClientLogoFiles } from "@/lib/client-logo-storage";
 import {
   clientInclude,
@@ -43,6 +44,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       notes?: string | null;
       logoUrl?: string | null;
       logoBgColor?: string | null;
+      logoTextTone?: string | null;
     } = {};
 
     if (body.name != null) {
@@ -83,6 +85,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         return NextResponse.json({ error: "Invalid logo background colour" }, { status: 400 });
       }
       clientData.logoBgColor = parsed;
+    }
+
+    if (body.logoTextTone !== undefined) {
+      const parsed = parseAvatarTextTone(body.logoTextTone);
+      if (body.logoTextTone !== null && body.logoTextTone !== "" && parsed === null) {
+        return NextResponse.json({ error: "Logo text colour must be light or dark" }, { status: 400 });
+      }
+      clientData.logoTextTone = parsed;
     }
 
     const contacts = parseContactsFromBody(body);

@@ -2,12 +2,23 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
+import { asAvatarTextTone } from "@/lib/avatar-text-tone";
 import { LANE_MONTHLY_HOURS } from "@/lib/ops-constants";
+
+type ClientOption = {
+  id: string;
+  name: string;
+  logoUrl: string | null;
+  logoBgColor: string | null;
+  logoTextTone: string | null;
+};
 
 type ClientLaneRow = {
   clientId: string;
   clientName: string;
   clientLogoUrl: string | null;
+  clientLogoBgColor: string | null;
+  clientLogoTextTone: string | null;
   clientStatus: string;
   pricingTier: string;
   laneCostGbp: number;
@@ -27,6 +38,8 @@ type LedgerRow = {
   athleteCode: string;
   clientName: string;
   clientLogoUrl: string | null;
+  clientLogoBgColor: string | null;
+  clientLogoTextTone: string | null;
   hoursWorked: number;
   revenueGbp: number;
   athleteCostGbp: number;
@@ -63,6 +76,7 @@ type CommercialData = {
   clientLanes: ClientLaneRow[];
   rows: LedgerRow[];
   athleteTotals: AthleteMonthlyRow[];
+  clientFilter?: string | null;
 };
 
 type ExchangeRate = {
@@ -97,6 +111,8 @@ function currentMonth(): string {
 
 export function CommercialClient() {
   const [month, setMonth] = useState(currentMonth());
+  const [clientId, setClientId] = useState("");
+  const [clients, setClients] = useState<ClientOption[]>([]);
   const [ledger, setLedger] = useState<CommercialData | null>(null);
   const [rates, setRates] = useState<ExchangeRate[]>([]);
   const [fxSettings, setFxSettings] = useState<CommercialSettings | null>(null);
@@ -106,10 +122,39 @@ export function CommercialClient() {
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
 
+  useEffect(() => {
+    void fetch("/api/ops/clients")
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.clients) {
+          setClients(
+            j.clients.map(
+              (c: {
+                id: string;
+                name: string;
+                logoUrl?: string | null;
+                logoBgColor?: string | null;
+                logoTextTone?: string | null;
+              }) => ({
+                id: c.id,
+                name: c.name,
+                logoUrl: c.logoUrl ?? null,
+                logoBgColor: c.logoBgColor ?? null,
+                logoTextTone: c.logoTextTone ?? null,
+              })
+            )
+          );
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
+    const q = new URLSearchParams({ month });
+    if (clientId) q.set("clientId", clientId);
     const [cr, rr, sr, fx] = await Promise.all([
-      fetch(`/api/ops/commercial?month=${month}`),
+      fetch(`/api/ops/commercial?${q}`),
       fetch("/api/ops/exchange-rates"),
       fetch("/api/ops/submissions"),
       fetch("/api/ops/commercial-settings"),
@@ -123,11 +168,16 @@ export function CommercialClient() {
     if (sr.ok) setSubmissions(sj.submissions || []);
     if (fx.ok) setFxSettings(fj);
     setLoading(false);
-  }, [month]);
+  }, [month, clientId]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  const selectedClient = useMemo(
+    () => clients.find((c) => c.id === clientId) ?? null,
+    [clients, clientId]
+  );
 
   const reportingRate = useMemo(
     () => rates.find((r) => r.rateType === "reporting" && r.activeFlag && r.effectiveMonth === month),
@@ -202,7 +252,7 @@ export function CommercialClient() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-wrap items-end gap-3">
+      <div className="flex flex-wrap items-end gap-4">
         <label className="text-xs text-slate-400">
           Month
           <input
@@ -212,8 +262,35 @@ export function CommercialClient() {
             className="mt-1 block rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
           />
         </label>
+        <label className="text-xs text-slate-400">
+          Client / firm
+          <select
+            value={clientId}
+            onChange={(e) => setClientId(e.target.value)}
+            className="select-console mt-1 block min-w-[14rem] rounded-md px-3 py-2 text-sm"
+          >
+            <option value="">All clients</option>
+            {clients.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        {selectedClient ? (
+          <p className="flex items-center gap-2 pb-2 text-xs text-slate-400">
+            <ClientAvatar
+              name={selectedClient.name}
+              logoUrl={selectedClient.logoUrl}
+              backgroundColor={selectedClient.logoBgColor}
+              textTone={asAvatarTextTone(selectedClient.logoTextTone)}
+              size={22}
+            />
+            Filtering commercial data to {selectedClient.name}
+          </p>
+        ) : null}
         {ledger ? (
-          <p className="text-xs text-slate-500">
+          <p className="pb-2 text-xs text-slate-500">
             Athlete costs: £1 = R{ledger.appliedRate.toFixed(2)} (
             {ledger.costConversionMode === "live" ? "live" : "manual reporting"})
             {ledger.liveRate != null ? ` · Live ref R${ledger.liveRate.toFixed(2)}` : ""}
@@ -263,8 +340,9 @@ export function CommercialClient() {
             <div className="border-b border-white/[0.06] px-4 py-3">
               <h2 className="text-sm font-semibold text-white">Client lanes (billing)</h2>
               <p className="mt-1 text-xs text-slate-500">
-                Each active lane bills at the tier rate for the month. Project hours below show utilization against{" "}
-                {LANE_MONTHLY_HOURS}h included per lane.
+                {clientId
+                  ? "Lane billing and utilization for the selected firm this month."
+                  : `Each active lane bills at the tier rate for the month. Project hours below show utilization against ${LANE_MONTHLY_HOURS}h included per lane.`}
               </p>
             </div>
             <table className="min-w-full text-left text-sm">
@@ -286,7 +364,13 @@ export function CommercialClient() {
                   <tr key={lane.clientId} className="border-b border-white/[0.04] text-slate-300">
                     <td className="px-4 py-2">
                       <span className="inline-flex items-center gap-2">
-                        <ClientAvatar name={lane.clientName} logoUrl={lane.clientLogoUrl} size={32} />
+                        <ClientAvatar
+                          name={lane.clientName}
+                          logoUrl={lane.clientLogoUrl}
+                          backgroundColor={lane.clientLogoBgColor}
+                          textTone={asAvatarTextTone(lane.clientLogoTextTone)}
+                          size={32}
+                        />
                         {lane.clientName}
                       </span>
                       {lane.clientStatus !== "active" ? (
@@ -332,7 +416,9 @@ export function CommercialClient() {
             <div className="border-b border-white/[0.06] px-4 py-3">
               <h2 className="text-sm font-semibold text-white">Athlete utilization (projects)</h2>
               <p className="mt-1 text-xs text-slate-500">
-                Hours from daily logs allocate athlete cost; revenue share is proportional to hours on each client.
+                {clientId
+                  ? "Hours and margin attributed to the selected client from daily logs."
+                  : "Hours from daily logs allocate athlete cost; revenue share is proportional to hours on each client."}
               </p>
             </div>
             <table className="min-w-full text-left text-sm">
@@ -355,7 +441,13 @@ export function CommercialClient() {
                     </td>
                     <td className="px-4 py-2">
                       <span className="inline-flex items-center gap-2">
-                        <ClientAvatar name={row.clientName} logoUrl={row.clientLogoUrl} size={32} />
+                        <ClientAvatar
+                          name={row.clientName}
+                          logoUrl={row.clientLogoUrl}
+                          backgroundColor={row.clientLogoBgColor}
+                          textTone={asAvatarTextTone(row.clientLogoTextTone)}
+                          size={32}
+                        />
                         {row.clientName}
                       </span>
                     </td>
@@ -371,7 +463,9 @@ export function CommercialClient() {
             </table>
             {ledger.rows.length === 0 ? (
               <p className="p-4 text-sm text-slate-500">
-                No project hours logged this month — lane billing above still applies for active clients.
+                {clientId
+                  ? "No project hours logged for this client this month."
+                  : "No project hours logged this month — lane billing above still applies for active clients."}
               </p>
             ) : null}
           </div>
@@ -380,7 +474,9 @@ export function CommercialClient() {
             <div className="border-b border-white/[0.06] px-4 py-3">
               <h2 className="text-sm font-semibold text-white">Athlete monthly breakdown</h2>
               <p className="mt-1 text-xs text-slate-500">
-                Per-athlete earnings, revenue produced, and Blocharch margin for the month.
+                {clientId
+                  ? "Per-athlete hours, revenue, and margin for the selected client."
+                  : "Per-athlete earnings, revenue produced, and Blocharch margin for the month."}
               </p>
             </div>
             <table className="min-w-full text-left text-sm">

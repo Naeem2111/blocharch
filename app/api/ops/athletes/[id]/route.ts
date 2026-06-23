@@ -6,6 +6,7 @@ import { requireOpsSession } from "@/lib/ops-access";
 import { parseDateOnly } from "@/lib/ops-hours";
 import { parseImageUrlField } from "@/lib/image-url";
 import { parseHexColor } from "@/lib/hex-color";
+import { parseAvatarTextTone } from "@/lib/avatar-text-tone";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -59,6 +60,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       athleteData.profilePhotoBgColor = parsed;
     }
 
+    if (body.profilePhotoTextTone !== undefined) {
+      const parsed = parseAvatarTextTone(body.profilePhotoTextTone);
+      if (body.profilePhotoTextTone !== null && body.profilePhotoTextTone !== "" && parsed === null) {
+        return NextResponse.json({ error: "Profile text colour must be light or dark" }, { status: 400 });
+      }
+      athleteData.profilePhotoTextTone = parsed;
+    }
+
     const userData: { disabled?: boolean; passwordHash?: string } = {};
     if (body.disabled != null) userData.disabled = Boolean(body.disabled);
     if (body.password != null) {
@@ -98,6 +107,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         blocharchStartDate: athlete.blocharchStartDate.toISOString().slice(0, 10),
         profilePhotoUrl: athlete.profilePhotoUrl,
         profilePhotoBgColor: athlete.profilePhotoBgColor,
+        profilePhotoTextTone: athlete.profilePhotoTextTone,
         projectCount: athlete._count.projects,
       },
     });
