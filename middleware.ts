@@ -3,6 +3,8 @@ import type { NextRequest } from "next/server";
 import { verifySessionToken, type SessionRole } from "@/lib/session-token";
 import {
   canAccessModule,
+  canAccessOpsApiPath,
+  canAccessOpsDashboardPath,
   defaultDashboardPath,
   isAdminApiPath,
   isAdminDashboardPath,
@@ -61,7 +63,10 @@ export async function middleware(request: NextRequest) {
   }
 
   if ((isOpsDashboardPath(path) || isOpsApiPath(path)) && !n8nAuthorized) {
-    if (!role || !canAccessModule(role, "ops")) {
+    const allowed = isOpsApiPath(path)
+      ? role != null && canAccessOpsApiPath(role, path)
+      : role != null && canAccessOpsDashboardPath(role, path);
+    if (!allowed) {
       if (isApi) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }

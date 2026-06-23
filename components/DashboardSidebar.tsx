@@ -8,7 +8,7 @@ import { LogoutButton } from "@/components/LogoutButton";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { BLOCHARCH_SITE } from "@/lib/blocharch-brand";
 import type { SessionUser } from "@/lib/auth";
-import { canAccessModule, type AppModule } from "@/lib/permissions";
+import { canAccessModule, canAccessOpsOverview, type AppModule } from "@/lib/permissions";
 import {
   applyItemOrder,
   applySectionOrder,
@@ -592,15 +592,25 @@ export function DashboardSidebar({
 
   const visibleSections = useMemo(() => {
     const filtered = NAV_SECTIONS.filter((section) => {
+      if (section.id === "onboarding" || section.id === "ops") {
+        if (section.id === "ops") return canAccessOpsOverview(user.role);
+        return canAccessModule(user.role, section.module);
+      }
       if (!canAccessModule(user.role, section.module)) return false;
       if (section.id === "planner" && user.role === "user") return false;
       return true;
     });
     const ordered = applySectionOrder(filtered, navOrder?.sections);
-    return ordered.map((section) => ({
-      ...section,
-      items: applyItemOrder(section.items, navOrder?.items[section.id]),
-    }));
+    return ordered.map((section) => {
+      const items =
+        section.id === "ops" && user.role === "manager"
+          ? section.items.filter((item) => item.href === "/dashboard/ops")
+          : section.items;
+      return {
+        ...section,
+        items: applyItemOrder(items, navOrder?.items[section.id]),
+      };
+    });
   }, [user.role, navOrder]);
 
   const persistSectionOrder = (ids: string[]) => {

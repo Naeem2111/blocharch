@@ -6,8 +6,8 @@ export default function OpsHomePage() {
     <>
       <PageHeader
         title="Athlete operations"
-        badge="Admin"
-        description="Production tracking, commercial reporting, and project operations — Blocharch’s internal OS for athletes, clients, and lanes."
+        badge="Operations"
+        description="Production tracking, athlete performance, and project operations — overview, submissions, and commercial reporting."
         className="mb-8"
       />
       <OpsOverviewClient />

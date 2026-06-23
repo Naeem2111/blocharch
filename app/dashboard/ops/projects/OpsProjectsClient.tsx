@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { ClientAvatar } from "@/components/ops/ClientAvatar";
 import { ProjectProgressBar } from "@/components/ProjectProgressBar";
+import { asAvatarTextTone } from "@/lib/avatar-text-tone";
 import {
   COMPLEXITY_LABELS,
   PROJECT_PHASE_LABELS,
@@ -10,12 +12,21 @@ import {
 import { daysUntilDueFromIso, projectDueColor } from "@/lib/project-color-scale";
 import { computeProjectTimeline } from "@/lib/project-timeline";
 
-type ClientOption = { id: string; name: string };
+type ClientOption = {
+  id: string;
+  name: string;
+  logoUrl: string | null;
+  logoBgColor: string | null;
+  logoTextTone: string | null;
+};
 type AthleteOption = { id: string; fullName: string; athleteCode: string };
 type ProjectRow = {
   id: string;
   clientId: string;
   clientName: string;
+  clientLogoUrl: string | null;
+  clientLogoBgColor: string | null;
+  clientLogoTextTone: string | null;
   assignedAthleteId: string | null;
   assignedAthleteName: string | null;
   name: string;
@@ -78,7 +89,24 @@ export function OpsProjectsClient() {
     const cj = await cr.json();
     const aj = await ar.json();
     if (pr.ok) setProjects(pj.projects || []);
-    if (cr.ok) setClients((cj.clients || []).map((c: { id: string; name: string }) => ({ id: c.id, name: c.name })));
+    if (cr.ok)
+      setClients(
+        (cj.clients || []).map(
+          (c: {
+            id: string;
+            name: string;
+            logoUrl?: string | null;
+            logoBgColor?: string | null;
+            logoTextTone?: string | null;
+          }) => ({
+            id: c.id,
+            name: c.name,
+            logoUrl: c.logoUrl ?? null,
+            logoBgColor: c.logoBgColor ?? null,
+            logoTextTone: c.logoTextTone ?? null,
+          })
+        )
+      );
     if (ar.ok)
       setAthletes(
         (aj.athletes || []).map((a: { id: string; fullName: string; athleteCode: string }) => ({
@@ -172,6 +200,8 @@ export function OpsProjectsClient() {
 
   if (loading) return <p className="text-sm text-slate-500">Loading projects…</p>;
 
+  const createClient = clients.find((c) => c.id === form.clientId) ?? null;
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -184,7 +214,33 @@ export function OpsProjectsClient() {
 
       {open && (
         <form onSubmit={createProject} className="card-tool grid gap-3 rounded-xl p-4 md:grid-cols-2">
-          <label className="text-xs text-slate-400">Client<select required value={form.clientId} onChange={(e) => setForm((f) => ({ ...f, clientId: e.target.value }))} className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"><option value="">Select…</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+          <label className="text-xs text-slate-400">
+            Client
+            <div className="mt-1 flex items-center gap-2">
+              {createClient ? (
+                <ClientAvatar
+                  name={createClient.name}
+                  logoUrl={createClient.logoUrl}
+                  backgroundColor={createClient.logoBgColor}
+                  textTone={asAvatarTextTone(createClient.logoTextTone)}
+                  size={28}
+                />
+              ) : null}
+              <select
+                required
+                value={form.clientId}
+                onChange={(e) => setForm((f) => ({ ...f, clientId: e.target.value }))}
+                className="select-console block min-w-0 flex-1 rounded-md px-3 py-2 text-sm"
+              >
+                <option value="">Select…</option>
+                {clients.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </label>
           <label className="text-xs text-slate-400">Athlete<select value={form.assignedAthleteId} onChange={(e) => setForm((f) => ({ ...f, assignedAthleteId: e.target.value }))} className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"><option value="">Unassigned</option>{athletes.map((a) => <option key={a.id} value={a.id}>{a.fullName}</option>)}</select></label>
           <label className="text-xs text-slate-400">Name<input required value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
           <label className="text-xs text-slate-400">Number<input required value={form.projectNumber} onChange={(e) => setForm((f) => ({ ...f, projectNumber: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
@@ -229,7 +285,15 @@ export function OpsProjectsClient() {
               </div>
             ) : (
               <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
+                <div className="flex min-w-0 items-start gap-3">
+                  <ClientAvatar
+                    name={p.clientName}
+                    logoUrl={p.clientLogoUrl}
+                    backgroundColor={p.clientLogoBgColor}
+                    textTone={asAvatarTextTone(p.clientLogoTextTone)}
+                    size={40}
+                  />
+                  <div>
                   <h2 className="font-semibold text-white">{p.name}</h2>
                   <p className="text-xs text-slate-500">
                     {p.clientName} · {p.projectNumber} · {p.assignedAthleteName ?? "Unassigned"}
@@ -249,6 +313,7 @@ export function OpsProjectsClient() {
                   </p>
                   <div className="mt-3 max-w-md">
                     <ProjectProgressBar percent={p.progressPercent ?? 0} />
+                  </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">

@@ -640,10 +640,16 @@ export async function buildAnalytics(
   };
 }
 
-export async function buildOpsOverview(reference: Date) {
+export async function buildOpsOverview(
+  reference: Date,
+  options: { includeFinancials?: boolean } = {}
+) {
+  const includeFinancials = options.includeFinancials !== false;
   const from = monthStartUtc(reference);
   const to = monthEndUtc(reference);
   const ledger = await buildCommercialLedger(reference);
+  const beatenDeadlinesByAthlete = await buildBeatenDeadlines(reference);
+  const beatenMap = new Map(beatenDeadlinesByAthlete.map((a) => [a.athleteId, a]));
 
   const [activeAthletes, activeProjects, openBlockers, checkInRequests, dailySubmissions] =
     await Promise.all([
@@ -677,15 +683,76 @@ export async function buildOpsOverview(reference: Date) {
     if (Number(agg._sum.totalHours ?? 0) > a.monthlyHourCap) capExceededCount++;
   }
 
+  type PerformerRow = {
+    athleteId: string;
+    athleteName: string;
+    hoursWorked: number;
+    revenueGbp: number;
+    marginGbp: number;
+    marginPercent: number;
+    beatenCount: number;
+    totalDaysBeaten: number;
+    averageDaysBeaten: number;
+  };
+
+  const performerMap = new Map<string, PerformerRow>();
+
+  for (const t of ledger.athleteTotals) {
+    const beaten = beatenMap.get(t.athleteId);
+    performerMap.set(t.athleteId, {
+      athleteId: t.athleteId,
+      athleteName: t.athleteName,
+      hoursWorked: t.hoursWorked,
+      revenueGbp: t.revenueGbp,
+      marginGbp: t.marginGbp,
+      marginPercent: t.revenueGbp > 0 ? round2((t.marginGbp / t.revenueGbp) * 100) : 0,
+      beatenCount: beaten?.beatenCount ?? 0,
+      totalDaysBeaten: beaten?.totalDaysBeaten ?? 0,
+      averageDaysBeaten: beaten?.averageDaysBeaten ?? 0,
+    });
+  }
+
+  for (const beaten of beatenDeadlinesByAthlete) {
+    if (performerMap.has(beaten.athleteId)) continue;
+    performerMap.set(beaten.athleteId, {
+      athleteId: beaten.athleteId,
+      athleteName: beaten.athleteName,
+      hoursWorked: 0,
+      revenueGbp: 0,
+      marginGbp: 0,
+      marginPercent: 0,
+      beatenCount: beaten.beatenCount,
+      totalDaysBeaten: beaten.totalDaysBeaten,
+      averageDaysBeaten: beaten.averageDaysBeaten,
+    });
+  }
+
+  const topPerformers = Array.from(performerMap.values())
+    .sort(
+      (a, b) =>
+        b.beatenCount - a.beatenCount ||
+        b.totalDaysBeaten - a.totalDaysBeaten ||
+        b.hoursWorked - a.hoursWorked ||
+        b.marginGbp - a.marginGbp
+    )
+    .slice(0, 8);
+
   return {
+    month: from.toISOString().slice(0, 7),
     activeAthletes,
     activeProjects,
     openBlockers,
     checkInRequests,
-    monthlyRevenueGbp: ledger.totalRevenueGbp,
-    grossMarginGbp: ledger.grossMarginGbp,
-    grossMarginPercent: ledger.grossMarginPercent,
+    ...(includeFinancials
+      ? {
+          monthlyRevenueGbp: ledger.totalRevenueGbp,
+          grossMarginGbp: ledger.grossMarginGbp,
+          grossMarginPercent: ledger.grossMarginPercent,
+        }
+      : {}),
     alertCounts: { daily12Count, daily14Count, capExceededCount },
+    topPerformers,
+    beatenDeadlinesByAthlete,
   };
 }
 

@@ -20,6 +20,24 @@ export function canAccessModule(role: UserRole, module: AppModule): boolean {
   return MODULE_ROLES[module].includes(role);
 }
 
+/** Ops overview + athlete performance (managers) vs full ops console (admin). */
+export function canAccessOpsOverview(role: UserRole): boolean {
+  return role === "admin" || role === "manager";
+}
+
+export function canAccessOpsDashboardPath(role: UserRole, path: string): boolean {
+  if (role === "admin" && canAccessModule(role, "ops")) return true;
+  if (role === "manager") return path === "/dashboard/ops";
+  return false;
+}
+
+export function canAccessOpsApiPath(role: UserRole, path: string): boolean {
+  const normalized = path.split("?")[0] ?? path;
+  if (role === "admin" && canAccessModule(role, "ops")) return true;
+  if (role === "manager") return normalized === "/api/ops/overview";
+  return false;
+}
+
 /** First screen after login for each role. */
 export function defaultDashboardPath(role: UserRole): string {
   if (canAccessModule(role, "marketing")) return "/dashboard";

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import type { OpsAthlete, Prisma } from "@prisma/client";
 import { getSessionFromRequest } from "@/lib/auth";
 import type { SessionUser } from "@/lib/auth";
-import { canAccessModule } from "@/lib/permissions";
+import { canAccessModule, canAccessOpsOverview } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { computeMonthlyHoursSummary, monthEndUtc, monthStartUtc } from "@/lib/ops-hours";
 
@@ -13,6 +13,18 @@ export async function requireOpsSession(
   const session = await getSessionFromRequest(request);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!canAccessModule(session.user.role, "ops")) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  return { user: session.user };
+}
+
+/** Admin full ops or manager ops overview only. */
+export async function requireOpsOverviewSession(
+  request: NextRequest
+): Promise<{ user: SessionUser } | NextResponse> {
+  const session = await getSessionFromRequest(request);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!canAccessOpsOverview(session.user.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   return { user: session.user };

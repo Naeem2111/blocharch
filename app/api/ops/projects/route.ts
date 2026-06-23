@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
   const projects = await prisma.opsProject.findMany({
     orderBy: [{ dueDate: "asc" }, { name: "asc" }],
     include: {
-      client: { select: { id: true, name: true } },
+      client: { select: { id: true, name: true, logoUrl: true, logoBgColor: true, logoTextTone: true } },
       assignedAthlete: { select: { id: true, fullName: true, athleteCode: true } },
     },
   });
@@ -27,6 +27,9 @@ export async function GET(request: NextRequest) {
       id: p.id,
       clientId: p.clientId,
       clientName: p.client.name,
+      clientLogoUrl: p.client.logoUrl,
+      clientLogoBgColor: p.client.logoBgColor,
+      clientLogoTextTone: p.client.logoTextTone,
       assignedAthleteId: p.assignedAthleteId,
       assignedAthleteName: p.assignedAthlete?.fullName ?? null,
       athleteCode: p.assignedAthlete?.athleteCode ?? null,
