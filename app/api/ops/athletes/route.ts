@@ -6,6 +6,7 @@ import { hashPassword } from "@/lib/password";
 import { requireOpsSession } from "@/lib/ops-access";
 import { parseDateOnly } from "@/lib/ops-hours";
 import { parseImageUrlField } from "@/lib/image-url";
+import { parseHexColor } from "@/lib/hex-color";
 import { ensureAthleteSystemBoards } from "@/lib/planner-system-boards";
 
 export async function GET(request: NextRequest) {
@@ -34,6 +35,7 @@ export async function GET(request: NextRequest) {
       overtimeRateZar: Number(a.overtimeRateZar),
       blocharchStartDate: a.blocharchStartDate.toISOString().slice(0, 10),
       profilePhotoUrl: a.profilePhotoUrl,
+      profilePhotoBgColor: a.profilePhotoBgColor,
       projectCount: a._count.projects,
       submissionCount: a._count.submissions,
     })),
@@ -86,6 +88,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    let profilePhotoBgColor: string | null | undefined;
+    if (body.profilePhotoBgColor !== undefined) {
+      const parsed = parseHexColor(body.profilePhotoBgColor);
+      if (body.profilePhotoBgColor !== null && body.profilePhotoBgColor !== "" && !parsed) {
+        return NextResponse.json({ error: "Invalid profile background colour" }, { status: 400 });
+      }
+      profilePhotoBgColor = parsed;
+    }
+
     const userId = randomUUID();
     const athlete = await prisma.$transaction(async (tx) => {
       await tx.user.create({
@@ -109,6 +120,7 @@ export async function POST(request: NextRequest) {
           monthlyHourCap: body.monthlyHourCap ?? 160,
           overtimeRateZar: body.overtimeRateZar ?? 200,
           ...(profilePhotoUrl !== undefined ? { profilePhotoUrl } : {}),
+          ...(profilePhotoBgColor !== undefined ? { profilePhotoBgColor } : {}),
         },
       });
       await ensureAthleteSystemBoards(created.id, userId, tx);

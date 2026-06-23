@@ -13,7 +13,7 @@ import {
 import { syncProjectAfterOpsUpdate } from "@/lib/planner-project-sync";
 
 /** Progress when a completed project is moved back to active work. */
-const REACTIVATION_PROGRESS_PERCENT = 50;
+const REACTIVATION_PROGRESS_PERCENT = 90;
 
 type RouteContext = { params: Promise<{ projectId: string }> };
 

@@ -160,7 +160,7 @@ export function AdminUsersClient({ currentUserId }: { currentUserId: string }) {
           <button
             type="submit"
             disabled={creating}
-            className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-500 disabled:opacity-50"
+            className="btn-brand-primary rounded-md px-4 py-2 text-sm font-medium disabled:opacity-50"
           >
             {creating ? "Creating…" : "Create user"}
           </button>
@@ -210,10 +210,10 @@ export function AdminUsersClient({ currentUserId }: { currentUserId: string }) {
                     <button
                       type="button"
                       onClick={() => patchUser(u.id, { disabled: !u.disabled })}
-                      className={`rounded-md px-2.5 py-1 text-xs font-medium ring-1 transition-colors ${
+                      className={`access-toggle rounded-md px-2.5 py-1 text-xs font-medium ring-1 transition-colors ${
                         u.disabled
-                          ? "bg-emerald-500/10 text-emerald-300 ring-emerald-500/25 hover:bg-emerald-500/15"
-                          : "bg-amber-500/10 text-amber-200 ring-amber-500/25 hover:bg-amber-500/15"
+                          ? "access-grant bg-emerald-500/10 text-emerald-300 ring-emerald-500/25 hover:bg-emerald-500/15"
+                          : "access-revoke bg-amber-500/10 text-amber-200 ring-amber-500/25 hover:bg-amber-500/15"
                       }`}
                     >
                       {u.disabled ? "Grant access" : "Revoke access"}

@@ -9,6 +9,7 @@ import {
 } from "@/lib/ops-constants";
 import { requireOpsSession } from "@/lib/ops-access";
 import { parseImageUrlField } from "@/lib/image-url";
+import { parseHexColor } from "@/lib/hex-color";
 import {
   clientInclude,
   mapClientToJson,
@@ -62,6 +63,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    let logoBgColor: string | null | undefined;
+    if (body.logoBgColor !== undefined) {
+      const parsed = parseHexColor(body.logoBgColor);
+      if (body.logoBgColor !== null && body.logoBgColor !== "" && !parsed) {
+        return NextResponse.json({ error: "Invalid logo background colour" }, { status: 400 });
+      }
+      logoBgColor = parsed;
+    }
+
     const client = await prisma.opsClient.create({
       data: {
         name,
@@ -71,6 +81,7 @@ export async function POST(request: NextRequest) {
         country: body.country ? String(body.country).trim() : null,
         notes: body.notes ? String(body.notes).trim() : null,
         ...(logoUrl !== undefined ? { logoUrl } : {}),
+        ...(logoBgColor !== undefined ? { logoBgColor } : {}),
         contacts: {
           create: contacts.map((c, i) => ({
             name: c.name,

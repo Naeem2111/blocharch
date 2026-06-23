@@ -306,6 +306,7 @@ model OpsClient {
   phone       String?
   country     String?
   logoUrl     String?         @map("logo_url")
+  logoBgColor String?         @map("logo_bg_color")
   status      OpsClientStatus @default(active)
   notes       String?         @db.Text
   createdAt   DateTime        @default(now()) @map("created_at")
@@ -362,8 +363,9 @@ model OpsAthlete {
   overtimeRateZar  Decimal          @default(200) @map("overtime_rate_zar") @db.Decimal(10, 2)
   blocharchStartDate DateTime       @map("blocharch_start_date") @db.Date
   status           OpsAthleteStatus @default(active)
-  /** Direct link to profile photo (http/https). */
-  profilePhotoUrl  String?          @map("profile_photo_url")
+  /** Direct link to profile photo (http/https or /uploads/…). */
+  profilePhotoUrl      String?          @map("profile_photo_url")
+  profilePhotoBgColor  String?          @map("profile_photo_bg_color")
   createdAt        DateTime         @default(now()) @map("created_at")
   updatedAt        DateTime         @updatedAt @map("updated_at")
 

@@ -10,6 +10,7 @@ import {
 } from "@/lib/ops-constants";
 import { requireOpsSession } from "@/lib/ops-access";
 import { parseImageUrlField } from "@/lib/image-url";
+import { parseHexColor } from "@/lib/hex-color";
 import { removeClientLogoFiles } from "@/lib/client-logo-storage";
 import {
   clientInclude,
@@ -41,6 +42,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       status?: "active" | "inactive";
       notes?: string | null;
       logoUrl?: string | null;
+      logoBgColor?: string | null;
     } = {};
 
     if (body.name != null) {
@@ -73,6 +75,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       if (!clientData.logoUrl?.startsWith("/uploads/")) {
         await removeClientLogoFiles(id);
       }
+    }
+
+    if (body.logoBgColor !== undefined) {
+      const parsed = parseHexColor(body.logoBgColor);
+      if (body.logoBgColor !== null && body.logoBgColor !== "" && !parsed) {
+        return NextResponse.json({ error: "Invalid logo background colour" }, { status: 400 });
+      }
+      clientData.logoBgColor = parsed;
     }
 
     const contacts = parseContactsFromBody(body);

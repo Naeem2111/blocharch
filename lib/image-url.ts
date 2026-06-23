@@ -6,6 +6,7 @@ export function parseImageUrlField(raw: unknown): string | null | undefined {
   if (raw === null || raw === "") return null;
   const url = String(raw).trim().slice(0, IMAGE_URL_MAX);
   if (!url) return null;
+  if (/^\/uploads\//i.test(url)) return url;
   if (!/^https?:\/\//i.test(url)) {
     throw new Error("Image URL must start with http:// or https://");
   }

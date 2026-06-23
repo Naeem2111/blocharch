@@ -1,5 +1,6 @@
 import type { PlannerBoardKind, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { createDefaultColumnsOnBoard } from "@/lib/planner-columns-seed";
 import { ensureDefaultLabelsOnBoard } from "@/lib/planner-labels-seed";
 
 export const SYSTEM_BOARD_TITLES = {
@@ -8,8 +9,6 @@ export const SYSTEM_BOARD_TITLES = {
   my_tasks: "My Tasks",
   completed: "Completed",
 } as const satisfies Record<Exclude<PlannerBoardKind, "custom" | "project">, string>;
-
-const DEFAULT_COLUMNS = ["Backlog", "In progress", "Review", "Done"] as const;
 
 type Tx = Prisma.TransactionClient;
 
@@ -49,15 +48,7 @@ async function createBoardWithColumns(
     },
   });
 
-  await tx.plannerColumn.createMany({
-    data: DEFAULT_COLUMNS.map((title, sortOrder) => ({
-      boardId: board.id,
-      title,
-      sortOrder,
-      color: "#64748b",
-    })),
-  });
-
+  await createDefaultColumnsOnBoard(board.id, tx);
   await ensureDefaultLabelsOnBoard(board.id, tx);
 
   return board;

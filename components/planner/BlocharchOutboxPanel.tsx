@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { APPROVED_PLANNER_LABELS } from "@/lib/planner-approved-labels";
+import { APPROVED_PLANNER_LABELS, labelColor } from "@/lib/planner-approved-labels";
+import { PlannerLabelChip } from "@/components/planner/PlannerLabelChip";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
 
 type AthleteOption = {
@@ -265,7 +266,11 @@ export function BlocharchOutboxPanel() {
                 </span>
                 <span className="text-xs text-slate-500">
                   {row.labelName ? (
-                    <span className="mr-2 rounded bg-white/[0.06] px-1.5 py-0.5">{row.labelName}</span>
+                    <PlannerLabelChip
+                      name={row.labelName}
+                      color={labelColor(row.labelName)}
+                      className="mr-2"
+                    />
                   ) : null}
                   {row.deliveredAt ? "Delivered" : "Pending"}
                 </span>

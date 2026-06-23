@@ -9,6 +9,9 @@ import {
 } from "@/lib/planner-access";
 import { isProtectedSystemBoard } from "@/lib/planner-system-boards";
 import {
+  ensureDefaultColumnsOnBoard,
+} from "@/lib/planner-columns-seed";
+import {
   ensureDefaultLabelsOnBoard,
   purgeUnapprovedBoardLabels,
 } from "@/lib/planner-labels-seed";
@@ -27,6 +30,7 @@ export async function GET(request: NextRequest, context: Ctx) {
 
   await purgeUnapprovedBoardLabels(boardId);
   await ensureDefaultLabelsOnBoard(boardId);
+  await ensureDefaultColumnsOnBoard(boardId);
 
   const board = await prisma.plannerBoard.findUnique({
     where: { id: boardId },

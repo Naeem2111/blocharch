@@ -40,7 +40,7 @@ export function SimpleBarChart({ items, valueSuffix = "", maxValue }: SimpleBarC
                 {valueSuffix}
               </span>
             </div>
-            <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]">
+            <div className="h-2 overflow-hidden rounded-full bg-white/[0.06] chart-bar-track">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-brand-600 to-brand-400"
                 style={{ width: `${pct}%` }}

@@ -1,8 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
+import { AvatarColorPicker } from "@/components/ops/AvatarColorPicker";
 import { ImageUrlField } from "@/components/ops/ImageUrlField";
+import { DEFAULT_AVATAR_BG } from "@/lib/hex-color";
 
 type ClientContact = { id?: string; name: string; email: string };
 
@@ -17,6 +19,7 @@ type ClientRow = {
   status: string;
   notes: string | null;
   logoUrl: string | null;
+  logoBgColor: string | null;
   projectCount: number;
   commercial: {
     pricingTier: string;
@@ -28,6 +31,59 @@ type ClientRow = {
 
 const emptyContact = (): ClientContact => ({ name: "", email: "" });
 
+function ClientLogoUpload({
+  clientId,
+  onUploaded,
+}: {
+  clientId: string;
+  onUploaded: (logoUrl: string) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [err, setErr] = useState("");
+
+  async function onPick(file: File | null) {
+    if (!file) return;
+    setErr("");
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.set("logo", file);
+      const r = await fetch(`/api/ops/clients/${clientId}/logo`, { method: "POST", body: form });
+      const j = await r.json();
+      if (!r.ok) {
+        setErr(j.error || "Upload failed");
+        return;
+      }
+      onUploaded(j.logoUrl ?? "");
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  }
+
+  return (
+    <div className="md:col-span-2">
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/gif"
+        className="hidden"
+        onChange={(e) => void onPick(e.target.files?.[0] ?? null)}
+      />
+      <button
+        type="button"
+        disabled={uploading}
+        onClick={() => inputRef.current?.click()}
+        className="btn-secondary rounded-lg px-3 py-1.5 text-xs text-slate-200"
+      >
+        {uploading ? "Uploading…" : "Upload logo file"}
+      </button>
+      {err ? <p className="mt-1 text-xs text-red-400">{err}</p> : null}
+    </div>
+  );
+}
+
 const emptyCreate = {
   name: "",
   companyName: "",
@@ -37,6 +93,7 @@ const emptyCreate = {
   laneCostGbp: "2041",
   activeLaneCount: "1",
   logoUrl: "",
+  logoBgColor: "#ffffff",
 };
 
 function ContactFields({
@@ -115,6 +172,7 @@ export function OpsClientsClient() {
     laneCostGbp: "2041",
     activeLaneCount: "1",
     logoUrl: "",
+    logoBgColor: DEFAULT_AVATAR_BG,
   });
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
@@ -154,6 +212,7 @@ export function OpsClientsClient() {
         laneCostGbp: Number(form.laneCostGbp),
         activeLaneCount: Number(form.activeLaneCount),
         logoUrl: form.logoUrl.trim() || null,
+        logoBgColor: form.logoBgColor || null,
       }),
     });
     const j = await r.json();
@@ -185,6 +244,7 @@ export function OpsClientsClient() {
       laneCostGbp: String(c.commercial?.laneCostGbp ?? 2041),
       activeLaneCount: String(c.commercial?.activeLaneCount ?? 1),
       logoUrl: c.logoUrl ?? "",
+      logoBgColor: c.logoBgColor ?? DEFAULT_AVATAR_BG,
     });
     setError("");
     setMsg("");
@@ -208,6 +268,7 @@ export function OpsClientsClient() {
         laneCostGbp: Number(editForm.laneCostGbp),
         activeLaneCount: Number(editForm.activeLaneCount),
         logoUrl: editForm.logoUrl.trim() || null,
+        logoBgColor: editForm.logoBgColor || null,
       }),
     });
     const j = await r.json();
@@ -243,7 +304,7 @@ export function OpsClientsClient() {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-brand-500"
+          className="btn-brand-primary rounded-lg px-4 py-2 text-sm font-semibold"
         >
           New client
         </button>
@@ -264,10 +325,16 @@ export function OpsClientsClient() {
           </label>
           <ImageUrlField
             label="Client logo"
-            hint="Paste a direct image link. Shown as a circle in Commercial and client lists."
+            hint="Paste a direct image link or upload a file after saving. Shown as a circle in Commercial and client lists."
             displayName={form.name || "New client"}
             value={form.logoUrl}
             onChange={(logoUrl) => setForm((f) => ({ ...f, logoUrl }))}
+          />
+          <AvatarColorPicker
+            label="Logo circle background"
+            value={form.logoBgColor}
+            onChange={(logoBgColor) => setForm((f) => ({ ...f, logoBgColor }))}
+            hint="Colour behind transparent PNG logos."
           />
           <label className="text-xs text-slate-400">
             Company
@@ -325,7 +392,7 @@ export function OpsClientsClient() {
           </label>
           {error ? <p className="text-sm text-red-400 md:col-span-2">{error}</p> : null}
           <div className="flex gap-2 md:col-span-2">
-            <button type="submit" className="rounded-lg bg-white/[0.08] px-4 py-2 text-sm text-slate-100">
+            <button type="submit" className="btn-brand-primary rounded-lg px-4 py-2 text-sm">
               Create client
             </button>
             <button type="button" onClick={() => setOpen(false)} className="text-sm text-slate-500">
@@ -353,6 +420,15 @@ export function OpsClientsClient() {
                   displayName={editForm.name || c.name}
                   value={editForm.logoUrl}
                   onChange={(logoUrl) => setEditForm((f) => ({ ...f, logoUrl }))}
+                />
+                <ClientLogoUpload
+                  clientId={c.id}
+                  onUploaded={(logoUrl) => setEditForm((f) => ({ ...f, logoUrl }))}
+                />
+                <AvatarColorPicker
+                  label="Logo circle background"
+                  value={editForm.logoBgColor}
+                  onChange={(logoBgColor) => setEditForm((f) => ({ ...f, logoBgColor }))}
                 />
                 <label className="text-xs text-slate-400">
                   Status
@@ -439,7 +515,7 @@ export function OpsClientsClient() {
                   <button
                     type="button"
                     onClick={() => void saveEdit(c.id)}
-                    className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-slate-950"
+                    className="btn-brand-primary rounded-lg px-3 py-1.5 text-xs font-semibold"
                   >
                     Save
                   </button>
@@ -458,7 +534,12 @@ export function OpsClientsClient() {
             ) : (
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="flex min-w-0 items-start gap-3">
-                  <ClientAvatar name={c.name} logoUrl={c.logoUrl} size={40} />
+                  <ClientAvatar
+                    name={c.name}
+                    logoUrl={c.logoUrl}
+                    backgroundColor={c.logoBgColor}
+                    size={40}
+                  />
                   <div>
                   <p className="font-medium text-white">{c.name}</p>
                   <p className="text-xs text-slate-500">

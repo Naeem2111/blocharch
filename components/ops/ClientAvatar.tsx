@@ -1,6 +1,10 @@
+import { avatarInitials } from "@/lib/avatar-initials";
+
 type ClientAvatarProps = {
   name: string;
   logoUrl?: string | null;
+  /** Circle background when logo is transparent or for initials fallback. */
+  backgroundColor?: string | null;
   size?: number;
   className?: string;
   /** contain fits full logos inside the box; cover fills circular profile photos. */
@@ -10,17 +14,23 @@ type ClientAvatarProps = {
 export function ClientAvatar({
   name,
   logoUrl,
+  backgroundColor,
   size = 36,
   className = "",
   objectFit = "contain",
 }: ClientAvatarProps) {
-  const style = { width: size, height: size };
-  const initial = (name.trim()[0] ?? "?").toUpperCase();
+  const style: React.CSSProperties = {
+    width: size,
+    height: size,
+    ...(backgroundColor ? { backgroundColor } : {}),
+  };
+  const initials = avatarInitials(name);
+  const fontSize = size <= 32 ? "0.65rem" : size <= 40 ? "0.7rem" : "0.75rem";
 
   if (logoUrl) {
     return (
       <span
-        className={`inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/[0.06] ring-1 ring-white/10 ${className}`}
+        className={`avatar-circle inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/[0.06] ring-1 ring-white/10 ${className}`}
         style={style}
       >
         <img
@@ -36,11 +46,11 @@ export function ClientAvatar({
 
   return (
     <span
-      className={`flex shrink-0 items-center justify-center rounded-full bg-white/[0.08] text-xs font-semibold text-slate-300 ring-1 ring-white/10 ${className}`}
-      style={style}
+      className={`avatar-circle flex shrink-0 items-center justify-center rounded-full bg-white/[0.08] font-semibold text-slate-300 ring-1 ring-white/10 ${className}`}
+      style={{ ...style, fontSize }}
       aria-hidden
     >
-      {initial}
+      {initials}
     </span>
   );
 }

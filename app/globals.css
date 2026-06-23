@@ -105,6 +105,30 @@
     @apply border-slate-300 bg-white text-slate-900;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23475569' d='M3 4.5 6 7.5 9 4.5'/%3E%3C/svg%3E");
   }
+
+  .field-console {
+    @apply border border-white/[0.08] bg-white/[0.04] text-white;
+  }
+
+  [data-theme="light"] .field-console {
+    @apply border-slate-300 bg-white text-slate-900 shadow-sm;
+  }
+
+  .btn-brand-primary {
+    @apply bg-brand-600 font-semibold text-white hover:bg-brand-500;
+  }
+
+  [data-theme="light"] .btn-brand-primary {
+    @apply bg-brand-700 text-white shadow-sm hover:bg-brand-600;
+  }
+
+  .btn-secondary {
+    @apply bg-white/[0.08] hover:bg-white/[0.12];
+  }
+
+  [data-theme="light"] .btn-secondary {
+    @apply border border-slate-300 bg-white text-slate-800 shadow-sm hover:bg-slate-50;
+  }
 }
 
 /* Light theme remaps for hard-coded Tailwind utility classes used across the console. */
@@ -148,11 +172,74 @@
   color: #0891b2 !important;
 }
 
+[data-theme="light"] .text-brand-100 {
+  color: #0e7490 !important;
+}
+
+[data-theme="light"] .bg-slate-900 {
+  background-color: #ffffff !important;
+}
+
+[data-theme="light"] .modal-panel {
+  background-color: #ffffff !important;
+  border-color: rgb(203 213 225 / 0.95) !important;
+  box-shadow: 0 20px 40px rgb(15 23 42 / 0.12) !important;
+}
+
+[data-theme="light"] .bg-black\/40,
+[data-theme="light"] .bg-black\/30 {
+  background-color: #ffffff !important;
+}
+
+[data-theme="light"] .bg-white\/\[0\.02\] {
+  background-color: rgb(248 250 252 / 1) !important;
+}
+
+[data-theme="light"] .hover\:bg-white\/\[0\.07\]:hover {
+  background-color: rgb(241 245 249 / 1) !important;
+}
+
+[data-theme="light"] .planner-kanban-column {
+  background-color: rgb(248 250 252 / 1) !important;
+  border-color: rgb(203 213 225 / 0.95) !important;
+}
+
+[data-theme="light"] .planner-task-card {
+  background-color: #ffffff !important;
+  border-color: rgb(203 213 225 / 0.9) !important;
+  color: #334155 !important;
+}
+
+[data-theme="light"] .planner-task-card:hover {
+  background-color: rgb(241 245 249 / 1) !important;
+}
+
+[data-theme="light"] .chart-bar-track {
+  background-color: rgb(226 232 240 / 1) !important;
+}
+
+[data-theme="light"] .border-white\/10,
+[data-theme="light"] .border-white\/20,
 [data-theme="light"] .border-white\/\[0\.06\],
 [data-theme="light"] .border-white\/\[0\.08\],
 [data-theme="light"] .border-white\/\[0\.1\],
 [data-theme="light"] .border-white\/\[0\.12\] {
   border-color: rgb(203 213 225 / 0.95) !important;
+}
+
+[data-theme="light"] input[type="date"],
+[data-theme="light"] input[type="month"] {
+  color-scheme: light;
+}
+
+[data-theme="light"] input.progress-slider {
+  background: linear-gradient(
+    to right,
+    var(--progress-color, #22c55e) 0%,
+    var(--progress-color, #22c55e) var(--progress-pct, 0%),
+    rgb(226 232 240 / 1) var(--progress-pct, 0%),
+    rgb(226 232 240 / 1) 100%
+  );
 }
 
 [data-theme="light"] .ring-white\/\[0\.04\],
@@ -334,6 +421,20 @@
   background-color: rgb(226 232 240 / 1) !important;
 }
 
+/* Planner label chips — avoid washed-out grey pills in light theme */
+.planner-label-chip {
+  background-color: color-mix(in srgb, var(--label-color, #64748b) 28%, transparent);
+  color: var(--label-color, #64748b);
+  --tw-ring-color: color-mix(in srgb, var(--label-color, #64748b) 45%, transparent);
+}
+
+[data-theme="light"] .planner-label-chip {
+  background-color: color-mix(in srgb, var(--label-color, #64748b) 22%, white);
+  color: color-mix(in srgb, var(--label-color, #64748b) 55%, #020617);
+  --tw-ring-color: color-mix(in srgb, var(--label-color, #64748b) 55%, #64748b);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--label-color, #64748b) 35%, #cbd5e1);
+}
+
 input.progress-slider {
   -webkit-appearance: none;
   appearance: none;
@@ -365,4 +466,46 @@ input.progress-slider::-moz-range-thumb {
   background: var(--progress-color, #22c55e);
   border: 2px solid #0f172a;
   cursor: pointer;
+}
+
+[data-theme="light"] .planner-tab-selected {
+  background-color: rgb(207 250 254 / 0.75) !important;
+  border-color: rgb(6 182 212 / 0.55) !important;
+  color: #0c4a6e !important;
+}
+
+[data-theme="light"] .planner-tab-alert {
+  background-color: rgb(254 242 242 / 1) !important;
+  border-color: rgb(248 113 113 / 0.65) !important;
+  color: #b91c1c !important;
+}
+
+[data-theme="light"] .text-amber-100 {
+  color: #92400e !important;
+}
+
+[data-theme="light"] .text-amber-200 {
+  color: #b45309 !important;
+}
+
+[data-theme="light"] .text-red-100 {
+  color: #b91c1c !important;
+}
+
+[data-theme="light"] .access-revoke {
+  background-color: rgb(255 251 235 / 1) !important;
+  color: #b45309 !important;
+  --tw-ring-color: rgb(245 158 11 / 0.45) !important;
+}
+
+[data-theme="light"] .access-grant {
+  background-color: rgb(236 253 245 / 1) !important;
+  color: #047857 !important;
+  --tw-ring-color: rgb(16 185 129 / 0.45) !important;
+}
+
+[data-theme="light"] .avatar-circle:not([style*="background-color"]) {
+  background-color: rgb(241 245 249 / 1) !important;
+  color: #475569 !important;
+  --tw-ring-color: rgb(203 213 225 / 0.95) !important;
 }

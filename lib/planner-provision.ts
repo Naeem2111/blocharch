@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { ensureDefaultColumnsOnBoard } from "@/lib/planner-columns-seed";
 import { ensureDefaultLabelsOnBoard } from "@/lib/planner-labels-seed";
 import { ensureAdminOutboxBoard, ensureAthleteSystemBoards } from "@/lib/planner-system-boards";
 
@@ -22,10 +23,10 @@ export async function provisionMissingPlannerBoards() {
   }
 
   const boards = await prisma.plannerBoard.findMany({
-    where: { kind: { in: ["custom", "project", "blocharch_inbox", "my_tasks", "completed"] } },
     select: { id: true },
   });
   for (const b of boards) {
+    await ensureDefaultColumnsOnBoard(b.id);
     await ensureDefaultLabelsOnBoard(b.id);
   }
 }

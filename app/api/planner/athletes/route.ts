@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
       athleteCode: a.athleteCode,
       username: a.user.username,
       profilePhotoUrl: a.profilePhotoUrl,
+      profilePhotoBgColor: a.profilePhotoBgColor,
       activeProjects: a._count.projects,
     })),
   });

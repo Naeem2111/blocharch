@@ -103,6 +103,7 @@ export async function POST(request: NextRequest) {
             title: c.title,
             color: c.color,
             sortOrder: c.sortOrder,
+            linkedLabelName: c.linkedLabelName,
           })),
         },
         labels: {

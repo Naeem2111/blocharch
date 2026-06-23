@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
-import { ImageUrlField } from "@/components/ops/ImageUrlField";
+import { AvatarUploadField } from "@/components/ops/AvatarUploadField";
+import { DEFAULT_AVATAR_BG } from "@/lib/hex-color";
 
 type AthleteRow = {
   id: string;
@@ -12,6 +13,7 @@ type AthleteRow = {
   email: string | null;
   status: string;
   profilePhotoUrl: string | null;
+  profilePhotoBgColor: string | null;
   baseMonthlyPayZar: number;
   monthlyHourCap: number;
   overtimeRateZar: number;
@@ -32,6 +34,7 @@ export function OpsAthletesClient() {
     email: "",
     blocharchStartDate: new Date().toISOString().slice(0, 10),
     profilePhotoUrl: "",
+    profilePhotoBgColor: DEFAULT_AVATAR_BG,
   });
   const [editForm, setEditForm] = useState({
     fullName: "",
@@ -43,6 +46,7 @@ export function OpsAthletesClient() {
     blocharchStartDate: "",
     password: "",
     profilePhotoUrl: "",
+    profilePhotoBgColor: DEFAULT_AVATAR_BG,
   });
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
@@ -67,6 +71,7 @@ export function OpsAthletesClient() {
       body: JSON.stringify({
         ...form,
         profilePhotoUrl: form.profilePhotoUrl.trim() || null,
+        profilePhotoBgColor: form.profilePhotoBgColor || null,
       }),
     });
     const j = await r.json();
@@ -83,6 +88,7 @@ export function OpsAthletesClient() {
       email: "",
       blocharchStartDate: new Date().toISOString().slice(0, 10),
       profilePhotoUrl: "",
+      profilePhotoBgColor: DEFAULT_AVATAR_BG,
     });
     await load();
   }
@@ -99,6 +105,7 @@ export function OpsAthletesClient() {
       blocharchStartDate: a.blocharchStartDate,
       password: "",
       profilePhotoUrl: a.profilePhotoUrl ?? "",
+      profilePhotoBgColor: a.profilePhotoBgColor ?? DEFAULT_AVATAR_BG,
     });
     setError("");
     setMsg("");
@@ -115,6 +122,7 @@ export function OpsAthletesClient() {
       overtimeRateZar: Number(editForm.overtimeRateZar),
       blocharchStartDate: editForm.blocharchStartDate,
       profilePhotoUrl: editForm.profilePhotoUrl.trim() || null,
+      profilePhotoBgColor: editForm.profilePhotoBgColor || null,
     };
     if (editForm.password.trim()) body.password = editForm.password.trim();
 
@@ -139,7 +147,11 @@ export function OpsAthletesClient() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-slate-400">{athletes.length} athlete(s)</p>
-        <button type="button" onClick={() => setOpen(true)} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-brand-500">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="btn-brand-primary rounded-lg px-4 py-2 text-sm font-semibold"
+        >
           New athlete
         </button>
       </div>
@@ -147,11 +159,16 @@ export function OpsAthletesClient() {
 
       {open && (
         <form onSubmit={createAthlete} className="card-tool grid gap-3 rounded-xl p-4 md:grid-cols-2">
-          <ImageUrlField
+          <AvatarUploadField
             label="Profile photo"
             displayName={form.fullName || "New athlete"}
-            value={form.profilePhotoUrl}
-            onChange={(profilePhotoUrl) => setForm((f) => ({ ...f, profilePhotoUrl }))}
+            photoUrl={form.profilePhotoUrl}
+            backgroundColor={form.profilePhotoBgColor}
+            onPhotoUrlChange={(profilePhotoUrl) => setForm((f) => ({ ...f, profilePhotoUrl }))}
+            onBackgroundColorChange={(profilePhotoBgColor) =>
+              setForm((f) => ({ ...f, profilePhotoBgColor }))
+            }
+            hint="Initials appear until a photo is uploaded (edit after create to upload a file)."
           />
           <label className="text-xs text-slate-400">Full name<input required value={form.fullName} onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
           <label className="text-xs text-slate-400">Athlete code<input required value={form.athleteCode} onChange={(e) => setForm((f) => ({ ...f, athleteCode: e.target.value.toUpperCase() }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
@@ -161,7 +178,7 @@ export function OpsAthletesClient() {
           <label className="text-xs text-slate-400">Start date<input type="date" required value={form.blocharchStartDate} onChange={(e) => setForm((f) => ({ ...f, blocharchStartDate: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
           {error ? <p className="text-sm text-red-400 md:col-span-2">{error}</p> : null}
           <div className="flex gap-2 md:col-span-2">
-            <button type="submit" className="rounded-lg bg-white/[0.08] px-4 py-2 text-sm text-slate-100">Create athlete</button>
+            <button type="submit" className="btn-brand-primary rounded-lg px-4 py-2 text-sm">Create athlete</button>
             <button type="button" onClick={() => setOpen(false)} className="text-sm text-slate-500">Cancel</button>
           </div>
         </form>
@@ -172,11 +189,18 @@ export function OpsAthletesClient() {
           <div key={a.id} className="card-tool rounded-xl p-4">
             {editingId === a.id ? (
               <div className="grid gap-3 md:grid-cols-2">
-                <ImageUrlField
+                <AvatarUploadField
                   label="Profile photo"
                   displayName={editForm.fullName || a.fullName}
-                  value={editForm.profilePhotoUrl}
-                  onChange={(profilePhotoUrl) => setEditForm((f) => ({ ...f, profilePhotoUrl }))}
+                  photoUrl={editForm.profilePhotoUrl}
+                  backgroundColor={editForm.profilePhotoBgColor}
+                  onPhotoUrlChange={(profilePhotoUrl) =>
+                    setEditForm((f) => ({ ...f, profilePhotoUrl }))
+                  }
+                  onBackgroundColorChange={(profilePhotoBgColor) =>
+                    setEditForm((f) => ({ ...f, profilePhotoBgColor }))
+                  }
+                  uploadPath={`/api/ops/athletes/${a.id}/photo`}
                 />
                 <label className="text-xs text-slate-400">Full name<input value={editForm.fullName} onChange={(e) => setEditForm((f) => ({ ...f, fullName: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
                 <label className="text-xs text-slate-400">Status<select value={editForm.status} onChange={(e) => setEditForm((f) => ({ ...f, status: e.target.value }))} className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
@@ -187,14 +211,20 @@ export function OpsAthletesClient() {
                 <label className="text-xs text-slate-400">Overtime rate (ZAR)<input type="number" value={editForm.overtimeRateZar} onChange={(e) => setEditForm((f) => ({ ...f, overtimeRateZar: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
                 <label className="text-xs text-slate-400">New password (optional)<input type="password" value={editForm.password} onChange={(e) => setEditForm((f) => ({ ...f, password: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
                 <div className="flex gap-2 md:col-span-2">
-                  <button type="button" onClick={() => void saveEdit(a.id)} className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-slate-950">Save</button>
+                  <button type="button" onClick={() => void saveEdit(a.id)} className="btn-brand-primary rounded-lg px-3 py-1.5 text-xs font-semibold">Save</button>
                   <button type="button" onClick={() => setEditingId(null)} className="text-xs text-slate-500">Cancel</button>
                 </div>
               </div>
             ) : (
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="flex min-w-0 items-start gap-3">
-                  <ClientAvatar name={a.fullName} logoUrl={a.profilePhotoUrl} size={40} objectFit="cover" />
+                  <ClientAvatar
+                    name={a.fullName}
+                    logoUrl={a.profilePhotoUrl}
+                    backgroundColor={a.profilePhotoBgColor}
+                    size={40}
+                    objectFit="cover"
+                  />
                   <div>
                     <p className="font-medium text-white">{a.fullName} <span className="text-slate-500">({a.athleteCode})</span></p>
                     <p className="text-xs text-slate-500">{a.username} · {a.monthlyHourCap}h cap · R{a.baseMonthlyPayZar.toLocaleString()} · {a.projectCount} projects</p>

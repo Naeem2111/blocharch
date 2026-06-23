@@ -5,6 +5,7 @@ import { hashPassword } from "@/lib/password";
 import { requireOpsSession } from "@/lib/ops-access";
 import { parseDateOnly } from "@/lib/ops-hours";
 import { parseImageUrlField } from "@/lib/image-url";
+import { parseHexColor } from "@/lib/hex-color";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -50,6 +51,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       }
     }
 
+    if (body.profilePhotoBgColor !== undefined) {
+      const parsed = parseHexColor(body.profilePhotoBgColor);
+      if (body.profilePhotoBgColor !== null && body.profilePhotoBgColor !== "" && !parsed) {
+        return NextResponse.json({ error: "Invalid profile background colour" }, { status: 400 });
+      }
+      athleteData.profilePhotoBgColor = parsed;
+    }
+
     const userData: { disabled?: boolean; passwordHash?: string } = {};
     if (body.disabled != null) userData.disabled = Boolean(body.disabled);
     if (body.password != null) {
@@ -88,6 +97,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         overtimeRateZar: Number(athlete.overtimeRateZar),
         blocharchStartDate: athlete.blocharchStartDate.toISOString().slice(0, 10),
         profilePhotoUrl: athlete.profilePhotoUrl,
+        profilePhotoBgColor: athlete.profilePhotoBgColor,
         projectCount: athlete._count.projects,
       },
     });

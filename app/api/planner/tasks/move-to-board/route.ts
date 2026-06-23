@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { canEditBoard, canViewBoard, requirePlannerSession } from "@/lib/planner-access";
+import { resolveGeneralColumnId } from "@/lib/planner-default-columns";
 import { findLinkedColumnForBoard, relocateTaskToLabelLinkedColumn } from "@/lib/planner-label-column";
 
 async function resolveDefaultColumnId(boardId: string): Promise<string | null> {
@@ -10,13 +11,7 @@ async function resolveDefaultColumnId(boardId: string): Promise<string | null> {
     orderBy: { sortOrder: "asc" },
     select: { id: true, title: true },
   });
-  if (!cols.length) return null;
-  const backlog = cols.find((c) =>
-    /^(backlog|inbox|todo|general|to do)\b/i.test(c.title.trim())
-  );
-  if (backlog) return backlog.id;
-  const notDone = cols.find((c) => !/^(done|completed)\b/i.test(c.title.trim()));
-  return (notDone ?? cols[0])!.id;
+  return resolveGeneralColumnId(cols);
 }
 
 /** Move an inbox task onto another board; auto-places by linked label column when possible. */

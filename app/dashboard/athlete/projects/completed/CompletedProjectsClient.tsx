@@ -41,7 +41,7 @@ export function CompletedProjectsClient() {
   async function reactivate(projectId: string, name: string) {
     if (
       !window.confirm(
-        `Move "${name}" back to My Projects? Progress will reset from 100% to 50% so you can keep logging daily work.`
+        `Move "${name}" back to My Projects? Progress will reset from 100% to 90% so you can keep logging daily work.`
       )
     ) {
       return;

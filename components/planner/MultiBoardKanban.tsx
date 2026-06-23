@@ -149,7 +149,7 @@ export function MultiBoardKanban({ boards, onMoveTask, onOpenTask, onToggleCompl
           <section
             key={board.id}
             id={`planner-board-${board.id}`}
-            className="flex w-[min(100%,920px)] shrink-0 flex-col rounded-xl border border-white/[0.08] bg-white/[0.02]"
+            className="planner-kanban-column flex w-[min(100%,920px)] shrink-0 flex-col rounded-xl border border-white/[0.08] bg-white/[0.02]"
           >
             <header
               className="sticky left-0 border-b border-white/[0.06] px-3 py-2"
@@ -262,7 +262,7 @@ export function MultiBoardKanban({ boards, onMoveTask, onOpenTask, onToggleCompl
                             }}
                             onDrop={(e) => handleDropCard(col.id, t.id, e)}
                             onClick={() => onOpenTask(t, col.id, board.id)}
-                            className={`cursor-grab rounded-lg border border-white/[0.06] bg-white/[0.04] p-2 text-left text-sm active:cursor-grabbing ${
+                            className={`planner-task-card cursor-grab rounded-lg border border-white/[0.06] bg-white/[0.04] p-2 text-left text-sm active:cursor-grabbing ${
                               dragTaskId === t.id ? "opacity-40" : "hover:bg-white/[0.07]"
                             }`}
                           >

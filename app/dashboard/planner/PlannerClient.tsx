@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { composeDueAtIso, splitDueAtIso } from "@/lib/planner-due-datetime";
 import { BlocharchOutboxPanel } from "@/components/planner/BlocharchOutboxPanel";
 import { MultiBoardKanban } from "@/components/planner/MultiBoardKanban";
+import { PlannerLabelChip, plannerLabelChipStyle } from "@/components/planner/PlannerLabelChip";
 import {
   boardDetailAfterCrossBoardMove,
   boardDetailAfterMovingTask,
@@ -14,6 +15,7 @@ import {
 import { startDragAutoScroll, stopDragAutoScroll, trackDragPointer } from "@/lib/planner-drag-scroll";
 import { createDragHighlightScheduler } from "@/lib/planner-drag-ui";
 import { APPROVED_PLANNER_LABELS } from "@/lib/planner-approved-labels";
+import { resolveGeneralColumnId } from "@/lib/planner-default-columns";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
 
 const FIXED_BOARD_KINDS = new Set([
@@ -44,6 +46,7 @@ type TeamAthleteRow = {
   athleteCode: string;
   username: string;
   profilePhotoUrl: string | null;
+  profilePhotoBgColor?: string | null;
   activeProjects: number;
 };
 
@@ -103,9 +106,7 @@ type BoardDetail = {
 type AssigneeOption = { id: string; username: string; role: string };
 
 function resolveBacklogColumnId(columns: ColumnRow[]): string | null {
-  const named = columns.find((c) => /^backlog\b/i.test(c.title.trim()));
-  if (named) return named.id;
-  return columns[0]?.id ?? null;
+  return resolveGeneralColumnId(columns);
 }
 
 function googleEventUrl(title: string, due: Date) {
@@ -1098,7 +1099,7 @@ export function PlannerClient() {
                     onClick={() => goPlanner({ area: "team", athlete: a.userId })}
                     className="flex w-full items-center gap-3 rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-left transition-colors hover:bg-white/[0.06]"
                   >
-                    <ClientAvatar name={a.fullName} logoUrl={a.profilePhotoUrl} size={36} objectFit="cover" />
+                    <ClientAvatar name={a.fullName} logoUrl={a.profilePhotoUrl} backgroundColor={a.profilePhotoBgColor} size={36} objectFit="cover" />
                     <span className="min-w-0">
                       <span className="block font-medium text-slate-100">{a.fullName}</span>
                       <span className="mt-0.5 block text-xs text-slate-500">
@@ -1213,9 +1214,9 @@ export function PlannerClient() {
                 setAllBoardsView(next);
                 if (next) void loadAllBoardDetails();
               }}
-              className={`rounded-lg border px-3 py-2 text-xs font-medium ${
+              className={`planner-tab rounded-lg border px-3 py-2 text-xs font-medium ${
                 allBoardsView
-                  ? "border-brand-500/40 bg-brand-500/10 text-brand-200"
+                  ? "planner-tab-selected border-brand-500/40 bg-brand-500/10 text-brand-200"
                   : "border-white/[0.08] bg-white/[0.03] text-slate-400"
               }`}
             >
@@ -1269,13 +1270,13 @@ export function PlannerClient() {
                 e.preventDefault();
                 void onDropBoardTab(b.id, e.dataTransfer);
               }}
-              className={`rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
+              className={`planner-tab rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
                 boardId === b.id && !allBoardsView
-                  ? "border-brand-500/40 bg-brand-500/10 text-brand-100"
+                  ? "planner-tab-selected border-brand-500/40 bg-brand-500/10 text-brand-100"
                   : dropTargetBoardId === b.id
-                    ? "border-brand-500/50 bg-brand-500/15 text-brand-100 ring-2 ring-brand-500/30"
+                    ? "planner-tab-selected border-brand-500/50 bg-brand-500/15 text-brand-100 ring-2 ring-brand-500/30"
                     : inboxUnread
-                      ? "animate-pulse border-red-500/40 bg-red-500/10 text-red-100 ring-1 ring-red-500/35"
+                      ? "planner-tab-alert animate-pulse border-red-500/40 bg-red-500/10 text-red-100 ring-1 ring-red-500/35"
                       : "border-white/[0.08] bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]"
               }`}
               style={{ borderLeftWidth: 4, borderLeftColor: b.color }}
@@ -1442,7 +1443,7 @@ export function PlannerClient() {
             {detail.columns.map((col, colIdx) => (
               <div
                 key={col.id}
-                className={`flex w-[min(78vw,280px)] shrink-0 flex-col rounded-xl border border-white/[0.08] bg-white/[0.02] transition-[box-shadow,background-color,border-color] duration-150 sm:w-[280px] ${
+                className={`planner-kanban-column flex w-[min(78vw,280px)] shrink-0 flex-col rounded-xl border border-white/[0.08] bg-white/[0.02] transition-[box-shadow,background-color,border-color] duration-150 sm:w-[280px] ${
                   detail.editable && dragTaskId && dropTargetColumnId === col.id
                     ? "border-brand-500/35 bg-brand-500/[0.07] ring-2 ring-brand-500/25"
                     : ""
@@ -1640,7 +1641,7 @@ export function PlannerClient() {
                             setEditTask({ ...t, columnId: col.id });
                           }
                         }}
-                        className={`w-full rounded-lg border border-white/[0.06] bg-white/[0.04] p-3 text-left text-sm text-slate-200 outline-none transition-[opacity,transform,box-shadow] duration-150 hover:bg-white/[0.07] focus-visible:ring-2 focus-visible:ring-brand-500/50 ${
+                        className={`planner-task-card w-full rounded-lg border border-white/[0.06] bg-white/[0.04] p-3 text-left text-sm text-slate-200 outline-none transition-[opacity,transform,box-shadow] duration-150 hover:bg-white/[0.07] focus-visible:ring-2 focus-visible:ring-brand-500/50 ${
                           detail.editable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
                         } ${
                           isSelected ? "ring-2 ring-brand-500/45 bg-brand-500/[0.08]" : ""
@@ -1689,13 +1690,11 @@ export function PlannerClient() {
                             {t.labels.length > 0 ? (
                               <div className="mt-2 flex flex-wrap gap-1">
                                 {t.labels.map((x) => (
-                                  <span
+                                  <PlannerLabelChip
                                     key={x.label.id}
-                                    className="rounded px-1.5 py-0.5 text-[10px] text-white"
-                                    style={{ backgroundColor: `${x.label.color}50` }}
-                                  >
-                                    {x.label.name}
-                                  </span>
+                                    name={x.label.name}
+                                    color={x.label.color}
+                                  />
                                 ))}
                               </div>
                             ) : null}
@@ -1902,7 +1901,7 @@ export function PlannerClient() {
           role="dialog"
           aria-modal="true"
         >
-          <div className="w-full max-w-md rounded-2xl border border-white/[0.1] bg-slate-900 p-6 shadow-xl">
+          <div className="modal-panel w-full max-w-md rounded-2xl border border-white/[0.1] bg-slate-900 p-6 shadow-xl">
             <h3 className="text-lg font-semibold text-white">Move to board</h3>
             <p className="mt-1 text-xs text-slate-500">
               Route this inbox task to a working board. It will land in the column linked to its
@@ -2003,7 +2002,7 @@ function EditableColumnHeader({
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          className="mb-2 w-full rounded border border-white/10 bg-black/40 px-2 py-1 text-sm text-white"
+          className="field-console mb-2 w-full rounded border border-white/10 bg-black/40 px-2 py-1 text-sm text-white"
           autoFocus
         />
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2152,7 +2151,7 @@ function EditableLabelChip({
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="w-28 rounded border border-white/10 bg-black/40 px-2 py-0.5 text-xs text-white"
+          className="field-console w-28 rounded border border-white/10 bg-black/40 px-2 py-0.5 text-xs text-white"
           autoFocus
           maxLength={64}
         />
@@ -2185,10 +2184,10 @@ function EditableLabelChip({
 
   return (
     <div
-      className="flex max-w-full items-center gap-1 rounded-full py-0.5 pl-2.5 pr-1 ring-1 ring-white/15"
-      style={{ backgroundColor: `${label.color}40` }}
+      className="flex max-w-full items-center gap-1 rounded-full py-0.5 pl-2.5 pr-1 planner-label-chip ring-1 ring-inset"
+      style={plannerLabelChipStyle(label.color)}
     >
-      <span className="max-w-[10rem] truncate text-xs font-medium text-white" title={label.name}>
+      <span className="max-w-[10rem] truncate text-xs font-semibold" title={label.name}>
         {label.name}
       </span>
       <button
@@ -2248,7 +2247,7 @@ function LabelInlineForm({ onCreate }: { onCreate: (name: string, color: string)
         value={name}
         onChange={(e) => setName(e.target.value)}
         placeholder="Label"
-        className="w-24 rounded border border-white/10 bg-black/30 px-2 py-0.5 text-xs"
+        className="field-console w-24 rounded border border-white/10 bg-black/30 px-2 py-0.5 text-xs"
       />
       <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-6 w-8 cursor-pointer rounded border-0" />
       <button type="submit" className="text-xs text-brand-400">
@@ -2339,7 +2338,7 @@ function TaskFormModal({
   const [labelIds, setLabelIds] = useState<string[]>([]);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="dialog">
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-white/[0.1] bg-slate-900 p-6 shadow-xl">
+      <div className="modal-panel max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-white/[0.1] bg-slate-900 p-6 shadow-xl">
         <h3 className="text-lg font-semibold text-white">New task</h3>
         <div className="mt-4 space-y-3 text-sm">
           <label className="block text-slate-400">
@@ -2448,7 +2447,7 @@ function TaskFormModal({
                       );
                     }}
                   />
-                  <span style={{ color: l.color }}>{l.name}</span>
+                  <PlannerLabelChip name={l.name} color={l.color} size="sm" />
                 </label>
               ))}
             </div>
@@ -2519,7 +2518,7 @@ function EditTaskModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="dialog">
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-white/[0.1] bg-slate-900 p-6 shadow-xl">
+      <div className="modal-panel max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-white/[0.1] bg-slate-900 p-6 shadow-xl">
         <h3 className="text-lg font-semibold text-white">{readOnly ? "View task" : "Edit task"}</h3>
         {readOnly ? (
           <p className="mt-1 text-xs text-slate-500">This board is read-only. You cannot change fields here.</p>
@@ -2640,7 +2639,7 @@ function EditTaskModal({
                       );
                     }}
                   />
-                  <span style={{ color: l.color }}>{l.name}</span>
+                  <PlannerLabelChip name={l.name} color={l.color} size="sm" />
                 </label>
               ))}
             </div>

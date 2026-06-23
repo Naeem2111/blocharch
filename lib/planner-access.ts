@@ -78,13 +78,7 @@ export async function planBoardIdsForUser(user: SessionUser): Promise<string[]> 
   return Array.from(ids);
 }
 
-/** Default kanban columns — colour-coded workflow. */
-export const DEFAULT_PLANNER_COLUMNS: { title: string; color: string; sortOrder: number }[] = [
-  { title: "Backlog", color: "#64748b", sortOrder: 0 },
-  { title: "In progress", color: "#0ea5e9", sortOrder: 1 },
-  { title: "Review", color: "#f59e0b", sortOrder: 2 },
-  { title: "Done", color: "#22c55e", sortOrder: 3 },
-];
+export { DEFAULT_PLANNER_COLUMNS, resolveGeneralColumnId } from "@/lib/planner-default-columns";
 
 export async function canManageBoardMembers(user: SessionUser, boardId: string): Promise<boolean> {
   const board = await findBoard(boardId);
