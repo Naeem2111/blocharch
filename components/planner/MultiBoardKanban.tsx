@@ -2,6 +2,8 @@
 
 import { Fragment, useEffect, useRef, useState } from "react";
 import type { KanbanBoardDetail, KanbanTaskRow } from "@/lib/planner-board-mutation";
+import { KanbanTaskMovePad } from "@/components/planner/KanbanTaskMovePad";
+import { taskNudgeAvailability, type NudgeDirection } from "@/lib/planner-task-nudge";
 import { startDragAutoScroll, stopDragAutoScroll, trackDragPointer } from "@/lib/planner-drag-scroll";
 import { createDragHighlightScheduler } from "@/lib/planner-drag-ui";
 
@@ -50,9 +52,16 @@ type Props = {
   ) => void | Promise<void>;
   onOpenTask: (task: KanbanTaskRow, columnId: string, boardId: string) => void;
   onToggleComplete?: (taskId: string, completed: boolean) => void;
+  onNudgeTask?: (boardId: string, taskId: string, direction: NudgeDirection) => void;
 };
 
-export function MultiBoardKanban({ boards, onMoveTask, onOpenTask, onToggleComplete }: Props) {
+export function MultiBoardKanban({
+  boards,
+  onMoveTask,
+  onOpenTask,
+  onToggleComplete,
+  onNudgeTask,
+}: Props) {
   const [dragTaskId, setDragTaskId] = useState<string | null>(null);
   const [dropTargetColumnId, setDropTargetColumnId] = useState<string | null>(null);
   const [taskDropGuide, setTaskDropGuide] = useState<{
@@ -216,6 +225,10 @@ export function MultiBoardKanban({ boards, onMoveTask, onOpenTask, onToggleCompl
                         completedColumnId !== null &&
                         board.columns.length >= 2;
                       const isInDoneColumn = col.id === completedColumnId;
+                      const nudge =
+                        board.editable && onNudgeTask
+                          ? taskNudgeAvailability(board.columns, t.id)
+                          : null;
 
                       return (
                         <Fragment key={t.id}>
@@ -235,6 +248,8 @@ export function MultiBoardKanban({ boards, onMoveTask, onOpenTask, onToggleCompl
                           ) : null}
                           <div
                             draggable={board.editable}
+                            role="button"
+                            tabIndex={0}
                             onDragStart={(e) => {
                               if (!board.editable) return;
                               dragTaskIdRef.current = t.id;
@@ -262,6 +277,22 @@ export function MultiBoardKanban({ boards, onMoveTask, onOpenTask, onToggleCompl
                             }}
                             onDrop={(e) => handleDropCard(col.id, t.id, e)}
                             onClick={() => onOpenTask(t, col.id, board.id)}
+                            onKeyDown={(e) => {
+                              if (board.editable && onNudgeTask) {
+                                const keyMap: Record<string, NudgeDirection> = {
+                                  ArrowUp: "up",
+                                  ArrowDown: "down",
+                                  ArrowLeft: "left",
+                                  ArrowRight: "right",
+                                };
+                                const dir = keyMap[e.key];
+                                if (dir) {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  onNudgeTask(board.id, t.id, dir);
+                                }
+                              }
+                            }}
                             className={`planner-task-card cursor-grab rounded-lg border border-white/[0.06] bg-white/[0.04] p-2 text-left text-sm active:cursor-grabbing ${
                               dragTaskId === t.id ? "opacity-40" : "hover:bg-white/[0.07]"
                             }`}
@@ -287,6 +318,15 @@ export function MultiBoardKanban({ boards, onMoveTask, onOpenTask, onToggleCompl
                                   </p>
                                 ) : null}
                               </div>
+                              {nudge ? (
+                                <KanbanTaskMovePad
+                                  onNudge={(dir) => onNudgeTask!(board.id, t.id, dir)}
+                                  canUp={nudge.up}
+                                  canDown={nudge.down}
+                                  canLeft={nudge.left}
+                                  canRight={nudge.right}
+                                />
+                              ) : null}
                             </div>
                           </div>
                         </Fragment>

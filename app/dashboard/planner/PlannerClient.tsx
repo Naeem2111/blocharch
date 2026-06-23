@@ -3,6 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { composeDueAtIso, splitDueAtIso } from "@/lib/planner-due-datetime";
+import { KanbanTaskMovePad } from "@/components/planner/KanbanTaskMovePad";
 import { BlocharchOutboxPanel } from "@/components/planner/BlocharchOutboxPanel";
 import { MultiBoardKanban } from "@/components/planner/MultiBoardKanban";
 import { PlannerLabelChip, plannerLabelChipStyle } from "@/components/planner/PlannerLabelChip";
@@ -16,6 +17,11 @@ import { startDragAutoScroll, stopDragAutoScroll, trackDragPointer } from "@/lib
 import { createDragHighlightScheduler } from "@/lib/planner-drag-ui";
 import { APPROVED_PLANNER_LABELS } from "@/lib/planner-approved-labels";
 import { resolveGeneralColumnId } from "@/lib/planner-default-columns";
+import {
+  computeTaskNudge,
+  taskNudgeAvailability,
+  type NudgeDirection,
+} from "@/lib/planner-task-nudge";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
 
 const FIXED_BOARD_KINDS = new Set([
@@ -581,35 +587,25 @@ export function PlannerClient() {
     }
   }
 
-  function nudgeTask(taskId: string, direction: "up" | "down" | "left" | "right") {
+  function applyTaskNudge(board: BoardDetail, taskId: string, direction: NudgeDirection) {
+    if (!board.editable) return;
+    const target = computeTaskNudge(board.columns, taskId, direction);
+    if (!target) return;
+    reorderTasksAndPersist(board, taskId, target.destColumnId, target.insertBeforeTaskId);
+  }
+
+  function nudgeTask(taskId: string, direction: NudgeDirection) {
     const snap = detailRef.current;
-    if (!snap?.editable) return;
+    if (!snap) return;
+    applyTaskNudge(snap, taskId, direction);
+  }
 
-    let colIndex = -1;
-    let taskIndex = -1;
-    let colId = "";
-    for (let ci = 0; ci < snap.columns.length; ci++) {
-      const ti = snap.columns[ci]!.tasks.findIndex((t) => t.id === taskId);
-      if (ti >= 0) {
-        colIndex = ci;
-        taskIndex = ti;
-        colId = snap.columns[ci]!.id;
-        break;
-      }
-    }
-    if (colIndex < 0) return;
-
-    const col = snap.columns[colIndex]!;
-    if (direction === "up" && taskIndex > 0) {
-      reorderTasksAndPersist(snap, taskId, colId, col.tasks[taskIndex - 1]!.id);
-    } else if (direction === "down" && taskIndex < col.tasks.length - 1) {
-      const beforeId = col.tasks[taskIndex + 2]?.id ?? null;
-      reorderTasksAndPersist(snap, taskId, colId, beforeId);
-    } else if (direction === "left" && colIndex > 0) {
-      reorderTasksAndPersist(snap, taskId, snap.columns[colIndex - 1]!.id, null);
-    } else if (direction === "right" && colIndex < snap.columns.length - 1) {
-      reorderTasksAndPersist(snap, taskId, snap.columns[colIndex + 1]!.id, null);
-    }
+  function nudgeTaskOnBoard(boardId: string, taskId: string, direction: NudgeDirection) {
+    const board =
+      boardsDetailRef.current[boardId] ??
+      (detailRef.current?.id === boardId ? detailRef.current : null);
+    if (!board) return;
+    applyTaskNudge(board, taskId, direction);
   }
 
   async function createBoard(e: React.FormEvent) {
@@ -1315,6 +1311,7 @@ export function PlannerClient() {
             <MultiBoardKanban
               boards={multiBoardList as KanbanBoardDetail[]}
               onMoveTask={moveTaskUniversal}
+              onNudgeTask={nudgeTaskOnBoard}
               onOpenTask={(task, columnId, openBoardId) => {
                 setBoardId(openBoardId);
                 setEditTask({ ...task, columnId });
@@ -1340,7 +1337,7 @@ export function PlannerClient() {
                   <>
                     {" "}
                     · Drag cards between columns and boards (use All boards view or drop on board tabs).
-                    Drop on the top or bottom half of a card to insert above or below.
+                    Use the ↑↓←→ pad on each card (or arrow keys when focused) if drag-and-drop is unreliable.
                     {completedColumnId ? (
                       <>
                         {" "}
@@ -1507,6 +1504,9 @@ export function PlannerClient() {
                       detail.columns.length >= 2;
                     const isInDoneColumn = col.id === completedColumnId;
                     const isSelected = selectedTaskId === t.id;
+                    const nudge = detail.editable
+                      ? taskNudgeAvailability(detail.columns, t.id)
+                      : null;
                     const showInboxMove =
                       detail.kind === "blocharch_inbox" && detail.editable && inboxMoveTargets.length > 0;
                     const showInsertLine =
@@ -1635,6 +1635,21 @@ export function PlannerClient() {
                           setEditTask({ ...t, columnId: col.id });
                         }}
                         onKeyDown={(e) => {
+                          if (detail.editable) {
+                            const keyMap: Record<string, NudgeDirection> = {
+                              ArrowUp: "up",
+                              ArrowDown: "down",
+                              ArrowLeft: "left",
+                              ArrowRight: "right",
+                            };
+                            const dir = keyMap[e.key];
+                            if (dir) {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              nudgeTask(t.id, dir);
+                              return;
+                            }
+                          }
                           if (e.key === "Enter" || e.key === " ") {
                             e.preventDefault();
                             setSelectedTaskId(t.id);
@@ -1698,28 +1713,6 @@ export function PlannerClient() {
                                 ))}
                               </div>
                             ) : null}
-                            {detail.editable && isSelected ? (
-                              <div
-                                className="mt-2 flex flex-wrap items-center gap-1"
-                                onClick={(e) => e.stopPropagation()}
-                                onPointerDown={(e) => e.stopPropagation()}
-                                role="group"
-                                aria-label="Move task"
-                              >
-                                <span className="mr-1 text-[10px] text-slate-500">Move:</span>
-                                {(["up", "down", "left", "right"] as const).map((dir) => (
-                                  <button
-                                    key={dir}
-                                    type="button"
-                                    title={`Move ${dir}`}
-                                    onClick={() => nudgeTask(t.id, dir)}
-                                    className="rounded border border-white/[0.1] px-1.5 py-0.5 text-[10px] text-slate-300 hover:bg-white/[0.08]"
-                                  >
-                                    {dir === "up" ? "↑" : dir === "down" ? "↓" : dir === "left" ? "←" : "→"}
-                                  </button>
-                                ))}
-                              </div>
-                            ) : null}
                             {showInboxMove ? (
                               <div
                                 className="mt-2"
@@ -1736,6 +1729,15 @@ export function PlannerClient() {
                               </div>
                             ) : null}
                           </div>
+                          {nudge ? (
+                            <KanbanTaskMovePad
+                              onNudge={(dir) => nudgeTask(t.id, dir)}
+                              canUp={nudge.up}
+                              canDown={nudge.down}
+                              canLeft={nudge.left}
+                              canRight={nudge.right}
+                            />
+                          ) : null}
                         </div>
                       </div>
                       </Fragment>

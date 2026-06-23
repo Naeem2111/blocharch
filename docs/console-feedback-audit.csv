@@ -49,7 +49,7 @@ OPS,Analytics — client/firm filter,AUDIT,Done,All clients or single firm filte
 OPS,Check-ins — Pending/Unscheduled (red) vs Scheduled (green),AUDIT,Done,Red left border for pending; green for scheduled/approved.
 PLANNER,Board create/rename/delete,AUDIT,Done,Approved.
 PLANNER,Remove Cross-board To-dos (admin + athlete),AUDIT,Done,Section removed from PlannerClient.
-PLANNER,Reliable drag-and-drop + scroll,AUDIT,Partial,RAF auto-scroll retained; arrow fallback (↑↓←→) on selected task card.
+PLANNER,Reliable drag-and-drop + scroll,AUDIT,Partial,RAF auto-scroll retained; D-pad on every card + arrow keys; drag still available.
 PLANNER,Labels simplified to 5 only (This Week / Tomorrow / Urgent / Urgent Today / Waiting),AUDIT,Done,planner-approved-labels.ts + purgeUnapprovedBoardLabels on board load.
 PLANNER,Custom column colour + optional label link,AUDIT,Done,linkedLabelName on PlannerColumn; create/edit column UI.
 PLANNER,Column-to-label auto-move logic,AUDIT,Done,relocateTaskToLabelLinkedColumn on label PATCH + column link change + inbox move-to-board.
