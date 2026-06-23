@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { pendingCheckInAthleteIds } from "@/lib/check-in-admin";
 import { prisma } from "@/lib/prisma";
 import { requireOpsSession } from "@/lib/ops-access";
 
@@ -17,11 +18,13 @@ export async function GET(request: NextRequest) {
       lineItems: {
         include: {
           project: { select: { name: true } },
-          client: { select: { name: true } },
+          client: { select: { name: true, logoUrl: true } },
         },
       },
     },
   });
+
+  const pendingAthletes = await pendingCheckInAthleteIds();
 
   return NextResponse.json({
     submissions: submissions.map((s) => ({
@@ -33,12 +36,14 @@ export async function GET(request: NextRequest) {
       totalHours: Number(s.totalHours),
       wellbeingScore: s.wellbeingScore,
       checkInRequested: s.checkInRequested,
+      checkInNeedsAction: s.checkInRequested && pendingAthletes.has(s.athleteId),
       dailyNote: s.dailyNote,
       lockedAt: s.lockedAt?.toISOString() ?? null,
       updatedAt: s.updatedAt.toISOString(),
       lineItems: s.lineItems.map((li) => ({
         projectName: li.project.name,
         clientName: li.client.name,
+        clientLogoUrl: li.client.logoUrl,
         projectPhase: li.projectPhase,
         taskType: li.taskType,
         taskTypes: li.taskTypes?.length ? li.taskTypes : [li.taskType],

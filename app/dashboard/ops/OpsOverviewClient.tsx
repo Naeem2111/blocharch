@@ -13,12 +13,32 @@ type OverviewData = {
   alertCounts: { daily12Count: number; daily14Count: number; capExceededCount: number };
 };
 
-function StatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
+function StatCard({
+  label,
+  value,
+  sub,
+  alert,
+}: {
+  label: string;
+  value: string | number;
+  sub?: string;
+  alert?: boolean;
+}) {
   return (
-    <div className="card-tool rounded-xl p-5">
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{label}</p>
-      <p className="mt-2 text-2xl font-semibold tabular-nums text-white">{value}</p>
-      {sub ? <p className="mt-1 text-xs text-slate-500">{sub}</p> : null}
+    <div
+      className={`rounded-xl p-5 ${
+        alert
+          ? "animate-pulse border border-red-500/40 bg-red-500/[0.06] ring-1 ring-red-500/35"
+          : "card-tool"
+      }`}
+    >
+      <p className={`text-[10px] font-semibold uppercase tracking-wider ${alert ? "text-red-300" : "text-slate-500"}`}>
+        {label}
+      </p>
+      <p className={`mt-2 text-2xl font-semibold tabular-nums ${alert ? "text-red-100" : "text-white"}`}>
+        {value}
+      </p>
+      {sub ? <p className={`mt-1 text-xs ${alert ? "text-red-200/80" : "text-slate-500"}`}>{sub}</p> : null}
     </div>
   );
 }
@@ -44,7 +64,12 @@ export function OpsOverviewClient() {
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
       <StatCard label="Active athletes" value={data.activeAthletes} />
       <StatCard label="Active projects" value={data.activeProjects} />
-      <StatCard label="Pending check-ins" value={data.checkInRequests} sub="Athletes waiting for a response" />
+      <StatCard
+        label="Pending check-ins"
+        value={data.checkInRequests}
+        sub="Athletes waiting for a response"
+        alert={data.checkInRequests > 0}
+      />
       <StatCard
         label="Monthly revenue (GBP)"
         value={`£${data.monthlyRevenueGbp.toLocaleString()}`}

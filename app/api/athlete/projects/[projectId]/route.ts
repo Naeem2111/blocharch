@@ -34,6 +34,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       currentStage?: typeof project.currentStage;
       currentStatus?: typeof project.currentStatus;
       progressPercent?: number;
+      completedAt?: null;
+      deadlineBeatenDays?: null;
       notes?: string | null;
     } = {};
 
@@ -69,6 +71,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         if (pct != null && pct >= 100) {
           data.progressPercent = REACTIVATION_PROGRESS_PERCENT;
         }
+        data.completedAt = null;
+        data.deadlineBeatenDays = null;
       }
     }
 

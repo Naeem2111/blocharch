@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireOpsSession } from "@/lib/ops-access";
+import { acknowledgeCheckInRequest } from "@/lib/check-in-admin";
 import {
   createCheckInCalendarEvent,
   loadCheckInRequest,
@@ -56,6 +57,8 @@ export async function PATCH(request: NextRequest, context: Ctx) {
           linkPath: "/dashboard/athlete/book-call",
         }).catch(() => {});
 
+        await acknowledgeCheckInRequest(row.id, row.athlete.id, row.projectId);
+
         return NextResponse.json({ request: serializeCheckInRequest(row) });
       }
 
@@ -102,6 +105,7 @@ export async function PATCH(request: NextRequest, context: Ctx) {
         message: adminNote ?? null,
         linkPath: "/dashboard/athlete/book-call",
       }).catch(() => {});
+      await acknowledgeCheckInRequest(row.id, row.athlete.id, row.projectId);
       return NextResponse.json({ request: serializeCheckInRequest(row) });
     }
 
@@ -149,6 +153,8 @@ export async function PATCH(request: NextRequest, context: Ctx) {
         message: row.zoomLink ? `Zoom: ${row.zoomLink}` : adminNote ?? null,
         linkPath: "/dashboard/athlete/book-call",
       }).catch(() => {});
+
+      await acknowledgeCheckInRequest(row.id, row.athlete.id, row.projectId);
 
       return NextResponse.json({ request: serializeCheckInRequest(row) });
     }

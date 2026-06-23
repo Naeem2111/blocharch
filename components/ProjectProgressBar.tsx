@@ -32,7 +32,7 @@ export function ProjectProgressBar({
         </div>
       ) : null}
       <div
-        className="h-2 w-full overflow-hidden rounded-full bg-slate-700/40 dark:bg-white/[0.06]"
+        className="progress-track h-2 w-full overflow-hidden rounded-full bg-white/[0.06]"
         role="progressbar"
         aria-valuenow={p}
         aria-valuemin={0}

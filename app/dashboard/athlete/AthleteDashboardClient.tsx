@@ -34,6 +34,18 @@ type DashboardData = {
   todayHours: number;
   alerts: OpsAlert[];
   recentSubmissions: Array<{ submissionDate: string; totalHours: number; lockedAt: string | null }>;
+  beatenDeadlines: {
+    count: number;
+    totalDaysBeaten: number;
+    recent: Array<{
+      id: string;
+      name: string;
+      clientName: string;
+      dueDate: string | null;
+      completedAt: string | null;
+      daysBeaten: number;
+    }>;
+  };
 };
 
 const severityClass: Record<OpsAlert["severity"], string> = {
@@ -154,6 +166,29 @@ export function AthleteDashboardClient() {
                 </li>
               ))}
             </ul>
+          )}
+        </div>
+        <div className="card-tool rounded-xl p-5">
+          <h2 className="text-sm font-semibold text-white">Beaten deadlines</h2>
+          <p className="mt-1 text-xs text-slate-500">Projects you finished before the due date.</p>
+          {data.beatenDeadlines.count === 0 ? (
+            <p className="mt-3 text-sm text-slate-500">No early completions recorded yet.</p>
+          ) : (
+            <>
+              <p className="mt-3 text-lg font-semibold tabular-nums text-emerald-300">
+                {data.beatenDeadlines.count} project{data.beatenDeadlines.count === 1 ? "" : "s"} ·{" "}
+                {data.beatenDeadlines.totalDaysBeaten}d total early
+              </p>
+              <ul className="mt-3 space-y-2">
+                {data.beatenDeadlines.recent.slice(0, 5).map((p) => (
+                  <li key={p.id} className="text-sm text-slate-300">
+                    <span className="font-medium text-slate-200">{p.name}</span>
+                    <span className="text-slate-500"> · {p.clientName}</span>
+                    <span className="ml-1 text-emerald-300">{p.daysBeaten}d early</span>
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
         </div>
         <div className="card-tool rounded-xl p-5 md:col-span-2">

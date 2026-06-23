@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   LANE_MONTHLY_HOURS,
@@ -7,6 +8,8 @@ import {
 import { computeMonthlyHoursSummary, monthEndUtc, monthStartUtc } from "@/lib/ops-hours";
 import { getCostConversionSnapshot } from "@/lib/ops-exchange";
 import { OPS_ALERT_THRESHOLDS, submissionEditCutoffUtc } from "@/lib/ops-alerts";
+import { countPendingCheckInRequests } from "@/lib/check-in-admin";
+import { buildBeatenDeadlines, type BeatenDeadlinesByAthlete } from "@/lib/analytics-deadlines";
 
 export { LANE_MONTHLY_HOURS };
 
@@ -378,15 +381,30 @@ export type AnalyticsPayload = {
     marginGbp: number;
     marginPercent: number;
   }>;
+  beatenDeadlinesByAthlete: BeatenDeadlinesByAthlete[];
+  clientFilter: string | null;
 };
 
-export async function buildAnalytics(reference: Date): Promise<AnalyticsPayload> {
+export type BuildAnalyticsOptions = {
+  clientId?: string | null;
+};
+
+export async function buildAnalytics(
+  reference: Date,
+  options: BuildAnalyticsOptions = {}
+): Promise<AnalyticsPayload> {
+  const clientId = options.clientId?.trim() || null;
   const from = monthStartUtc(reference);
   const to = monthEndUtc(reference);
   const ledger = await buildCommercialLedger(reference);
 
+  const lineItemWhere: Prisma.OpsSubmissionLineItemWhereInput = {
+    submission: { submissionDate: { gte: from, lte: to } },
+    ...(clientId ? { clientId } : {}),
+  };
+
   const lineItems = await prisma.opsSubmissionLineItem.findMany({
-    where: { submission: { submissionDate: { gte: from, lte: to } } },
+    where: lineItemWhere,
     include: {
       submission: { include: { athlete: true } },
       client: { select: { id: true, name: true, logoUrl: true } },
@@ -415,10 +433,12 @@ export async function buildAnalytics(reference: Date): Promise<AnalyticsPayload>
   }
 
   const now = dateOnlyUtc(new Date());
+  const projectClientFilter = clientId ? { clientId } : {};
   const riskProjects = await prisma.opsProject.findMany({
     where: {
       dueDate: { not: null, lte: new Date(now.getTime() + 14 * 86400000) },
       currentStatus: { notIn: ["completed", "handed_over"] },
+      ...projectClientFilter,
     },
     include: {
       client: { select: { name: true, logoUrl: true } },
@@ -432,6 +452,7 @@ export async function buildAnalytics(reference: Date): Promise<AnalyticsPayload>
     where: {
       dueDate: { gte: from, lte: to },
       currentStatus: { notIn: ["completed", "handed_over"] },
+      ...projectClientFilter,
     },
     include: {
       client: { select: { name: true, logoUrl: true } },
@@ -442,10 +463,12 @@ export async function buildAnalytics(reference: Date): Promise<AnalyticsPayload>
 
   const clientCostMap = new Map<string, number>();
   for (const row of ledger.rows) {
+    if (clientId && row.clientId !== clientId) continue;
     clientCostMap.set(row.clientId, (clientCostMap.get(row.clientId) ?? 0) + row.athleteCostGbp);
   }
 
   const profitabilityByClient = ledger.clientLanes
+    .filter((lane) => !clientId || lane.clientId === clientId)
     .map((lane) => {
       const costGbp = round2(clientCostMap.get(lane.clientId) ?? 0);
       const revenueGbp = lane.totalClientRevenueGbp;
@@ -461,6 +484,8 @@ export async function buildAnalytics(reference: Date): Promise<AnalyticsPayload>
       };
     })
     .sort((a, b) => b.marginGbp - a.marginGbp);
+
+  const beatenDeadlinesByAthlete = await buildBeatenDeadlines(reference, clientId);
 
   return {
     month: from.toISOString().slice(0, 7),
@@ -504,6 +529,8 @@ export async function buildAnalytics(reference: Date): Promise<AnalyticsPayload>
       assignedAthleteName: p.assignedAthlete?.fullName ?? null,
     })),
     profitabilityByClient,
+    beatenDeadlinesByAthlete,
+    clientFilter: clientId,
   };
 }
 
@@ -519,7 +546,7 @@ export async function buildOpsOverview(reference: Date) {
         where: { currentStatus: { notIn: ["completed", "handed_over"] } },
       }),
       prisma.opsProject.count({ where: { blockerFlag: true } }),
-      prisma.opsProject.count({ where: { checkInRequested: true } }),
+      countPendingCheckInRequests(),
       prisma.opsDailySubmission.findMany({
         where: { submissionDate: { gte: from, lte: to } },
         select: { totalHours: true },

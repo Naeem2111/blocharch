@@ -1,5 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import {
+  computeDeadlineBeatenDays,
+  projectCompletionDate,
+} from "@/lib/project-completion";
+import {
   isActiveProjectStatus,
   syncProjectAfterOpsUpdate,
 } from "@/lib/planner-project-sync";
@@ -24,6 +28,7 @@ export async function syncProjectProgressFromLineItems(
         currentStatus: true,
         name: true,
         progressPercent: true,
+        dueDate: true,
       },
     });
     if (!before) continue;
@@ -43,9 +48,18 @@ export async function syncProjectProgressFromLineItems(
       isActiveProjectStatus(before.currentStatus) &&
       updated.assignedAthleteId
     ) {
+      const completedAt = projectCompletionDate();
+      const deadlineBeatenDays = before.dueDate
+        ? computeDeadlineBeatenDays(before.dueDate, completedAt)
+        : null;
+
       const completed = await prisma.opsProject.update({
         where: { id: projectId },
-        data: { currentStatus: "completed" },
+        data: {
+          currentStatus: "completed",
+          completedAt,
+          deadlineBeatenDays,
+        },
         select: {
           assignedAthleteId: true,
           currentStatus: true,

@@ -561,6 +561,7 @@ export function DashboardSidebar({
         if (!j) continue;
         if (j.notifications) next.notifications = (next.notifications ?? 0) + j.notifications;
         if (j.checkIns) next.checkIns = (next.checkIns ?? 0) + j.checkIns;
+        if (j.submissionCheckIns) next.submissionCheckIns = (next.submissionCheckIns ?? 0) + j.submissionCheckIns;
         if (j.inbox) next.inbox = (next.inbox ?? 0) + j.inbox;
         if (j.urgent) urgent = true;
       }
@@ -724,9 +725,11 @@ export function DashboardSidebar({
                   urgent={
                     item.badgeKey === "inbox"
                       ? (badges.inbox ?? 0) > 0
-                      : item.badgeKey === "notifications"
-                        ? sidebarUrgent
-                        : false
+                      : item.badgeKey === "checkIns"
+                        ? (badges.checkIns ?? 0) > 0
+                        : item.badgeKey === "notifications"
+                          ? sidebarUrgent
+                          : false
                   }
                   dragging={dragItem}
                   dropIndex={dropItemIndex}

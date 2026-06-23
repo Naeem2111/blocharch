@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAthletePortalSession } from "@/lib/ops-access";
+import { notifyOpsCheckInRequest } from "@/lib/check-in-admin";
 import { serializeCheckInRequest } from "@/lib/check-in-requests";
 
 const checkInInclude = {
@@ -79,6 +80,23 @@ export async function POST(request: NextRequest) {
       },
       include: checkInInclude,
     });
+
+    await notifyOpsCheckInRequest({
+      id: row.id,
+      athleteId: row.athleteId,
+      projectId: row.projectId,
+      reason: row.reason,
+      source: row.source,
+      athlete: row.athlete,
+      project: row.project,
+    });
+
+    if (projectId) {
+      await prisma.opsProject.update({
+        where: { id: projectId },
+        data: { checkInRequested: true },
+      });
+    }
 
     return NextResponse.json({ request: serializeCheckInRequest(row) }, { status: 201 });
   } catch {

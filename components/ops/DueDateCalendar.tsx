@@ -52,11 +52,11 @@ export function DueDateCalendar({
   const monthLabel = firstDay.toLocaleString("en-GB", { month: "long", year: "numeric" });
 
   return (
-    <div>
+    <div className="due-date-calendar">
       <h3 className="text-sm font-semibold text-white">{monthLabel}</h3>
-      <div className="mt-3 grid grid-cols-7 gap-px overflow-hidden rounded-lg border border-white/[0.08] bg-white/[0.04] text-xs">
+      <div className="due-date-calendar-grid mt-3 grid grid-cols-7 gap-px overflow-hidden rounded-lg border border-white/[0.08] bg-white/[0.04] text-xs">
         {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
-          <div key={d} className="bg-slate-900/80 px-2 py-1.5 text-center font-medium text-slate-500">
+          <div key={d} className="due-date-calendar-head px-2 py-1.5 text-center font-medium text-slate-500">
             {d}
           </div>
         ))}
@@ -65,19 +65,19 @@ export function DueDateCalendar({
           return (
             <div
               key={i}
-              className={`min-h-[88px] bg-slate-900/50 p-1.5 ${cell.day ? "" : "opacity-40"}`}
+              className={`due-date-calendar-cell min-h-[88px] p-1.5 ${cell.day ? "" : "due-date-calendar-cell-empty"}`}
             >
               {cell.day ? (
                 <>
-                  <span className="tabular-nums text-slate-400">{cell.day}</span>
+                  <span className="due-date-calendar-day-num tabular-nums text-slate-400">{cell.day}</span>
                   <ul className="mt-1 space-y-1">
                     {items.map((p) => (
                       <li
                         key={p.id}
-                        className="rounded bg-white/[0.04] px-1 py-0.5"
+                        className="due-date-calendar-event rounded bg-white/[0.04] px-1 py-0.5"
                         title={`${p.name} · ${p.clientName}`}
                       >
-                        <p className="flex items-center gap-1 truncate text-[10px] font-medium text-slate-200">
+                        <p className="due-date-calendar-event-title flex items-center gap-1 truncate text-[10px] font-medium text-slate-200">
                           {p.clientLogoUrl ? (
                             <ClientAvatar name={p.clientName} logoUrl={p.clientLogoUrl} size={14} />
                           ) : null}

@@ -52,11 +52,11 @@ export function MiniMonthCalendar({
   const pad = (n: number) => String(n).padStart(2, "0");
 
   return (
-    <div className={className}>
-      <p className="text-xs font-medium text-slate-400">{monthLabel}</p>
+    <div className={`mini-month-calendar ${className}`}>
+      <p className="mini-calendar-title text-xs font-medium text-slate-400">{monthLabel}</p>
       <div className="mt-2 grid grid-cols-7 gap-1 text-center text-[10px]">
         {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => (
-          <span key={`${d}-${i}`} className="py-1 font-medium text-slate-600">
+          <span key={`${d}-${i}`} className="mini-calendar-weekday py-1 font-medium text-slate-600">
             {d}
           </span>
         ))}
@@ -73,9 +73,9 @@ export function MiniMonthCalendar({
               type={clickable ? "button" : undefined}
               onClick={clickable ? () => onSelectDate!(iso) : undefined}
               title={dayMarks.map((m) => m.label).filter(Boolean).join(", ") || undefined}
-              className={`relative rounded-md py-1.5 tabular-nums transition-colors ${
+              className={`mini-calendar-day relative rounded-md py-1.5 tabular-nums transition-colors ${
                 isSelected
-                  ? "bg-brand-500/25 font-semibold text-brand-100 ring-1 ring-brand-500/40"
+                  ? "mini-calendar-day-selected bg-brand-500/25 font-semibold text-brand-100 ring-1 ring-brand-500/40"
                   : clickable
                     ? "text-slate-300 hover:bg-white/[0.06]"
                     : "text-slate-400"

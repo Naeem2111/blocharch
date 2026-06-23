@@ -77,6 +77,52 @@ export async function GET(request: NextRequest) {
     },
   });
 
+  const [beatenCount, beatenDeadlineProjects] = await Promise.all([
+    prisma.opsProject.count({
+      where: {
+        assignedAthleteId: athlete.id,
+        deadlineBeatenDays: { gt: 0 },
+      },
+    }),
+    prisma.opsProject.findMany({
+      where: {
+        assignedAthleteId: athlete.id,
+        deadlineBeatenDays: { gt: 0 },
+      },
+      orderBy: [{ completedAt: "desc" }, { updatedAt: "desc" }],
+      take: 10,
+      select: {
+        id: true,
+        name: true,
+        dueDate: true,
+        completedAt: true,
+        deadlineBeatenDays: true,
+        client: { select: { name: true } },
+      },
+    }),
+  ]);
+
+  const totalDaysAgg = await prisma.opsProject.aggregate({
+    where: {
+      assignedAthleteId: athlete.id,
+      deadlineBeatenDays: { gt: 0 },
+    },
+    _sum: { deadlineBeatenDays: true },
+  });
+
+  const beatenDeadlines = {
+    count: beatenCount,
+    totalDaysBeaten: totalDaysAgg._sum?.deadlineBeatenDays ?? 0,
+    recent: beatenDeadlineProjects.map((p) => ({
+      id: p.id,
+      name: p.name,
+      clientName: p.client.name,
+      dueDate: p.dueDate?.toISOString().slice(0, 10) ?? null,
+      completedAt: p.completedAt?.toISOString().slice(0, 10) ?? null,
+      daysBeaten: p.deadlineBeatenDays ?? 0,
+    })),
+  };
+
   return NextResponse.json({
     profile: {
       fullName: athlete.fullName,
@@ -101,5 +147,6 @@ export async function GET(request: NextRequest) {
       checkInRequested: s.checkInRequested,
       lockedAt: s.lockedAt?.toISOString() ?? null,
     })),
+    beatenDeadlines,
   });
 }

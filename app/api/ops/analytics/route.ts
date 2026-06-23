@@ -14,6 +14,7 @@ export async function GET(request: NextRequest) {
   const gate = await requireOpsSession(request);
   if (gate instanceof NextResponse) return gate;
 
-  const analytics = await buildAnalytics(monthFromQuery(request));
+  const clientId = request.nextUrl.searchParams.get("clientId")?.trim() || null;
+  const analytics = await buildAnalytics(monthFromQuery(request), { clientId });
   return NextResponse.json(analytics);
 }

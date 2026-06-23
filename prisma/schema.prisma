@@ -421,6 +421,10 @@ model OpsProject {
   currentStatus     OpsProjectStatus    @default(not_started) @map("current_status")
   /** Latest progress % from daily log (0–100). */
   progressPercent   Int?                @map("progress_percent")
+  /** Date the project was marked complete (from daily log or handover). */
+  completedAt       DateTime?           @map("completed_at") @db.Date
+  /** Days finished before due date; null if not early or no due date. */
+  deadlineBeatenDays Int?               @map("deadline_beaten_days")
   notes             String?             @db.Text
   blockerFlag       Boolean             @default(false) @map("blocker_flag")
   checkInRequested  Boolean             @default(false) @map("check_in_requested")

@@ -24,6 +24,10 @@ OPS,Ops sub-nav: remove Clients/Athletes; add Daily submissions,AUDIT,Done,OpsSu
 OPS,Ops sub-nav order: Overview / Daily submissions / Projects / Commercial / Check-ins / Notifications / Analytics,AUDIT,Done,Notifications removed; order matches audit.
 OPS,Daily Submissions — layout & log display,AUDIT,Done,Ops submissions hub working.
 OPS,Daily Submissions — required field when task type Other,AUDIT,Done,Ops hub shows Other explanation from line item notes.
+OPS,Daily Submissions — check-in red glow until actioned,AUDIT,Done,Sidebar/sub-nav glow + ops banner + flagged submission cards.
+OPS,Daily Submissions — client logo on admin logs,AUDIT,Done,ClientAvatar from onboarding logoUrl on each line item.
+OPS,Daily Submissions — light theme legibility,AUDIT,Done,Light-theme overrides for red/amber/emerald status text and check-in alerts.
+OPS,Daily Submissions — deadline beaten on 100% complete,AUDIT,Done,completedAt + deadlineBeatenDays stored on auto-complete at 100%.
 OPS,Projects — admin cards match athlete My Projects design,AUDIT,Done,Colour border + progress bar on OpsProjectsClient.
 OPS,Projects — due-date colour scale on admin cards,AUDIT,Done,project-color-scale on ops project cards.
 OPS,Project form — remove Blocker checkbox,AUDIT,Done,Removed from edit form.
@@ -38,8 +42,10 @@ OPS,Check-ins — Scheduled Meetings tab (reversible),AUDIT,Done,Scheduled meeti
 OPS,Check-ins — source label (Book a Call vs Daily Log),AUDIT,Done,source on schema + request cards.
 OPS,Analytics — due date risk progress % as text,AUDIT,Done,showLabel on analytics progress bars.
 OPS,Analytics — month filter & charts,AUDIT,Done,Hours by phase/client/athlete + profitability working.
-OPS,Analytics — hours by phase accumulates over time (not monthly reset),AUDIT,Partial,Verify buildAnalytics uses cumulative not month-only for phase totals.
-OPS,Analytics — client logo next to client name,AUDIT,Partial,Name only in analytics tables; Commercial shows logos.
+OPS,Analytics — hours by phase accumulates over time (not monthly reset),AUDIT,Partial,Phase totals are month-scoped from daily log line items.
+OPS,Analytics — client logo next to client name,AUDIT,Done,Client logos on charts and due-date tables.
+OPS,Analytics — beaten deadlines per athlete,AUDIT,Done,Beaten deadlines chart + detail table with days early.
+OPS,Analytics — client/firm filter,AUDIT,Done,All clients or single firm filter on analytics API + UI.
 OPS,Check-ins — Pending/Unscheduled (red) vs Scheduled (green),AUDIT,Done,Red left border for pending; green for scheduled/approved.
 PLANNER,Board create/rename/delete,AUDIT,Done,Approved.
 PLANNER,Remove Cross-board To-dos (admin + athlete),AUDIT,Done,Section removed from PlannerClient.
@@ -65,6 +71,8 @@ WORKSPACE,Sidebar hide/unhide sections,AUDIT,Missing,Collapse exists; no Hide + 
 ATHLETE,Dashboard layout & stats cards,AUDIT,Done,Hours/earnings/projects approved.
 ATHLETE,Dashboard Alerts sync with unread notifications,AUDIT,Done,Unread notifications merged into dashboard alerts with links.
 ATHLETE,Daily Log layout & smart calculation,AUDIT,Done,Calendar/edit/wellbeing 1-10/hours approved in recent work.
+ATHLETE,Daily Log — previous entries collapsed,AUDIT,Done,Expandable previous logs with project cards; click to edit.
+ATHLETE,Daily Log — beaten deadlines on dashboard,AUDIT,Done,Beaten deadlines card with count and recent early completions.
 ATHLETE,Daily Log — check-in opens Book a Call form modal,AUDIT,Done,CheckInRequestModal from daily log.
 ATHLETE,Daily Log — Other task type requires explanation,AUDIT,Done,Required Other field + API validation.
 ATHLETE,My Projects cards & due-date calendar,AUDIT,Done,Colour scale + calendar + progress bar implemented.

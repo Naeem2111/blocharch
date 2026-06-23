@@ -10,8 +10,27 @@ import {
   PROJECT_STATUS_LABELS,
 } from "@/lib/ops-constants";
 
+type ClientOption = { id: string; name: string; logoUrl: string | null };
+
+type BeatenDeadlinesByAthlete = {
+  athleteId: string;
+  athleteName: string;
+  beatenCount: number;
+  totalDaysBeaten: number;
+  averageDaysBeaten: number;
+  projects: Array<{
+    projectId: string;
+    projectName: string;
+    clientName: string;
+    dueDate: string;
+    completedDate: string;
+    daysBeaten: number;
+  }>;
+};
+
 type AnalyticsData = {
   month: string;
+  clientFilter: string | null;
   hoursByPhase: Array<{ phase: string; hours: number }>;
   hoursByClient: Array<{ clientId: string; clientName: string; clientLogoUrl: string | null; hours: number }>;
   hoursByAthlete: Array<{ athleteId: string; athleteName: string; hours: number }>;
@@ -45,6 +64,7 @@ type AnalyticsData = {
     marginGbp: number;
     marginPercent: number;
   }>;
+  beatenDeadlinesByAthlete: BeatenDeadlinesByAthlete[];
 };
 
 function currentMonth(): string {
@@ -54,13 +74,34 @@ function currentMonth(): string {
 
 export function AnalyticsClient() {
   const [month, setMonth] = useState(currentMonth());
+  const [clientId, setClientId] = useState("");
+  const [clients, setClients] = useState<ClientOption[]>([]);
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  useEffect(() => {
+    void fetch("/api/ops/clients")
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.clients) {
+          setClients(
+            j.clients.map((c: { id: string; name: string; logoUrl?: string | null }) => ({
+              id: c.id,
+              name: c.name,
+              logoUrl: c.logoUrl ?? null,
+            }))
+          );
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
-    const r = await fetch(`/api/ops/analytics?month=${month}`);
+    const q = new URLSearchParams({ month });
+    if (clientId) q.set("clientId", clientId);
+    const r = await fetch(`/api/ops/analytics?${q}`);
     const j = await r.json();
     if (!r.ok) {
       setError(j.error || "Failed to load");
@@ -70,11 +111,16 @@ export function AnalyticsClient() {
     setData(j);
     setError("");
     setLoading(false);
-  }, [month]);
+  }, [month, clientId]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  const selectedClient = useMemo(
+    () => clients.find((c) => c.id === clientId) ?? null,
+    [clients, clientId]
+  );
 
   const phaseBars = useMemo(
     () =>
@@ -105,33 +151,86 @@ export function AnalyticsClient() {
     [data]
   );
 
+  const beatenBars = useMemo(
+    () =>
+      (data?.beatenDeadlinesByAthlete ?? []).map((a) => ({
+        label: a.athleteName,
+        value: a.beatenCount,
+        sublabel: `${a.totalDaysBeaten}d total · avg ${a.averageDaysBeaten}d`,
+      })),
+    [data]
+  );
+
+  const beatenRows = useMemo(
+    () =>
+      (data?.beatenDeadlinesByAthlete ?? []).flatMap((a) =>
+        a.projects.map((p) => ({
+          ...p,
+          athleteName: a.athleteName,
+        }))
+      ),
+    [data]
+  );
+
   if (loading && !data) return <p className="text-sm text-slate-500">Loading analytics…</p>;
   if (error) return <p className="text-sm text-red-400">{error}</p>;
   if (!data) return null;
 
   return (
     <div className="space-y-8">
-      <label className="inline-block text-xs text-slate-400">
-        Month
-        <input
-          type="month"
-          value={month}
-          onChange={(e) => setMonth(e.target.value)}
-          className="mt-1 block rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
-        />
-      </label>
+      <div className="flex flex-wrap items-end gap-4">
+        <label className="text-xs text-slate-400">
+          Month
+          <input
+            type="month"
+            value={month}
+            onChange={(e) => setMonth(e.target.value)}
+            className="mt-1 block rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+          />
+        </label>
+        <label className="text-xs text-slate-400">
+          Client / firm
+          <select
+            value={clientId}
+            onChange={(e) => setClientId(e.target.value)}
+            className="select-console mt-1 block min-w-[14rem] rounded-md px-3 py-2 text-sm"
+          >
+            <option value="">All clients</option>
+            {clients.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        {selectedClient ? (
+          <p className="flex items-center gap-2 pb-2 text-xs text-slate-400">
+            <ClientAvatar name={selectedClient.name} logoUrl={selectedClient.logoUrl} size={22} />
+            Filtering analytics to {selectedClient.name}
+          </p>
+        ) : null}
+      </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="card-tool rounded-xl p-5">
           <h2 className="text-sm font-semibold text-white">Hours by phase</h2>
+          <p className="mt-1 text-xs text-slate-500">
+            {clientId ? "Hours logged for the selected firm this month." : "All firms — cumulative phase hours this month."}
+          </p>
           <div className="mt-4">
             <SimpleBarChart items={phaseBars} valueSuffix="h" />
           </div>
         </div>
         <div className="card-tool rounded-xl p-5">
-          <h2 className="text-sm font-semibold text-white">Hours by client</h2>
+          <h2 className="text-sm font-semibold text-white">
+            {clientId ? "Hours this month" : "Hours by client"}
+          </h2>
           <div className="mt-4">
-            <SimpleBarChart items={clientBars} valueSuffix="h" />
+            {clientBars.length === 0 ? (
+              <p className="text-sm text-slate-500">No hours logged for this filter.</p>
+            ) : (
+              <SimpleBarChart items={clientBars} valueSuffix="h" />
+            )}
           </div>
         </div>
         <div className="card-tool rounded-xl p-5">
@@ -154,6 +253,51 @@ export function AnalyticsClient() {
             />
           </div>
         </div>
+      </div>
+
+      <div className="card-tool rounded-xl p-5">
+        <h2 className="text-sm font-semibold text-white">Beaten deadlines</h2>
+        <p className="mt-1 text-xs text-slate-500">
+          Projects completed before their due date in the selected month — useful for performance
+          recognition and future bonus calculations.
+        </p>
+        {beatenBars.length === 0 ? (
+          <p className="mt-4 text-sm text-slate-500">No beaten deadlines in this period.</p>
+        ) : (
+          <>
+            <div className="mt-4 max-w-xl">
+              <SimpleBarChart items={beatenBars} valueSuffix="" />
+            </div>
+            <div className="mt-6 overflow-x-auto">
+              <table className="min-w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-white/[0.06] text-xs uppercase text-slate-500">
+                    <th className="px-3 py-2">Athlete</th>
+                    <th className="px-3 py-2">Project</th>
+                    <th className="px-3 py-2">Client</th>
+                    <th className="px-3 py-2">Completed</th>
+                    <th className="px-3 py-2">Due</th>
+                    <th className="px-3 py-2">Days beaten</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {beatenRows.map((row) => (
+                    <tr key={row.projectId} className="border-b border-white/[0.04] text-slate-300">
+                      <td className="px-3 py-2">{row.athleteName}</td>
+                      <td className="px-3 py-2">{row.projectName}</td>
+                      <td className="px-3 py-2">{row.clientName}</td>
+                      <td className="px-3 py-2 tabular-nums">{row.completedDate}</td>
+                      <td className="px-3 py-2 tabular-nums">{row.dueDate}</td>
+                      <td className="px-3 py-2 tabular-nums font-medium text-emerald-300">
+                        {row.daysBeaten}d early
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="card-tool rounded-xl p-5">

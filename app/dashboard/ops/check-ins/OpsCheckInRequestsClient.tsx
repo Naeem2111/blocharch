@@ -13,6 +13,7 @@ type RequestRow = {
   contextNotes: string | null;
   requestedStartAt: string;
   status: string;
+  createdAt?: string;
 };
 
 type ManagerStatus = "pending" | "scheduled";
@@ -37,7 +38,7 @@ function checkInStatusMeta(status: string): { label: string; cardClass: string; 
   if (manager === "pending") {
     return {
       label: "Pending / Unscheduled",
-      cardClass: "border-l-4 border-l-red-500/70",
+      cardClass: "border-l-4 border-l-red-500/70 ring-1 ring-red-500/20",
       badgeClass: "bg-red-500/15 text-red-300",
     };
   }
@@ -56,7 +57,6 @@ export function OpsCheckInRequestsClient() {
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    setLoading(true);
     const q = filter === "pending" ? "?status=pending" : "?status=scheduled";
     const r = await fetch(`/api/ops/check-in-requests${q}`);
     const j = await r.json().catch(() => ({}));
@@ -68,7 +68,10 @@ export function OpsCheckInRequestsClient() {
   }, [filter]);
 
   useEffect(() => {
-    load();
+    setLoading(true);
+    void load();
+    const t = setInterval(() => void load(), 30_000);
+    return () => clearInterval(t);
   }, [load]);
 
   async function setStatus(id: string, status: ManagerStatus) {
@@ -89,8 +92,23 @@ export function OpsCheckInRequestsClient() {
 
   return (
     <div className="space-y-6">
+      {pendingCount > 0 ? (
+        <div
+          className="animate-pulse rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 ring-1 ring-red-500/35"
+          role="status"
+        >
+          <p className="text-sm font-semibold text-red-100">
+            {pendingCount} check-in request{pendingCount === 1 ? "" : "s"} awaiting action
+          </p>
+          <p className="mt-1 text-xs text-red-200/80">
+            Mark Scheduled once you have arranged the meeting. This alert stays until each request is
+            actioned.
+          </p>
+        </div>
+      ) : null}
+
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-slate-400">
+        <p className={`text-sm ${pendingCount > 0 ? "font-medium text-red-200" : "text-slate-400"}`}>
           {pendingCount} pending / unscheduled
         </p>
         <div className="flex gap-2">
@@ -99,11 +117,18 @@ export function OpsCheckInRequestsClient() {
             onClick={() => setFilter("pending")}
             className={`rounded-lg px-3 py-1.5 text-xs font-medium ring-1 ${
               filter === "pending"
-                ? "bg-brand-500/20 text-brand-200 ring-brand-500/30"
+                ? pendingCount > 0
+                  ? "animate-pulse bg-red-500/15 text-red-200 ring-red-500/40"
+                  : "bg-brand-500/20 text-brand-200 ring-brand-500/30"
                 : "bg-white/[0.04] text-slate-400 ring-white/[0.08]"
             }`}
           >
             Check-in requests
+            {pendingCount > 0 ? (
+              <span className="ml-1.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
+                {pendingCount > 99 ? "99+" : pendingCount}
+              </span>
+            ) : null}
           </button>
           <button
             type="button"

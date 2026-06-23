@@ -46,7 +46,11 @@ type PastSubmission = {
   editable: boolean;
   alerts: Array<{ code: string; severity: string; message: string }>;
   lineItems: Array<{
+    id: string;
     projectId: string;
+    clientName: string;
+    projectName: string;
+    projectNumber: string;
     projectPhase: string;
     taskType: string;
     taskTypes?: string[];
@@ -88,6 +92,7 @@ export function AthleteSubmissionsClient() {
   const [calendarMonth, setCalendarMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [formLocked, setFormLocked] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [expandedSubmissionIds, setExpandedSubmissionIds] = useState<Set<string>>(new Set());
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
   function applySubmission(sub: PastSubmission, notify?: string) {
@@ -267,6 +272,20 @@ export function AthleteSubmissionsClient() {
       setSaving(false);
     }
   }
+
+  function toggleSubmissionExpanded(id: string) {
+    setExpandedSubmissionIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const pastEntries = useMemo(
+    () => pastSubmissions.filter((s) => s.submissionDate !== selectedDate || s.id !== editingId),
+    [pastSubmissions, selectedDate, editingId]
+  );
 
   if (loading) return <p className="text-sm text-slate-500">Loading…</p>;
 
@@ -543,40 +562,79 @@ export function AthleteSubmissionsClient() {
     </form>
 
       <div className="card-tool rounded-xl p-5">
-        <h2 className="text-sm font-semibold text-white">Recent submissions</h2>
+        <h2 className="text-sm font-semibold text-white">Previous logs</h2>
         <p className="mt-1 text-xs text-slate-500">
-          Logs auto-lock after 7 days. Click Edit on an unlocked entry below, or ask admin to unlock under Commercial.
+          Collapsed by default — expand a day to see project cards, then click a card to edit (if unlocked).
         </p>
-        {pastSubmissions.length === 0 ? (
-          <p className="mt-3 text-sm text-slate-500">No submissions yet.</p>
+        {pastEntries.length === 0 ? (
+          <p className="mt-3 text-sm text-slate-500">No other submissions yet.</p>
         ) : (
           <ul className="mt-4 space-y-2">
-            {pastSubmissions.map((s) => (
-              <li
-                key={s.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white/[0.03] px-3 py-2 text-sm"
-              >
-                <span className="text-slate-300">
-                  {s.submissionDate} · {s.totalHours}h
-                  {s.lockedAt ? (
-                    <span className="ml-2 rounded bg-white/[0.06] px-1.5 py-0.5 text-[10px] uppercase text-slate-500">
-                      Locked
-                    </span>
-                  ) : s.editable ? (
-                    <span className="ml-2 text-[10px] text-brand-300">Editable</span>
-                  ) : null}
-                </span>
-                {s.editable ? (
+            {pastEntries.map((s) => {
+              const expanded = expandedSubmissionIds.has(s.id);
+              return (
+                <li key={s.id} className="overflow-hidden rounded-lg ring-1 ring-white/[0.08]">
                   <button
                     type="button"
-                    onClick={() => loadSubmissionIntoForm(s)}
-                    className="text-xs text-brand-300 hover:text-brand-200"
+                    onClick={() => toggleSubmissionExpanded(s.id)}
+                    className="flex w-full items-center justify-between gap-2 bg-white/[0.03] px-3 py-2.5 text-left text-sm hover:bg-white/[0.06]"
                   >
-                    Edit
+                    <span className="flex items-center gap-2 text-slate-300">
+                      <span
+                        className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded bg-white/[0.06] text-xs font-bold text-slate-400"
+                        aria-hidden
+                      >
+                        {expanded ? "−" : "+"}
+                      </span>
+                      {s.submissionDate} · {s.totalHours}h · {s.lineItems.length} project
+                      {s.lineItems.length === 1 ? "" : "s"}
+                      {s.lockedAt ? (
+                        <span className="rounded bg-white/[0.06] px-1.5 py-0.5 text-[10px] uppercase text-slate-500">
+                          Locked
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-brand-300">Editable</span>
+                      )}
+                      {s.checkInRequested ? (
+                        <span className="text-[10px] text-amber-300">Check-in</span>
+                      ) : null}
+                    </span>
                   </button>
-                ) : null}
-              </li>
-            ))}
+                  {expanded ? (
+                    <div className="grid gap-2 border-t border-white/[0.06] bg-white/[0.02] p-3 sm:grid-cols-2">
+                      {s.lineItems.map((li) => (
+                        <button
+                          key={li.id}
+                          type="button"
+                          disabled={!s.editable}
+                          onClick={() => loadSubmissionIntoForm(s)}
+                          className={`rounded-lg p-3 text-left ring-1 transition-colors ${
+                            s.editable
+                              ? "cursor-pointer bg-white/[0.04] ring-white/[0.08] hover:bg-brand-500/10 hover:ring-brand-500/25"
+                              : "cursor-default bg-white/[0.02] ring-white/[0.06] opacity-80"
+                          }`}
+                        >
+                          <p className="text-sm font-medium text-white">{li.projectName}</p>
+                          <p className="text-xs text-slate-500">
+                            {li.clientName} · #{li.projectNumber}
+                          </p>
+                          <p className="mt-2 text-xs text-slate-400">
+                            {li.hoursWorked}h
+                            {li.completionPercent != null ? ` · ${li.completionPercent}%` : ""}
+                          </p>
+                          {li.completedSummary ? (
+                            <p className="mt-1 line-clamp-2 text-xs text-slate-500">{li.completedSummary}</p>
+                          ) : null}
+                          {s.editable ? (
+                            <p className="mt-2 text-[10px] font-medium text-brand-300">Click to edit this day</p>
+                          ) : null}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
