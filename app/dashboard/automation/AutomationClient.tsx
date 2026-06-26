@@ -169,7 +169,7 @@ export function AutomationClient() {
       </div>
 
       <p className="text-slate-500 text-sm">
-        Track lead stage, star rating, and last contact date. Click a star again to clear the rating.
+        Track lead stage, rating, last contact, and notes. Open a practice to record software and detailed notes.
       </p>
 
       {loading ? (

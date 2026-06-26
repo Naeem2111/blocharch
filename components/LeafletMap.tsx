@@ -26,7 +26,7 @@ type MarkerItem = {
 
 import { LEAD_STAGE_COLORS } from "@/lib/lead-stage-ui";
 import type { LeadStage } from "@/lib/leads";
-import { buildMapPinStageSelectHtml } from "@/lib/map-pin-popup";
+import { buildMapPinStageSelectHtml, applyMapPinStageSelectAppearance } from "@/lib/map-pin-popup";
 
 const STAGE_COLORS: Record<Stage, string> = LEAD_STAGE_COLORS;
 
@@ -168,8 +168,10 @@ function MapClusterLayer({
             ?.querySelector(".map-pin-stage-select") as HTMLSelectElement | null;
           if (!sel) return;
           sel.value = m.stage;
+          applyMapPinStageSelectAppearance(sel);
           sel.onchange = () => {
             const next = sel.value as Stage;
+            applyMapPinStageSelectAppearance(sel);
             onStageChangeRef.current?.(m.id, next);
           };
         });

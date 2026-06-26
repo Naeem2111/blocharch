@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { loadArchitects } from "@/lib/architects";
 import { updateLead, getLead, LEAD_STAGES, type LeadStage } from "@/lib/leads";
+import { isPracticeSoftwareId } from "@/lib/practice-software";
 
 async function resolvePracticeUrl(id: string): Promise<string | null> {
   const architects = await loadArchitects();
@@ -24,7 +25,14 @@ export async function PATCH(
   }
 
   const body = await request.json().catch(() => ({}));
-  const updates: { stage?: LeadStage; rating?: number; notes?: string; lastEmailedAt?: string | null } = {};
+  const updates: {
+    stage?: LeadStage;
+    rating?: number;
+    notes?: string;
+    software?: string;
+    softwareOther?: string;
+    lastEmailedAt?: string | null;
+  } = {};
 
   if (body.stage && LEAD_STAGES.includes(body.stage)) {
     updates.stage = body.stage as LeadStage;
@@ -34,6 +42,22 @@ export async function PATCH(
   }
   if (typeof body.notes === "string") {
     updates.notes = body.notes;
+  }
+  if (body.software === null || body.software === "") {
+    updates.software = "";
+    updates.softwareOther = "";
+  } else if (typeof body.software === "string") {
+    const software = body.software.trim();
+    if (software && !isPracticeSoftwareId(software)) {
+      return Response.json({ error: "Invalid software option" }, { status: 400 });
+    }
+    updates.software = software;
+    if (software !== "other") {
+      updates.softwareOther = "";
+    }
+  }
+  if (typeof body.softwareOther === "string") {
+    updates.softwareOther = body.softwareOther.trim();
   }
   if (typeof body.lastEmailedAt === "string") {
     const trimmed = body.lastEmailedAt.trim();

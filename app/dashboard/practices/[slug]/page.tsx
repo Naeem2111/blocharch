@@ -157,7 +157,7 @@ export default async function PracticeDetailPage({
         <div className="lg:col-span-1">
           <div className="space-y-6 sticky top-4">
             <div className="card-tool rounded-2xl p-6 ring-1 ring-white/[0.06]">
-              <h2 className="text-lg font-semibold text-white mb-4">Lead status</h2>
+              <h2 className="text-lg font-semibold text-white mb-4">Lead nurturing</h2>
               <LeadStatus slug={decoded} />
             </div>
             {bestAddress?.trim() && (

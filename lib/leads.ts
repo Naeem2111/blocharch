@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 
-/** Outreach stages — targeted (shortlist) through n8n nurture flow. */
+/** Outreach pipeline stages for lead nurturing. */
 export const LEAD_STAGES = [
   "targeted",
   "cold",
@@ -16,6 +16,8 @@ export interface LeadRecord {
   stage: LeadStage;
   rating: number; // 1-5
   notes?: string;
+  software?: string;
+  softwareOther?: string;
   lastEmailedAt?: string; // ISO date
 }
 
@@ -44,6 +46,8 @@ export async function loadLeads(): Promise<LeadsData> {
         stage: row.stage,
         rating: clampRating(row.rating),
         notes: row.notes || undefined,
+        software: row.software || undefined,
+        softwareOther: row.softwareOther || undefined,
         lastEmailedAt: row.lastEmailedAt?.toISOString(),
       },
     ])
@@ -63,6 +67,8 @@ export async function getLead(practiceUrl: string): Promise<LeadRecord | null> {
     stage,
     rating: clampRating(r.rating),
     notes: r.notes || undefined,
+    software: r.software || undefined,
+    softwareOther: r.softwareOther || undefined,
     lastEmailedAt: r.lastEmailedAt?.toISOString(),
   };
 }
@@ -82,15 +88,29 @@ export async function getOrCreateLead(practiceUrl: string): Promise<LeadRecord> 
 
 export async function updateLead(
   practiceUrl: string,
-  updates: Partial<Pick<LeadRecord, "stage" | "rating" | "notes">> & { lastEmailedAt?: string | null }
+  updates: Partial<Pick<LeadRecord, "stage" | "rating" | "notes" | "software" | "softwareOther">> & {
+    lastEmailedAt?: string | null;
+  }
 ): Promise<LeadRecord> {
   const current = await getOrCreateLead(practiceUrl);
+  const nextSoftware =
+    updates.software !== undefined
+      ? updates.software?.trim() || undefined
+      : current.software;
+  const nextSoftwareOther =
+    nextSoftware === "other"
+      ? updates.softwareOther !== undefined
+        ? updates.softwareOther.trim() || undefined
+        : current.softwareOther
+      : undefined;
   const next: LeadRecord = {
     ...current,
     ...updates,
     stage: updates.stage && LEAD_STAGES.includes(updates.stage) ? updates.stage : current.stage,
     rating:
       updates.rating !== undefined ? clampRating(updates.rating) : current.rating,
+    software: nextSoftware,
+    softwareOther: nextSoftwareOther,
     lastEmailedAt:
       updates.lastEmailedAt !== undefined
         ? updates.lastEmailedAt || undefined
@@ -102,6 +122,8 @@ export async function updateLead(
       stage: next.stage,
       rating: next.rating,
       notes: next.notes,
+      software: next.software ?? null,
+      softwareOther: next.softwareOther ?? null,
       lastEmailedAt: next.lastEmailedAt ? new Date(next.lastEmailedAt) : null,
     },
     create: {
@@ -109,6 +131,8 @@ export async function updateLead(
       stage: next.stage,
       rating: next.rating,
       notes: next.notes,
+      software: next.software ?? null,
+      softwareOther: next.softwareOther ?? null,
       lastEmailedAt: next.lastEmailedAt ? new Date(next.lastEmailedAt) : null,
     },
   });

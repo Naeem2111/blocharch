@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { LEAD_STAGES } from "@/lib/leads";
 import { LEAD_STAGE_LABELS } from "@/lib/lead-stage-ui";
+import { PRACTICE_SOFTWARE_OPTIONS } from "@/lib/practice-software";
 
 function StarRating({
   value,
@@ -50,6 +51,8 @@ export function LeadStatus({ slug }: { slug: string }) {
   const [stage, setStage] = useState("");
   const [rating, setRating] = useState(0);
   const [notes, setNotes] = useState("");
+  const [software, setSoftware] = useState("");
+  const [softwareOther, setSoftwareOther] = useState("");
   const [lastEmailedAt, setLastEmailedAt] = useState<string | undefined>();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -61,12 +64,20 @@ export function LeadStatus({ slug }: { slug: string }) {
         setStage(d.stage || "cold");
         setRating(d.rating ?? 0);
         setNotes(d.notes || "");
+        setSoftware(d.software || "");
+        setSoftwareOther(d.softwareOther || "");
         setLastEmailedAt(d.lastEmailedAt || undefined);
       })
       .finally(() => setLoading(false));
   }, [slug]);
 
-  async function update(updates: { stage?: string; rating?: number; notes?: string }) {
+  async function update(updates: {
+    stage?: string;
+    rating?: number;
+    notes?: string;
+    software?: string;
+    softwareOther?: string;
+  }) {
     setSaving(true);
     try {
       const res = await fetch(`/api/leads/${encodeURIComponent(slug)}`, {
@@ -79,6 +90,8 @@ export function LeadStatus({ slug }: { slug: string }) {
         if (d.stage !== undefined) setStage(d.stage);
         if (d.rating !== undefined) setRating(d.rating);
         if (d.notes !== undefined) setNotes(d.notes);
+        if (d.software !== undefined) setSoftware(d.software || "");
+        if (d.softwareOther !== undefined) setSoftwareOther(d.softwareOther || "");
         if (d.lastEmailedAt !== undefined) setLastEmailedAt(d.lastEmailedAt || undefined);
       }
     } finally {
@@ -86,13 +99,16 @@ export function LeadStatus({ slug }: { slug: string }) {
     }
   }
 
-  if (loading) return <p className="text-slate-500 text-sm">Loading lead status…</p>;
+  if (loading) return <p className="text-slate-500 text-sm">Loading…</p>;
 
   return (
     <div className="space-y-4">
+      <p className="text-slate-500 text-xs leading-relaxed">
+        Track pipeline stage, rating, software, and notes for this practice. Changes are saved to the database.
+      </p>
       {lastEmailedAt ? (
         <div>
-          <p className="text-slate-500 text-xs font-medium uppercase tracking-wider mb-1">Last email sent</p>
+          <p className="text-slate-500 text-xs font-medium uppercase tracking-wider mb-1">Last contact</p>
           <p className="text-slate-200 text-sm">{formatEmailedAt(lastEmailedAt)}</p>
         </div>
       ) : null}
@@ -102,7 +118,7 @@ export function LeadStatus({ slug }: { slug: string }) {
           value={stage}
           onChange={(e) => update({ stage: e.target.value })}
           disabled={saving}
-          className="select-console px-3 py-2 rounded-lg text-sm"
+          className="select-console px-3 py-2 rounded-lg text-sm w-full"
         >
           {LEAD_STAGES.map((s) => (
             <option key={s} value={s}>
@@ -116,18 +132,50 @@ export function LeadStatus({ slug }: { slug: string }) {
         <StarRating value={rating} onChange={(v) => update({ rating: v })} disabled={saving} />
       </div>
       <div>
-        <p className="text-slate-500 text-xs font-medium uppercase tracking-wider mb-1">Notes &amp; automation log</p>
-        <p className="text-slate-500 text-xs mb-1.5">
-          n8n appends timestamped lines here when emails are sent (cold, follow-up, book call, thank you).
-        </p>
+        <p className="text-slate-500 text-xs font-medium uppercase tracking-wider mb-1">Software</p>
+        <select
+          value={software}
+          onChange={(e) => {
+            const next = e.target.value;
+            setSoftware(next);
+            if (next !== "other") {
+              setSoftwareOther("");
+              void update({ software: next, softwareOther: "" });
+            } else {
+              void update({ software: next });
+            }
+          }}
+          disabled={saving}
+          className="select-console px-3 py-2 rounded-lg text-sm w-full"
+        >
+          <option value="">Not set</option>
+          {PRACTICE_SOFTWARE_OPTIONS.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        {software === "other" ? (
+          <input
+            value={softwareOther}
+            onChange={(e) => setSoftwareOther(e.target.value)}
+            onBlur={() => update({ software: "other", softwareOther })}
+            disabled={saving}
+            placeholder="Specify software"
+            className="mt-2 w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm"
+          />
+        ) : null}
+      </div>
+      <div>
+        <p className="text-slate-500 text-xs font-medium uppercase tracking-wider mb-1">Notes</p>
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           onBlur={() => update({ notes })}
           disabled={saving}
           rows={5}
-          className="w-full px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm resize-none"
-          placeholder="Add notes…"
+          className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm resize-none"
+          placeholder="Call notes, context, next steps…"
         />
       </div>
     </div>

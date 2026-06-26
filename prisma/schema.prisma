@@ -141,6 +141,8 @@ model Lead {
   stage         LeadStage @default(cold)
   rating        Int       @default(0)
   notes         String?
+  software      String?
+  softwareOther String?   @map("software_other")
   lastEmailedAt DateTime? @map("last_emailed_at")
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
