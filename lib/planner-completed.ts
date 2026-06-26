@@ -36,6 +36,12 @@ function resolveDoneColumn(columns: { id: string; title: string }[]) {
   return { doneCol, firstCol };
 }
 
+/** Done / Completed column id for a board, if any. */
+export function findDoneColumnId(columns: { id: string; title: string }[]): string | null {
+  const { doneCol } = resolveDoneColumn(columns);
+  return doneCol?.id ?? null;
+}
+
 /** Move task to this board's Done column (or restore to prior column). */
 export async function setPlannerTaskCompleted(taskId: string, completed: boolean) {
   const task = await prisma.plannerTask.findUnique({
