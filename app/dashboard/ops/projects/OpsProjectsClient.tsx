@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
 import { ProjectProgressBar } from "@/components/ProjectProgressBar";
 import { asAvatarTextTone } from "@/lib/avatar-text-tone";
@@ -64,6 +64,7 @@ export function OpsProjectsClient() {
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [form, setForm] = useState(emptyCreate);
+  const [clientFilterId, setClientFilterId] = useState("");
   const [editForm, setEditForm] = useState({
     assignedAthleteId: "",
     name: "",
@@ -198,14 +199,152 @@ export function OpsProjectsClient() {
     await load();
   }
 
+  const filteredProjects = useMemo(() => {
+    if (!clientFilterId) return projects;
+    return projects.filter((p) => p.clientId === clientFilterId);
+  }, [projects, clientFilterId]);
+
+  const projectsByClient = useMemo(() => {
+    const groups = new Map<
+      string,
+      {
+        clientId: string;
+        clientName: string;
+        clientLogoUrl: string | null;
+        clientLogoBgColor: string | null;
+        clientLogoTextTone: string | null;
+        projects: ProjectRow[];
+      }
+    >();
+    for (const p of filteredProjects) {
+      const existing = groups.get(p.clientId);
+      if (existing) {
+        existing.projects.push(p);
+      } else {
+        groups.set(p.clientId, {
+          clientId: p.clientId,
+          clientName: p.clientName,
+          clientLogoUrl: p.clientLogoUrl,
+          clientLogoBgColor: p.clientLogoBgColor,
+          clientLogoTextTone: p.clientLogoTextTone,
+          projects: [p],
+        });
+      }
+    }
+    return Array.from(groups.values()).sort((a, b) => a.clientName.localeCompare(b.clientName));
+  }, [filteredProjects]);
+
   if (loading) return <p className="text-sm text-slate-500">Loading projects…</p>;
 
   const createClient = clients.find((c) => c.id === form.clientId) ?? null;
+  const selectedFilterClient = clients.find((c) => c.id === clientFilterId) ?? null;
+
+  function renderProjectCard(p: ProjectRow) {
+    const timeline = computeProjectTimeline({
+      startDate: p.startDate,
+      dueDate: p.dueDate,
+      handoverDate: p.handoverDate,
+    });
+    const daysUntil = daysUntilDueFromIso(p.dueDate);
+    const accent = projectDueColor(daysUntil);
+
+    return (
+      <article
+        key={p.id}
+        className="card-tool rounded-xl p-4"
+        style={{ borderLeftWidth: 4, borderLeftColor: accent }}
+      >
+        {editingId === p.id ? (
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="text-xs text-slate-400">Name<input value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
+            <label className="text-xs text-slate-400">Number<input value={editForm.projectNumber} onChange={(e) => setEditForm((f) => ({ ...f, projectNumber: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
+            <label className="text-xs text-slate-400">Athlete<select value={editForm.assignedAthleteId} onChange={(e) => setEditForm((f) => ({ ...f, assignedAthleteId: e.target.value }))} className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"><option value="">Unassigned</option>{athletes.map((a) => <option key={a.id} value={a.id}>{a.fullName}</option>)}</select></label>
+            <label className="text-xs text-slate-400">Complexity<select value={editForm.complexity} onChange={(e) => setEditForm((f) => ({ ...f, complexity: e.target.value }))} className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
+            <label className="text-xs text-slate-400">Stage<select value={editForm.currentStage} onChange={(e) => setEditForm((f) => ({ ...f, currentStage: e.target.value }))} className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm">{Object.entries(PROJECT_PHASE_LABELS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
+            <label className="text-xs text-slate-400">Status<select value={editForm.currentStatus} onChange={(e) => setEditForm((f) => ({ ...f, currentStatus: e.target.value }))} className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm">{Object.entries(PROJECT_STATUS_LABELS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
+            <label className="text-xs text-slate-400">Due<input type="date" value={editForm.dueDate} onChange={(e) => setEditForm((f) => ({ ...f, dueDate: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
+            <label className="text-xs text-slate-400">Handover<input type="date" value={editForm.handoverDate} onChange={(e) => setEditForm((f) => ({ ...f, handoverDate: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.04] px-3 py-2 text-sm text-white" /></label>
+            <label className="text-xs text-slate-400 md:col-span-2">Notes<textarea value={editForm.notes} onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))} rows={2} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
+            <div className="flex flex-wrap gap-2 md:col-span-2">
+              <button type="button" onClick={() => void saveEdit(p.id)} className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-slate-950">Save</button>
+              <button type="button" onClick={() => setEditingId(null)} className="text-xs text-slate-500">Cancel</button>
+              <button type="button" onClick={() => void deleteProject(p.id, p.name)} className="text-xs text-red-400 hover:text-red-300">Delete project</button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <h2 className="font-semibold text-white">{p.name}</h2>
+              <p className="text-xs text-slate-500">
+                {p.projectNumber} · {p.assignedAthleteName ?? "Unassigned"}
+              </p>
+              <p
+                className={`mt-2 text-xs ${
+                  timeline.isOverdue
+                    ? "text-red-300"
+                    : timeline.isDueSoon
+                      ? "text-amber-300"
+                      : "text-slate-500"
+                }`}
+              >
+                {PROJECT_PHASE_LABELS[p.currentStage]} · {PROJECT_STATUS_LABELS[p.currentStatus]}
+                {timeline.daysActive != null ? ` · ${timeline.daysActive} days active` : ""}
+                {timeline.label ? ` · ${timeline.label}` : ""}
+              </p>
+              <div className="mt-3 max-w-md">
+                <ProjectProgressBar percent={p.progressPercent ?? 0} />
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="rounded-md bg-white/[0.06] px-2 py-1 text-[10px] uppercase text-slate-400">
+                {COMPLEXITY_LABELS[p.complexity]}
+              </span>
+              <button type="button" onClick={() => startEdit(p)} className="text-xs text-brand-300 hover:text-brand-200">Edit</button>
+            </div>
+          </div>
+        )}
+      </article>
+    );
+  }
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-slate-400">{projects.length} project(s)</p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="flex flex-wrap items-end gap-4">
+          <p className="pb-2 text-sm text-slate-400">
+            {filteredProjects.length} project{filteredProjects.length === 1 ? "" : "s"}
+            {clientFilterId
+              ? ` for ${selectedFilterClient?.name ?? "client"}`
+              : ` · ${projectsByClient.length} client${projectsByClient.length === 1 ? "" : "s"}`}
+          </p>
+          <label className="text-xs text-slate-400">
+            Client / firm
+            <select
+              value={clientFilterId}
+              onChange={(e) => setClientFilterId(e.target.value)}
+              className="select-console mt-1 block min-w-[14rem] rounded-md px-3 py-2 text-sm"
+            >
+              <option value="">All clients</option>
+              {clients.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {selectedFilterClient ? (
+            <p className="flex items-center gap-2 pb-2 text-xs text-slate-400">
+              <ClientAvatar
+                name={selectedFilterClient.name}
+                logoUrl={selectedFilterClient.logoUrl}
+                backgroundColor={selectedFilterClient.logoBgColor}
+                textTone={asAvatarTextTone(selectedFilterClient.logoTextTone)}
+                size={22}
+              />
+              Showing {selectedFilterClient.name} only
+            </p>
+          ) : null}
+        </div>
         <button type="button" onClick={() => setOpen(true)} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-brand-500">
           New project
         </button>
@@ -251,83 +390,32 @@ export function OpsProjectsClient() {
         </form>
       )}
 
-      <div className="space-y-3">
-        {projects.map((p) => {
-          const timeline = computeProjectTimeline({
-            startDate: p.startDate,
-            dueDate: p.dueDate,
-            handoverDate: p.handoverDate,
-          });
-          const daysUntil = daysUntilDueFromIso(p.dueDate);
-          const accent = projectDueColor(daysUntil);
-          return (
-          <article
-            key={p.id}
-            className="card-tool rounded-xl p-4"
-            style={{ borderLeftWidth: 4, borderLeftColor: accent }}
-          >
-            {editingId === p.id ? (
-              <div className="grid gap-3 md:grid-cols-2">
-                <label className="text-xs text-slate-400">Name<input value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
-                <label className="text-xs text-slate-400">Number<input value={editForm.projectNumber} onChange={(e) => setEditForm((f) => ({ ...f, projectNumber: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
-                <label className="text-xs text-slate-400">Athlete<select value={editForm.assignedAthleteId} onChange={(e) => setEditForm((f) => ({ ...f, assignedAthleteId: e.target.value }))} className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"><option value="">Unassigned</option>{athletes.map((a) => <option key={a.id} value={a.id}>{a.fullName}</option>)}</select></label>
-                <label className="text-xs text-slate-400">Complexity<select value={editForm.complexity} onChange={(e) => setEditForm((f) => ({ ...f, complexity: e.target.value }))} className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
-                <label className="text-xs text-slate-400">Stage<select value={editForm.currentStage} onChange={(e) => setEditForm((f) => ({ ...f, currentStage: e.target.value }))} className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm">{Object.entries(PROJECT_PHASE_LABELS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
-                <label className="text-xs text-slate-400">Status<select value={editForm.currentStatus} onChange={(e) => setEditForm((f) => ({ ...f, currentStatus: e.target.value }))} className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm">{Object.entries(PROJECT_STATUS_LABELS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
-                <label className="text-xs text-slate-400">Due<input type="date" value={editForm.dueDate} onChange={(e) => setEditForm((f) => ({ ...f, dueDate: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
-                <label className="text-xs text-slate-400">Handover<input type="date" value={editForm.handoverDate} onChange={(e) => setEditForm((f) => ({ ...f, handoverDate: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.04] px-3 py-2 text-sm text-white" /></label>
-                <label className="text-xs text-slate-400 md:col-span-2">Notes<textarea value={editForm.notes} onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))} rows={2} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
-                <div className="flex flex-wrap gap-2 md:col-span-2">
-                  <button type="button" onClick={() => void saveEdit(p.id)} className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-slate-950">Save</button>
-                  <button type="button" onClick={() => setEditingId(null)} className="text-xs text-slate-500">Cancel</button>
-                  <button type="button" onClick={() => void deleteProject(p.id, p.name)} className="text-xs text-red-400 hover:text-red-300">Delete project</button>
-                </div>
+      <div className="space-y-8">
+        {projectsByClient.map((group) => (
+          <section key={group.clientId} className="space-y-3">
+            <div className="flex flex-wrap items-center gap-3 border-b border-white/[0.06] pb-2">
+              <ClientAvatar
+                name={group.clientName}
+                logoUrl={group.clientLogoUrl}
+                backgroundColor={group.clientLogoBgColor}
+                textTone={asAvatarTextTone(group.clientLogoTextTone)}
+                size={36}
+              />
+              <div>
+                <h2 className="text-sm font-semibold text-white">{group.clientName}</h2>
+                <p className="text-xs text-slate-500">
+                  {group.projects.length} project{group.projects.length === 1 ? "" : "s"}
+                </p>
               </div>
-            ) : (
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="flex min-w-0 items-start gap-3">
-                  <ClientAvatar
-                    name={p.clientName}
-                    logoUrl={p.clientLogoUrl}
-                    backgroundColor={p.clientLogoBgColor}
-                    textTone={asAvatarTextTone(p.clientLogoTextTone)}
-                    size={40}
-                  />
-                  <div>
-                  <h2 className="font-semibold text-white">{p.name}</h2>
-                  <p className="text-xs text-slate-500">
-                    {p.clientName} · {p.projectNumber} · {p.assignedAthleteName ?? "Unassigned"}
-                  </p>
-                  <p
-                    className={`mt-2 text-xs ${
-                      timeline.isOverdue
-                        ? "text-red-300"
-                        : timeline.isDueSoon
-                          ? "text-amber-300"
-                          : "text-slate-500"
-                    }`}
-                  >
-                    {PROJECT_PHASE_LABELS[p.currentStage]} · {PROJECT_STATUS_LABELS[p.currentStatus]}
-                    {timeline.daysActive != null ? ` · ${timeline.daysActive} days active` : ""}
-                    {timeline.label ? ` · ${timeline.label}` : ""}
-                  </p>
-                  <div className="mt-3 max-w-md">
-                    <ProjectProgressBar percent={p.progressPercent ?? 0} />
-                  </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="rounded-md bg-white/[0.06] px-2 py-1 text-[10px] uppercase text-slate-400">
-                    {COMPLEXITY_LABELS[p.complexity]}
-                  </span>
-                  <button type="button" onClick={() => startEdit(p)} className="text-xs text-brand-300 hover:text-brand-200">Edit</button>
-                </div>
-              </div>
-            )}
-          </article>
-          );
-        })}
-        {projects.length === 0 ? <p className="text-sm text-slate-500">No projects yet.</p> : null}
+            </div>
+            <div className="space-y-3">{group.projects.map((p) => renderProjectCard(p))}</div>
+          </section>
+        ))}
+        {filteredProjects.length === 0 ? (
+          <p className="text-sm text-slate-500">
+            {clientFilterId ? "No projects for this client." : "No projects yet."}
+          </p>
+        ) : null}
       </div>
       {error && !open ? <p className="text-sm text-red-400">{error}</p> : null}
     </div>

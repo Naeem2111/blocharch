@@ -110,7 +110,15 @@ export const athleteProjectSelect = {
   blockerFlag: true,
   checkInRequested: true,
   updatedAt: true,
-  client: { select: { id: true, name: true } },
+  client: {
+    select: {
+      id: true,
+      name: true,
+      logoUrl: true,
+      logoBgColor: true,
+      logoTextTone: true,
+    },
+  },
 } satisfies Prisma.OpsProjectSelect;
 
 export function serializeProjectForAthlete(project: Prisma.OpsProjectGetPayload<{ select: typeof athleteProjectSelect }>) {
