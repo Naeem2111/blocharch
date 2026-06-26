@@ -339,6 +339,7 @@ export function PlannerClient() {
   }
 
   const canUseTeamRoster = currentRole === "admin" || currentRole === "manager";
+  const isAthleteSelfView = currentRole === "user";
   const showHub = !area;
   const showTeamRoster =
     area === "team" && !athleteUserId && athleteParam !== "me" && canUseTeamRoster;
@@ -1285,11 +1286,11 @@ export function PlannerClient() {
                   {inboxUnreadCount > 99 ? "99+" : inboxUnreadCount}
                 </span>
               ) : null}
-              {b.isSystem ? (
+              {b.isSystem && !isAthleteSelfView ? (
                 <span className="ml-2 text-[10px] uppercase text-amber-500/80">fixed</span>
-              ) : (
+              ) : !b.isSystem ? (
                 <span className="ml-2 text-[10px] uppercase text-slate-500">{b.scope}</span>
-              )}
+              ) : null}
             </button>
             </div>
             );
@@ -1319,6 +1320,7 @@ export function PlannerClient() {
                 setEditTask({ ...task, columnId });
               }}
               onToggleComplete={(taskId, completed) => void toggleTaskCompleted(taskId, completed)}
+              hideFixedBadge={isAthleteSelfView}
             />
           ) : (
             <p className="text-sm text-slate-500">No boards to show.</p>
@@ -1353,7 +1355,7 @@ export function PlannerClient() {
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              {detail.editable ? (
+              {detail.editable && !isAthleteSelfView ? (
                 <>
                   <button
                     type="button"
@@ -1373,7 +1375,7 @@ export function PlannerClient() {
                   ) : null}
                 </>
               ) : null}
-              {icsUrl ? (
+              {icsUrl && !isAthleteSelfView ? (
                 <a
                   href={icsUrl}
                   className="rounded-lg border border-white/[0.1] bg-white/[0.05] px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-white/[0.08]"
@@ -1419,18 +1421,21 @@ export function PlannerClient() {
             <div className="card-tool rounded-xl p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Labels</p>
               <p className="mt-1 text-[11px] text-slate-600">
-                Edit name or colour anytime. Deleting removes the tag from every task on this board.
+                {isAthleteSelfView
+                  ? "Task tags on this board."
+                  : "Edit name or colour anytime. Deleting removes the tag from every task on this board."}
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 {detail.labels.map((l) => (
                   <EditableLabelChip
                     key={l.id}
                     label={l}
+                    readOnly={isAthleteSelfView}
                     onPatch={patchLabel}
                     onDelete={deleteLabel}
                   />
                 ))}
-                <LabelInlineForm onCreate={createLabel} />
+                {!isAthleteSelfView ? <LabelInlineForm onCreate={createLabel} /> : null}
               </div>
             </div>
           )}
@@ -2133,10 +2138,12 @@ function EditableColumnHeader({
 
 function EditableLabelChip({
   label,
+  readOnly = false,
   onPatch,
   onDelete,
 }: {
   label: Label;
+  readOnly?: boolean;
   onPatch: (id: string, patch: { name: string; color: string }) => Promise<boolean>;
   onDelete: (id: string) => Promise<void>;
 }) {
@@ -2148,6 +2155,19 @@ function EditableLabelChip({
     setName(label.name);
     setColor(label.color);
   }, [label.id, label.name, label.color]);
+
+  if (readOnly) {
+    return (
+      <div
+        className="flex max-w-full items-center rounded-full py-0.5 px-2.5 planner-label-chip ring-1 ring-inset"
+        style={plannerLabelChipStyle(label.color)}
+      >
+        <span className="max-w-[10rem] truncate text-xs font-semibold" title={label.name}>
+          {label.name}
+        </span>
+      </div>
+    );
+  }
 
   if (editing) {
     return (

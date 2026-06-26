@@ -162,17 +162,13 @@ function MapClusterLayer({
       marker.bindPopup(lines.join(""));
       if (!m.hub && onStageChangeRef.current) {
         marker.on("popupopen", () => {
-          const sel = marker
-            .getPopup()
-            ?.getElement()
-            ?.querySelector(".map-pin-stage-select") as HTMLSelectElement | null;
+          const popupEl = marker.getPopup()?.getElement();
+          const sel = popupEl?.querySelector(".map-pin-stage-select") as HTMLSelectElement | null;
           if (!sel) return;
-          sel.value = m.stage;
           applyMapPinStageSelectAppearance(sel);
           sel.onchange = () => {
-            const next = sel.value as Stage;
             applyMapPinStageSelectAppearance(sel);
-            onStageChangeRef.current?.(m.id, next);
+            onStageChangeRef.current?.(m.id, sel.value as Stage);
           };
         });
       }

@@ -45,6 +45,7 @@ function insertAnchorBeforeId(
 
 type Props = {
   boards: KanbanBoardDetail[];
+  hideFixedBadge?: boolean;
   onMoveTask: (
     taskId: string,
     destColumnId: string,
@@ -57,6 +58,7 @@ type Props = {
 
 export function MultiBoardKanban({
   boards,
+  hideFixedBadge = false,
   onMoveTask,
   onOpenTask,
   onToggleComplete,
@@ -166,7 +168,7 @@ export function MultiBoardKanban({
               style={{ borderLeftWidth: 4, borderLeftColor: board.color }}
             >
               <h3 className="text-sm font-semibold text-white">{board.title}</h3>
-              {board.isSystem ? (
+              {board.isSystem && !hideFixedBadge ? (
                 <span className="text-[10px] uppercase text-amber-500/80">fixed board</span>
               ) : null}
             </header>
