@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma";
 
-/** 6 outreach stages as per n8n workflow (cold → no_reply/positive/negative/etc) */
+/** Outreach stages — targeted (shortlist) through n8n nurture flow. */
 export const LEAD_STAGES = [
+  "targeted",
   "cold",
   "no_reply",
   "positive_reply",

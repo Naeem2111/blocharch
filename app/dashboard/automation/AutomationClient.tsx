@@ -2,16 +2,11 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { LEAD_STAGES } from "@/lib/leads";
+import { LEAD_STAGE_LABELS } from "@/lib/lead-stage-ui";
 import { LeadStagePicker } from "@/components/LeadStagePicker";
 
-const STAGES = [
-  "cold",
-  "no_reply",
-  "positive_reply",
-  "follow_up_interested",
-  "negative_reply",
-  "follow_up_not_interested",
-] as const;
+const STAGES = LEAD_STAGES;
 
 interface LeadItem {
   url: string;
@@ -166,7 +161,7 @@ export function AutomationClient() {
             <option value="">All</option>
             {STAGES.map((s) => (
               <option key={s} value={s}>
-                {s}
+                {LEAD_STAGE_LABELS[s]}
               </option>
             ))}
           </select>

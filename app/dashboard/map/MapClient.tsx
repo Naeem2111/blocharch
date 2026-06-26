@@ -3,6 +3,8 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MAP_PRACTICE_DISPLAY_LIMIT, type MapPracticeStage } from "@/lib/map-practices";
+import { LEAD_STAGES } from "@/lib/leads";
+import { LEAD_STAGE_COLORS, LEAD_STAGE_LABELS } from "@/lib/lead-stage-ui";
 
 import { hubUsesIconStudio, type MapHubAnchor } from "@/lib/map-hub";
 
@@ -29,14 +31,12 @@ type Practice = { name: string; address: string; slug: string; stage: MapPractic
 
 const MAP_FOCAL_SYNTHETIC_ID = "__blocharch_map_focal__";
 
-const STAGE_META: Record<MapPracticeStage, { label: string; color: string }> = {
-  cold: { label: "Cold", color: "#0ea5e9" },
-  no_reply: { label: "No reply", color: "#f59e0b" },
-  positive_reply: { label: "Positive reply", color: "#22c55e" },
-  follow_up_interested: { label: "Follow-up interested", color: "#10b981" },
-  negative_reply: { label: "Negative reply", color: "#ef4444" },
-  follow_up_not_interested: { label: "Follow-up not interested", color: "#f97316" },
-};
+const STAGE_META: Record<MapPracticeStage, { label: string; color: string }> = Object.fromEntries(
+  LEAD_STAGES.map((stage) => [
+    stage,
+    { label: LEAD_STAGE_LABELS[stage], color: LEAD_STAGE_COLORS[stage] },
+  ])
+) as Record<MapPracticeStage, { label: string; color: string }>;
 
 /** Per-request batch size for Nominatim (uncached addresses only). Order follows proximity-sorted practices. */
 const GEOCODE_CHUNK = 8;
@@ -271,14 +271,10 @@ export function MapClient({
   );
 
   const stageCounts = useMemo(() => {
-    const counts: Record<MapPracticeStage, number> = {
-      cold: 0,
-      no_reply: 0,
-      positive_reply: 0,
-      follow_up_interested: 0,
-      negative_reply: 0,
-      follow_up_not_interested: 0,
-    };
+    const counts = Object.fromEntries(LEAD_STAGES.map((s) => [s, 0])) as Record<
+      MapPracticeStage,
+      number
+    >;
     for (const m of filteredMarkers) {
       if (m.id === MAP_FOCAL_SYNTHETIC_ID) continue;
       counts[m.stage] += 1;

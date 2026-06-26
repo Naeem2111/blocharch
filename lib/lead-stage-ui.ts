@@ -1,6 +1,7 @@
 import type { LeadStage } from "@/lib/leads";
 
 export const LEAD_STAGE_COLORS: Record<LeadStage, string> = {
+  targeted: "#d946ef",
   cold: "#0ea5e9",
   no_reply: "#f59e0b",
   positive_reply: "#22c55e",
@@ -10,6 +11,7 @@ export const LEAD_STAGE_COLORS: Record<LeadStage, string> = {
 };
 
 export const LEAD_STAGE_LABELS: Record<LeadStage, string> = {
+  targeted: "Targeted",
   cold: "Cold",
   no_reply: "No reply",
   positive_reply: "Positive reply",

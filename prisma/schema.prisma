@@ -14,6 +14,7 @@ enum UserRole {
 }
 
 enum LeadStage {
+  targeted
   cold
   no_reply
   positive_reply

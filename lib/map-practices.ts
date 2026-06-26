@@ -2,13 +2,9 @@ import { getBestAddressFromFields } from "@/lib/address-display";
 import { prisma } from "@/lib/prisma";
 import { getMapFocalAnchor, type MapAnchorRow, type MapHubAnchor } from "@/lib/map-hub";
 
-export type MapPracticeStage =
-  | "cold"
-  | "no_reply"
-  | "positive_reply"
-  | "follow_up_interested"
-  | "negative_reply"
-  | "follow_up_not_interested";
+import type { LeadStage } from "@/lib/leads";
+
+export type MapPracticeStage = LeadStage;
 
 export type MapPractice = {
   name: string;

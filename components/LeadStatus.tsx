@@ -1,15 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-
-const STAGES = [
-  "cold",
-  "no_reply",
-  "positive_reply",
-  "follow_up_interested",
-  "negative_reply",
-  "follow_up_not_interested",
-] as const;
+import { LEAD_STAGES } from "@/lib/leads";
+import { LEAD_STAGE_LABELS } from "@/lib/lead-stage-ui";
 
 function StarRating({
   value,
@@ -111,9 +104,9 @@ export function LeadStatus({ slug }: { slug: string }) {
           disabled={saving}
           className="select-console px-3 py-2 rounded-lg text-sm"
         >
-          {STAGES.map((s) => (
+          {LEAD_STAGES.map((s) => (
             <option key={s} value={s}>
-              {s}
+              {LEAD_STAGE_LABELS[s]}
             </option>
           ))}
         </select>
