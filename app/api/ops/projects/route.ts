@@ -9,6 +9,10 @@ import {
 import { requireOpsSession } from "@/lib/ops-access";
 import { parseDateOnly } from "@/lib/ops-hours";
 import { syncProjectBoardOnAssign } from "@/lib/planner-project-sync";
+import {
+  normalizeAthleteProjectCode,
+  validateAthleteProjectCodeDb,
+} from "@/lib/ops-project-code";
 
 export async function GET(request: NextRequest) {
   const gate = await requireOpsSession(request);
@@ -60,20 +64,25 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const clientId = String(body.clientId || "").trim();
     const name = String(body.name || "").trim();
-    const projectNumber = String(body.projectNumber || "").trim();
+    const projectNumber = normalizeAthleteProjectCode(String(body.projectNumber || ""));
     const assignedAthleteId = body.assignedAthleteId ? String(body.assignedAthleteId).trim() : null;
 
-    if (!clientId || !name || !projectNumber) {
-      return NextResponse.json({ error: "Client, name, and project number are required" }, { status: 400 });
+    if (!clientId || !name || !assignedAthleteId || !projectNumber) {
+      return NextResponse.json({ error: "Client, name, athlete, and athlete code are required" }, { status: 400 });
     }
 
     const client = await prisma.opsClient.findUnique({ where: { id: clientId } });
     if (!client) return NextResponse.json({ error: "Client not found" }, { status: 404 });
 
-    if (assignedAthleteId) {
-      const athlete = await prisma.opsAthlete.findUnique({ where: { id: assignedAthleteId } });
-      if (!athlete) return NextResponse.json({ error: "Athlete not found" }, { status: 404 });
-    }
+    const athlete = await prisma.opsAthlete.findUnique({ where: { id: assignedAthleteId } });
+    if (!athlete) return NextResponse.json({ error: "Athlete not found" }, { status: 404 });
+
+    const codeError = await validateAthleteProjectCodeDb(prisma, {
+      clientId,
+      code: projectNumber,
+      assignedAthleteId,
+    });
+    if (codeError) return NextResponse.json({ error: codeError }, { status: 400 });
 
     const complexity = isOpsProjectComplexity(String(body.complexity || ""))
       ? body.complexity
@@ -110,7 +119,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ project: { id: project.id, name: project.name } }, { status: 201 });
   } catch (err) {
     if (err && typeof err === "object" && "code" in err && err.code === "P2002") {
-      return NextResponse.json({ error: "Project number already exists for this client" }, { status: 400 });
+      return NextResponse.json({ error: "This athlete code is already used for this client" }, { status: 400 });
     }
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }

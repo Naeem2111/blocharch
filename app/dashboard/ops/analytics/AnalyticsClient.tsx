@@ -410,12 +410,12 @@ export function AnalyticsClient() {
         )}
       </div>
 
-      <div className="card-tool rounded-xl p-5">
-        <h2 className="text-sm font-semibold text-white">Due date calendar</h2>
-        <p className="mt-1 text-xs text-slate-500">
+      <div className="card-tool rounded-xl p-5 md:p-6">
+        <h2 className="text-base font-semibold text-white">Due date calendar</h2>
+        <p className="mt-1.5 text-sm text-slate-500">
           Active projects due in the selected month — progress bars show completion.
         </p>
-        <div className="mt-4">
+        <div className="mt-5">
           <DueDateCalendar month={month} projects={data.dueDateCalendar ?? []} />
         </div>
       </div>

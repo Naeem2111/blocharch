@@ -11,6 +11,7 @@ import {
 } from "@/lib/ops-constants";
 import { daysUntilDueFromIso, projectDueColor } from "@/lib/project-color-scale";
 import { computeProjectTimeline } from "@/lib/project-timeline";
+import { validateAthleteProjectCodeLocal } from "@/lib/ops-project-code";
 
 type ClientOption = {
   id: string;
@@ -29,6 +30,7 @@ type ProjectRow = {
   clientLogoTextTone: string | null;
   assignedAthleteId: string | null;
   assignedAthleteName: string | null;
+  athleteCode: string | null;
   name: string;
   projectNumber: string;
   address: string | null;
@@ -54,6 +56,9 @@ const emptyCreate = {
   dueDate: "",
 };
 
+const inputClass =
+  "mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white";
+
 export function OpsProjectsClient() {
   const [projects, setProjects] = useState<ProjectRow[]>([]);
   const [clients, setClients] = useState<ClientOption[]>([]);
@@ -61,6 +66,7 @@ export function OpsProjectsClient() {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editClientId, setEditClientId] = useState("");
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [form, setForm] = useState(emptyCreate);
@@ -125,6 +131,10 @@ export function OpsProjectsClient() {
 
   async function createProject(e: React.FormEvent) {
     e.preventDefault();
+    if (createCodeError) {
+      setError(createCodeError);
+      return;
+    }
     setError("");
     const r = await fetch("/api/ops/projects", {
       method: "POST",
@@ -142,9 +152,11 @@ export function OpsProjectsClient() {
   }
 
   function startEdit(p: ProjectRow) {
+    const athleteId = p.assignedAthleteId ?? "";
     setEditingId(p.id);
+    setEditClientId(p.clientId);
     setEditForm({
-      assignedAthleteId: p.assignedAthleteId ?? "",
+      assignedAthleteId: athleteId,
       name: p.name,
       projectNumber: p.projectNumber,
       address: p.address ?? "",
@@ -162,13 +174,23 @@ export function OpsProjectsClient() {
   }
 
   async function saveEdit(id: string) {
+    if (editCodeError) {
+      setError(editCodeError);
+      return;
+    }
     setError("");
     const r = await fetch(`/api/ops/projects/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        ...editForm,
         assignedAthleteId: editForm.assignedAthleteId || null,
+        name: editForm.name,
+        projectNumber: editForm.projectNumber,
+        address: editForm.address,
+        projectLead: editForm.projectLead,
+        complexity: editForm.complexity,
+        currentStage: editForm.currentStage,
+        currentStatus: editForm.currentStatus,
         startDate: editForm.startDate || null,
         dueDate: editForm.dueDate || null,
         handoverDate: editForm.handoverDate || null,
@@ -181,6 +203,7 @@ export function OpsProjectsClient() {
       return;
     }
     setEditingId(null);
+    setEditClientId("");
     setMsg("Project updated.");
     await load();
   }
@@ -198,6 +221,47 @@ export function OpsProjectsClient() {
     setMsg("Project deleted.");
     await load();
   }
+
+  const projectRowsForValidation = useMemo(
+    () => projects.map((p) => ({ id: p.id, clientId: p.clientId, projectNumber: p.projectNumber })),
+    [projects]
+  );
+
+  const createCodeError = useMemo(
+    () =>
+      form.clientId
+        ? validateAthleteProjectCodeLocal({
+            code: form.projectNumber,
+            clientId: form.clientId,
+            assignedAthleteId: form.assignedAthleteId || null,
+            projects: projectRowsForValidation,
+            athletes,
+          })
+        : null,
+    [form.clientId, form.projectNumber, form.assignedAthleteId, projectRowsForValidation, athletes]
+  );
+
+  const editCodeError = useMemo(
+    () =>
+      editingId && editClientId
+        ? validateAthleteProjectCodeLocal({
+            code: editForm.projectNumber,
+            clientId: editClientId,
+            assignedAthleteId: editForm.assignedAthleteId || null,
+            excludeProjectId: editingId,
+            projects: projectRowsForValidation,
+            athletes,
+          })
+        : null,
+    [
+      editingId,
+      editClientId,
+      editForm.projectNumber,
+      editForm.assignedAthleteId,
+      projectRowsForValidation,
+      athletes,
+    ]
+  );
 
   const filteredProjects = useMemo(() => {
     if (!clientFilterId) return projects;
@@ -239,6 +303,26 @@ export function OpsProjectsClient() {
   const createClient = clients.find((c) => c.id === form.clientId) ?? null;
   const selectedFilterClient = clients.find((c) => c.id === clientFilterId) ?? null;
 
+  function athleteCodeById(athleteId: string): string {
+    return athletes.find((a) => a.id === athleteId)?.athleteCode ?? "";
+  }
+
+  function handleCreateAthleteChange(athleteId: string) {
+    setForm((f) => ({
+      ...f,
+      assignedAthleteId: athleteId,
+      projectNumber: athleteId ? athleteCodeById(athleteId) : "",
+    }));
+  }
+
+  function handleEditAthleteChange(athleteId: string) {
+    setEditForm((f) => ({
+      ...f,
+      assignedAthleteId: athleteId,
+      projectNumber: athleteId ? athleteCodeById(athleteId) : "",
+    }));
+  }
+
   function renderProjectCard(p: ProjectRow) {
     const timeline = computeProjectTimeline({
       startDate: p.startDate,
@@ -257,8 +341,31 @@ export function OpsProjectsClient() {
         {editingId === p.id ? (
           <div className="grid gap-3 md:grid-cols-2">
             <label className="text-xs text-slate-400">Name<input value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
-            <label className="text-xs text-slate-400">Number<input value={editForm.projectNumber} onChange={(e) => setEditForm((f) => ({ ...f, projectNumber: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
-            <label className="text-xs text-slate-400">Athlete<select value={editForm.assignedAthleteId} onChange={(e) => setEditForm((f) => ({ ...f, assignedAthleteId: e.target.value }))} className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"><option value="">Unassigned</option>{athletes.map((a) => <option key={a.id} value={a.id}>{a.fullName}</option>)}</select></label>
+            <label className="text-xs text-slate-400">
+              Athlete
+              <select
+                value={editForm.assignedAthleteId}
+                onChange={(e) => handleEditAthleteChange(e.target.value)}
+                className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
+              >
+                <option value="">Unassigned</option>
+                {athletes.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.fullName}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-xs text-slate-400">
+              Athlete code
+              <input
+                value={editForm.projectNumber}
+                onChange={(e) => setEditForm((f) => ({ ...f, projectNumber: e.target.value }))}
+                placeholder="e.g. JD01"
+                className={inputClass}
+              />
+              {editCodeError ? <span className="mt-1 block text-[11px] text-red-400">{editCodeError}</span> : null}
+            </label>
             <label className="text-xs text-slate-400">Complexity<select value={editForm.complexity} onChange={(e) => setEditForm((f) => ({ ...f, complexity: e.target.value }))} className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
             <label className="text-xs text-slate-400">Stage<select value={editForm.currentStage} onChange={(e) => setEditForm((f) => ({ ...f, currentStage: e.target.value }))} className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm">{Object.entries(PROJECT_PHASE_LABELS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
             <label className="text-xs text-slate-400">Status<select value={editForm.currentStatus} onChange={(e) => setEditForm((f) => ({ ...f, currentStatus: e.target.value }))} className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm">{Object.entries(PROJECT_STATUS_LABELS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
@@ -266,8 +373,15 @@ export function OpsProjectsClient() {
             <label className="text-xs text-slate-400">Handover<input type="date" value={editForm.handoverDate} onChange={(e) => setEditForm((f) => ({ ...f, handoverDate: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.04] px-3 py-2 text-sm text-white" /></label>
             <label className="text-xs text-slate-400 md:col-span-2">Notes<textarea value={editForm.notes} onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))} rows={2} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
             <div className="flex flex-wrap gap-2 md:col-span-2">
-              <button type="button" onClick={() => void saveEdit(p.id)} className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-slate-950">Save</button>
-              <button type="button" onClick={() => setEditingId(null)} className="text-xs text-slate-500">Cancel</button>
+              <button
+                type="button"
+                disabled={!!editCodeError}
+                onClick={() => void saveEdit(p.id)}
+                className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Save
+              </button>
+              <button type="button" onClick={() => { setEditingId(null); setEditClientId(""); }} className="text-xs text-slate-500">Cancel</button>
               <button type="button" onClick={() => void deleteProject(p.id, p.name)} className="text-xs text-red-400 hover:text-red-300">Delete project</button>
             </div>
           </div>
@@ -276,7 +390,8 @@ export function OpsProjectsClient() {
             <div className="min-w-0">
               <h2 className="font-semibold text-white">{p.name}</h2>
               <p className="text-xs text-slate-500">
-                {p.projectNumber} · {p.assignedAthleteName ?? "Unassigned"}
+                {p.projectNumber}
+                {p.assignedAthleteName ? ` · ${p.assignedAthleteName}` : " · Unassigned"}
               </p>
               <p
                 className={`mt-2 text-xs ${
@@ -380,13 +495,47 @@ export function OpsProjectsClient() {
               </select>
             </div>
           </label>
-          <label className="text-xs text-slate-400">Athlete<select value={form.assignedAthleteId} onChange={(e) => setForm((f) => ({ ...f, assignedAthleteId: e.target.value }))} className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"><option value="">Unassigned</option>{athletes.map((a) => <option key={a.id} value={a.id}>{a.fullName}</option>)}</select></label>
+          <label className="text-xs text-slate-400">
+            Athlete
+            <select
+              required
+              value={form.assignedAthleteId}
+              onChange={(e) => handleCreateAthleteChange(e.target.value)}
+              className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
+            >
+              <option value="">Select…</option>
+              {athletes.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.fullName}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="text-xs text-slate-400">Name<input required value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
-          <label className="text-xs text-slate-400">Number<input required value={form.projectNumber} onChange={(e) => setForm((f) => ({ ...f, projectNumber: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
+          <label className="text-xs text-slate-400">
+            Athlete code
+            <input
+              required
+              value={form.projectNumber}
+              onChange={(e) => setForm((f) => ({ ...f, projectNumber: e.target.value }))}
+              placeholder="Prefilled from athlete; editable"
+              className={inputClass}
+            />
+            {createCodeError ? <span className="mt-1 block text-[11px] text-red-400">{createCodeError}</span> : null}
+          </label>
           <label className="text-xs text-slate-400 md:col-span-2">Address<input value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
           <label className="text-xs text-slate-400">Due<input type="date" value={form.dueDate} onChange={(e) => setForm((f) => ({ ...f, dueDate: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
           {error ? <p className="text-sm text-red-400 md:col-span-2">{error}</p> : null}
-          <div className="flex gap-2 md:col-span-2"><button type="submit" className="rounded-lg bg-white/[0.08] px-4 py-2 text-sm text-slate-100">Create</button><button type="button" onClick={() => setOpen(false)} className="text-sm text-slate-500">Cancel</button></div>
+          <div className="flex gap-2 md:col-span-2">
+            <button
+              type="submit"
+              disabled={!!createCodeError}
+              className="rounded-lg bg-white/[0.08] px-4 py-2 text-sm text-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Create
+            </button>
+            <button type="button" onClick={() => setOpen(false)} className="text-sm text-slate-500">Cancel</button>
+          </div>
         </form>
       )}
 

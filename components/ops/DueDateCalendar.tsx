@@ -56,10 +56,11 @@ export function DueDateCalendar({
 
   return (
     <div className="due-date-calendar">
-      <h3 className="text-sm font-semibold text-white">{monthLabel}</h3>
-      <div className="due-date-calendar-grid mt-3 grid grid-cols-7 gap-px overflow-hidden rounded-lg border border-white/[0.08] bg-white/[0.04] text-xs">
+      <h3 className="text-base font-semibold text-white">{monthLabel}</h3>
+      <div className="mt-4 overflow-x-auto">
+        <div className="due-date-calendar-grid grid min-w-[42rem] grid-cols-7 gap-1 overflow-hidden rounded-lg border border-white/[0.08] bg-white/[0.04] text-sm sm:min-w-0">
         {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
-          <div key={d} className="due-date-calendar-head px-2 py-1.5 text-center font-medium text-slate-500">
+          <div key={d} className="due-date-calendar-head px-2 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-slate-500 sm:text-sm sm:normal-case sm:tracking-normal">
             {d}
           </div>
         ))}
@@ -68,31 +69,35 @@ export function DueDateCalendar({
           return (
             <div
               key={i}
-              className={`due-date-calendar-cell min-h-[88px] p-1.5 ${cell.day ? "" : "due-date-calendar-cell-empty"}`}
+              className={`due-date-calendar-cell min-h-[7.5rem] p-2 sm:min-h-[8.5rem] sm:p-2.5 ${cell.day ? "" : "due-date-calendar-cell-empty"}`}
             >
               {cell.day ? (
                 <>
-                  <span className="due-date-calendar-day-num tabular-nums text-slate-400">{cell.day}</span>
-                  <ul className="mt-1 space-y-1">
+                  <span className="due-date-calendar-day-num text-sm font-semibold tabular-nums text-slate-300">
+                    {cell.day}
+                  </span>
+                  <ul className="mt-1.5 space-y-1.5">
                     {items.map((p) => (
                       <li
                         key={p.id}
-                        className="due-date-calendar-event rounded bg-white/[0.04] px-1 py-0.5"
+                        className="due-date-calendar-event rounded-md bg-white/[0.04] px-1.5 py-1"
                         title={`${p.name} · ${p.clientName}`}
                       >
-                        <p className="due-date-calendar-event-title flex items-center gap-1 truncate text-[10px] font-medium text-slate-200">
+                        <p className="due-date-calendar-event-title flex items-center gap-1.5 text-xs font-medium leading-snug text-slate-200">
                           {p.clientLogoUrl || p.clientLogoBgColor ? (
                             <ClientAvatar
                               name={p.clientName}
                               logoUrl={p.clientLogoUrl}
                               backgroundColor={p.clientLogoBgColor}
                               textTone={asAvatarTextTone(p.clientLogoTextTone)}
-                              size={14}
+                              size={18}
                             />
                           ) : null}
-                          <span className="truncate">{p.name}</span>
+                          <span className="line-clamp-2 min-w-0 flex-1">{p.name}</span>
                         </p>
-                        <ProjectProgressBar percent={p.progressPercent} showLabel={false} />
+                        <div className="mt-1 [&_.progress-track]:h-2.5">
+                          <ProjectProgressBar percent={p.progressPercent} showLabel={false} />
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -101,6 +106,7 @@ export function DueDateCalendar({
             </div>
           );
         })}
+        </div>
       </div>
     </div>
   );

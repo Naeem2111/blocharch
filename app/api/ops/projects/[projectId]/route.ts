@@ -9,6 +9,10 @@ import {
 import { requireOpsSession } from "@/lib/ops-access";
 import { parseDateOnly } from "@/lib/ops-hours";
 import { syncProjectAfterOpsUpdate } from "@/lib/planner-project-sync";
+import {
+  normalizeAthleteProjectCode,
+  validateAthleteProjectCodeDb,
+} from "@/lib/ops-project-code";
 import type { OpsProjectStatus } from "@prisma/client";
 
 type RouteContext = { params: Promise<{ projectId: string }> };
@@ -30,9 +34,17 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       if (!name) return NextResponse.json({ error: "Project name required" }, { status: 400 });
       data.name = name;
     }
+    if (body.assignedAthleteId !== undefined) {
+      const aid = body.assignedAthleteId ? String(body.assignedAthleteId).trim() : null;
+      if (aid) {
+        const athlete = await prisma.opsAthlete.findUnique({ where: { id: aid } });
+        if (!athlete) return NextResponse.json({ error: "Athlete not found" }, { status: 404 });
+      }
+      data.assignedAthleteId = aid;
+    }
     if (body.projectNumber != null) {
-      const projectNumber = String(body.projectNumber).trim();
-      if (!projectNumber) return NextResponse.json({ error: "Project number required" }, { status: 400 });
+      const projectNumber = normalizeAthleteProjectCode(String(body.projectNumber));
+      if (!projectNumber) return NextResponse.json({ error: "Athlete code is required" }, { status: 400 });
       data.projectNumber = projectNumber;
     }
     if (body.address !== undefined) data.address = body.address ? String(body.address).trim() : null;
@@ -55,15 +67,6 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       data.currentStatus = s;
     }
 
-    if (body.assignedAthleteId !== undefined) {
-      const aid = body.assignedAthleteId ? String(body.assignedAthleteId).trim() : null;
-      if (aid) {
-        const athlete = await prisma.opsAthlete.findUnique({ where: { id: aid } });
-        if (!athlete) return NextResponse.json({ error: "Athlete not found" }, { status: 404 });
-      }
-      data.assignedAthleteId = aid;
-    }
-
     if (body.startDate !== undefined) data.startDate = body.startDate ? parseDateOnly(String(body.startDate)) : null;
     if (body.dueDate !== undefined) data.dueDate = body.dueDate ? parseDateOnly(String(body.dueDate)) : null;
     if (body.handoverDate !== undefined) data.handoverDate = body.handoverDate ? parseDateOnly(String(body.handoverDate)) : null;
@@ -74,6 +77,22 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (Object.keys(data).length === 0) {
       return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
     }
+
+    const nextClientId = existing.clientId;
+    const nextProjectNumber =
+      typeof data.projectNumber === "string" ? data.projectNumber : existing.projectNumber;
+    const nextAthleteId =
+      data.assignedAthleteId !== undefined
+        ? (data.assignedAthleteId as string | null)
+        : existing.assignedAthleteId;
+
+    const codeError = await validateAthleteProjectCodeDb(prisma, {
+      clientId: nextClientId,
+      code: nextProjectNumber,
+      assignedAthleteId: nextAthleteId,
+      excludeProjectId: projectId,
+    });
+    if (codeError) return NextResponse.json({ error: codeError }, { status: 400 });
 
     const project = await prisma.opsProject.update({
       where: { id: projectId },
