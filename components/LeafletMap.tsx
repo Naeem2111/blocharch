@@ -26,7 +26,7 @@ type MarkerItem = {
 
 import { LEAD_STAGE_COLORS } from "@/lib/lead-stage-ui";
 import type { LeadStage } from "@/lib/leads";
-import { buildMapPinStageSelectHtml, applyMapPinStageSelectAppearance } from "@/lib/map-pin-popup";
+import { buildMapPinStageSelectHtml, initMapPinStageDropdown } from "@/lib/map-pin-popup";
 
 const STAGE_COLORS: Record<Stage, string> = LEAD_STAGE_COLORS;
 
@@ -161,15 +161,19 @@ function MapClusterLayer({
       ].filter(Boolean);
       marker.bindPopup(lines.join(""));
       if (!m.hub && onStageChangeRef.current) {
+        let cleanupPicker: (() => void) | null = null;
         marker.on("popupopen", () => {
+          cleanupPicker?.();
           const popupEl = marker.getPopup()?.getElement();
-          const sel = popupEl?.querySelector(".map-pin-stage-select") as HTMLSelectElement | null;
-          if (!sel) return;
-          applyMapPinStageSelectAppearance(sel);
-          sel.onchange = () => {
-            applyMapPinStageSelectAppearance(sel);
-            onStageChangeRef.current?.(m.id, sel.value as Stage);
-          };
+          const picker = popupEl?.querySelector(".map-pin-stage-picker") as HTMLElement | null;
+          if (!picker) return;
+          cleanupPicker = initMapPinStageDropdown(picker, (stage) => {
+            onStageChangeRef.current?.(m.id, stage);
+          });
+        });
+        marker.on("popupclose", () => {
+          cleanupPicker?.();
+          cleanupPicker = null;
         });
       }
       mcg.addLayer(marker);
@@ -254,6 +258,86 @@ export function LeafletMap({
         :global(.leaflet-map-cluster-blue .marker-cluster-large div) {
           background-color: rgba(14, 165, 233, 0.85);
           color: rgb(248, 250, 252);
+        }
+        :global(.leaflet-map-cluster-blue .leaflet-popup-content) {
+          overflow: visible;
+        }
+        :global(.map-pin-stage-row) {
+          margin-top: 8px;
+        }
+        :global(.map-pin-stage-label) {
+          display: block;
+          font-size: 11px;
+          font-weight: 600;
+          color: #475569;
+          margin-bottom: 4px;
+        }
+        :global(.map-pin-stage-picker) {
+          position: relative;
+          width: 100%;
+        }
+        :global(.map-pin-stage-trigger) {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 12px;
+          border: 1px solid #cbd5e1;
+          border-radius: 6px;
+          padding: 4px 8px;
+          background: #fff;
+          color: #0f172a;
+          text-align: left;
+          cursor: pointer;
+        }
+        :global(.map-pin-stage-trigger-label) {
+          flex: 1;
+          min-width: 0;
+        }
+        :global(.map-pin-stage-chevron) {
+          color: #64748b;
+          font-size: 10px;
+          line-height: 1;
+        }
+        :global(.map-pin-stage-menu) {
+          position: absolute;
+          top: calc(100% + 4px);
+          left: 0;
+          right: 0;
+          z-index: 1000;
+          margin: 0;
+          padding: 4px;
+          list-style: none;
+          border: 1px solid #cbd5e1;
+          border-radius: 6px;
+          background: #fff;
+          box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+          max-height: 220px;
+          overflow-y: auto;
+        }
+        :global(.map-pin-stage-option) {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          width: 100%;
+          border: none;
+          border-radius: 4px;
+          padding: 6px 8px;
+          background: transparent;
+          color: #0f172a;
+          font-size: 12px;
+          text-align: left;
+          cursor: pointer;
+        }
+        :global(.map-pin-stage-option:hover) {
+          background: #f1f5f9;
+        }
+        :global(.map-pin-stage-option--selected) {
+          background: #eff6ff;
+        }
+        :global(.map-pin-stage-option-label) {
+          flex: 1;
+          min-width: 0;
         }
       `}</style>
     </div>
