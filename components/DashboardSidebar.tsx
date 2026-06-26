@@ -117,6 +117,15 @@ const ONBOARDING_NAV: NavItem[] = [
       </svg>
     ),
   },
+  {
+    href: "/dashboard/ops/calculator",
+    label: "Calculator",
+    icon: (
+      <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 15.75V18m-7.5-6.75h.008v.008H8.25v-.008zm0 2.25h.008v.008H8.25V12zm0 2.25h.008v.008H8.25v-.008zm0 2.25h.008v.008H8.25V18zm2.498-6.75h.007v.008h-.007v-.008zm0 2.25h.007v.008h-.007V12zm0 2.25h.007v.008h-.007v-.008zm0 2.25h.007v.008h-.007V18zm2.504-6.75h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V12zm0 2.25h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V18zm2.498-6.75h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V12zm0 2.25h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V18zM6 3.75A2.25 2.25 0 018.25 1.5h7.5A2.25 2.25 0 0118 3.75v16.5A2.25 2.25 0 0115.75 22.5h-7.5A2.25 2.25 0 016 20.25V3.75z" />
+      </svg>
+    ),
+  },
 ];
 
 const OPS_NAV: NavItem[] = [
