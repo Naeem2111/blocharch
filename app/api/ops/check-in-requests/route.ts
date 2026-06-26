@@ -7,7 +7,7 @@ import { serializeCheckInRequest } from "@/lib/check-in-requests";
 import { isGoogleCalendarConfigured } from "@/lib/google-calendar";
 
 const include = {
-  athlete: { select: { fullName: true, athleteCode: true, email: true } },
+  athlete: { select: { fullName: true, athleteCode: true, email: true, profilePhotoUrl: true, profilePhotoBgColor: true, profilePhotoTextTone: true } },
   project: { include: { client: { select: { name: true } } } },
 } as const;
 

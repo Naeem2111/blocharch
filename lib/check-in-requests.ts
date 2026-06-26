@@ -4,7 +4,14 @@ import { createGoogleCalendarEvent, patchGoogleCalendarEvent } from "@/lib/googl
 
 export function serializeCheckInRequest(
   row: OpsCheckInRequest & {
-    athlete: { fullName: string; athleteCode: string; email: string | null };
+    athlete: {
+      fullName: string;
+      athleteCode: string;
+      email: string | null;
+      profilePhotoUrl?: string | null;
+      profilePhotoBgColor?: string | null;
+      profilePhotoTextTone?: string | null;
+    };
     project: { name: string; client: { name: string } } | null;
   }
 ) {
@@ -15,6 +22,9 @@ export function serializeCheckInRequest(
     athleteName: row.athlete.fullName,
     athleteCode: row.athlete.athleteCode,
     athleteEmail: row.athlete.email,
+    profilePhotoUrl: row.athlete.profilePhotoUrl ?? null,
+    profilePhotoBgColor: row.athlete.profilePhotoBgColor ?? null,
+    profilePhotoTextTone: row.athlete.profilePhotoTextTone ?? null,
     projectId: row.projectId,
     projectName: row.project?.name ?? null,
     clientName: row.project?.client?.name ?? null,
@@ -39,7 +49,16 @@ export async function loadCheckInRequest(id: string) {
   return prisma.opsCheckInRequest.findUnique({
     where: { id },
     include: {
-      athlete: { select: { fullName: true, athleteCode: true, email: true } },
+      athlete: {
+        select: {
+          fullName: true,
+          athleteCode: true,
+          email: true,
+          profilePhotoUrl: true,
+          profilePhotoBgColor: true,
+          profilePhotoTextTone: true,
+        },
+      },
       project: { include: { client: { select: { name: true } } } },
     },
   });

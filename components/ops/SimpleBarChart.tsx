@@ -10,6 +10,9 @@ type BarItem = {
   imageUrl?: string | null;
   imageBgColor?: string | null;
   imageTextTone?: string | null;
+  /** When true, show initials avatar even without a photo URL. */
+  showAvatar?: boolean;
+  objectFit?: "contain" | "cover";
 };
 
 type SimpleBarChartProps = {
@@ -33,13 +36,14 @@ export function SimpleBarChart({ items, valueSuffix = "", maxValue }: SimpleBarC
           <div key={item.label}>
             <div className="mb-1 flex items-center justify-between gap-2 text-xs">
               <span className="flex min-w-0 items-center gap-2 truncate text-slate-300">
-                {item.imageUrl || item.imageBgColor ? (
+                {item.showAvatar || item.imageUrl || item.imageBgColor ? (
                   <ClientAvatar
                     name={item.label}
                     logoUrl={item.imageUrl}
                     backgroundColor={item.imageBgColor}
                     textTone={asAvatarTextTone(item.imageTextTone)}
                     size={22}
+                    objectFit={item.objectFit ?? "contain"}
                   />
                 ) : null}
                 <span className="truncate">{item.label}</span>

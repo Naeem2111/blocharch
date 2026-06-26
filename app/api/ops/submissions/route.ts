@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     orderBy: [{ submissionDate: "desc" }, { updatedAt: "desc" }],
     take: limit,
     include: {
-      athlete: { select: { fullName: true, athleteCode: true } },
+      athlete: { select: { fullName: true, athleteCode: true, profilePhotoUrl: true, profilePhotoBgColor: true, profilePhotoTextTone: true } },
       lineItems: {
         include: {
           project: { select: { name: true } },
@@ -32,6 +32,9 @@ export async function GET(request: NextRequest) {
       athleteId: s.athleteId,
       athleteName: s.athlete.fullName,
       athleteCode: s.athlete.athleteCode,
+      profilePhotoUrl: s.athlete.profilePhotoUrl,
+      profilePhotoBgColor: s.athlete.profilePhotoBgColor,
+      profilePhotoTextTone: s.athlete.profilePhotoTextTone,
       submissionDate: s.submissionDate.toISOString().slice(0, 10),
       totalHours: Number(s.totalHours),
       wellbeingScore: s.wellbeingScore,

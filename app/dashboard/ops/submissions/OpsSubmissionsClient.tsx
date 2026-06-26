@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { AthleteAvatar } from "@/components/ops/AthleteAvatar";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
 import { asAvatarTextTone } from "@/lib/avatar-text-tone";
 import { PROJECT_PHASE_LABELS, TASK_TYPE_LABELS } from "@/lib/ops-constants";
@@ -27,6 +28,9 @@ type Submission = {
   id: string;
   athleteName: string;
   athleteCode: string;
+  profilePhotoUrl: string | null;
+  profilePhotoBgColor: string | null;
+  profilePhotoTextTone: string | null;
   submissionDate: string;
   totalHours: number;
   wellbeingScore: number | null;
@@ -114,12 +118,21 @@ export function OpsSubmissionsClient() {
             }`}
           >
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <div>
+              <div className="flex items-center gap-3">
+                <AthleteAvatar
+                  name={s.athleteName}
+                  photoUrl={s.profilePhotoUrl}
+                  backgroundColor={s.profilePhotoBgColor}
+                  textTone={asAvatarTextTone(s.profilePhotoTextTone)}
+                  size={36}
+                />
+                <div>
                 <h2 className="text-sm font-semibold text-white">
                   {s.athleteName}{" "}
                   <span className="font-normal text-slate-500">({s.athleteCode})</span>
                 </h2>
                 <p className="text-xs text-slate-500">{s.submissionDate}</p>
+                </div>
               </div>
               <p className="text-sm font-medium tabular-nums text-brand-300">{s.totalHours.toFixed(2)}h total</p>
             </div>

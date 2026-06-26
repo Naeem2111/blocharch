@@ -2,11 +2,16 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { AthleteAvatar } from "@/components/ops/AthleteAvatar";
 import { SimpleBarChart } from "@/components/ops/SimpleBarChart";
+import { asAvatarTextTone } from "@/lib/avatar-text-tone";
 
 type TopPerformer = {
   athleteId: string;
   athleteName: string;
+  profilePhotoUrl: string | null;
+  profilePhotoBgColor: string | null;
+  profilePhotoTextTone: string | null;
   hoursWorked: number;
   revenueGbp: number;
   marginGbp: number;
@@ -19,6 +24,9 @@ type TopPerformer = {
 type BeatenDeadlinesByAthlete = {
   athleteId: string;
   athleteName: string;
+  profilePhotoUrl: string | null;
+  profilePhotoBgColor: string | null;
+  profilePhotoTextTone: string | null;
   beatenCount: number;
   totalDaysBeaten: number;
   averageDaysBeaten: number;
@@ -105,6 +113,11 @@ export function OpsOverviewClient() {
         label: a.athleteName,
         value: a.beatenCount,
         sublabel: `${a.totalDaysBeaten}d total · avg ${a.averageDaysBeaten}d early`,
+        showAvatar: true,
+        imageUrl: a.profilePhotoUrl,
+        imageBgColor: a.profilePhotoBgColor,
+        imageTextTone: a.profilePhotoTextTone,
+        objectFit: "cover" as const,
       })),
     [data]
   );
@@ -115,6 +128,9 @@ export function OpsOverviewClient() {
         a.projects.map((p) => ({
           ...p,
           athleteName: a.athleteName,
+          profilePhotoUrl: a.profilePhotoUrl,
+          profilePhotoBgColor: a.profilePhotoBgColor,
+          profilePhotoTextTone: a.profilePhotoTextTone,
         }))
       ),
     [data]
@@ -211,7 +227,18 @@ export function OpsOverviewClient() {
               <tbody>
                 {data.topPerformers.map((a) => (
                   <tr key={a.athleteId} className="border-b border-white/[0.04] text-slate-300">
-                    <td className="px-3 py-2 font-medium text-white">{a.athleteName}</td>
+                    <td className="px-3 py-2 font-medium text-white">
+                      <span className="inline-flex items-center gap-2">
+                        <AthleteAvatar
+                          name={a.athleteName}
+                          photoUrl={a.profilePhotoUrl}
+                          backgroundColor={a.profilePhotoBgColor}
+                          textTone={asAvatarTextTone(a.profilePhotoTextTone)}
+                          size={28}
+                        />
+                        {a.athleteName}
+                      </span>
+                    </td>
                     <td className="px-3 py-2 tabular-nums">{a.hoursWorked}h</td>
                     <td className="px-3 py-2 tabular-nums">{a.beatenCount}</td>
                     <td className="px-3 py-2 tabular-nums text-emerald-300">
@@ -261,7 +288,18 @@ export function OpsOverviewClient() {
                 <tbody>
                   {beatenRows.map((row) => (
                     <tr key={row.projectId} className="border-b border-white/[0.04] text-slate-300">
-                      <td className="px-3 py-2">{row.athleteName}</td>
+                      <td className="px-3 py-2">
+                        <span className="inline-flex items-center gap-2">
+                          <AthleteAvatar
+                            name={row.athleteName}
+                            photoUrl={row.profilePhotoUrl}
+                            backgroundColor={row.profilePhotoBgColor}
+                            textTone={asAvatarTextTone(row.profilePhotoTextTone)}
+                            size={24}
+                          />
+                          {row.athleteName}
+                        </span>
+                      </td>
                       <td className="px-3 py-2">{row.projectName}</td>
                       <td className="px-3 py-2">{row.clientName}</td>
                       <td className="px-3 py-2 tabular-nums">{row.completedDate}</td>

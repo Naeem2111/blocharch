@@ -1,5 +1,6 @@
 import type { OpsProjectStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { athleteProfileVisual } from "@/lib/athlete-profile-visual";
 import { findDoneColumnId } from "@/lib/planner-completed";
 
 export type OpsArchivesFilters = {
@@ -40,7 +41,16 @@ export async function buildOpsArchives(filters: OpsArchivesFilters = {}) {
             logoTextTone: true,
           },
         },
-        assignedAthlete: { select: { id: true, fullName: true, athleteCode: true } },
+        assignedAthlete: {
+          select: {
+            id: true,
+            fullName: true,
+            athleteCode: true,
+            profilePhotoUrl: true,
+            profilePhotoBgColor: true,
+            profilePhotoTextTone: true,
+          },
+        },
       },
     }),
     prisma.plannerBoard.findMany({
@@ -54,7 +64,16 @@ export async function buildOpsArchives(filters: OpsArchivesFilters = {}) {
         title: true,
         athleteId: true,
         opsProjectId: true,
-        athlete: { select: { id: true, fullName: true, athleteCode: true } },
+        athlete: {
+          select: {
+            id: true,
+            fullName: true,
+            athleteCode: true,
+            profilePhotoUrl: true,
+            profilePhotoBgColor: true,
+            profilePhotoTextTone: true,
+          },
+        },
         opsProject: {
           select: {
             id: true,
@@ -71,26 +90,18 @@ export async function buildOpsArchives(filters: OpsArchivesFilters = {}) {
                 logoTextTone: true,
               },
             },
-            assignedAthlete: { select: { id: true, fullName: true, athleteCode: true } },
+            assignedAthlete: { select: { id: true, fullName: true, athleteCode: true, profilePhotoUrl: true, profilePhotoBgColor: true, profilePhotoTextTone: true } },
           },
         },
         columns: { orderBy: { sortOrder: "asc" }, select: { id: true, title: true } },
       },
     }),
     prisma.opsClient.findMany({
-      where: {
-        projects: { some: { currentStatus: { in: COMPLETED_PROJECT_STATUSES } } },
-      },
-      select: { id: true, name: true },
       orderBy: { name: "asc" },
+      select: { id: true, name: true },
     }),
     prisma.opsAthlete.findMany({
-      where: {
-        OR: [
-          { projects: { some: { currentStatus: { in: COMPLETED_PROJECT_STATUSES } } } },
-          { plannerBoards: { some: {} } },
-        ],
-      },
+      where: { status: "active" },
       select: { id: true, fullName: true, athleteCode: true },
       orderBy: { fullName: "asc" },
     }),
@@ -102,6 +113,9 @@ export async function buildOpsArchives(filters: OpsArchivesFilters = {}) {
     athleteId: string | null;
     athleteName: string | null;
     athleteCode: string | null;
+    profilePhotoUrl: string | null;
+    profilePhotoBgColor: string | null;
+    profilePhotoTextTone: string | null;
     projectId: string | null;
     projectName: string | null;
     projectNumber: string | null;
@@ -120,12 +134,15 @@ export async function buildOpsArchives(filters: OpsArchivesFilters = {}) {
     if (!doneId) continue;
     doneColumnIds.push(doneId);
     const project = board.opsProject;
+    const boardAthlete = board.athlete ?? project?.assignedAthlete ?? null;
+    const athleteVisual = athleteProfileVisual(boardAthlete);
     columnContext.set(doneId, {
       boardId: board.id,
       boardTitle: board.title,
-      athleteId: board.athlete?.id ?? project?.assignedAthleteId ?? null,
-      athleteName: board.athlete?.fullName ?? project?.assignedAthlete?.fullName ?? null,
-      athleteCode: board.athlete?.athleteCode ?? project?.assignedAthlete?.athleteCode ?? null,
+      athleteId: boardAthlete?.id ?? null,
+      athleteName: boardAthlete?.fullName ?? null,
+      athleteCode: boardAthlete?.athleteCode ?? null,
+      ...athleteVisual,
       projectId: project?.id ?? null,
       projectName: project?.name ?? null,
       projectNumber: project?.projectNumber ?? null,
@@ -151,7 +168,16 @@ export async function buildOpsArchives(filters: OpsArchivesFilters = {}) {
             assignee: {
               select: {
                 username: true,
-                opsAthleteProfile: { select: { id: true, fullName: true, athleteCode: true } },
+                opsAthleteProfile: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    athleteCode: true,
+                    profilePhotoUrl: true,
+                    profilePhotoBgColor: true,
+                    profilePhotoTextTone: true,
+                  },
+                },
               },
             },
             column: { select: { id: true } },
@@ -169,6 +195,13 @@ export async function buildOpsArchives(filters: OpsArchivesFilters = {}) {
         assigneeLabel(task.assignee) ?? ctx.athleteName ?? "Unassigned";
       const completedByAthleteId =
         task.assignee?.opsAthleteProfile?.id ?? ctx.athleteId ?? null;
+      const completedByProfile = task.assignee?.opsAthleteProfile
+        ? athleteProfileVisual(task.assignee.opsAthleteProfile)
+        : {
+            profilePhotoUrl: ctx.profilePhotoUrl,
+            profilePhotoBgColor: ctx.profilePhotoBgColor,
+            profilePhotoTextTone: ctx.profilePhotoTextTone,
+          };
 
       return {
         id: task.id,
@@ -177,6 +210,7 @@ export async function buildOpsArchives(filters: OpsArchivesFilters = {}) {
         completedAt: task.updatedAt.toISOString(),
         completedBy,
         completedByAthleteId,
+        ...completedByProfile,
         boardId: ctx.boardId,
         boardTitle: ctx.boardTitle,
         projectId: ctx.projectId,
@@ -205,7 +239,7 @@ export async function buildOpsArchives(filters: OpsArchivesFilters = {}) {
       submission: {
         select: {
           submissionDate: true,
-          athlete: { select: { id: true, fullName: true, athleteCode: true } },
+          athlete: { select: { id: true, fullName: true, athleteCode: true, profilePhotoUrl: true, profilePhotoBgColor: true, profilePhotoTextTone: true } },
         },
       },
       project: { select: { id: true, name: true, projectNumber: true } },
@@ -239,6 +273,7 @@ export async function buildOpsArchives(filters: OpsArchivesFilters = {}) {
       assignedAthleteId: p.assignedAthleteId,
       assignedAthleteName: p.assignedAthlete?.fullName ?? null,
       assignedAthleteCode: p.assignedAthlete?.athleteCode ?? null,
+      ...athleteProfileVisual(p.assignedAthlete),
       currentStatus: p.currentStatus,
       currentStage: p.currentStage,
       complexity: p.complexity,
@@ -256,6 +291,7 @@ export async function buildOpsArchives(filters: OpsArchivesFilters = {}) {
       athleteId: li.submission.athlete.id,
       athleteName: li.submission.athlete.fullName,
       athleteCode: li.submission.athlete.athleteCode,
+      ...athleteProfileVisual(li.submission.athlete),
       clientId: li.clientId,
       clientName: li.client.name,
       clientLogoUrl: li.client.logoUrl,

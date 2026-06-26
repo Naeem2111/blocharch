@@ -1,12 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { AthleteAvatar } from "@/components/ops/AthleteAvatar";
+import { asAvatarTextTone } from "@/lib/avatar-text-tone";
 
 type RequestRow = {
   id: string;
   source: string;
   athleteName: string;
   athleteCode: string;
+  profilePhotoUrl: string | null;
+  profilePhotoBgColor: string | null;
+  profilePhotoTextTone: string | null;
   projectName: string | null;
   clientName: string | null;
   reason: string;
@@ -159,9 +164,18 @@ export function OpsCheckInRequestsClient() {
               <li key={r.id} className={`card-tool rounded-xl p-4 ${statusMeta.cardClass}`}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 space-y-1">
-                    <p className="font-semibold text-white">
-                      {r.athleteName}{" "}
-                      <span className="text-xs font-normal text-slate-500">({r.athleteCode})</span>
+                    <p className="flex flex-wrap items-center gap-2 font-semibold text-white">
+                      <AthleteAvatar
+                        name={r.athleteName}
+                        photoUrl={r.profilePhotoUrl}
+                        backgroundColor={r.profilePhotoBgColor}
+                        textTone={asAvatarTextTone(r.profilePhotoTextTone)}
+                        size={32}
+                      />
+                      <span>
+                        {r.athleteName}{" "}
+                        <span className="text-xs font-normal text-slate-500">({r.athleteCode})</span>
+                      </span>
                     </p>
                     {r.projectName ? (
                       <p className="text-sm text-slate-400">

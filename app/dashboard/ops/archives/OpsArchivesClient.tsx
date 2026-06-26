@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { AthleteAvatar } from "@/components/ops/AthleteAvatar";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
 import { asAvatarTextTone } from "@/lib/avatar-text-tone";
 import {
@@ -11,7 +12,13 @@ import {
 } from "@/lib/ops-constants";
 import { groupProjectsByClient } from "@/lib/ops-project-groups";
 
-type FilterOption = { id: string; name: string };
+type FilterOption = {
+  id: string;
+  name: string;
+  logoUrl?: string | null;
+  logoBgColor?: string | null;
+  logoTextTone?: string | null;
+};
 type FilterOptionAthlete = { id: string; fullName: string; athleteCode: string };
 
 type ArchiveProject = {
@@ -26,6 +33,9 @@ type ArchiveProject = {
   assignedAthleteId: string | null;
   assignedAthleteName: string | null;
   assignedAthleteCode: string | null;
+  profilePhotoUrl: string | null;
+  profilePhotoBgColor: string | null;
+  profilePhotoTextTone: string | null;
   currentStatus: keyof typeof PROJECT_STATUS_LABELS;
   currentStage: keyof typeof PROJECT_PHASE_LABELS;
   complexity: keyof typeof COMPLEXITY_LABELS;
@@ -42,6 +52,9 @@ type ArchiveTask = {
   summary: string | null;
   completedAt: string;
   completedBy: string;
+  profilePhotoUrl: string | null;
+  profilePhotoBgColor: string | null;
+  profilePhotoTextTone: string | null;
   boardTitle: string;
   projectName: string | null;
   projectNumber: string | null;
@@ -58,6 +71,9 @@ type LoggedCompletion = {
   submissionDate: string;
   athleteName: string;
   athleteCode: string;
+  profilePhotoUrl: string | null;
+  profilePhotoBgColor: string | null;
+  profilePhotoTextTone: string | null;
   clientId: string;
   clientName: string;
   clientLogoUrl: string | null;
@@ -114,6 +130,45 @@ export function OpsArchivesClient() {
   const [tab, setTab] = useState<TabId>("projects");
   const [clientFilterId, setClientFilterId] = useState("");
   const [athleteFilterId, setAthleteFilterId] = useState("");
+  const [clients, setClients] = useState<FilterOption[]>([]);
+  const [athletes, setAthletes] = useState<FilterOptionAthlete[]>([]);
+
+  useEffect(() => {
+    void Promise.all([fetch("/api/ops/clients"), fetch("/api/ops/athletes")])
+      .then(async ([cr, ar]) => {
+        const cj = await cr.json();
+        const aj = await ar.json();
+        if (cj.clients) {
+          setClients(
+            cj.clients.map(
+              (c: {
+                id: string;
+                name: string;
+                logoUrl?: string | null;
+                logoBgColor?: string | null;
+                logoTextTone?: string | null;
+              }) => ({
+                id: c.id,
+                name: c.name,
+                logoUrl: c.logoUrl ?? null,
+                logoBgColor: c.logoBgColor ?? null,
+                logoTextTone: c.logoTextTone ?? null,
+              })
+            )
+          );
+        }
+        if (aj.athletes) {
+          setAthletes(
+            aj.athletes.map((a: { id: string; fullName: string; athleteCode: string }) => ({
+              id: a.id,
+              fullName: a.fullName,
+              athleteCode: a.athleteCode,
+            }))
+          );
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -157,6 +212,9 @@ export function OpsArchivesClient() {
     [data]
   );
 
+  const selectedFilterClient = clients.find((c) => c.id === clientFilterId) ?? null;
+  const selectedFilterAthlete = athletes.find((a) => a.id === athleteFilterId) ?? null;
+
   if (loading && !data) {
     return <p className="text-sm text-slate-500">Loading archives…</p>;
   }
@@ -172,7 +230,7 @@ export function OpsArchivesClient() {
             className="select-console mt-1 block min-w-[14rem] rounded-md px-3 py-2 text-sm"
           >
             <option value="">All clients</option>
-            {(data?.filterOptions.clients ?? []).map((c) => (
+            {clients.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
@@ -187,13 +245,31 @@ export function OpsArchivesClient() {
             className="select-console mt-1 block min-w-[14rem] rounded-md px-3 py-2 text-sm"
           >
             <option value="">All athletes</option>
-            {(data?.filterOptions.athletes ?? []).map((a) => (
+            {athletes.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.fullName}
               </option>
             ))}
           </select>
         </label>
+        {selectedFilterClient ? (
+          <p className="flex items-center gap-2 pb-2 text-xs text-slate-400">
+            <ClientAvatar
+              name={selectedFilterClient.name}
+              logoUrl={selectedFilterClient.logoUrl ?? null}
+              backgroundColor={selectedFilterClient.logoBgColor ?? null}
+              textTone={asAvatarTextTone(selectedFilterClient.logoTextTone)}
+              size={22}
+            />
+            Filtering archives to {selectedFilterClient.name}
+          </p>
+        ) : null}
+        {selectedFilterAthlete ? (
+          <p className="pb-2 text-xs text-slate-400">
+            Filtering archives to {selectedFilterAthlete.fullName}
+            <span className="block text-slate-500">{selectedFilterAthlete.athleteCode}</span>
+          </p>
+        ) : null}
         {loading ? <p className="pb-2 text-xs text-slate-500">Refreshing…</p> : null}
       </div>
 
@@ -268,10 +344,25 @@ export function OpsArchivesClient() {
                             </p>
                           </td>
                           <td className="px-4 py-3 text-slate-300">
-                            {p.assignedAthleteName ?? "Unassigned"}
-                            {p.assignedAthleteCode ? (
-                              <span className="block text-xs text-slate-500">{p.assignedAthleteCode}</span>
-                            ) : null}
+                            {p.assignedAthleteName ? (
+                              <span className="inline-flex items-center gap-2">
+                                <AthleteAvatar
+                                  name={p.assignedAthleteName}
+                                  photoUrl={p.profilePhotoUrl}
+                                  backgroundColor={p.profilePhotoBgColor}
+                                  textTone={asAvatarTextTone(p.profilePhotoTextTone)}
+                                  size={24}
+                                />
+                                <span>
+                                  {p.assignedAthleteName}
+                                  {p.assignedAthleteCode ? (
+                                    <span className="block text-xs text-slate-500">{p.assignedAthleteCode}</span>
+                                  ) : null}
+                                </span>
+                              </span>
+                            ) : (
+                              "Unassigned"
+                            )}
                           </td>
                           <td className="px-4 py-3 text-slate-300">
                             {PROJECT_STATUS_LABELS[p.currentStatus]}
@@ -320,10 +411,21 @@ export function OpsArchivesClient() {
                       {t.summary ? <p className="mt-1 text-xs text-slate-500">{t.summary}</p> : null}
                     </td>
                     <td className="px-4 py-3 text-slate-300">
-                      {t.completedBy}
-                      {t.athleteName && t.athleteName !== t.completedBy ? (
-                        <span className="block text-xs text-slate-500">Board: {t.athleteName}</span>
-                      ) : null}
+                      <span className="inline-flex items-center gap-2">
+                        <AthleteAvatar
+                          name={t.completedBy}
+                          photoUrl={t.profilePhotoUrl}
+                          backgroundColor={t.profilePhotoBgColor}
+                          textTone={asAvatarTextTone(t.profilePhotoTextTone)}
+                          size={24}
+                        />
+                        <span>
+                          {t.completedBy}
+                          {t.athleteName && t.athleteName !== t.completedBy ? (
+                            <span className="block text-xs text-slate-500">Board: {t.athleteName}</span>
+                          ) : null}
+                        </span>
+                      </span>
                     </td>
                     <td className="px-4 py-3">
                       {t.clientName ? (
@@ -379,8 +481,19 @@ export function OpsArchivesClient() {
                   <tr key={row.id} className="bg-white/[0.02]">
                     <td className="px-4 py-3 text-slate-300">{row.submissionDate}</td>
                     <td className="px-4 py-3 text-slate-300">
-                      {row.athleteName}
-                      <span className="block text-xs text-slate-500">{row.athleteCode}</span>
+                      <span className="inline-flex items-center gap-2">
+                        <AthleteAvatar
+                          name={row.athleteName}
+                          photoUrl={row.profilePhotoUrl}
+                          backgroundColor={row.profilePhotoBgColor}
+                          textTone={asAvatarTextTone(row.profilePhotoTextTone)}
+                          size={24}
+                        />
+                        <span>
+                          {row.athleteName}
+                          <span className="block text-xs text-slate-500">{row.athleteCode}</span>
+                        </span>
+                      </span>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">

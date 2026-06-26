@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { athleteProfileVisual } from "@/lib/athlete-profile-visual";
 import { prisma } from "@/lib/prisma";
 import { dateOnlyUtc, monthEndUtc, monthStartUtc } from "@/lib/ops-hours";
 
@@ -14,6 +15,9 @@ export type BeatenDeadlineProject = {
 export type BeatenDeadlinesByAthlete = {
   athleteId: string;
   athleteName: string;
+  profilePhotoUrl: string | null;
+  profilePhotoBgColor: string | null;
+  profilePhotoTextTone: string | null;
   beatenCount: number;
   totalDaysBeaten: number;
   averageDaysBeaten: number;
@@ -27,7 +31,8 @@ function daysBetween(start: Date, end: Date): number {
 /** Projects completed before due date in the selected month. */
 export async function buildBeatenDeadlines(
   reference: Date,
-  clientId?: string | null
+  clientId?: string | null,
+  athleteId?: string | null
 ): Promise<BeatenDeadlinesByAthlete[]> {
   const from = monthStartUtc(reference);
   const to = monthEndUtc(reference);
@@ -37,13 +42,22 @@ export async function buildBeatenDeadlines(
     dueDate: { not: null },
     assignedAthleteId: { not: null },
     ...(clientId ? { clientId } : {}),
+    ...(athleteId ? { assignedAthleteId: athleteId } : {}),
   };
 
   const projects = await prisma.opsProject.findMany({
     where,
     include: {
       client: { select: { name: true } },
-      assignedAthlete: { select: { id: true, fullName: true } },
+      assignedAthlete: {
+        select: {
+          id: true,
+          fullName: true,
+          profilePhotoUrl: true,
+          profilePhotoBgColor: true,
+          profilePhotoTextTone: true,
+        },
+      },
     },
   });
 
@@ -69,9 +83,11 @@ export async function buildBeatenDeadlines(
           : daysBetween(completed, due);
     if (daysBeaten == null || daysBeaten <= 0) continue;
     const athleteId = p.assignedAthlete.id;
+    const profile = athleteProfileVisual(p.assignedAthlete);
     const entry = byAthlete.get(athleteId) ?? {
       athleteId,
       athleteName: p.assignedAthlete.fullName,
+      ...profile,
       beatenCount: 0,
       totalDaysBeaten: 0,
       averageDaysBeaten: 0,

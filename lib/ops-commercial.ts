@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { athleteProfileVisual } from "@/lib/athlete-profile-visual";
 import { prisma } from "@/lib/prisma";
 import {
   LANE_MONTHLY_HOURS,
@@ -39,6 +40,9 @@ export type CommercialLedgerRow = {
   athleteId: string;
   athleteName: string;
   athleteCode: string;
+  profilePhotoUrl: string | null;
+  profilePhotoBgColor: string | null;
+  profilePhotoTextTone: string | null;
   clientId: string;
   clientName: string;
   clientLogoUrl: string | null;
@@ -76,6 +80,9 @@ export type CommercialSummary = {
   athleteTotals: Array<{
     athleteId: string;
     athleteName: string;
+    profilePhotoUrl: string | null;
+    profilePhotoBgColor: string | null;
+    profilePhotoTextTone: string | null;
     hoursWorked: number;
     overtimeHours: number;
     revenueGbp: number;
@@ -133,6 +140,9 @@ export function filterCommercialLedgerByClient(
     return {
       athleteId: t.athleteId,
       athleteName: t.athleteName,
+      profilePhotoUrl: full?.profilePhotoUrl ?? null,
+      profilePhotoBgColor: full?.profilePhotoBgColor ?? null,
+      profilePhotoTextTone: full?.profilePhotoTextTone ?? null,
       hoursWorked: round2(t.hoursWorked),
       overtimeHours: round2((full?.overtimeHours ?? 0) * share),
       revenueGbp: round2(t.revenueGbp),
@@ -285,6 +295,7 @@ export async function buildCommercialLedger(reference: Date): Promise<Commercial
       athleteId: athlete.id,
       athleteName: athlete.fullName,
       athleteCode: athlete.athleteCode,
+      ...athleteProfileVisual(athlete),
       clientId: client.id,
       clientName: client.name,
       clientLogoUrl: client.logoUrl,
@@ -358,6 +369,9 @@ export async function buildCommercialLedger(reference: Date): Promise<Commercial
     {
       athleteId: string;
       athleteName: string;
+      profilePhotoUrl: string | null;
+      profilePhotoBgColor: string | null;
+      profilePhotoTextTone: string | null;
       hoursWorked: number;
       revenueGbp: number;
       marginGbp: number;
@@ -374,6 +388,9 @@ export async function buildCommercialLedger(reference: Date): Promise<Commercial
       athleteTotalsMap.set(row.athleteId, {
         athleteId: row.athleteId,
         athleteName: row.athleteName,
+        profilePhotoUrl: row.profilePhotoUrl,
+        profilePhotoBgColor: row.profilePhotoBgColor,
+        profilePhotoTextTone: row.profilePhotoTextTone,
         hoursWorked: row.hoursWorked,
         revenueGbp: row.revenueGbp,
         marginGbp: row.marginGbp,
@@ -387,6 +404,9 @@ export async function buildCommercialLedger(reference: Date): Promise<Commercial
     return {
       athleteId: t.athleteId,
       athleteName: t.athleteName,
+      profilePhotoUrl: t.profilePhotoUrl,
+      profilePhotoBgColor: t.profilePhotoBgColor,
+      profilePhotoTextTone: t.profilePhotoTextTone,
       hoursWorked: round2(t.hoursWorked),
       overtimeHours: round2(cost?.monthOvertimeHours ?? 0),
       revenueGbp: round2(t.revenueGbp),
@@ -442,7 +462,14 @@ export type AnalyticsPayload = {
   month: string;
   hoursByPhase: Array<{ phase: string; hours: number }>;
   hoursByClient: Array<{ clientId: string; clientName: string; clientLogoUrl: string | null; clientLogoBgColor: string | null; clientLogoTextTone: string | null; hours: number }>;
-  hoursByAthlete: Array<{ athleteId: string; athleteName: string; hours: number }>;
+  hoursByAthlete: Array<{
+    athleteId: string;
+    athleteName: string;
+    profilePhotoUrl: string | null;
+    profilePhotoBgColor: string | null;
+    profilePhotoTextTone: string | null;
+    hours: number;
+  }>;
   dueDateRisk: Array<{
     id: string;
     name: string;
@@ -481,10 +508,12 @@ export type AnalyticsPayload = {
   }>;
   beatenDeadlinesByAthlete: BeatenDeadlinesByAthlete[];
   clientFilter: string | null;
+  athleteFilter: string | null;
 };
 
 export type BuildAnalyticsOptions = {
   clientId?: string | null;
+  athleteId?: string | null;
 };
 
 export async function buildAnalytics(
@@ -492,12 +521,16 @@ export async function buildAnalytics(
   options: BuildAnalyticsOptions = {}
 ): Promise<AnalyticsPayload> {
   const clientId = options.clientId?.trim() || null;
+  const athleteId = options.athleteId?.trim() || null;
   const from = monthStartUtc(reference);
   const to = monthEndUtc(reference);
   const ledger = await buildCommercialLedger(reference);
 
   const lineItemWhere: Prisma.OpsSubmissionLineItemWhereInput = {
-    submission: { submissionDate: { gte: from, lte: to } },
+    submission: {
+      submissionDate: { gte: from, lte: to },
+      ...(athleteId ? { athleteId } : {}),
+    },
     ...(clientId ? { clientId } : {}),
   };
 
@@ -511,7 +544,16 @@ export async function buildAnalytics(
 
   const phaseMap = new Map<string, number>();
   const clientHoursMap = new Map<string, { name: string; logoUrl: string | null; logoBgColor: string | null; logoTextTone: string | null; hours: number }>();
-  const athleteHoursMap = new Map<string, { name: string; hours: number }>();
+  const athleteHoursMap = new Map<
+    string,
+    {
+      name: string;
+      profilePhotoUrl: string | null;
+      profilePhotoBgColor: string | null;
+      profilePhotoTextTone: string | null;
+      hours: number;
+    }
+  >();
 
   for (const li of lineItems) {
     const hours = Number(li.hoursWorked);
@@ -521,22 +563,29 @@ export async function buildAnalytics(
     if (ch) ch.hours += hours;
     else clientHoursMap.set(li.clientId, { name: li.client.name, logoUrl: li.client.logoUrl, logoBgColor: li.client.logoBgColor, logoTextTone: li.client.logoTextTone, hours });
 
-    const ah = athleteHoursMap.get(li.submission.athleteId);
+    const athlete = li.submission.athlete;
+    const ah = athleteHoursMap.get(athlete.id);
     if (ah) ah.hours += hours;
-    else
-      athleteHoursMap.set(li.submission.athleteId, {
-        name: li.submission.athlete.fullName,
+    else {
+      const profile = athleteProfileVisual(athlete);
+      athleteHoursMap.set(athlete.id, {
+        name: athlete.fullName,
+        ...profile,
         hours,
       });
+    }
   }
 
   const now = dateOnlyUtc(new Date());
-  const projectClientFilter = clientId ? { clientId } : {};
+  const projectFilter = {
+    ...(clientId ? { clientId } : {}),
+    ...(athleteId ? { assignedAthleteId: athleteId } : {}),
+  };
   const riskProjects = await prisma.opsProject.findMany({
     where: {
       dueDate: { not: null, lte: new Date(now.getTime() + 14 * 86400000) },
       currentStatus: { notIn: ["completed", "handed_over"] },
-      ...projectClientFilter,
+      ...projectFilter,
     },
     include: {
       client: { select: { name: true, logoUrl: true, logoBgColor: true, logoTextTone: true } },
@@ -550,7 +599,7 @@ export async function buildAnalytics(
     where: {
       dueDate: { gte: from, lte: to },
       currentStatus: { notIn: ["completed", "handed_over"] },
-      ...projectClientFilter,
+      ...projectFilter,
     },
     include: {
       client: { select: { name: true, logoUrl: true, logoBgColor: true, logoTextTone: true } },
@@ -559,33 +608,83 @@ export async function buildAnalytics(
     orderBy: { dueDate: "asc" },
   });
 
-  const clientCostMap = new Map<string, number>();
-  for (const row of ledger.rows) {
-    if (clientId && row.clientId !== clientId) continue;
-    clientCostMap.set(row.clientId, (clientCostMap.get(row.clientId) ?? 0) + row.athleteCostGbp);
+  let profitabilityByClient: AnalyticsPayload["profitabilityByClient"];
+
+  if (athleteId) {
+    const profitMap = new Map<
+      string,
+      {
+        clientName: string;
+        clientLogoUrl: string | null;
+        clientLogoBgColor: string | null;
+        clientLogoTextTone: string | null;
+        revenueGbp: number;
+        costGbp: number;
+      }
+    >();
+    for (const row of ledger.rows) {
+      if (clientId && row.clientId !== clientId) continue;
+      if (row.athleteId !== athleteId) continue;
+      const existing = profitMap.get(row.clientId);
+      if (existing) {
+        existing.revenueGbp += row.revenueGbp;
+        existing.costGbp += row.athleteCostGbp;
+      } else {
+        profitMap.set(row.clientId, {
+          clientName: row.clientName,
+          clientLogoUrl: row.clientLogoUrl,
+          clientLogoBgColor: row.clientLogoBgColor,
+          clientLogoTextTone: row.clientLogoTextTone,
+          revenueGbp: row.revenueGbp,
+          costGbp: row.athleteCostGbp,
+        });
+      }
+    }
+    profitabilityByClient = Array.from(profitMap.entries())
+      .map(([clientIdKey, v]) => {
+        const marginGbp = round2(v.revenueGbp - v.costGbp);
+        return {
+          clientId: clientIdKey,
+          clientName: v.clientName,
+          clientLogoUrl: v.clientLogoUrl,
+          clientLogoBgColor: v.clientLogoBgColor,
+          clientLogoTextTone: v.clientLogoTextTone,
+          revenueGbp: round2(v.revenueGbp),
+          costGbp: round2(v.costGbp),
+          marginGbp,
+          marginPercent: v.revenueGbp > 0 ? round2((marginGbp / v.revenueGbp) * 100) : 0,
+        };
+      })
+      .sort((a, b) => b.marginGbp - a.marginGbp);
+  } else {
+    const clientCostMap = new Map<string, number>();
+    for (const row of ledger.rows) {
+      if (clientId && row.clientId !== clientId) continue;
+      clientCostMap.set(row.clientId, (clientCostMap.get(row.clientId) ?? 0) + row.athleteCostGbp);
+    }
+
+    profitabilityByClient = ledger.clientLanes
+      .filter((lane) => !clientId || lane.clientId === clientId)
+      .map((lane) => {
+        const costGbp = round2(clientCostMap.get(lane.clientId) ?? 0);
+        const revenueGbp = lane.totalClientRevenueGbp;
+        const marginGbp = round2(revenueGbp - costGbp);
+        return {
+          clientId: lane.clientId,
+          clientName: lane.clientName,
+          clientLogoUrl: lane.clientLogoUrl,
+          clientLogoBgColor: lane.clientLogoBgColor,
+          clientLogoTextTone: lane.clientLogoTextTone,
+          revenueGbp,
+          costGbp,
+          marginGbp,
+          marginPercent: revenueGbp > 0 ? round2((marginGbp / revenueGbp) * 100) : 0,
+        };
+      })
+      .sort((a, b) => b.marginGbp - a.marginGbp);
   }
 
-  const profitabilityByClient = ledger.clientLanes
-    .filter((lane) => !clientId || lane.clientId === clientId)
-    .map((lane) => {
-      const costGbp = round2(clientCostMap.get(lane.clientId) ?? 0);
-      const revenueGbp = lane.totalClientRevenueGbp;
-      const marginGbp = round2(revenueGbp - costGbp);
-      return {
-        clientId: lane.clientId,
-        clientName: lane.clientName,
-        clientLogoUrl: lane.clientLogoUrl,
-        clientLogoBgColor: lane.clientLogoBgColor,
-        clientLogoTextTone: lane.clientLogoTextTone,
-        revenueGbp,
-        costGbp,
-        marginGbp,
-        marginPercent: revenueGbp > 0 ? round2((marginGbp / revenueGbp) * 100) : 0,
-      };
-    })
-    .sort((a, b) => b.marginGbp - a.marginGbp);
-
-  const beatenDeadlinesByAthlete = await buildBeatenDeadlines(reference, clientId);
+  const beatenDeadlinesByAthlete = await buildBeatenDeadlines(reference, clientId, athleteId);
 
   return {
     month: from.toISOString().slice(0, 7),
@@ -603,7 +702,14 @@ export async function buildAnalytics(
       }))
       .sort((a, b) => b.hours - a.hours),
     hoursByAthlete: Array.from(athleteHoursMap.entries())
-      .map(([athleteId, v]) => ({ athleteId, athleteName: v.name, hours: round2(v.hours) }))
+      .map(([athleteId, v]) => ({
+        athleteId,
+        athleteName: v.name,
+        profilePhotoUrl: v.profilePhotoUrl,
+        profilePhotoBgColor: v.profilePhotoBgColor,
+        profilePhotoTextTone: v.profilePhotoTextTone,
+        hours: round2(v.hours),
+      }))
       .sort((a, b) => b.hours - a.hours),
     dueDateRisk: riskProjects.map((p) => {
       const due = p.dueDate!;
@@ -637,6 +743,7 @@ export async function buildAnalytics(
     profitabilityByClient,
     beatenDeadlinesByAthlete,
     clientFilter: clientId,
+    athleteFilter: athleteId,
   };
 }
 
@@ -686,6 +793,9 @@ export async function buildOpsOverview(
   type PerformerRow = {
     athleteId: string;
     athleteName: string;
+    profilePhotoUrl: string | null;
+    profilePhotoBgColor: string | null;
+    profilePhotoTextTone: string | null;
     hoursWorked: number;
     revenueGbp: number;
     marginGbp: number;
@@ -696,12 +806,17 @@ export async function buildOpsOverview(
   };
 
   const performerMap = new Map<string, PerformerRow>();
+  const athleteProfileById = new Map(
+    athletes.map((a) => [a.id, athleteProfileVisual(a)] as const)
+  );
 
   for (const t of ledger.athleteTotals) {
     const beaten = beatenMap.get(t.athleteId);
+    const profile = athleteProfileById.get(t.athleteId) ?? athleteProfileVisual(null);
     performerMap.set(t.athleteId, {
       athleteId: t.athleteId,
       athleteName: t.athleteName,
+      ...profile,
       hoursWorked: t.hoursWorked,
       revenueGbp: t.revenueGbp,
       marginGbp: t.marginGbp,
@@ -717,6 +832,9 @@ export async function buildOpsOverview(
     performerMap.set(beaten.athleteId, {
       athleteId: beaten.athleteId,
       athleteName: beaten.athleteName,
+      profilePhotoUrl: beaten.profilePhotoUrl,
+      profilePhotoBgColor: beaten.profilePhotoBgColor,
+      profilePhotoTextTone: beaten.profilePhotoTextTone,
       hoursWorked: 0,
       revenueGbp: 0,
       marginGbp: 0,

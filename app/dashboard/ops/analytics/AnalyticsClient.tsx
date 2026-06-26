@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DueDateCalendar } from "@/components/ops/DueDateCalendar";
 import { SimpleBarChart } from "@/components/ops/SimpleBarChart";
+import { AthleteAvatar } from "@/components/ops/AthleteAvatar";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
 import { ProjectProgressBar } from "@/components/ProjectProgressBar";
 import { asAvatarTextTone } from "@/lib/avatar-text-tone";
@@ -19,9 +20,18 @@ type ClientOption = {
   logoTextTone: string | null;
 };
 
+type AthleteOption = {
+  id: string;
+  fullName: string;
+  athleteCode: string;
+};
+
 type BeatenDeadlinesByAthlete = {
   athleteId: string;
   athleteName: string;
+  profilePhotoUrl: string | null;
+  profilePhotoBgColor: string | null;
+  profilePhotoTextTone: string | null;
   beatenCount: number;
   totalDaysBeaten: number;
   averageDaysBeaten: number;
@@ -38,9 +48,17 @@ type BeatenDeadlinesByAthlete = {
 type AnalyticsData = {
   month: string;
   clientFilter: string | null;
+  athleteFilter: string | null;
   hoursByPhase: Array<{ phase: string; hours: number }>;
   hoursByClient: Array<{ clientId: string; clientName: string; clientLogoUrl: string | null; clientLogoBgColor: string | null; clientLogoTextTone: string | null; hours: number }>;
-  hoursByAthlete: Array<{ athleteId: string; athleteName: string; hours: number }>;
+  hoursByAthlete: Array<{
+    athleteId: string;
+    athleteName: string;
+    profilePhotoUrl: string | null;
+    profilePhotoBgColor: string | null;
+    profilePhotoTextTone: string | null;
+    hours: number;
+  }>;
   dueDateRisk: Array<{
     id: string;
     name: string;
@@ -88,23 +106,35 @@ function currentMonth(): string {
 export function AnalyticsClient() {
   const [month, setMonth] = useState(currentMonth());
   const [clientId, setClientId] = useState("");
+  const [athleteId, setAthleteId] = useState("");
   const [clients, setClients] = useState<ClientOption[]>([]);
+  const [athletes, setAthletes] = useState<AthleteOption[]>([]);
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    void fetch("/api/ops/clients")
-      .then((r) => r.json())
-      .then((j) => {
-        if (j.clients) {
+    void Promise.all([fetch("/api/ops/clients"), fetch("/api/ops/athletes")])
+      .then(async ([cr, ar]) => {
+        const cj = await cr.json();
+        const aj = await ar.json();
+        if (cj.clients) {
           setClients(
-            j.clients.map((c: { id: string; name: string; logoUrl?: string | null; logoBgColor?: string | null; logoTextTone?: string | null }) => ({
+            cj.clients.map((c: { id: string; name: string; logoUrl?: string | null; logoBgColor?: string | null; logoTextTone?: string | null }) => ({
               id: c.id,
               name: c.name,
               logoUrl: c.logoUrl ?? null,
               logoBgColor: c.logoBgColor ?? null,
               logoTextTone: c.logoTextTone ?? null,
+            }))
+          );
+        }
+        if (aj.athletes) {
+          setAthletes(
+            aj.athletes.map((a: { id: string; fullName: string; athleteCode: string }) => ({
+              id: a.id,
+              fullName: a.fullName,
+              athleteCode: a.athleteCode,
             }))
           );
         }
@@ -116,6 +146,7 @@ export function AnalyticsClient() {
     setLoading(true);
     const q = new URLSearchParams({ month });
     if (clientId) q.set("clientId", clientId);
+    if (athleteId) q.set("athleteId", athleteId);
     const r = await fetch(`/api/ops/analytics?${q}`);
     const j = await r.json();
     if (!r.ok) {
@@ -126,7 +157,7 @@ export function AnalyticsClient() {
     setData(j);
     setError("");
     setLoading(false);
-  }, [month, clientId]);
+  }, [month, clientId, athleteId]);
 
   useEffect(() => {
     void load();
@@ -135,6 +166,11 @@ export function AnalyticsClient() {
   const selectedClient = useMemo(
     () => clients.find((c) => c.id === clientId) ?? null,
     [clients, clientId]
+  );
+
+  const selectedAthlete = useMemo(
+    () => athletes.find((a) => a.id === athleteId) ?? null,
+    [athletes, athleteId]
   );
 
   const phaseBars = useMemo(
@@ -164,6 +200,11 @@ export function AnalyticsClient() {
       (data?.hoursByAthlete ?? []).map((a) => ({
         label: a.athleteName,
         value: a.hours,
+        showAvatar: true,
+        imageUrl: a.profilePhotoUrl,
+        imageBgColor: a.profilePhotoBgColor,
+        imageTextTone: a.profilePhotoTextTone,
+        objectFit: "cover" as const,
       })),
     [data]
   );
@@ -174,6 +215,11 @@ export function AnalyticsClient() {
         label: a.athleteName,
         value: a.beatenCount,
         sublabel: `${a.totalDaysBeaten}d total · avg ${a.averageDaysBeaten}d`,
+        showAvatar: true,
+        imageUrl: a.profilePhotoUrl,
+        imageBgColor: a.profilePhotoBgColor,
+        imageTextTone: a.profilePhotoTextTone,
+        objectFit: "cover" as const,
       })),
     [data]
   );
@@ -184,6 +230,9 @@ export function AnalyticsClient() {
         a.projects.map((p) => ({
           ...p,
           athleteName: a.athleteName,
+          profilePhotoUrl: a.profilePhotoUrl,
+          profilePhotoBgColor: a.profilePhotoBgColor,
+          profilePhotoTextTone: a.profilePhotoTextTone,
         }))
       ),
     [data]
@@ -220,6 +269,21 @@ export function AnalyticsClient() {
             ))}
           </select>
         </label>
+        <label className="text-xs text-slate-400">
+          Athlete
+          <select
+            value={athleteId}
+            onChange={(e) => setAthleteId(e.target.value)}
+            className="select-console mt-1 block min-w-[14rem] rounded-md px-3 py-2 text-sm"
+          >
+            <option value="">All athletes</option>
+            {athletes.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.fullName}
+              </option>
+            ))}
+          </select>
+        </label>
         {selectedClient ? (
           <p className="flex items-center gap-2 pb-2 text-xs text-slate-400">
             <ClientAvatar
@@ -232,13 +296,21 @@ export function AnalyticsClient() {
             Filtering analytics to {selectedClient.name}
           </p>
         ) : null}
+        {selectedAthlete ? (
+          <p className="pb-2 text-xs text-slate-400">
+            Filtering analytics to {selectedAthlete.fullName}
+            <span className="block text-slate-500">{selectedAthlete.athleteCode}</span>
+          </p>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="card-tool rounded-xl p-5">
           <h2 className="text-sm font-semibold text-white">Hours by phase</h2>
           <p className="mt-1 text-xs text-slate-500">
-            {clientId ? "Hours logged for the selected firm this month." : "All firms — cumulative phase hours this month."}
+            {clientId || athleteId
+              ? "Hours logged for the selected filters this month."
+              : "All firms — cumulative phase hours this month."}
           </p>
           <div className="mt-4">
             <SimpleBarChart items={phaseBars} valueSuffix="h" />
@@ -246,7 +318,7 @@ export function AnalyticsClient() {
         </div>
         <div className="card-tool rounded-xl p-5">
           <h2 className="text-sm font-semibold text-white">
-            {clientId ? "Hours this month" : "Hours by client"}
+            {clientId || athleteId ? "Hours this month" : "Hours by client"}
           </h2>
           <div className="mt-4">
             {clientBars.length === 0 ? (
@@ -257,7 +329,9 @@ export function AnalyticsClient() {
           </div>
         </div>
         <div className="card-tool rounded-xl p-5">
-          <h2 className="text-sm font-semibold text-white">Hours by athlete</h2>
+          <h2 className="text-sm font-semibold text-white">
+            {athleteId ? "Athlete hours" : "Hours by athlete"}
+          </h2>
           <div className="mt-4">
             <SimpleBarChart items={athleteBars} valueSuffix="h" />
           </div>
@@ -308,7 +382,18 @@ export function AnalyticsClient() {
                 <tbody>
                   {beatenRows.map((row) => (
                     <tr key={row.projectId} className="border-b border-white/[0.04] text-slate-300">
-                      <td className="px-3 py-2">{row.athleteName}</td>
+                      <td className="px-3 py-2">
+                        <span className="inline-flex items-center gap-2">
+                          <AthleteAvatar
+                            name={row.athleteName}
+                            photoUrl={row.profilePhotoUrl}
+                            backgroundColor={row.profilePhotoBgColor}
+                            textTone={asAvatarTextTone(row.profilePhotoTextTone)}
+                            size={24}
+                          />
+                          {row.athleteName}
+                        </span>
+                      </td>
                       <td className="px-3 py-2">{row.projectName}</td>
                       <td className="px-3 py-2">{row.clientName}</td>
                       <td className="px-3 py-2 tabular-nums">{row.completedDate}</td>

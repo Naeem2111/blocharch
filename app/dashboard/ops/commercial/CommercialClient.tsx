@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { AthleteAvatar } from "@/components/ops/AthleteAvatar";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
 import { asAvatarTextTone } from "@/lib/avatar-text-tone";
 import { LANE_MONTHLY_HOURS } from "@/lib/ops-constants";
@@ -36,6 +37,9 @@ type ClientLaneRow = {
 type LedgerRow = {
   athleteName: string;
   athleteCode: string;
+  profilePhotoUrl: string | null;
+  profilePhotoBgColor: string | null;
+  profilePhotoTextTone: string | null;
   clientName: string;
   clientLogoUrl: string | null;
   clientLogoBgColor: string | null;
@@ -50,6 +54,9 @@ type LedgerRow = {
 type AthleteMonthlyRow = {
   athleteId: string;
   athleteName: string;
+  profilePhotoUrl: string | null;
+  profilePhotoBgColor: string | null;
+  profilePhotoTextTone: string | null;
   hoursWorked: number;
   overtimeHours: number;
   revenueGbp: number;
@@ -436,8 +443,19 @@ export function CommercialClient() {
                 {ledger.rows.map((row, i) => (
                   <tr key={i} className="border-b border-white/[0.04] text-slate-300">
                     <td className="px-4 py-2">
-                      {row.athleteName}
-                      <span className="ml-1 text-slate-500">({row.athleteCode})</span>
+                      <span className="inline-flex items-center gap-2">
+                        <AthleteAvatar
+                          name={row.athleteName}
+                          photoUrl={row.profilePhotoUrl}
+                          backgroundColor={row.profilePhotoBgColor}
+                          textTone={asAvatarTextTone(row.profilePhotoTextTone)}
+                          size={28}
+                        />
+                        <span>
+                          {row.athleteName}
+                          <span className="ml-1 text-slate-500">({row.athleteCode})</span>
+                        </span>
+                      </span>
                     </td>
                     <td className="px-4 py-2">
                       <span className="inline-flex items-center gap-2">
@@ -495,7 +513,18 @@ export function CommercialClient() {
               <tbody>
                 {(ledger.athleteTotals ?? []).map((a) => (
                   <tr key={a.athleteId} className="border-b border-white/[0.04] text-slate-300">
-                    <td className="px-4 py-2">{a.athleteName}</td>
+                    <td className="px-4 py-2">
+                      <span className="inline-flex items-center gap-2">
+                        <AthleteAvatar
+                          name={a.athleteName}
+                          photoUrl={a.profilePhotoUrl}
+                          backgroundColor={a.profilePhotoBgColor}
+                          textTone={asAvatarTextTone(a.profilePhotoTextTone)}
+                          size={28}
+                        />
+                        {a.athleteName}
+                      </span>
+                    </td>
                     <td className="px-4 py-2 tabular-nums">{a.hoursWorked}</td>
                     <td className="px-4 py-2 tabular-nums">{a.overtimeHours}</td>
                     <td className="px-4 py-2 tabular-nums">£{a.revenueGbp.toLocaleString()}</td>

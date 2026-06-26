@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
   if (gate instanceof NextResponse) return gate;
 
   const clientId = request.nextUrl.searchParams.get("clientId")?.trim() || null;
-  const analytics = await buildAnalytics(monthFromQuery(request), { clientId });
+  const athleteId = request.nextUrl.searchParams.get("athleteId")?.trim() || null;
+  const analytics = await buildAnalytics(monthFromQuery(request), { clientId, athleteId });
   return NextResponse.json(analytics);
 }
