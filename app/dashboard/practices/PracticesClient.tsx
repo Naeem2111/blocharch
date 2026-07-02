@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
+import { AddPracticeForm } from "@/components/practices/AddPracticeForm";
 import { getBestAddressFromFields } from "@/lib/address-display";
 import { gmailComposeUrl } from "@/lib/gmail-compose";
 
@@ -99,6 +100,7 @@ export function PracticesClient() {
 		totalPages: number;
 	} | null>(null);
 	const [loading, setLoading] = useState(true);
+	const [refreshKey, setRefreshKey] = useState(0);
 	const [columnsOpen, setColumnsOpen] = useState(false);
 	const [visible, setVisible] =
 		useState<Record<ColumnId, boolean>>(DEFAULT_VISIBLE);
@@ -127,7 +129,7 @@ export function PracticesClient() {
 			.then((r) => r.json())
 			.then(setData)
 			.finally(() => setLoading(false));
-	}, [query, page]);
+	}, [query, page, refreshKey]);
 
 	const toggleColumn = (id: ColumnId) => {
 		setVisible((v) => ({ ...v, [id]: !v[id] }));
@@ -156,6 +158,14 @@ export function PracticesClient() {
 
 	return (
 		<div>
+			<div className="mb-6">
+				<AddPracticeForm
+					onCreated={() => {
+						setPage(1);
+						setRefreshKey((k) => k + 1);
+					}}
+				/>
+			</div>
 			<div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-start sm:gap-3">
 				<input
 					type="search"

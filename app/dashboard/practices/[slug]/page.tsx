@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getBestAddress, loadArchitects } from "@/lib/architects";
 import { gmailComposeUrl } from "@/lib/gmail-compose";
+import { isManualPracticeUrl } from "@/lib/practice-url";
 import { LeadStatus } from "@/components/LeadStatus";
 import { LeadOutreachPanel } from "@/components/outreach/LeadOutreachPanel";
 import { PracticeMap } from "@/components/PracticeMap";
@@ -143,14 +144,18 @@ export default async function PracticeDetailPage({
             <p className="text-slate-500 text-xs font-medium uppercase tracking-wider mb-1">
               Source
             </p>
-            <a
-              href={practice.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-slate-400 hover:text-brand-400 text-sm"
-            >
-              {practice.url}
-            </a>
+            {isManualPracticeUrl(practice.url) ? (
+              <p className="text-slate-400 text-sm">Added manually to Blocharch</p>
+            ) : (
+              <a
+                href={practice.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-slate-400 hover:text-brand-400 text-sm"
+              >
+                {practice.url}
+              </a>
+            )}
           </div>
         </div>
           </div>

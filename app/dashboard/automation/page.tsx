@@ -6,7 +6,7 @@ export default function AutomationPage() {
     <div className="mx-auto max-w-7xl">
       <PageHeader
         title="Lead nurturing"
-        description="Manual outreach tracking — log emails, follow-ups, and replies per practice. Follow-up reminders appear in Marketing notifications."
+        description="Manual outreach tracking — log emails, follow-ups, and replies. Add practices retroactively with name and email."
       />
       <AutomationClient />
     </div>

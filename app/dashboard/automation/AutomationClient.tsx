@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { LEAD_FILTER_OPTIONS, followUpStatusColor, followUpStatusLabel, LEAD_STAGE_LABELS } from "@/lib/lead-stage-ui";
+import { AddPracticeForm } from "@/components/practices/AddPracticeForm";
+import { LEAD_FILTER_OPTIONS, followUpStatusColor, followUpStatusLabel } from "@/lib/lead-stage-ui";
 import { LeadStagePicker } from "@/components/LeadStagePicker";
+import { isManualPracticeUrl } from "@/lib/practice-url";
 
 interface LeadItem {
   url: string;
@@ -78,19 +80,24 @@ export function AutomationClient() {
   const [page, setPage] = useState(1);
   const [data, setData] = useState<{ items: LeadItem[]; total: number; totalPages: number } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  useEffect(() => {
+  const loadData = useCallback(() => {
     setLoading(true);
     const params = new URLSearchParams();
     params.set("page", String(page));
     params.set("perPage", "25");
     if (stage) params.set("stage", stage);
     params.set("withEmail", "true");
-    fetch(`/api/leads?${params}`)
+    return fetch(`/api/leads?${params}`)
       .then((r) => r.json())
       .then(setData)
       .finally(() => setLoading(false));
   }, [stage, page]);
+
+  useEffect(() => {
+    void loadData();
+  }, [loadData, refreshKey]);
 
   async function updateLead(practiceUrl: string, updates: { stage?: string; rating?: number }) {
     const slug = slugFromUrl(practiceUrl);
@@ -125,6 +132,13 @@ export function AutomationClient() {
 
   return (
     <div className="space-y-8">
+      <AddPracticeForm
+        onCreated={() => {
+          setPage(1);
+          setRefreshKey((k) => k + 1);
+        }}
+      />
+
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-2">
           <span className="text-sm text-slate-400">Filter:</span>
@@ -187,6 +201,11 @@ export function AutomationClient() {
                       >
                         {item.name || "—"}
                       </Link>
+                      {isManualPracticeUrl(item.url) ? (
+                        <span className="ml-2 rounded bg-white/[0.06] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-slate-500">
+                          Manual
+                        </span>
+                      ) : null}
                       {item.lead.nextAction ? (
                         <p className="mt-0.5 max-w-[12rem] truncate text-[10px] text-slate-500" title={item.lead.nextAction}>
                           {item.lead.nextAction}

@@ -1,5 +1,12 @@
 import { getBestAddressFromFields } from "@/lib/address-display";
+import { getOrCreateLead } from "@/lib/leads";
 import { prisma } from "@/lib/prisma";
+import {
+  isValidEmail,
+  manualPracticeUrl,
+  resolveUniquePracticeSlug,
+  slugFromPracticeUrl,
+} from "@/lib/practice-url";
 
 export interface Architect {
   url: string;
@@ -77,4 +84,63 @@ export async function searchArchitects(params: {
   const items = filtered.slice(start, start + perPage);
 
   return { items, total, page, totalPages };
+}
+
+export type CreateManualPracticeInput = {
+  name: string;
+  email: string;
+  contact?: string;
+  website?: string;
+  address?: string;
+};
+
+export async function createManualPractice(
+  input: CreateManualPracticeInput
+): Promise<Architect & { slug: string }> {
+  const name = input.name.trim();
+  const email = input.email.trim().toLowerCase();
+  if (!name) throw new Error("Practice name is required");
+  if (!email) throw new Error("Email is required");
+  if (!isValidEmail(email)) throw new Error("Enter a valid email address");
+
+  const duplicateEmail = await prisma.architect.findFirst({
+    where: { email: { equals: email, mode: "insensitive" } },
+    select: { name: true },
+  });
+  if (duplicateEmail) {
+    throw new Error(`A practice with this email already exists (${duplicateEmail.name})`);
+  }
+
+  const slug = await resolveUniquePracticeSlug(name);
+  const url = manualPracticeUrl(slug);
+
+  const row = await prisma.architect.create({
+    data: {
+      url,
+      name,
+      email,
+      contact: input.contact?.trim() || null,
+      website: input.website?.trim() || null,
+      address: input.address?.trim() || null,
+      socials: [],
+      awards: [],
+    },
+  });
+
+  await getOrCreateLead(url);
+
+  return {
+    url: row.url,
+    name: row.name,
+    website: row.website || "",
+    socials: row.socials,
+    email: row.email || "",
+    address: row.address || "",
+    contact: row.contact || "",
+    description: row.description || "",
+    years_active: row.yearsActive || "",
+    staff: row.staff || "",
+    awards: row.awards,
+    slug,
+  };
 }
