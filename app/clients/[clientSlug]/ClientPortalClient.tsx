@@ -46,12 +46,6 @@ function ProjectCard({ project, showTasks }: { project: PublicClientPortalProjec
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <h3 className="text-base font-semibold text-white sm:text-lg">{project.name}</h3>
-          {(project.projectNumber || project.leadName) && (
-            <p className="mt-0.5 text-xs text-slate-500">
-              {project.projectNumber}
-              {project.leadName ? ` · ${project.leadName}` : ""}
-            </p>
-          )}
         </div>
         <span
           className="client-portal-status-badge inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-bold uppercase tracking-wide"
