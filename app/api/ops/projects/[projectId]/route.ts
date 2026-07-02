@@ -47,6 +47,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       if (!projectNumber) return NextResponse.json({ error: "Athlete code is required" }, { status: 400 });
       data.projectNumber = projectNumber;
     }
+    if (body.projectLeadAthleteId !== undefined) {
+      const lid = body.projectLeadAthleteId ? String(body.projectLeadAthleteId).trim() : null;
+      if (lid) {
+        const leadAthlete = await prisma.opsAthlete.findUnique({ where: { id: lid } });
+        if (!leadAthlete) return NextResponse.json({ error: "Project lead not found" }, { status: 404 });
+      }
+      data.projectLeadAthleteId = lid;
+    }
     if (body.address !== undefined) data.address = body.address ? String(body.address).trim() : null;
     if (body.projectLead !== undefined) data.projectLead = body.projectLead ? String(body.projectLead).trim() : null;
     if (body.notes !== undefined) data.notes = body.notes ? String(body.notes).trim() : null;
@@ -100,6 +108,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       include: {
         client: { select: { id: true, name: true } },
         assignedAthlete: { select: { id: true, fullName: true, athleteCode: true } },
+        projectLeadAthlete: { select: { id: true, fullName: true, athleteCode: true } },
       },
     });
 
@@ -124,6 +133,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         clientName: project.client.name,
         assignedAthleteId: project.assignedAthleteId,
         assignedAthleteName: project.assignedAthlete?.fullName ?? null,
+        projectLeadAthleteId: project.projectLeadAthleteId,
+        projectLeadAthleteName: project.projectLeadAthlete?.fullName ?? null,
         name: project.name,
         projectNumber: project.projectNumber,
         address: project.address,

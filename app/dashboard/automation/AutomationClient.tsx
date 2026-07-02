@@ -226,27 +226,27 @@ export function AutomationClient() {
               <tbody className="divide-y divide-white/[0.06]">
                 {data.items.map((item) => (
                   <tr key={item.url} className="transition-colors hover:bg-white/[0.03]">
-                    <td className="px-4 py-3">
-                      <div className="flex min-w-0 flex-wrap items-center gap-2">
-                        <Link
-                          href={`/dashboard/practices/${encodeURIComponent(item.slug)}`}
-                          className="font-medium text-white hover:text-brand-400"
-                        >
-                          {item.name || "—"}
-                        </Link>
+                    <td className="min-w-[14rem] px-4 py-3">
+                      <Link
+                        href={`/dashboard/practices/${encodeURIComponent(item.slug)}`}
+                        className="text-sm font-semibold text-white hover:text-brand-400"
+                      >
+                        {item.name || "—"}
+                      </Link>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
                         <LeadStageTag
                           stage={item.lead.effectiveStage || item.lead.stage}
                           compact
                         />
                         <FollowUpTimeTag followUpDueAt={item.lead.followUpDueAt} compact />
                         {isManualPracticeUrl(item.url) ? (
-                          <span className="rounded bg-white/[0.06] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-slate-500">
+                          <span className="rounded bg-white/[0.06] px-2 py-0.5 text-xs uppercase tracking-wide text-slate-500">
                             Manual
                           </span>
                         ) : null}
                       </div>
                       {item.lead.nextAction ? (
-                        <p className="mt-1 max-w-[16rem] truncate text-[10px] text-slate-500" title={item.lead.nextAction}>
+                        <p className="mt-2 text-xs text-slate-400" title={item.lead.nextAction}>
                           {item.lead.nextAction}
                         </p>
                       ) : null}

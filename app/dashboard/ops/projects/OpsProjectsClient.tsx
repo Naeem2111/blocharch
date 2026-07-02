@@ -30,6 +30,8 @@ type ProjectRow = {
   clientLogoTextTone: string | null;
   assignedAthleteId: string | null;
   assignedAthleteName: string | null;
+  projectLeadAthleteId: string | null;
+  projectLeadAthleteName: string | null;
   athleteCode: string | null;
   name: string;
   projectNumber: string;
@@ -51,7 +53,7 @@ const emptyCreate = {
   name: "",
   projectNumber: "",
   address: "",
-  projectLead: "",
+  projectLeadAthleteId: "",
   complexity: "medium",
   dueDate: "",
 };
@@ -73,10 +75,10 @@ export function OpsProjectsClient() {
   const [clientFilterId, setClientFilterId] = useState("");
   const [editForm, setEditForm] = useState({
     assignedAthleteId: "",
+    projectLeadAthleteId: "",
     name: "",
     projectNumber: "",
     address: "",
-    projectLead: "",
     complexity: "medium",
     currentStage: "existing_drawings",
     currentStatus: "not_started",
@@ -139,7 +141,12 @@ export function OpsProjectsClient() {
     const r = await fetch("/api/ops/projects", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, assignedAthleteId: form.assignedAthleteId || null, dueDate: form.dueDate || null }),
+      body: JSON.stringify({
+        ...form,
+        assignedAthleteId: form.assignedAthleteId || null,
+        projectLeadAthleteId: form.projectLeadAthleteId || null,
+        dueDate: form.dueDate || null,
+      }),
     });
     const j = await r.json();
     if (!r.ok) {
@@ -157,10 +164,10 @@ export function OpsProjectsClient() {
     setEditClientId(p.clientId);
     setEditForm({
       assignedAthleteId: athleteId,
+      projectLeadAthleteId: p.projectLeadAthleteId ?? "",
       name: p.name,
       projectNumber: p.projectNumber,
       address: p.address ?? "",
-      projectLead: p.projectLead ?? "",
       complexity: p.complexity,
       currentStage: p.currentStage,
       currentStatus: p.currentStatus,
@@ -184,10 +191,10 @@ export function OpsProjectsClient() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         assignedAthleteId: editForm.assignedAthleteId || null,
+        projectLeadAthleteId: editForm.projectLeadAthleteId || null,
         name: editForm.name,
         projectNumber: editForm.projectNumber,
         address: editForm.address,
-        projectLead: editForm.projectLead,
         complexity: editForm.complexity,
         currentStage: editForm.currentStage,
         currentStatus: editForm.currentStatus,
@@ -342,7 +349,7 @@ export function OpsProjectsClient() {
           <div className="grid gap-3 md:grid-cols-2">
             <label className="text-xs text-slate-400">Name<input value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
             <label className="text-xs text-slate-400">
-              Athlete
+              Assigned athlete
               <select
                 value={editForm.assignedAthleteId}
                 onChange={(e) => handleEditAthleteChange(e.target.value)}
@@ -355,6 +362,22 @@ export function OpsProjectsClient() {
                   </option>
                 ))}
               </select>
+            </label>
+            <label className="text-xs text-slate-400">
+              Project lead
+              <select
+                value={editForm.projectLeadAthleteId}
+                onChange={(e) => setEditForm((f) => ({ ...f, projectLeadAthleteId: e.target.value }))}
+                className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
+              >
+                <option value="">None (hidden on client portal)</option>
+                {athletes.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.fullName}
+                  </option>
+                ))}
+              </select>
+              <span className="mt-1 block text-[10px] text-slate-500">Shown to clients; can differ from assigned athlete</span>
             </label>
             <label className="text-xs text-slate-400">
               Athlete code
@@ -393,6 +416,9 @@ export function OpsProjectsClient() {
                 {p.projectNumber}
                 {p.assignedAthleteName ? ` · ${p.assignedAthleteName}` : " · Unassigned"}
               </p>
+              {p.projectLeadAthleteName ? (
+                <p className="text-xs text-slate-400">Client lead: {p.projectLeadAthleteName}</p>
+              ) : null}
               <p
                 className={`mt-2 text-xs ${
                   timeline.isOverdue
@@ -496,7 +522,7 @@ export function OpsProjectsClient() {
             </div>
           </label>
           <label className="text-xs text-slate-400">
-            Athlete
+            Assigned athlete
             <select
               required
               value={form.assignedAthleteId}
@@ -510,6 +536,22 @@ export function OpsProjectsClient() {
                 </option>
               ))}
             </select>
+          </label>
+          <label className="text-xs text-slate-400">
+            Project lead
+            <select
+              value={form.projectLeadAthleteId}
+              onChange={(e) => setForm((f) => ({ ...f, projectLeadAthleteId: e.target.value }))}
+              className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
+            >
+              <option value="">None (hidden on client portal)</option>
+              {athletes.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.fullName}
+                </option>
+              ))}
+            </select>
+            <span className="mt-1 block text-[10px] text-slate-500">Shown to clients; can differ from assigned athlete</span>
           </label>
           <label className="text-xs text-slate-400">Name<input required value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
           <label className="text-xs text-slate-400">

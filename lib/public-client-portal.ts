@@ -88,6 +88,7 @@ function mapProject(
     name: string;
     projectNumber: string;
     address: string | null;
+    projectLead: string | null;
     currentStage: OpsProjectPhase;
     currentStatus: OpsProjectStatus;
     startDate: Date | null;
@@ -95,7 +96,7 @@ function mapProject(
     handoverDate: Date | null;
     progressPercent: number | null;
     deadlineBeatenDays: number | null;
-    assignedAthlete: {
+    projectLeadAthlete: {
       fullName: string;
       profilePhotoUrl: string | null;
       profilePhotoBgColor: string | null;
@@ -105,6 +106,7 @@ function mapProject(
   openTasks: PublicClientPortalTask[]
 ): PublicClientPortalProject {
   const progressPercent = p.progressPercent ?? 0;
+  const lead = p.projectLeadAthlete;
   return {
     id: p.id,
     name: p.name,
@@ -119,10 +121,10 @@ function mapProject(
     dueDate: isoDate(p.dueDate),
     handoverDate: isoDate(p.handoverDate),
     progressPercent,
-    leadName: p.assignedAthlete?.fullName ?? null,
-    leadPhotoUrl: p.assignedAthlete?.profilePhotoUrl ?? null,
-    leadPhotoBgColor: p.assignedAthlete?.profilePhotoBgColor ?? null,
-    leadPhotoTextTone: p.assignedAthlete?.profilePhotoTextTone ?? null,
+    leadName: lead?.fullName ?? p.projectLead ?? null,
+    leadPhotoUrl: lead?.profilePhotoUrl ?? null,
+    leadPhotoBgColor: lead?.profilePhotoBgColor ?? null,
+    leadPhotoTextTone: lead?.profilePhotoTextTone ?? null,
     openTasks,
     deadlineBeatenDays: p.deadlineBeatenDays,
   };
@@ -146,7 +148,7 @@ export async function getPublicClientPortal(clientSlug: string): Promise<PublicC
     where: { clientId: client.id },
     orderBy: [{ dueDate: "asc" }, { name: "asc" }],
     include: {
-      assignedAthlete: {
+      projectLeadAthlete: {
         select: {
           fullName: true,
           profilePhotoUrl: true,

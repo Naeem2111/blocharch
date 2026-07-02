@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
     include: {
       client: { select: { id: true, name: true, logoUrl: true, logoBgColor: true, logoTextTone: true } },
       assignedAthlete: { select: { id: true, fullName: true, athleteCode: true } },
+      projectLeadAthlete: { select: { id: true, fullName: true, athleteCode: true } },
     },
   });
 
@@ -36,6 +37,8 @@ export async function GET(request: NextRequest) {
       clientLogoTextTone: p.client.logoTextTone,
       assignedAthleteId: p.assignedAthleteId,
       assignedAthleteName: p.assignedAthlete?.fullName ?? null,
+      projectLeadAthleteId: p.projectLeadAthleteId,
+      projectLeadAthleteName: p.projectLeadAthlete?.fullName ?? null,
       athleteCode: p.assignedAthlete?.athleteCode ?? null,
       name: p.name,
       projectNumber: p.projectNumber,
@@ -67,6 +70,10 @@ export async function POST(request: NextRequest) {
     const projectNumber = normalizeAthleteProjectCode(String(body.projectNumber || ""));
     const assignedAthleteId = body.assignedAthleteId ? String(body.assignedAthleteId).trim() : null;
 
+    const projectLeadAthleteId = body.projectLeadAthleteId
+      ? String(body.projectLeadAthleteId).trim()
+      : null;
+
     if (!clientId || !name || !assignedAthleteId || !projectNumber) {
       return NextResponse.json({ error: "Client, name, athlete, and athlete code are required" }, { status: 400 });
     }
@@ -76,6 +83,11 @@ export async function POST(request: NextRequest) {
 
     const athlete = await prisma.opsAthlete.findUnique({ where: { id: assignedAthleteId } });
     if (!athlete) return NextResponse.json({ error: "Athlete not found" }, { status: 404 });
+
+    if (projectLeadAthleteId) {
+      const leadAthlete = await prisma.opsAthlete.findUnique({ where: { id: projectLeadAthleteId } });
+      if (!leadAthlete) return NextResponse.json({ error: "Project lead not found" }, { status: 404 });
+    }
 
     const codeError = await validateAthleteProjectCodeDb(prisma, {
       clientId,
@@ -98,6 +110,7 @@ export async function POST(request: NextRequest) {
       data: {
         clientId,
         assignedAthleteId,
+        projectLeadAthleteId,
         name,
         projectNumber,
         address: body.address ? String(body.address).trim() : null,

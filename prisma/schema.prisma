@@ -435,7 +435,8 @@ model OpsAthlete {
   updatedAt        DateTime         @updatedAt @map("updated_at")
 
   user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  projects     OpsProject[]
+  projects     OpsProject[]         @relation("AssignedAthleteProjects")
+  leadProjects OpsProject[]         @relation("ProjectLeadAthlete")
   submissions  OpsDailySubmission[]
   plannerBoards PlannerBoard[]
   outboxTasks  OpsOutboxTask[]      @relation("OutboxTargetAthlete")
@@ -473,7 +474,9 @@ model OpsAthleteNotification {
 model OpsProject {
   id                String              @id @default(uuid())
   clientId          String              @map("client_id")
-  assignedAthleteId String?             @map("assigned_athlete_id")
+  assignedAthleteId    String?             @map("assigned_athlete_id")
+  /** Client-facing project lead (shown on client portal; may differ from assigned athlete). */
+  projectLeadAthleteId String?             @map("project_lead_athlete_id")
   name              String
   projectNumber     String              @map("project_number")
   address           String?             @db.Text
@@ -498,8 +501,9 @@ model OpsProject {
   createdAt         DateTime            @default(now()) @map("created_at")
   updatedAt         DateTime            @updatedAt @map("updated_at")
 
-  client          OpsClient               @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  assignedAthlete OpsAthlete?             @relation(fields: [assignedAthleteId], references: [id], onDelete: SetNull)
+  client            OpsClient               @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  assignedAthlete   OpsAthlete?             @relation("AssignedAthleteProjects", fields: [assignedAthleteId], references: [id], onDelete: SetNull)
+  projectLeadAthlete OpsAthlete?            @relation("ProjectLeadAthlete", fields: [projectLeadAthleteId], references: [id], onDelete: SetNull)
   lineItems       OpsSubmissionLineItem[]
   plannerBoards   PlannerBoard[]
   outboxTasks     OpsOutboxTask[]
@@ -507,6 +511,7 @@ model OpsProject {
 
   @@unique([clientId, projectNumber])
   @@index([assignedAthleteId])
+  @@index([projectLeadAthleteId])
   @@map("ops_projects")
 }
 

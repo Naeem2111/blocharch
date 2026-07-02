@@ -20,7 +20,7 @@ export function FollowUpTimeTag({ followUpDueAt, className = "", compact = false
 
   return (
     <span
-      className={`inline-flex shrink-0 items-center rounded-full font-semibold leading-none ${compact ? "px-2 py-0.5 text-[10px]" : "px-2.5 py-1 text-xs"} ${className}`}
+      className={`inline-flex shrink-0 items-center rounded-full font-semibold leading-tight ${compact ? "px-2.5 py-1 text-xs" : "px-3 py-1.5 text-sm"} ${className}`}
       style={{ backgroundColor, color }}
       title={followUpDueAt ? `Follow-up due ${new Date(followUpDueAt).toLocaleDateString()}` : undefined}
     >

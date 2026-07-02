@@ -78,7 +78,7 @@ function ProjectCard({ project, showTasks }: { project: PublicClientPortalProjec
         <ProjectProgressBar percent={project.progressPercent} />
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+      <div className="mt-4 flex flex-wrap items-center gap-2">
         {project.leadName ? (
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Your lead</span>
@@ -94,12 +94,6 @@ function ProjectCard({ project, showTasks }: { project: PublicClientPortalProjec
         ) : (
           <span className="text-xs text-slate-500">Lead assigned soon</span>
         )}
-        {project.leadName ? (
-          <span className="inline-flex items-center gap-1.5 text-[10px] text-sky-400 client-portal-accent-sky">
-            <span className="h-1.5 w-1.5 rounded-full bg-sky-400 client-portal-accent-sky-dot" />
-            Athlete assigned
-          </span>
-        ) : null}
       </div>
 
       {showTasks && project.openTasks.length > 0 ? (
