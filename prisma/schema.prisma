@@ -393,6 +393,7 @@ model OpsClientContact {
   createdAt DateTime @default(now()) @map("created_at")
 
   client OpsClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  leadProjects OpsProject[]
 
   @@index([clientId])
   @@map("ops_client_contacts")
@@ -475,7 +476,9 @@ model OpsProject {
   id                String              @id @default(uuid())
   clientId          String              @map("client_id")
   assignedAthleteId    String?             @map("assigned_athlete_id")
-  /** Client-facing project lead (shown on client portal; may differ from assigned athlete). */
+  /** Client-facing project lead — a contact on this client (shown on client portal). */
+  projectLeadContactId String?             @map("project_lead_contact_id")
+  /** @deprecated Use projectLeadContactId */
   projectLeadAthleteId String?             @map("project_lead_athlete_id")
   name              String
   projectNumber     String              @map("project_number")
@@ -487,7 +490,7 @@ model OpsProject {
   startDate         DateTime?           @map("start_date") @db.Date
   dueDate           DateTime?           @map("due_date") @db.Date
   handoverDate      DateTime?           @map("handover_date") @db.Date
-  currentStage      OpsProjectPhase     @default(existing_drawings) @map("current_stage")
+  currentStage      OpsProjectPhase     @default(survey_conversion) @map("current_stage")
   currentStatus     OpsProjectStatus    @default(not_started) @map("current_status")
   /** Latest progress % from daily log (0–100). */
   progressPercent   Int?                @map("progress_percent")
@@ -503,6 +506,7 @@ model OpsProject {
 
   client            OpsClient               @relation(fields: [clientId], references: [id], onDelete: Cascade)
   assignedAthlete   OpsAthlete?             @relation("AssignedAthleteProjects", fields: [assignedAthleteId], references: [id], onDelete: SetNull)
+  projectLeadContact OpsClientContact?        @relation(fields: [projectLeadContactId], references: [id], onDelete: SetNull)
   projectLeadAthlete OpsAthlete?            @relation("ProjectLeadAthlete", fields: [projectLeadAthleteId], references: [id], onDelete: SetNull)
   lineItems       OpsSubmissionLineItem[]
   plannerBoards   PlannerBoard[]
@@ -511,6 +515,7 @@ model OpsProject {
 
   @@index([clientId, projectNumber])
   @@index([assignedAthleteId])
+  @@index([projectLeadContactId])
   @@index([projectLeadAthleteId])
   @@map("ops_projects")
 }

@@ -7,8 +7,9 @@ import { AthleteAvatar } from "@/components/ops/AthleteAvatar";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
 import { ProjectProgressBar } from "@/components/ProjectProgressBar";
 import { asAvatarTextTone } from "@/lib/avatar-text-tone";
+import type { OpsProjectPhase } from "@prisma/client";
 import {
-  PROJECT_PHASE_LABELS,
+  displayProjectStageLabel,
   PROJECT_STATUS_LABELS,
 } from "@/lib/ops-constants";
 
@@ -176,7 +177,7 @@ export function AnalyticsClient() {
   const phaseBars = useMemo(
     () =>
       (data?.hoursByPhase ?? []).map((p) => ({
-        label: PROJECT_PHASE_LABELS[p.phase as keyof typeof PROJECT_PHASE_LABELS] ?? p.phase,
+        label: displayProjectStageLabel(p.phase as OpsProjectPhase) ?? p.phase,
         value: p.hours,
         sublabel: `${p.hours}h`,
       })),

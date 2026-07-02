@@ -81,7 +81,7 @@ function ProjectCard({ project, showTasks }: { project: PublicClientPortalProjec
       <div className="mt-4 flex flex-wrap items-center gap-2">
         {project.leadName ? (
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Your lead</span>
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Office lead</span>
             <AthleteAvatar
               name={project.leadName}
               photoUrl={project.leadPhotoUrl}
@@ -92,7 +92,7 @@ function ProjectCard({ project, showTasks }: { project: PublicClientPortalProjec
             <span className="text-sm text-slate-300">{project.leadName}</span>
           </div>
         ) : (
-          <span className="text-xs text-slate-500">Lead assigned soon</span>
+          <span className="text-xs text-slate-500">Office lead assigned soon</span>
         )}
       </div>
 

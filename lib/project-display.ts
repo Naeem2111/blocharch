@@ -1,13 +1,13 @@
 import type { OpsProjectPhase } from "@prisma/client";
-import { PROJECT_PHASE_LABELS } from "@/lib/ops-constants";
+import { displayProjectStageLabel } from "@/lib/ops-constants";
 
 export function projectStageDisplayLabel(stage: OpsProjectPhase): string {
-  return PROJECT_PHASE_LABELS[stage];
+  return displayProjectStageLabel(stage);
 }
 
 /** Full title with stage/package — consistent across athlete, admin, archives, and daily logs. */
 export function formatProjectFullTitle(name: string, currentStage: OpsProjectPhase): string {
-  const stageLabel = PROJECT_PHASE_LABELS[currentStage];
+  const stageLabel = displayProjectStageLabel(currentStage);
   const trimmed = name.trim();
   if (!trimmed) return stageLabel;
 

@@ -26,7 +26,7 @@ export function parseContactsFromBody(
 				? String(emailRaw).trim()
 				: null;
 		if (!name && !email) continue;
-		out.push({ name: name || "Contact", email });
+		out.push({ name: name || "Office lead", email });
 	}
 	return out;
 }
@@ -41,14 +41,14 @@ export function contactsFromLegacy(client: {
 		return [...client.contacts]
 			.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
 			.map((c) => ({
-				name: c.name.trim() || "Contact",
+				name: c.name.trim() || "Office lead",
 				email: c.email?.trim() || null,
 			}));
 	}
 	const name = client.contactPerson?.trim();
 	const email = client.email?.trim() || null;
 	if (!name && !email) return [];
-	return [{ name: name || "Contact", email }];
+	return [{ name: name || "Office lead", email }];
 }
 
 export function serializeContacts(

@@ -1,15 +1,8 @@
 import type { OpsProjectPhase, OpsTaskType } from "@prisma/client";
-import { PROJECT_PHASE_LABELS, TASK_TYPE_LABELS } from "@/lib/ops-constants";
+import { OPS_PROJECT_STAGE_OPTIONS, TASK_TYPE_LABELS } from "@/lib/ops-constants";
 
-/** V2: combined phase options shown in daily tracker UI. */
-export const DAILY_PROJECT_PHASE_OPTIONS: { value: OpsProjectPhase; label: string }[] = [
-  { value: "survey_conversion", label: "Survey Conversion (Existing Drawings)" },
-  { value: "proposed_drawings", label: PROJECT_PHASE_LABELS.proposed_drawings },
-  { value: "planning_submission", label: PROJECT_PHASE_LABELS.planning_submission },
-  { value: "tender_construction_pack", label: PROJECT_PHASE_LABELS.tender_construction_pack },
-  { value: "construction", label: PROJECT_PHASE_LABELS.construction },
-  { value: "housekeeping_internal", label: PROJECT_PHASE_LABELS.housekeeping_internal },
-];
+/** Daily log phase options — same combined survey/existing stage as operations tracker. */
+export const DAILY_PROJECT_PHASE_OPTIONS = OPS_PROJECT_STAGE_OPTIONS;
 
 export const DAILY_TASK_TYPE_OPTIONS = Object.entries(TASK_TYPE_LABELS).map(([value, label]) => ({
   value: value as OpsTaskType,

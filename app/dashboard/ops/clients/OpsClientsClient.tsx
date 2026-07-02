@@ -113,11 +113,12 @@ function ContactFields({
 }) {
   return (
     <div className="space-y-2 md:col-span-2">
-      <p className="text-xs font-medium text-slate-400">Contacts</p>
+      <p className="text-xs font-medium text-slate-400">Office leads</p>
+      <p className="text-[10px] text-slate-500">People at this firm who can be assigned as project leads on the client portal.</p>
       {contacts.map((row, i) => (
         <div key={i} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
           <input
-            placeholder="Contact name"
+            placeholder="Office lead name"
             value={row.name}
             onChange={(e) => {
               const next = [...contacts];
@@ -155,7 +156,7 @@ function ContactFields({
         onClick={() => onChange([...contacts, emptyContact()])}
         className="text-xs text-brand-300 hover:text-brand-200"
       >
-        + Add contact
+        + Add office lead
       </button>
     </div>
   );
@@ -625,6 +626,9 @@ export function OpsClientsClient() {
                     {c.projectCount} project(s)
                   </p>
                   {c.software ? <p className="text-xs text-slate-500">Software: {c.software}</p> : null}
+                  {c.contacts.length > 0 ? (
+                    <p className="mt-1 text-[10px] uppercase tracking-wide text-slate-600">Office leads</p>
+                  ) : null}
                   {c.contacts.map((ct) => (
                     <p key={ct.id ?? ct.name} className="text-xs text-slate-500">
                       {ct.name}

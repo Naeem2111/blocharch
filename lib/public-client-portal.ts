@@ -5,7 +5,7 @@ import {
   isClientPortalActiveProject,
   isClientPortalCompletedProject,
 } from "@/lib/client-portal-projects";
-import { PROJECT_PHASE_LABELS, PROJECT_STATUS_LABELS } from "@/lib/ops-constants";
+import { PROJECT_STATUS_LABELS, displayProjectStageLabel } from "@/lib/ops-constants";
 
 export type PublicClientPortalTask = {
   id: string;
@@ -96,6 +96,10 @@ function mapProject(
     handoverDate: Date | null;
     progressPercent: number | null;
     deadlineBeatenDays: number | null;
+    projectLeadContact: {
+      name: string;
+      email: string | null;
+    } | null;
     projectLeadAthlete: {
       fullName: string;
       profilePhotoUrl: string | null;
@@ -106,14 +110,15 @@ function mapProject(
   openTasks: PublicClientPortalTask[]
 ): PublicClientPortalProject {
   const progressPercent = p.progressPercent ?? 0;
-  const lead = p.projectLeadAthlete;
+  const contact = p.projectLeadContact;
+  const legacyAthlete = p.projectLeadAthlete;
   return {
     id: p.id,
     name: p.name,
     projectNumber: p.projectNumber,
     address: p.address,
     currentStage: p.currentStage,
-    currentStageLabel: PROJECT_PHASE_LABELS[p.currentStage],
+    currentStageLabel: displayProjectStageLabel(p.currentStage),
     currentStatus: p.currentStatus,
     currentStatusLabel: PROJECT_STATUS_LABELS[p.currentStatus],
     statusBadge: clientStatusBadge(p.currentStatus, progressPercent),
@@ -121,10 +126,10 @@ function mapProject(
     dueDate: isoDate(p.dueDate),
     handoverDate: isoDate(p.handoverDate),
     progressPercent,
-    leadName: lead?.fullName ?? p.projectLead ?? null,
-    leadPhotoUrl: lead?.profilePhotoUrl ?? null,
-    leadPhotoBgColor: lead?.profilePhotoBgColor ?? null,
-    leadPhotoTextTone: lead?.profilePhotoTextTone ?? null,
+    leadName: contact?.name ?? legacyAthlete?.fullName ?? p.projectLead ?? null,
+    leadPhotoUrl: contact ? null : legacyAthlete?.profilePhotoUrl ?? null,
+    leadPhotoBgColor: contact ? null : legacyAthlete?.profilePhotoBgColor ?? null,
+    leadPhotoTextTone: contact ? null : legacyAthlete?.profilePhotoTextTone ?? null,
     openTasks,
     deadlineBeatenDays: p.deadlineBeatenDays,
   };
@@ -148,6 +153,7 @@ export async function getPublicClientPortal(clientSlug: string): Promise<PublicC
     where: { clientId: client.id },
     orderBy: [{ dueDate: "asc" }, { name: "asc" }],
     include: {
+      projectLeadContact: { select: { name: true, email: true } },
       projectLeadAthlete: {
         select: {
           fullName: true,

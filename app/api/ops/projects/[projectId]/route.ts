@@ -11,6 +11,7 @@ import { parseDateOnly } from "@/lib/ops-hours";
 import { syncProjectAfterOpsUpdate } from "@/lib/planner-project-sync";
 import { normalizeAthleteProjectCode } from "@/lib/ops-project-code";
 import { projectDisplayFields } from "@/lib/project-display";
+import { validateProjectLeadContactDb } from "@/lib/ops-project-lead";
 import type { OpsProjectStatus } from "@prisma/client";
 
 type RouteContext = { params: Promise<{ projectId: string }> };
@@ -20,7 +21,7 @@ function serializeOpsProject(
     id: string;
     clientId: string;
     assignedAthleteId: string | null;
-    projectLeadAthleteId: string | null;
+    projectLeadContactId: string | null;
     name: string;
     projectNumber: string;
     address: string | null;
@@ -39,7 +40,7 @@ function serializeOpsProject(
     checkInRequested: boolean;
     client: { id: string; name: string };
     assignedAthlete: { id: string; fullName: string; athleteCode: string } | null;
-    projectLeadAthlete: { id: string; fullName: string; athleteCode: string } | null;
+    projectLeadContact: { id: string; name: string; email: string | null } | null;
   },
   hoursLogged: number
 ) {
@@ -51,8 +52,9 @@ function serializeOpsProject(
     assignedAthleteId: project.assignedAthleteId,
     assignedAthleteName: project.assignedAthlete?.fullName ?? null,
     assignedAthleteCode: project.assignedAthlete?.athleteCode ?? null,
-    projectLeadAthleteId: project.projectLeadAthleteId,
-    projectLeadAthleteName: project.projectLeadAthlete?.fullName ?? null,
+    projectLeadContactId: project.projectLeadContactId,
+    projectLeadContactName: project.projectLeadContact?.name ?? null,
+    projectLeadContactEmail: project.projectLeadContact?.email ?? null,
     name: project.name,
     displayTitle,
     stageLabel,
@@ -85,7 +87,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     include: {
       client: { select: { id: true, name: true } },
       assignedAthlete: { select: { id: true, fullName: true, athleteCode: true } },
-      projectLeadAthlete: { select: { id: true, fullName: true, athleteCode: true } },
+      projectLeadContact: { select: { id: true, name: true, email: true } },
     },
   });
   if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
@@ -164,13 +166,12 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       if (!projectNumber) return NextResponse.json({ error: "Athlete code is required" }, { status: 400 });
       data.projectNumber = projectNumber;
     }
-    if (body.projectLeadAthleteId !== undefined) {
-      const lid = body.projectLeadAthleteId ? String(body.projectLeadAthleteId).trim() : null;
-      if (lid) {
-        const leadAthlete = await prisma.opsAthlete.findUnique({ where: { id: lid } });
-        if (!leadAthlete) return NextResponse.json({ error: "Project lead not found" }, { status: 404 });
-      }
-      data.projectLeadAthleteId = lid;
+    if (body.projectLeadContactId !== undefined) {
+      const cid = body.projectLeadContactId ? String(body.projectLeadContactId).trim() : null;
+      const leadError = await validateProjectLeadContactDb(prisma, existing.clientId, cid);
+      if (leadError) return NextResponse.json({ error: leadError }, { status: 400 });
+      data.projectLeadContactId = cid;
+      data.projectLeadAthleteId = null;
     }
     if (body.address !== undefined) data.address = body.address ? String(body.address).trim() : null;
     if (body.projectLead !== undefined) data.projectLead = body.projectLead ? String(body.projectLead).trim() : null;
@@ -212,7 +213,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       include: {
         client: { select: { id: true, name: true } },
         assignedAthlete: { select: { id: true, fullName: true, athleteCode: true } },
-        projectLeadAthlete: { select: { id: true, fullName: true, athleteCode: true } },
+        projectLeadContact: { select: { id: true, name: true, email: true } },
       },
       data,
     });

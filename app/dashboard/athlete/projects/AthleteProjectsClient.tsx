@@ -7,9 +7,12 @@ import { ProjectProgressBar } from "@/components/ProjectProgressBar";
 import { asAvatarTextTone } from "@/lib/avatar-text-tone";
 import {
   COMPLEXITY_LABELS,
-  PROJECT_PHASE_LABELS,
+  displayProjectStageLabel,
+  OPS_PROJECT_STAGE_OPTIONS,
   PROJECT_STATUS_LABELS,
+  projectStageSelectValue,
 } from "@/lib/ops-constants";
+import type { OpsProjectPhase } from "@prisma/client";
 import { formatProjectFullTitle } from "@/lib/project-display";
 import { clientMetaFromNestedClient, groupProjectsByClient } from "@/lib/ops-project-groups";
 import { daysUntilDueFromIso, projectDueColor } from "@/lib/project-color-scale";
@@ -31,7 +34,7 @@ type ProjectRow = {
   projectNumber: string;
   address: string | null;
   complexity: keyof typeof COMPLEXITY_LABELS;
-  currentStage: keyof typeof PROJECT_PHASE_LABELS;
+  currentStage: OpsProjectPhase;
   currentStatus: keyof typeof PROJECT_STATUS_LABELS;
   startDate: string | null;
   dueDate: string | null;
@@ -283,13 +286,13 @@ export function AthleteProjectsClient() {
               <label className="text-xs text-slate-400">
                 Stage
                 <select
-                  value={form.currentStage}
+                  value={projectStageSelectValue(form.currentStage as OpsProjectPhase)}
                   onChange={(e) => setForm((f) => ({ ...f, currentStage: e.target.value }))}
                   className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
                 >
-                  {Object.entries(PROJECT_PHASE_LABELS).map(([k, label]) => (
-                    <option key={k} value={k}>
-                      {label}
+                  {OPS_PROJECT_STAGE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
                     </option>
                   ))}
                 </select>
@@ -340,7 +343,7 @@ export function AthleteProjectsClient() {
               <dl className="mt-4 grid grid-cols-2 gap-3 text-xs md:grid-cols-4">
                 <div>
                   <dt className="text-slate-500">Stage</dt>
-                  <dd className="text-slate-200">{PROJECT_PHASE_LABELS[p.currentStage]}</dd>
+                  <dd className="text-slate-200">{displayProjectStageLabel(p.currentStage)}</dd>
                 </div>
                 <div>
                   <dt className="text-slate-500">Status</dt>

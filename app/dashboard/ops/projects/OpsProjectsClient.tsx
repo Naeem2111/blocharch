@@ -1,17 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type { OpsProjectPhase } from "@prisma/client";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
 import { ProjectProgressBar } from "@/components/ProjectProgressBar";
 import { asAvatarTextTone } from "@/lib/avatar-text-tone";
 import {
   COMPLEXITY_LABELS,
-  PROJECT_PHASE_LABELS,
+  displayProjectStageLabel,
+  OPS_PROJECT_STAGE_OPTIONS,
   PROJECT_STATUS_LABELS,
+  projectStageSelectValue,
 } from "@/lib/ops-constants";
 import { daysUntilDueFromIso, projectDueColor } from "@/lib/project-color-scale";
 import { computeProjectTimeline } from "@/lib/project-timeline";
 import { formatProjectFullTitle } from "@/lib/project-display";
+
+type ClientContactOption = { id: string; name: string; email: string | null };
 
 type ClientOption = {
   id: string;
@@ -19,6 +24,7 @@ type ClientOption = {
   logoUrl: string | null;
   logoBgColor: string | null;
   logoTextTone: string | null;
+  contacts: ClientContactOption[];
 };
 type AthleteOption = { id: string; fullName: string; athleteCode: string };
 type ProjectRow = {
@@ -30,8 +36,9 @@ type ProjectRow = {
   clientLogoTextTone: string | null;
   assignedAthleteId: string | null;
   assignedAthleteName: string | null;
-  projectLeadAthleteId: string | null;
-  projectLeadAthleteName: string | null;
+  projectLeadContactId: string | null;
+  projectLeadContactName: string | null;
+  projectLeadContactEmail: string | null;
   athleteCode: string | null;
   name: string;
   displayTitle?: string;
@@ -39,7 +46,7 @@ type ProjectRow = {
   address: string | null;
   projectLead: string | null;
   complexity: keyof typeof COMPLEXITY_LABELS;
-  currentStage: keyof typeof PROJECT_PHASE_LABELS;
+  currentStage: OpsProjectPhase;
   currentStatus: keyof typeof PROJECT_STATUS_LABELS;
   startDate: string | null;
   dueDate: string | null;
@@ -54,8 +61,8 @@ const emptyCreate = {
   name: "",
   projectNumber: "",
   address: "",
-  projectLeadAthleteId: "",
-  currentStage: "existing_drawings",
+  projectLeadContactId: "",
+  currentStage: "survey_conversion",
   complexity: "medium",
   dueDate: "",
 };
@@ -78,12 +85,12 @@ export function OpsProjectsClient() {
   const [scope, setScope] = useState<"active" | "all">("active");
   const [editForm, setEditForm] = useState({
     assignedAthleteId: "",
-    projectLeadAthleteId: "",
+    projectLeadContactId: "",
     name: "",
     projectNumber: "",
     address: "",
     complexity: "medium",
-    currentStage: "existing_drawings",
+    currentStage: "survey_conversion",
     currentStatus: "not_started",
     startDate: "",
     dueDate: "",
@@ -110,12 +117,18 @@ export function OpsProjectsClient() {
             logoUrl?: string | null;
             logoBgColor?: string | null;
             logoTextTone?: string | null;
+            contacts?: { id: string; name: string; email: string | null }[];
           }) => ({
             id: c.id,
             name: c.name,
             logoUrl: c.logoUrl ?? null,
             logoBgColor: c.logoBgColor ?? null,
             logoTextTone: c.logoTextTone ?? null,
+            contacts: (c.contacts ?? []).map((ct) => ({
+              id: ct.id,
+              name: ct.name,
+              email: ct.email ?? null,
+            })),
           })
         )
       );
@@ -143,7 +156,7 @@ export function OpsProjectsClient() {
       body: JSON.stringify({
         ...form,
         assignedAthleteId: form.assignedAthleteId || null,
-        projectLeadAthleteId: form.projectLeadAthleteId || null,
+        projectLeadContactId: form.projectLeadContactId || null,
         dueDate: form.dueDate || null,
       }),
     });
@@ -163,7 +176,7 @@ export function OpsProjectsClient() {
     setEditClientId(p.clientId);
     setEditForm({
       assignedAthleteId: athleteId,
-      projectLeadAthleteId: p.projectLeadAthleteId ?? "",
+      projectLeadContactId: p.projectLeadContactId ?? "",
       name: p.name,
       projectNumber: p.projectNumber,
       address: p.address ?? "",
@@ -186,7 +199,7 @@ export function OpsProjectsClient() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         assignedAthleteId: editForm.assignedAthleteId || null,
-        projectLeadAthleteId: editForm.projectLeadAthleteId || null,
+        projectLeadContactId: editForm.projectLeadContactId || null,
         name: editForm.name,
         projectNumber: editForm.projectNumber,
         address: editForm.address,
@@ -262,6 +275,9 @@ export function OpsProjectsClient() {
   if (loading) return <p className="text-sm text-slate-500">Loading projects…</p>;
 
   const createClient = clients.find((c) => c.id === form.clientId) ?? null;
+  const createClientContacts = createClient?.contacts ?? [];
+  const editClient = clients.find((c) => c.id === editClientId) ?? null;
+  const editClientContacts = editClient?.contacts ?? [];
   const selectedFilterClient = clients.find((c) => c.id === clientFilterId) ?? null;
 
   function athleteCodeById(athleteId: string): string {
@@ -317,20 +333,27 @@ export function OpsProjectsClient() {
               </select>
             </label>
             <label className="text-xs text-slate-400">
-              Project lead
+              Office lead
               <select
-                value={editForm.projectLeadAthleteId}
-                onChange={(e) => setEditForm((f) => ({ ...f, projectLeadAthleteId: e.target.value }))}
+                value={editForm.projectLeadContactId}
+                onChange={(e) => setEditForm((f) => ({ ...f, projectLeadContactId: e.target.value }))}
                 className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
               >
                 <option value="">None (hidden on client portal)</option>
-                {athletes.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.fullName}
+                {editClientContacts.map((ct) => (
+                  <option key={ct.id} value={ct.id}>
+                    {ct.name}
+                    {ct.email ? ` · ${ct.email}` : ""}
                   </option>
                 ))}
               </select>
-              <span className="mt-1 block text-[10px] text-slate-500">Shown to clients; can differ from assigned athlete</span>
+              {editClientContacts.length === 0 ? (
+                <span className="mt-1 block text-[10px] text-amber-400">
+                  Add office leads on the client record first (Ops → Clients).
+                </span>
+              ) : (
+                <span className="mt-1 block text-[10px] text-slate-500">Shown to clients on the project portal</span>
+              )}
             </label>
             <label className="text-xs text-slate-400">
               Athlete code
@@ -350,7 +373,20 @@ export function OpsProjectsClient() {
               />
             </label>
             <label className="text-xs text-slate-400">Complexity<select value={editForm.complexity} onChange={(e) => setEditForm((f) => ({ ...f, complexity: e.target.value }))} className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
-            <label className="text-xs text-slate-400">Stage<select value={editForm.currentStage} onChange={(e) => setEditForm((f) => ({ ...f, currentStage: e.target.value }))} className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm">{Object.entries(PROJECT_PHASE_LABELS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
+            <label className="text-xs text-slate-400">
+              Stage / package
+              <select
+                value={projectStageSelectValue(editForm.currentStage as OpsProjectPhase)}
+                onChange={(e) => setEditForm((f) => ({ ...f, currentStage: e.target.value }))}
+                className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
+              >
+                {OPS_PROJECT_STAGE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </label>
             <label className="text-xs text-slate-400">Status<select value={editForm.currentStatus} onChange={(e) => setEditForm((f) => ({ ...f, currentStatus: e.target.value }))} className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm">{Object.entries(PROJECT_STATUS_LABELS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
             <label className="text-xs text-slate-400">Due<input type="date" value={editForm.dueDate} onChange={(e) => setEditForm((f) => ({ ...f, dueDate: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
             <label className="text-xs text-slate-400">Handover<input type="date" value={editForm.handoverDate} onChange={(e) => setEditForm((f) => ({ ...f, handoverDate: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.04] px-3 py-2 text-sm text-white" /></label>
@@ -378,8 +414,11 @@ export function OpsProjectsClient() {
                 {p.address ? ` · ${p.address}` : ""}
                 {p.assignedAthleteName ? ` · ${p.assignedAthleteName}` : " · Unassigned"}
               </p>
-              {p.projectLeadAthleteName ? (
-                <p className="text-xs text-slate-400">Client lead: {p.projectLeadAthleteName}</p>
+              {p.projectLeadContactName ? (
+                <p className="text-xs text-slate-400">
+                  Office lead: {p.projectLeadContactName}
+                  {p.projectLeadContactEmail ? ` · ${p.projectLeadContactEmail}` : ""}
+                </p>
               ) : null}
               <p
                 className={`mt-2 text-xs ${
@@ -390,7 +429,7 @@ export function OpsProjectsClient() {
                       : "text-slate-500"
                 }`}
               >
-                {PROJECT_PHASE_LABELS[p.currentStage]} · {PROJECT_STATUS_LABELS[p.currentStatus]}
+                {displayProjectStageLabel(p.currentStage)} · {PROJECT_STATUS_LABELS[p.currentStatus]}
                 {timeline.daysActive != null ? ` · ${timeline.daysActive} days active` : ""}
                 {timeline.label ? ` · ${timeline.label}` : ""}
               </p>
@@ -482,7 +521,13 @@ export function OpsProjectsClient() {
               <select
                 required
                 value={form.clientId}
-                onChange={(e) => setForm((f) => ({ ...f, clientId: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    clientId: e.target.value,
+                    projectLeadContactId: "",
+                  }))
+                }
                 className="select-console block min-w-0 flex-1 rounded-md px-3 py-2 text-sm"
               >
                 <option value="">Select…</option>
@@ -511,20 +556,30 @@ export function OpsProjectsClient() {
             </select>
           </label>
           <label className="text-xs text-slate-400">
-            Project lead
+            Office lead
             <select
-              value={form.projectLeadAthleteId}
-              onChange={(e) => setForm((f) => ({ ...f, projectLeadAthleteId: e.target.value }))}
+              value={form.projectLeadContactId}
+              onChange={(e) => setForm((f) => ({ ...f, projectLeadContactId: e.target.value }))}
               className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
+              disabled={!form.clientId}
             >
-              <option value="">None (hidden on client portal)</option>
-              {athletes.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.fullName}
+              <option value="">
+                {form.clientId ? "None (hidden on client portal)" : "Select client first"}
+              </option>
+              {createClientContacts.map((ct) => (
+                <option key={ct.id} value={ct.id}>
+                  {ct.name}
+                  {ct.email ? ` · ${ct.email}` : ""}
                 </option>
               ))}
             </select>
-            <span className="mt-1 block text-[10px] text-slate-500">Shown to clients; can differ from assigned athlete</span>
+            {form.clientId && createClientContacts.length === 0 ? (
+              <span className="mt-1 block text-[10px] text-amber-400">
+                Add office leads on the client record first (Ops → Clients).
+              </span>
+            ) : (
+              <span className="mt-1 block text-[10px] text-slate-500">Pick from this client&apos;s office leads</span>
+            )}
           </label>
           <label className="text-xs text-slate-400">
             Stage / package
@@ -534,9 +589,9 @@ export function OpsProjectsClient() {
               onChange={(e) => setForm((f) => ({ ...f, currentStage: e.target.value }))}
               className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
             >
-              {Object.entries(PROJECT_PHASE_LABELS).map(([k, label]) => (
-                <option key={k} value={k}>
-                  {label}
+              {OPS_PROJECT_STAGE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
                 </option>
               ))}
             </select>
@@ -558,7 +613,7 @@ export function OpsProjectsClient() {
               Full title preview:{" "}
               {formatProjectFullTitle(
                 form.name || form.address,
-                form.currentStage as keyof typeof PROJECT_PHASE_LABELS
+                form.currentStage as OpsProjectPhase
               )}
             </p>
           ) : null}

@@ -24,6 +24,32 @@ export const PROJECT_PHASE_LABELS: Record<OpsProjectPhase, string> = {
   housekeeping_internal: "Housekeeping / Internal",
 };
 
+/** Combined package label — survey conversion + existing drawings are one operational stage. */
+export const SURVEY_EXISTING_DRAWINGS_LABEL = "Survey Conversion (Existing Drawings)";
+
+/** Stage options for project create/edit (operations tracker, athlete projects). */
+export const OPS_PROJECT_STAGE_OPTIONS: { value: OpsProjectPhase; label: string }[] = [
+  { value: "survey_conversion", label: SURVEY_EXISTING_DRAWINGS_LABEL },
+  { value: "proposed_drawings", label: PROJECT_PHASE_LABELS.proposed_drawings },
+  { value: "planning_submission", label: PROJECT_PHASE_LABELS.planning_submission },
+  { value: "tender_construction_pack", label: PROJECT_PHASE_LABELS.tender_construction_pack },
+  { value: "construction", label: PROJECT_PHASE_LABELS.construction },
+  { value: "housekeeping_internal", label: PROJECT_PHASE_LABELS.housekeeping_internal },
+];
+
+/** User-facing stage label; legacy existing_drawings shows as the combined package. */
+export function displayProjectStageLabel(stage: OpsProjectPhase): string {
+  if (stage === "survey_conversion" || stage === "existing_drawings") {
+    return SURVEY_EXISTING_DRAWINGS_LABEL;
+  }
+  return PROJECT_PHASE_LABELS[stage];
+}
+
+/** Map legacy existing_drawings to the combined stage for dropdowns. */
+export function projectStageSelectValue(stage: OpsProjectPhase): OpsProjectPhase {
+  return stage === "existing_drawings" ? "survey_conversion" : stage;
+}
+
 export const TASK_TYPE_LABELS: Record<OpsTaskType, string> = {
   plans: "Plans",
   sections: "Sections",

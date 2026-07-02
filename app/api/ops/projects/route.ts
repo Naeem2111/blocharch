@@ -11,6 +11,7 @@ import { parseDateOnly } from "@/lib/ops-hours";
 import { syncProjectBoardOnAssign } from "@/lib/planner-project-sync";
 import { normalizeAthleteProjectCode } from "@/lib/ops-project-code";
 import { projectDisplayFields } from "@/lib/project-display";
+import { validateProjectLeadContactDb } from "@/lib/ops-project-lead";
 
 const ACTIVE_STATUSES = ["completed", "handed_over"] as const;
 
@@ -32,7 +33,7 @@ export async function GET(request: NextRequest) {
     include: {
       client: { select: { id: true, name: true, logoUrl: true, logoBgColor: true, logoTextTone: true } },
       assignedAthlete: { select: { id: true, fullName: true, athleteCode: true } },
-      projectLeadAthlete: { select: { id: true, fullName: true, athleteCode: true } },
+      projectLeadContact: { select: { id: true, name: true, email: true } },
     },
   });
 
@@ -48,8 +49,9 @@ export async function GET(request: NextRequest) {
         clientLogoTextTone: p.client.logoTextTone,
         assignedAthleteId: p.assignedAthleteId,
         assignedAthleteName: p.assignedAthlete?.fullName ?? null,
-        projectLeadAthleteId: p.projectLeadAthleteId,
-        projectLeadAthleteName: p.projectLeadAthlete?.fullName ?? null,
+        projectLeadContactId: p.projectLeadContactId,
+        projectLeadContactName: p.projectLeadContact?.name ?? null,
+        projectLeadContactEmail: p.projectLeadContact?.email ?? null,
         athleteCode: p.assignedAthlete?.athleteCode ?? null,
         name: p.name,
         displayTitle,
@@ -84,8 +86,8 @@ export async function POST(request: NextRequest) {
     let name = String(body.name || "").trim();
     const assignedAthleteId = body.assignedAthleteId ? String(body.assignedAthleteId).trim() : null;
 
-    const projectLeadAthleteId = body.projectLeadAthleteId
-      ? String(body.projectLeadAthleteId).trim()
+    const projectLeadContactId = body.projectLeadContactId
+      ? String(body.projectLeadContactId).trim()
       : null;
 
     const complexity = isOpsProjectComplexity(String(body.complexity || ""))
@@ -93,7 +95,7 @@ export async function POST(request: NextRequest) {
       : "medium";
     const currentStage = isOpsProjectPhase(String(body.currentStage || ""))
       ? body.currentStage
-      : "existing_drawings";
+      : "survey_conversion";
     const currentStatus = isOpsProjectStatus(String(body.currentStatus || ""))
       ? body.currentStatus
       : "not_started";
@@ -127,16 +129,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Project title is required" }, { status: 400 });
     }
 
-    if (projectLeadAthleteId) {
-      const leadAthlete = await prisma.opsAthlete.findUnique({ where: { id: projectLeadAthleteId } });
-      if (!leadAthlete) return NextResponse.json({ error: "Project lead not found" }, { status: 404 });
-    }
+    const leadError = await validateProjectLeadContactDb(prisma, clientId, projectLeadContactId);
+    if (leadError) return NextResponse.json({ error: leadError }, { status: 400 });
 
     const project = await prisma.opsProject.create({
       data: {
         clientId,
         assignedAthleteId,
-        projectLeadAthleteId,
+        projectLeadContactId,
+        projectLeadAthleteId: null,
         name,
         projectNumber,
         address,
