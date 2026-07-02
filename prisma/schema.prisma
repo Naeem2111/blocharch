@@ -313,6 +313,9 @@ model OpsClient {
   /** Initials text on logo circle when no image: light (white) or dark (black). */
   logoTextTone String?         @map("logo_text_tone")
   status      OpsClientStatus @default(active)
+  /** URL slug for public client portal: /clients/{slug} */
+  slug                 String? @unique
+  publicPortalEnabled  Boolean @default(false) @map("public_portal_enabled")
   notes       String?         @db.Text
   createdAt   DateTime        @default(now()) @map("created_at")
   updatedAt   DateTime        @updatedAt @map("updated_at")

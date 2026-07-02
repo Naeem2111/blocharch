@@ -80,6 +80,8 @@ type ClientWithRelations = {
 	logoBgColor: string | null;
 	logoTextTone: string | null;
 	status: string;
+	slug: string | null;
+	publicPortalEnabled: boolean;
 	notes: string | null;
 	contacts: {
 		id: string;
@@ -114,6 +116,8 @@ export function mapClientToJson(c: ClientWithRelations) {
 		logoBgColor: c.logoBgColor,
 		logoTextTone: c.logoTextTone,
 		status: c.status,
+		slug: c.slug ?? null,
+		publicPortalEnabled: c.publicPortalEnabled ?? false,
 		notes: c.notes,
 		projectCount: c._count.projects,
 		commercial: c.commercial

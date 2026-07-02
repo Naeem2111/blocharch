@@ -16,6 +16,7 @@ import {
 	mapClientToJson,
 	parseContactsFromBody,
 } from "@/lib/ops-client-api";
+import { resolveUniqueClientSlug, slugifyClientName } from "@/lib/client-slug";
 
 export async function GET(request: NextRequest) {
 	const gate = await requireOpsSession(request);
@@ -98,9 +99,12 @@ export async function POST(request: NextRequest) {
 			logoTextTone = parsed;
 		}
 
+		const slug = await resolveUniqueClientSlug(name);
+
 		const client = await prisma.opsClient.create({
 			data: {
 				name,
+				slug,
 				companyName: body.companyName ? String(body.companyName).trim() : null,
 				software: body.software ? String(body.software).trim() : null,
 				phone: body.phone ? String(body.phone).trim() : null,

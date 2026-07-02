@@ -8,6 +8,7 @@ import { ImageUrlField } from "@/components/ops/ImageUrlField";
 import type { AvatarTextTone } from "@/lib/avatar-text-tone";
 import { asAvatarTextTone, DEFAULT_AVATAR_TEXT_TONE } from "@/lib/avatar-text-tone";
 import { DEFAULT_AVATAR_BG } from "@/lib/hex-color";
+import { clientPortalPath } from "@/lib/client-slug";
 
 type ClientContact = { id?: string; name: string; email: string };
 
@@ -20,6 +21,8 @@ type ClientRow = {
   phone: string | null;
   country: string | null;
   status: string;
+  slug: string | null;
+  publicPortalEnabled: boolean;
   notes: string | null;
   logoUrl: string | null;
   logoBgColor: string | null;
@@ -172,6 +175,8 @@ export function OpsClientsClient() {
     phone: "",
     country: "",
     status: "active",
+    slug: "",
+    publicPortalEnabled: false,
     notes: "",
     tierPercent: "30",
     laneCostGbp: "2041",
@@ -246,6 +251,8 @@ export function OpsClientsClient() {
       phone: c.phone ?? "",
       country: c.country ?? "",
       status: c.status,
+      slug: c.slug ?? "",
+      publicPortalEnabled: c.publicPortalEnabled,
       notes: c.notes ?? "",
       tierPercent: String(c.commercial?.tierPercent ?? 30),
       laneCostGbp: String(c.commercial?.laneCostGbp ?? 2041),
@@ -271,6 +278,8 @@ export function OpsClientsClient() {
         phone: editForm.phone,
         country: editForm.country,
         status: editForm.status,
+        slug: editForm.slug.trim() || null,
+        publicPortalEnabled: editForm.publicPortalEnabled,
         notes: editForm.notes,
         tierPercent: Number(editForm.tierPercent),
         laneCostGbp: Number(editForm.laneCostGbp),
@@ -524,6 +533,52 @@ export function OpsClientsClient() {
                   />
                 </label>
                 <label className="text-xs text-slate-400 md:col-span-2">
+                  Client portal slug
+                  <input
+                    value={editForm.slug}
+                    onChange={(e) => setEditForm((f) => ({ ...f, slug: e.target.value }))}
+                    placeholder="e.g. icon-architects"
+                    className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+                  />
+                  <span className="mt-1 block text-[11px] text-slate-600">
+                    Public URL: /clients/{editForm.slug.trim() || "your-slug"}
+                  </span>
+                </label>
+                <label className="flex items-center gap-2 text-xs text-slate-300 md:col-span-2">
+                  <input
+                    type="checkbox"
+                    checked={editForm.publicPortalEnabled}
+                    onChange={(e) =>
+                      setEditForm((f) => ({ ...f, publicPortalEnabled: e.target.checked }))
+                    }
+                    className="rounded border-white/20"
+                  />
+                  Enable public client portal (no login required)
+                </label>
+                {editForm.publicPortalEnabled && editForm.slug.trim() ? (
+                  <div className="flex flex-wrap items-center gap-2 md:col-span-2">
+                    <a
+                      href={clientPortalPath(editForm.slug.trim())}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-brand-300 hover:text-brand-200"
+                    >
+                      Open portal ↗
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const url = `${window.location.origin}${clientPortalPath(editForm.slug.trim())}`;
+                        void navigator.clipboard.writeText(url);
+                        setMsg("Portal link copied.");
+                      }}
+                      className="text-xs text-slate-400 hover:text-slate-200"
+                    >
+                      Copy link
+                    </button>
+                  </div>
+                ) : null}
+                <label className="text-xs text-slate-400 md:col-span-2">
                   Notes
                   <textarea
                     value={editForm.notes}
@@ -576,6 +631,19 @@ export function OpsClientsClient() {
                       {ct.email ? ` · ${ct.email}` : ""}
                     </p>
                   ))}
+                  {c.publicPortalEnabled && c.slug ? (
+                    <p className="mt-2 text-xs text-brand-300">
+                      <a
+                        href={clientPortalPath(c.slug)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:text-brand-200"
+                      >
+                        Client portal ↗
+                      </a>
+                      <span className="text-slate-600"> · /clients/{c.slug}</span>
+                    </p>
+                  ) : null}
                   </div>
                 </div>
                 <button

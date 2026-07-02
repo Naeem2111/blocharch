@@ -18,6 +18,7 @@ import {
 	mapClientToJson,
 	parseContactsFromBody,
 } from "@/lib/ops-client-api";
+import { resolveUniqueClientSlug, slugifyClientName } from "@/lib/client-slug";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -42,6 +43,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 			phone?: string | null;
 			country?: string | null;
 			status?: "active" | "inactive";
+			slug?: string | null;
+			publicPortalEnabled?: boolean;
 			notes?: string | null;
 			logoUrl?: string | null;
 			logoBgColor?: string | null;
@@ -74,6 +77,50 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 			clientData.notes = body.notes ? String(body.notes).trim() : null;
 		if (body.status === "active" || body.status === "inactive")
 			clientData.status = body.status;
+
+		if (body.publicPortalEnabled !== undefined) {
+			clientData.publicPortalEnabled = Boolean(body.publicPortalEnabled);
+		}
+
+		if (body.slug !== undefined) {
+			const raw = body.slug == null || body.slug === "" ? null : String(body.slug).trim().toLowerCase();
+			if (raw === null) {
+				clientData.slug = null;
+			} else {
+				const normalized = slugifyClientName(raw);
+				if (!normalized) {
+					return NextResponse.json({ error: "Invalid portal slug" }, { status: 400 });
+				}
+				const taken = await prisma.opsClient.findFirst({
+					where: { slug: normalized, id: { not: id } },
+					select: { id: true },
+				});
+				if (taken) {
+					return NextResponse.json({ error: "Portal slug already in use" }, { status: 400 });
+				}
+				clientData.slug = normalized;
+			}
+		}
+
+		if (body.name != null && clientData.name && !body.slug && !existing.slug) {
+			clientData.slug = await resolveUniqueClientSlug(clientData.name, id);
+		}
+
+		if (clientData.publicPortalEnabled && !clientData.slug && !existing.slug) {
+			const slugSource = clientData.name ?? existing.name;
+			clientData.slug = await resolveUniqueClientSlug(slugSource, id);
+		} else if (
+			clientData.publicPortalEnabled &&
+			clientData.slug === null &&
+			existing.slug &&
+			body.slug !== undefined &&
+			(body.slug === "" || body.slug === null)
+		) {
+			return NextResponse.json(
+				{ error: "Portal slug is required when the client portal is enabled" },
+				{ status: 400 },
+			);
+		}
 
 		if (body.logoUrl !== undefined) {
 			try {
