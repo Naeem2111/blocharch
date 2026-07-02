@@ -416,6 +416,7 @@ export type MarketingDueDateItem = {
   practiceSlug: string;
   practiceName: string;
   followUpDueAt: string;
+  effectiveStage: LeadStage;
   followUpStatus: FollowUpStatus;
   nextAction?: string;
 };
@@ -457,6 +458,7 @@ export async function listMarketingFollowUpDates(): Promise<MarketingDueDateItem
       practiceSlug: slug,
       practiceName: a.name,
       followUpDueAt: toIso(a.lead.followUpDueAt)!,
+      effectiveStage: computeEffectiveStage(stage, a.lead.followUpDueAt),
       followUpStatus: computeFollowUpStatus(a.lead.followUpDueAt, stage),
       nextAction: a.lead.nextAction || undefined,
     });

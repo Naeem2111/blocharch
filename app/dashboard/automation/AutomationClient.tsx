@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { AddPracticeForm } from "@/components/practices/AddPracticeForm";
+import { FollowUpTimeTag } from "@/components/FollowUpTimeTag";
+import { LeadStageTag } from "@/components/LeadStageTag";
 import { LEAD_FILTER_OPTIONS, followUpStatusColor, followUpStatusLabel } from "@/lib/lead-stage-ui";
 import { LeadStagePicker } from "@/components/LeadStagePicker";
 import { isManualPracticeUrl } from "@/lib/practice-url";
@@ -225,19 +227,26 @@ export function AutomationClient() {
                 {data.items.map((item) => (
                   <tr key={item.url} className="transition-colors hover:bg-white/[0.03]">
                     <td className="px-4 py-3">
-                      <Link
-                        href={`/dashboard/practices/${encodeURIComponent(item.slug)}`}
-                        className="font-medium text-white hover:text-brand-400"
-                      >
-                        {item.name || "—"}
-                      </Link>
-                      {isManualPracticeUrl(item.url) ? (
-                        <span className="ml-2 rounded bg-white/[0.06] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-slate-500">
-                          Manual
-                        </span>
-                      ) : null}
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <Link
+                          href={`/dashboard/practices/${encodeURIComponent(item.slug)}`}
+                          className="font-medium text-white hover:text-brand-400"
+                        >
+                          {item.name || "—"}
+                        </Link>
+                        <LeadStageTag
+                          stage={item.lead.effectiveStage || item.lead.stage}
+                          compact
+                        />
+                        <FollowUpTimeTag followUpDueAt={item.lead.followUpDueAt} compact />
+                        {isManualPracticeUrl(item.url) ? (
+                          <span className="rounded bg-white/[0.06] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-slate-500">
+                            Manual
+                          </span>
+                        ) : null}
+                      </div>
                       {item.lead.nextAction ? (
-                        <p className="mt-0.5 max-w-[12rem] truncate text-[10px] text-slate-500" title={item.lead.nextAction}>
+                        <p className="mt-1 max-w-[16rem] truncate text-[10px] text-slate-500" title={item.lead.nextAction}>
                           {item.lead.nextAction}
                         </p>
                       ) : null}

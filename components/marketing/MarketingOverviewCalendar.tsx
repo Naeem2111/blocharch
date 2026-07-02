@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { MiniMonthCalendar, type CalendarMark } from "@/components/MiniMonthCalendar";
+import { FollowUpTimeTag } from "@/components/FollowUpTimeTag";
+import { LeadStageTag } from "@/components/LeadStageTag";
 import type { MarketingDueDateItem } from "@/lib/lead-outreach";
-import { followUpStatusColor, followUpStatusLabel } from "@/lib/lead-stage-ui";
 import { daysUntilDueFromIso, projectDueColor } from "@/lib/project-color-scale";
 
 function formatShortDate(iso: string): string {
@@ -156,22 +157,15 @@ export function MarketingOverviewCalendar({ items }: { items: MarketingDueDateIt
                     key={`${item.practiceUrl}-${item.followUpDueAt}`}
                     className="rounded-xl border border-white/[0.08] bg-white/[0.02] px-4 py-3"
                   >
-                    <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <Link
                         href={`/dashboard/practices/${encodeURIComponent(item.practiceSlug)}`}
                         className="font-medium text-white hover:text-brand-300"
                       >
                         {item.practiceName}
                       </Link>
-                      <span
-                        className="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase"
-                        style={{
-                          color: followUpStatusColor(item.followUpStatus),
-                          backgroundColor: `${followUpStatusColor(item.followUpStatus)}18`,
-                        }}
-                      >
-                        {followUpStatusLabel(item.followUpStatus)}
-                      </span>
+                      <LeadStageTag stage={item.effectiveStage} compact />
+                      <FollowUpTimeTag followUpDueAt={item.followUpDueAt} compact />
                     </div>
                     {item.nextAction ? (
                       <p className="mt-1 text-xs text-slate-400">Next: {item.nextAction}</p>
@@ -193,12 +187,16 @@ export function MarketingOverviewCalendar({ items }: { items: MarketingDueDateIt
                     key={`upcoming-${item.practiceUrl}`}
                     className="flex items-center justify-between gap-3 rounded-lg px-1 py-1.5 text-sm"
                   >
-                    <Link
-                      href={`/dashboard/practices/${encodeURIComponent(item.practiceSlug)}`}
-                      className="min-w-0 truncate text-slate-200 hover:text-brand-300"
-                    >
-                      {item.practiceName}
-                    </Link>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Link
+                        href={`/dashboard/practices/${encodeURIComponent(item.practiceSlug)}`}
+                        className="min-w-0 truncate text-slate-200 hover:text-brand-300"
+                      >
+                        {item.practiceName}
+                      </Link>
+                      <LeadStageTag stage={item.effectiveStage} compact />
+                      <FollowUpTimeTag followUpDueAt={item.followUpDueAt} compact />
+                    </div>
                     <span className="shrink-0 text-xs text-slate-500">
                       {formatShortDate(toDateOnly(item.followUpDueAt))}
                     </span>

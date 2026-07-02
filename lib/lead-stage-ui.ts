@@ -1,4 +1,5 @@
 import type { LeadStage } from "@/lib/leads";
+import { daysUntilDueFromIso, projectDueColor } from "@/lib/project-color-scale";
 
 export const LEAD_STAGE_COLORS: Record<LeadStage, string> = {
   cold: "#0ea5e9",
@@ -70,4 +71,32 @@ export function followUpStatusColor(status: string): string {
     default:
       return "#64748b";
   }
+}
+
+/** Human-readable countdown for a follow-up due date. */
+export function formatFollowUpTimeLeft(followUpDueAt?: string | null): string | null {
+  const days = daysUntilDueFromIso(followUpDueAt ?? null);
+  if (days == null) return null;
+  if (days < 0) {
+    const n = Math.abs(days);
+    return `${n} day${n === 1 ? "" : "s"} overdue`;
+  }
+  if (days === 0) return "Due today";
+  if (days === 1) return "1 day left";
+  return `${days} days left`;
+}
+
+export function followUpTimeLeftColor(followUpDueAt?: string | null): string {
+  return projectDueColor(daysUntilDueFromIso(followUpDueAt ?? null));
+}
+
+/** Text color that reads on solid fill (Gmail label style). */
+export function tagTextColorFromBackground(hex: string): string {
+  const raw = hex.replace("#", "");
+  if (raw.length !== 6) return "#ffffff";
+  const r = parseInt(raw.slice(0, 2), 16);
+  const g = parseInt(raw.slice(2, 4), 16);
+  const b = parseInt(raw.slice(4, 6), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.62 ? "#1e293b" : "#ffffff";
 }

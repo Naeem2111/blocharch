@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { LeadStageTag } from "@/components/LeadStageTag";
+import { FollowUpTimeTag } from "@/components/FollowUpTimeTag";
 import type { MarketingNotificationItem } from "@/lib/lead-outreach";
-import { LEAD_STAGE_COLORS, LEAD_STAGE_LABELS, followUpStatusLabel } from "@/lib/lead-stage-ui";
+import { LEAD_STAGE_COLORS, followUpStatusLabel } from "@/lib/lead-stage-ui";
 
 function formatDate(iso?: string): string {
   if (!iso) return "—";
@@ -47,11 +49,11 @@ export function MarketingNotificationsClient() {
                 style={{ borderLeft: `3px solid ${color}` }}
               >
                 <div className="min-w-0">
-                  <h2 className="text-lg font-semibold text-white">{item.practiceName}</h2>
-                  <p className="mt-1 text-sm text-slate-400">
-                    Stage:{" "}
-                    <span style={{ color }}>{LEAD_STAGE_LABELS[item.effectiveStage]}</span>
-                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-lg font-semibold text-white">{item.practiceName}</h2>
+                    <LeadStageTag stage={item.effectiveStage} />
+                    <FollowUpTimeTag followUpDueAt={item.followUpDueAt} />
+                  </div>
                   <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
                     <div>
                       <dt className="text-slate-500">Last contacted</dt>
