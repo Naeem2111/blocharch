@@ -1,10 +1,13 @@
 import Link from "next/link";
 import { loadArchitects } from "@/lib/architects";
+import { listMarketingFollowUpDates } from "@/lib/lead-outreach";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/PageHeader";
+import { MarketingOverviewCalendar } from "@/components/marketing/MarketingOverviewCalendar";
 
 export default async function DashboardPage() {
   const architects = await loadArchitects();
+  const followUpDates = await listMarketingFollowUpDates();
   const total = architects.length;
   const withEmail = architects.filter((a) => a.email?.trim()).length;
   const withWebsite = architects.filter((a) => a.website?.trim()).length;
@@ -45,6 +48,9 @@ export default async function DashboardPage() {
             Geocoded in database (of {total} in directory)
           </p>
         </div>
+      </div>
+      <div className="mb-10">
+        <MarketingOverviewCalendar items={followUpDates} />
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Link

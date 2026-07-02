@@ -411,6 +411,64 @@ export async function listMarketingNotifications(): Promise<MarketingNotificatio
   return items;
 }
 
+export type MarketingDueDateItem = {
+  practiceUrl: string;
+  practiceSlug: string;
+  practiceName: string;
+  followUpDueAt: string;
+  followUpStatus: FollowUpStatus;
+  nextAction?: string;
+};
+
+/** All scheduled marketing follow-ups for calendar views (excludes closed pipeline stages). */
+export async function listMarketingFollowUpDates(): Promise<MarketingDueDateItem[]> {
+  await syncAllFollowUpDueStages();
+
+  const architects = await prisma.architect.findMany({
+    where: {
+      lead: { followUpDueAt: { not: null } },
+    },
+    select: {
+      url: true,
+      name: true,
+      lead: {
+        select: {
+          stage: true,
+          followUpDueAt: true,
+          nextAction: true,
+        },
+      },
+    },
+    orderBy: { name: "asc" },
+  });
+
+  const items: MarketingDueDateItem[] = [];
+
+  for (const a of architects) {
+    if (!a.lead?.followUpDueAt) continue;
+    const stage = normalizeLeadStage(a.lead.stage);
+    if (REMINDER_STOP_STAGES.includes(stage)) continue;
+
+    const slugMatch = a.url.match(/\/practice\/([^/]+)\/?$/);
+    const slug = slugMatch ? slugMatch[1] : "";
+
+    items.push({
+      practiceUrl: a.url,
+      practiceSlug: slug,
+      practiceName: a.name,
+      followUpDueAt: toIso(a.lead.followUpDueAt)!,
+      followUpStatus: computeFollowUpStatus(a.lead.followUpDueAt, stage),
+      nextAction: a.lead.nextAction || undefined,
+    });
+  }
+
+  items.sort(
+    (a, b) => new Date(a.followUpDueAt).getTime() - new Date(b.followUpDueAt).getTime()
+  );
+
+  return items;
+}
+
 export function matchesLeadFilter(
   filter: string,
   lead: {

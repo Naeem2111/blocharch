@@ -77,6 +77,8 @@ function StarRating({
 
 export function AutomationClient() {
   const [stage, setStage] = useState<string>("");
+  const [q, setQ] = useState("");
+  const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [data, setData] = useState<{ items: LeadItem[]; total: number; totalPages: number } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -88,12 +90,13 @@ export function AutomationClient() {
     params.set("page", String(page));
     params.set("perPage", "25");
     if (stage) params.set("stage", stage);
+    if (query) params.set("q", query);
     params.set("withEmail", "true");
     return fetch(`/api/leads?${params}`)
       .then((r) => r.json())
       .then(setData)
       .finally(() => setLoading(false));
-  }, [stage, page]);
+  }, [stage, page, query]);
 
   useEffect(() => {
     void loadData();
@@ -139,6 +142,32 @@ export function AutomationClient() {
         }}
       />
 
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-3">
+        <input
+          type="search"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              setQuery(q);
+              setPage(1);
+            }
+          }}
+          placeholder="Search by name, email, contact, address..."
+          className="flex-1 rounded-lg border border-white/[0.08] bg-white/[0.04] px-4 py-2.5 text-white placeholder-slate-500 ring-1 ring-black/20 focus:border-brand-500/50 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+        />
+        <button
+          type="button"
+          onClick={() => {
+            setQuery(q);
+            setPage(1);
+          }}
+          className="rounded-lg bg-gradient-to-r from-brand-500 to-brand-600 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-lg shadow-brand/25 transition-opacity hover:opacity-95"
+        >
+          Search
+        </button>
+      </div>
+
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-2">
           <span className="text-sm text-slate-400">Filter:</span>
@@ -175,6 +204,7 @@ export function AutomationClient() {
         <>
           <p className="text-sm text-slate-500">
             {data.total} practice{data.total !== 1 ? "s" : ""} with email
+            {query ? ` matching “${query}”` : ""}
           </p>
           <div className="overflow-x-auto rounded-2xl border border-white/[0.08] bg-white/[0.02] ring-1 ring-white/[0.04]">
             <table className="w-full min-w-[1100px]">
