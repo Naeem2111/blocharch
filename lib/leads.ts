@@ -1,24 +1,45 @@
 import { prisma } from "@/lib/prisma";
+import type { LeadCommunicationType } from "@prisma/client";
 
 /** Outreach pipeline stages for lead nurturing. */
 export const LEAD_STAGES = [
-  "targeted",
   "cold",
-  "no_reply",
+  "targeted",
+  "first_email_sent",
+  "follow_up_due",
+  "follow_up_sent",
+  "reply_received",
   "positive_reply",
-  "follow_up_interested",
+  "interested",
+  "client_onboarded",
   "negative_reply",
+  "not_interested",
+] as const;
+
+export type LeadStage = (typeof LEAD_STAGES)[number];
+
+/** All stages including deprecated DB values. */
+export const ALL_LEAD_STAGES = [
+  ...LEAD_STAGES,
+  "no_reply",
+  "follow_up_interested",
   "follow_up_not_interested",
 ] as const;
-export type LeadStage = (typeof LEAD_STAGES)[number];
+
+export type LeadStageDb = (typeof ALL_LEAD_STAGES)[number];
 
 export interface LeadRecord {
   stage: LeadStage;
-  rating: number; // 1-5
+  rating: number;
   notes?: string;
   software?: string;
   softwareOther?: string;
-  lastEmailedAt?: string; // ISO date
+  lastEmailedAt?: string;
+  lastContactedAt?: string;
+  followUpDueAt?: string;
+  lastCommunicationType?: string;
+  touchCount?: number;
+  nextAction?: string;
 }
 
 export interface LeadsData {
@@ -31,11 +52,20 @@ function clampRating(value: number): number {
 
 const OLD_TO_NEW_STAGE: Record<string, LeadStage> = {
   new: "cold",
-  contacted: "no_reply",
+  contacted: "first_email_sent",
+  no_reply: "first_email_sent",
   qualified: "positive_reply",
-  won: "positive_reply",
+  won: "client_onboarded",
   lost: "negative_reply",
+  follow_up_interested: "interested",
+  follow_up_not_interested: "not_interested",
 };
+
+export function normalizeLeadStage(value: unknown): LeadStage {
+  if (typeof value !== "string") return "cold";
+  if (LEAD_STAGES.includes(value as LeadStage)) return value as LeadStage;
+  return OLD_TO_NEW_STAGE[value] ?? "cold";
+}
 
 export async function loadLeads(): Promise<LeadsData> {
   const rows = await prisma.lead.findMany();
@@ -43,12 +73,17 @@ export async function loadLeads(): Promise<LeadsData> {
     rows.map((row) => [
       row.architectUrl,
       {
-        stage: row.stage,
+        stage: normalizeLeadStage(row.stage),
         rating: clampRating(row.rating),
         notes: row.notes || undefined,
         software: row.software || undefined,
         softwareOther: row.softwareOther || undefined,
         lastEmailedAt: row.lastEmailedAt?.toISOString(),
+        lastContactedAt: row.lastContactedAt?.toISOString(),
+        followUpDueAt: row.followUpDueAt?.toISOString(),
+        lastCommunicationType: row.lastCommunicationType || undefined,
+        touchCount: row.touchCount,
+        nextAction: row.nextAction || undefined,
       },
     ])
   );
@@ -59,17 +94,18 @@ export async function getLead(practiceUrl: string): Promise<LeadRecord | null> {
     where: { architectUrl: practiceUrl },
   });
   if (!r) return null;
-  const raw = r.stage;
-  const stage = LEAD_STAGES.includes(raw as LeadStage)
-    ? (raw as LeadStage)
-    : (OLD_TO_NEW_STAGE[raw] ?? "cold");
   return {
-    stage,
+    stage: normalizeLeadStage(r.stage),
     rating: clampRating(r.rating),
     notes: r.notes || undefined,
     software: r.software || undefined,
     softwareOther: r.softwareOther || undefined,
     lastEmailedAt: r.lastEmailedAt?.toISOString(),
+    lastContactedAt: r.lastContactedAt?.toISOString(),
+    followUpDueAt: r.followUpDueAt?.toISOString(),
+    lastCommunicationType: r.lastCommunicationType || undefined,
+    touchCount: r.touchCount,
+    nextAction: r.nextAction || undefined,
   };
 }
 
@@ -83,20 +119,26 @@ export async function getOrCreateLead(practiceUrl: string): Promise<LeadRecord> 
       rating: 0,
     },
   });
-  return { stage: "cold", rating: 0 };
+  return { stage: "cold", rating: 0, touchCount: 0 };
 }
 
 export async function updateLead(
   practiceUrl: string,
-  updates: Partial<Pick<LeadRecord, "stage" | "rating" | "notes" | "software" | "softwareOther">> & {
+  updates: Partial<
+    Pick<
+      LeadRecord,
+      "stage" | "rating" | "notes" | "software" | "softwareOther" | "nextAction" | "lastCommunicationType"
+    >
+  > & {
     lastEmailedAt?: string | null;
+    lastContactedAt?: string | null;
+    followUpDueAt?: string | null;
+    touchCount?: number;
   }
 ): Promise<LeadRecord> {
   const current = await getOrCreateLead(practiceUrl);
   const nextSoftware =
-    updates.software !== undefined
-      ? updates.software?.trim() || undefined
-      : current.software;
+    updates.software !== undefined ? updates.software?.trim() || undefined : current.software;
   const nextSoftwareOther =
     nextSoftware === "other"
       ? updates.softwareOther !== undefined
@@ -106,15 +148,21 @@ export async function updateLead(
   const next: LeadRecord = {
     ...current,
     ...updates,
-    stage: updates.stage && LEAD_STAGES.includes(updates.stage) ? updates.stage : current.stage,
-    rating:
-      updates.rating !== undefined ? clampRating(updates.rating) : current.rating,
+    stage: updates.stage ? normalizeLeadStage(updates.stage) : current.stage,
+    rating: updates.rating !== undefined ? clampRating(updates.rating) : current.rating,
     software: nextSoftware,
     softwareOther: nextSoftwareOther,
     lastEmailedAt:
       updates.lastEmailedAt !== undefined
         ? updates.lastEmailedAt || undefined
         : current.lastEmailedAt,
+    lastContactedAt:
+      updates.lastContactedAt !== undefined
+        ? updates.lastContactedAt || undefined
+        : current.lastContactedAt,
+    followUpDueAt:
+      updates.followUpDueAt !== undefined ? updates.followUpDueAt || undefined : current.followUpDueAt,
+    touchCount: updates.touchCount !== undefined ? updates.touchCount : current.touchCount,
   };
   await prisma.lead.upsert({
     where: { architectUrl: practiceUrl },
@@ -125,6 +173,11 @@ export async function updateLead(
       software: next.software ?? null,
       softwareOther: next.softwareOther ?? null,
       lastEmailedAt: next.lastEmailedAt ? new Date(next.lastEmailedAt) : null,
+      lastContactedAt: next.lastContactedAt ? new Date(next.lastContactedAt) : null,
+      followUpDueAt: next.followUpDueAt ? new Date(next.followUpDueAt) : null,
+      lastCommunicationType: (next.lastCommunicationType as LeadCommunicationType | undefined) ?? null,
+      touchCount: next.touchCount ?? 0,
+      nextAction: next.nextAction ?? null,
     },
     create: {
       architectUrl: practiceUrl,
@@ -134,6 +187,11 @@ export async function updateLead(
       software: next.software ?? null,
       softwareOther: next.softwareOther ?? null,
       lastEmailedAt: next.lastEmailedAt ? new Date(next.lastEmailedAt) : null,
+      lastContactedAt: next.lastContactedAt ? new Date(next.lastContactedAt) : null,
+      followUpDueAt: next.followUpDueAt ? new Date(next.followUpDueAt) : null,
+      lastCommunicationType: (next.lastCommunicationType as LeadCommunicationType | undefined) ?? null,
+      touchCount: next.touchCount ?? 0,
+      nextAction: next.nextAction ?? null,
     },
   });
   return next;
@@ -153,6 +211,7 @@ export async function appendLeadAutomationNote(
   return await updateLead(practiceUrl, {
     notes,
     lastEmailedAt: ts,
-    ...(options?.stage && LEAD_STAGES.includes(options.stage) ? { stage: options.stage } : {}),
+    lastContactedAt: ts,
+    ...(options?.stage ? { stage: normalizeLeadStage(options.stage) } : {}),
   });
 }

@@ -1,4 +1,6 @@
 import { getBestAddressFromFields } from "@/lib/address-display";
+import { computeEffectiveStage } from "@/lib/lead-outreach";
+import { normalizeLeadStage } from "@/lib/leads";
 import { prisma } from "@/lib/prisma";
 import { getMapFocalAnchor, type MapAnchorRow, type MapHubAnchor } from "@/lib/map-hub";
 
@@ -94,7 +96,7 @@ export async function loadPracticesForMap(): Promise<{
       description: true,
       latitude: true,
       longitude: true,
-      lead: { select: { stage: true } },
+      lead: { select: { stage: true, followUpDueAt: true } },
     },
     orderBy: { name: "asc" },
   });
@@ -110,7 +112,8 @@ export async function loadPracticesForMap(): Promise<{
       "";
     if (!addr) continue;
 
-    const stage = (r.lead?.stage ?? "cold") as MapPracticeStage;
+    const rawStage = normalizeLeadStage(r.lead?.stage ?? "cold");
+    const stage = computeEffectiveStage(rawStage, r.lead?.followUpDueAt ?? null) as MapPracticeStage;
     const lat = r.latitude;
     const lng = r.longitude;
     const distKm =

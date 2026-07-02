@@ -50,6 +50,7 @@ export function isMarketingDashboardPath(path: string): boolean {
   if (path.startsWith("/dashboard/practices")) return true;
   if (path.startsWith("/dashboard/map")) return true;
   if (path.startsWith("/dashboard/automation")) return true;
+  if (path.startsWith("/dashboard/marketing")) return true;
   return false;
 }
 
@@ -57,6 +58,7 @@ export function isMarketingApiPath(path: string): boolean {
   if (path.startsWith("/api/practices")) return true;
   if (path === "/api/stats") return true;
   if (path.startsWith("/api/leads")) return true;
+  if (path.startsWith("/api/marketing")) return true;
   if (path.startsWith("/api/workflow")) return true;
   if (path === "/api/templates") return true;
   if (path.startsWith("/api/geocode")) return true;

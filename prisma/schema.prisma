@@ -14,13 +14,39 @@ enum UserRole {
 }
 
 enum LeadStage {
-  targeted
   cold
-  no_reply
+  targeted
+  first_email_sent
+  follow_up_due
+  follow_up_sent
+  reply_received
   positive_reply
-  follow_up_interested
+  interested
+  client_onboarded
   negative_reply
+  not_interested
+  /** @deprecated — migrated to first_email_sent */
+  no_reply
+  /** @deprecated — migrated to interested */
+  follow_up_interested
+  /** @deprecated — migrated to not_interested */
   follow_up_not_interested
+}
+
+enum LeadCommunicationType {
+  first_email
+  follow_up_email
+  inbound_reply
+  whatsapp
+  linkedin
+  call
+  note
+  other
+}
+
+enum LeadCommunicationDirection {
+  outbound
+  inbound
 }
 
 enum PlannerBoardScope {
@@ -136,20 +162,50 @@ model Architect {
 }
 
 model Lead {
-  id            String    @id @default(uuid())
-  architectUrl  String    @unique @map("architect_url")
-  stage         LeadStage @default(cold)
-  rating        Int       @default(0)
-  notes         String?
-  software      String?
-  softwareOther String?   @map("software_other")
-  lastEmailedAt DateTime? @map("last_emailed_at")
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                    String                  @id @default(uuid())
+  architectUrl          String                  @unique @map("architect_url")
+  stage                 LeadStage               @default(cold)
+  rating                Int                     @default(0)
+  notes                 String?
+  software              String?
+  softwareOther         String?                 @map("software_other")
+  lastEmailedAt         DateTime?               @map("last_emailed_at")
+  lastContactedAt       DateTime?               @map("last_contacted_at")
+  followUpDueAt         DateTime?               @map("follow_up_due_at")
+  lastCommunicationType LeadCommunicationType?  @map("last_communication_type")
+  touchCount            Int                     @default(0) @map("touch_count")
+  nextAction            String?                 @map("next_action")
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
 
-  architect Architect @relation(fields: [architectUrl], references: [url], onDelete: Cascade)
+  architect    Architect          @relation(fields: [architectUrl], references: [url], onDelete: Cascade)
+  outreachLogs LeadOutreachLog[]
 
   @@map("leads")
+}
+
+model LeadOutreachLog {
+  id                String                     @id @default(uuid())
+  leadId            String                     @map("lead_id")
+  stageAtLog        LeadStage                  @map("stage_at_log")
+  communicationType LeadCommunicationType      @map("communication_type")
+  direction         LeadCommunicationDirection
+  contactPerson     String?                    @map("contact_person")
+  emailAddress      String?                    @map("email_address")
+  subject           String?
+  messageBody       String?                    @map("message_body")
+  replyReceived     String?                    @map("reply_received")
+  internalNotes     String?                    @map("internal_notes")
+  contactDate       DateTime                   @map("contact_date")
+  followUpDueAt     DateTime?                  @map("follow_up_due_at")
+  nextAction        String?                    @map("next_action")
+  createdAt         DateTime                   @default(now()) @map("created_at")
+  updatedAt         DateTime                   @updatedAt @map("updated_at")
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId, contactDate(sort: Desc)])
+  @@map("lead_outreach_logs")
 }
 
 model User {

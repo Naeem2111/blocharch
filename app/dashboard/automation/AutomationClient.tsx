@@ -2,11 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { LEAD_STAGES } from "@/lib/leads";
-import { LEAD_STAGE_LABELS } from "@/lib/lead-stage-ui";
+import { LEAD_FILTER_OPTIONS, followUpStatusColor, followUpStatusLabel, LEAD_STAGE_LABELS } from "@/lib/lead-stage-ui";
 import { LeadStagePicker } from "@/components/LeadStagePicker";
-
-const STAGES = LEAD_STAGES;
 
 interface LeadItem {
   url: string;
@@ -14,7 +11,19 @@ interface LeadItem {
   email: string;
   contact: string;
   slug: string;
-  lead: { stage: string; rating: number; notes?: string; lastEmailedAt?: string };
+  lead: {
+    stage: string;
+    effectiveStage: string;
+    rating: number;
+    notes?: string;
+    lastEmailedAt?: string;
+    lastContactedAt?: string;
+    followUpDueAt?: string;
+    followUpStatus: string;
+    lastCommunicationType?: string;
+    touchCount: number;
+    nextAction?: string;
+  };
 }
 
 function slugFromUrl(url: string): string {
@@ -22,32 +31,15 @@ function slugFromUrl(url: string): string {
   return m ? m[1] : "";
 }
 
-function formatEmailedAt(iso?: string): string {
+function formatDate(iso?: string): string {
   if (!iso?.trim()) return "—";
   try {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
-    return d.toLocaleString(undefined, {
-      dateStyle: "short",
-      timeStyle: "short",
-    });
+    return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
   } catch {
     return iso;
   }
-}
-
-function toDatetimeLocalValue(iso?: string): string {
-  if (!iso?.trim()) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-function truncateNote(s: string, max: number): string {
-  const t = s.replace(/\s+/g, " ").trim();
-  if (t.length <= max) return t;
-  return t.slice(0, max - 1) + "…";
 }
 
 function StarRating({
@@ -67,12 +59,12 @@ function StarRating({
           type="button"
           disabled={disabled}
           onClick={() => onChange(value === n ? 0 : n)}
-          className={`p-0.5 rounded transition-colors ${
+          className={`rounded p-0.5 transition-colors ${
             disabled ? "cursor-not-allowed opacity-60" : "hover:scale-110"
           } ${value >= n ? "text-amber-400" : "text-slate-600"}`}
           aria-label={`Rate ${n} stars`}
         >
-          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+          <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
             <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
           </svg>
         </button>
@@ -86,8 +78,6 @@ export function AutomationClient() {
   const [page, setPage] = useState(1);
   const [data, setData] = useState<{ items: LeadItem[]; total: number; totalPages: number } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [editingEmailed, setEditingEmailed] = useState<string | null>(null);
-  const [emailedDraft, setEmailedDraft] = useState("");
 
   useEffect(() => {
     setLoading(true);
@@ -102,10 +92,7 @@ export function AutomationClient() {
       .finally(() => setLoading(false));
   }, [stage, page]);
 
-  async function updateLead(
-    practiceUrl: string,
-    updates: { stage?: string; rating?: number; notes?: string; lastEmailedAt?: string | null }
-  ) {
+  async function updateLead(practiceUrl: string, updates: { stage?: string; rating?: number }) {
     const slug = slugFromUrl(practiceUrl);
     const res = await fetch(`/api/leads/${encodeURIComponent(slug)}`, {
       method: "PATCH",
@@ -122,10 +109,12 @@ export function AutomationClient() {
             ? {
                 ...item,
                 lead: {
+                  ...item.lead,
                   stage: d.stage ?? item.lead.stage,
+                  effectiveStage: d.outreach?.effectiveStage ?? d.stage ?? item.lead.effectiveStage,
                   rating: d.rating ?? item.lead.rating,
-                  notes: d.notes ?? item.lead.notes,
-                  lastEmailedAt: d.lastEmailedAt ?? item.lead.lastEmailedAt,
+                  followUpDueAt: d.followUpDueAt ?? item.lead.followUpDueAt,
+                  followUpStatus: d.outreach?.followUpStatus ?? item.lead.followUpStatus,
                 },
               }
             : item
@@ -134,22 +123,11 @@ export function AutomationClient() {
     }
   }
 
-  function startEditEmailed(url: string, current?: string) {
-    setEditingEmailed(url);
-    setEmailedDraft(toDatetimeLocalValue(current));
-  }
-
-  async function saveEmailed(url: string) {
-    const iso = emailedDraft ? new Date(emailedDraft).toISOString() : null;
-    await updateLead(url, { lastEmailedAt: iso });
-    setEditingEmailed(null);
-  }
-
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-2">
-          <span className="text-slate-400 text-sm">Stage:</span>
+          <span className="text-sm text-slate-400">Filter:</span>
           <select
             value={stage}
             onChange={(e) => {
@@ -158,37 +136,44 @@ export function AutomationClient() {
             }}
             className="select-console rounded-lg px-3 py-2 text-sm"
           >
-            <option value="">All</option>
-            {STAGES.map((s) => (
-              <option key={s} value={s}>
-                {LEAD_STAGE_LABELS[s]}
+            {LEAD_FILTER_OPTIONS.map((opt) => (
+              <option key={opt.value || "all"} value={opt.value}>
+                {opt.label}
               </option>
             ))}
           </select>
         </div>
+        <Link
+          href="/dashboard/marketing/notifications"
+          className="rounded-lg border border-brand-500/30 bg-brand-500/10 px-3 py-2 text-sm font-medium text-brand-200 hover:bg-brand-500/15"
+        >
+          Marketing notifications
+        </Link>
       </div>
 
-      <p className="text-slate-500 text-sm">
-        Track lead stage, rating, last contact, and notes. Open a practice to record software and detailed notes.
+      <p className="text-sm text-slate-500">
+        Track outreach stages, follow-up dates, and contact history. Open a practice to log emails, replies, and next actions.
       </p>
 
       {loading ? (
-        <p className="text-slate-400 py-8">Loading…</p>
+        <p className="py-8 text-slate-400">Loading…</p>
       ) : data ? (
         <>
-          <p className="text-slate-500 text-sm">
+          <p className="text-sm text-slate-500">
             {data.total} practice{data.total !== 1 ? "s" : ""} with email
           </p>
           <div className="overflow-x-auto rounded-2xl border border-white/[0.08] bg-white/[0.02] ring-1 ring-white/[0.04]">
-            <table className="w-full">
+            <table className="w-full min-w-[1100px]">
               <thead>
                 <tr className="bg-white/[0.04] text-left text-sm text-slate-400">
                   <th className="px-4 py-3 font-medium">Name</th>
                   <th className="px-4 py-3 font-medium">Stage</th>
                   <th className="px-4 py-3 font-medium">Rating</th>
-                  <th className="px-4 py-3 font-medium">Email</th>
-                  <th className="px-4 py-3 font-medium whitespace-nowrap">Last emailed</th>
-                  <th className="px-4 py-3 font-medium min-w-[10rem]">Activity</th>
+                  <th className="px-4 py-3 font-medium whitespace-nowrap">Last contacted</th>
+                  <th className="px-4 py-3 font-medium whitespace-nowrap">Next follow-up</th>
+                  <th className="px-4 py-3 font-medium">Follow-up</th>
+                  <th className="px-4 py-3 font-medium">Last type</th>
+                  <th className="px-4 py-3 font-medium">Touches</th>
                   <th className="px-4 py-3 font-medium"></th>
                 </tr>
               </thead>
@@ -202,10 +187,15 @@ export function AutomationClient() {
                       >
                         {item.name || "—"}
                       </Link>
+                      {item.lead.nextAction ? (
+                        <p className="mt-0.5 max-w-[12rem] truncate text-[10px] text-slate-500" title={item.lead.nextAction}>
+                          {item.lead.nextAction}
+                        </p>
+                      ) : null}
                     </td>
                     <td className="px-4 py-3">
                       <LeadStagePicker
-                        value={item.lead.stage}
+                        value={item.lead.effectiveStage || item.lead.stage}
                         onChange={(s) => updateLead(item.url, { stage: s })}
                       />
                     </td>
@@ -215,62 +205,35 @@ export function AutomationClient() {
                         onChange={(v) => updateLead(item.url, { rating: v })}
                       />
                     </td>
-                    <td className="px-4 py-3 text-slate-300 text-sm">
-                      {item.email ? (
-                        <a href={`mailto:${item.email}`} className="text-brand-400 hover:underline">
-                          {item.email}
-                        </a>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-400">
+                      {formatDate(item.lead.lastContactedAt || item.lead.lastEmailedAt)}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-400">
+                      {formatDate(item.lead.followUpDueAt)}
+                    </td>
+                    <td className="px-4 py-3 text-xs">
+                      {item.lead.followUpStatus && item.lead.followUpStatus !== "none" ? (
+                        <span
+                          className="rounded px-1.5 py-0.5 font-semibold uppercase"
+                          style={{
+                            color: followUpStatusColor(item.lead.followUpStatus),
+                            backgroundColor: `${followUpStatusColor(item.lead.followUpStatus)}18`,
+                          }}
+                        >
+                          {followUpStatusLabel(item.lead.followUpStatus)}
+                        </span>
                       ) : (
                         "—"
                       )}
                     </td>
-                    <td className="px-4 py-3 text-slate-400 text-xs whitespace-nowrap">
-                      {editingEmailed === item.url ? (
-                        <div className="flex flex-col gap-1">
-                          <input
-                            type="datetime-local"
-                            value={emailedDraft}
-                            onChange={(e) => setEmailedDraft(e.target.value)}
-                            className="rounded border border-white/[0.08] bg-white/[0.04] px-2 py-1 text-xs text-white"
-                          />
-                          <div className="flex gap-1">
-                            <button
-                              type="button"
-                              onClick={() => void saveEmailed(item.url)}
-                              className="text-brand-400 hover:text-brand-300"
-                            >
-                              Save
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setEditingEmailed(null)}
-                              className="text-slate-500"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => startEditEmailed(item.url, item.lead.lastEmailedAt)}
-                          className="text-left hover:text-brand-300"
-                          title="Click to edit"
-                        >
-                          {formatEmailedAt(item.lead.lastEmailedAt)}
-                        </button>
-                      )}
+                    <td className="px-4 py-3 text-xs text-slate-400">
+                      {item.lead.lastCommunicationType || "—"}
                     </td>
-                    <td
-                      className="px-4 py-3 text-slate-400 text-xs max-w-[14rem]"
-                      title={item.lead.notes || undefined}
-                    >
-                      {item.lead.notes ? truncateNote(item.lead.notes, 120) : "—"}
-                    </td>
+                    <td className="px-4 py-3 text-xs tabular-nums text-slate-300">{item.lead.touchCount ?? 0}</td>
                     <td className="px-4 py-3">
                       <Link
                         href={`/dashboard/practices/${encodeURIComponent(item.slug)}`}
-                        className="text-brand-400 hover:text-brand-300 text-sm"
+                        className="text-sm text-brand-400 hover:text-brand-300"
                       >
                         View
                       </Link>
@@ -281,7 +244,7 @@ export function AutomationClient() {
             </table>
           </div>
           {data.totalPages > 1 && (
-            <div className="flex items-center gap-2 mt-4">
+            <div className="mt-4 flex items-center gap-2">
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
@@ -289,7 +252,7 @@ export function AutomationClient() {
               >
                 Previous
               </button>
-              <span className="text-slate-400 text-sm">
+              <span className="text-sm text-slate-400">
                 Page {page} of {data.totalPages}
               </span>
               <button

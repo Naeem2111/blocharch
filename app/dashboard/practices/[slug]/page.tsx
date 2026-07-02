@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getBestAddress, loadArchitects } from "@/lib/architects";
 import { gmailComposeUrl } from "@/lib/gmail-compose";
 import { LeadStatus } from "@/components/LeadStatus";
+import { LeadOutreachPanel } from "@/components/outreach/LeadOutreachPanel";
 import { PracticeMap } from "@/components/PracticeMap";
 
 function slugFromUrl(url: string): string {
@@ -30,7 +31,7 @@ export default async function PracticeDetailPage({
   const bestAddress = getBestAddress(practice);
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-6xl mx-auto">
       <Link
         href="/dashboard/practices"
         className="inline-flex items-center text-slate-400 hover:text-white text-sm mb-6"
@@ -152,7 +153,15 @@ export default async function PracticeDetailPage({
             </a>
           </div>
         </div>
-      </div>
+          </div>
+          <div className="card-tool mt-6 rounded-2xl p-6 ring-1 ring-white/[0.06]">
+            <h2 className="text-lg font-semibold text-white mb-4">Outreach tracker</h2>
+            <LeadOutreachPanel
+              slug={decoded}
+              practiceEmail={practice.email ?? undefined}
+              practiceContact={practice.contact ?? undefined}
+            />
+          </div>
         </div>
         <div className="lg:col-span-1">
           <div className="space-y-6 sticky top-4">

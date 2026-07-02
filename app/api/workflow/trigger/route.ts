@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
   if (markAsContacted) {
     const now = new Date().toISOString();
     for (const { practice } of payloads) {
-      await updateLead(practice.url, { stage: "no_reply", lastEmailedAt: now });
+      await updateLead(practice.url, { stage: "first_email_sent", lastEmailedAt: now });
     }
   }
 

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { loadArchitects } from "@/lib/architects";
-import { updateLead, getLead, LEAD_STAGES, type LeadStage } from "@/lib/leads";
+import { getOutreachSummary } from "@/lib/lead-outreach";
+import { getOrCreateLead, updateLead, normalizeLeadStage, LEAD_STAGES, type LeadStage } from "@/lib/leads";
 import { isPracticeSoftwareId } from "@/lib/practice-software";
 
 async function resolvePracticeUrl(id: string): Promise<string | null> {
@@ -32,10 +33,12 @@ export async function PATCH(
     software?: string;
     softwareOther?: string;
     lastEmailedAt?: string | null;
+    followUpDueAt?: string | null;
+    nextAction?: string;
   } = {};
 
   if (body.stage && LEAD_STAGES.includes(body.stage)) {
-    updates.stage = body.stage as LeadStage;
+    updates.stage = normalizeLeadStage(body.stage);
   }
   if (typeof body.rating === "number") {
     updates.rating = body.rating;
@@ -63,9 +66,17 @@ export async function PATCH(
     const trimmed = body.lastEmailedAt.trim();
     updates.lastEmailedAt = trimmed ? trimmed : null;
   }
+  if (typeof body.followUpDueAt === "string") {
+    const trimmed = body.followUpDueAt.trim();
+    updates.followUpDueAt = trimmed ? trimmed : null;
+  }
+  if (typeof body.nextAction === "string") {
+    updates.nextAction = body.nextAction.trim();
+  }
 
   const lead = await updateLead(url, updates);
-  return Response.json(lead);
+  const summary = await getOutreachSummary(url);
+  return Response.json({ ...lead, outreach: summary });
 }
 
 export async function GET(
@@ -77,6 +88,8 @@ export async function GET(
   if (!url) {
     return Response.json({ error: "Practice not found" }, { status: 404 });
   }
-  const lead = await getLead(url);
-  return Response.json(lead || { stage: "new", rating: 0 });
+  await getOrCreateLead(url);
+  const lead = await getOrCreateLead(url);
+  const summary = await getOutreachSummary(url);
+  return Response.json({ ...lead, outreach: summary });
 }
