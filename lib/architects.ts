@@ -144,3 +144,116 @@ export async function createManualPractice(
     slug,
   };
 }
+
+export type UpdatePracticeInput = {
+  name?: string;
+  email?: string | null;
+  contact?: string | null;
+  website?: string | null;
+  address?: string | null;
+};
+
+function mapArchitectRow(r: {
+  url: string;
+  name: string;
+  website: string | null;
+  socials: string[];
+  email: string | null;
+  address: string | null;
+  contact: string | null;
+  description: string | null;
+  yearsActive: string | null;
+  staff: string | null;
+  awards: string[];
+}): Architect {
+  return {
+    url: r.url,
+    name: r.name,
+    website: r.website || "",
+    socials: r.socials,
+    email: r.email || "",
+    address: r.address || "",
+    contact: r.contact || "",
+    description: r.description || "",
+    years_active: r.yearsActive || "",
+    staff: r.staff || "",
+    awards: r.awards,
+  };
+}
+
+export async function findArchitectBySlugOrUrl(id: string): Promise<Architect | null> {
+  const decoded = decodeURIComponent(id);
+  const row = await prisma.architect.findFirst({
+    where: {
+      OR: [
+        { url: decoded },
+        { url: id },
+        { url: { endsWith: `/practice/${decoded}` } },
+        { url: { endsWith: `/practice/${id}` } },
+      ],
+    },
+  });
+  return row ? mapArchitectRow(row) : null;
+}
+
+export async function updateArchitect(
+  id: string,
+  input: UpdatePracticeInput
+): Promise<Architect & { slug: string }> {
+  const existing = await findArchitectBySlugOrUrl(id);
+  if (!existing) throw new Error("Practice not found");
+
+  const updates: UpdatePracticeInput = {};
+
+  if (input.name !== undefined) {
+    const name = input.name.trim();
+    if (!name) throw new Error("Practice name cannot be empty");
+    updates.name = name;
+  }
+
+  if (input.email !== undefined) {
+    const email = input.email?.trim().toLowerCase() || "";
+    if (email && !isValidEmail(email)) throw new Error("Enter a valid email address");
+    if (email) {
+      const duplicateEmail = await prisma.architect.findFirst({
+        where: {
+          email: { equals: email, mode: "insensitive" },
+          NOT: { url: existing.url },
+        },
+        select: { name: true },
+      });
+      if (duplicateEmail) {
+        throw new Error(`A practice with this email already exists (${duplicateEmail.name})`);
+      }
+    }
+    updates.email = email || null;
+  }
+
+  if (input.contact !== undefined) {
+    updates.contact = input.contact?.trim() || null;
+  }
+  if (input.website !== undefined) {
+    updates.website = input.website?.trim() || null;
+  }
+  if (input.address !== undefined) {
+    updates.address = input.address?.trim() || null;
+  }
+
+  const row = await prisma.architect.update({
+    where: { url: existing.url },
+    data: {
+      ...(updates.name !== undefined ? { name: updates.name } : {}),
+      ...(updates.email !== undefined ? { email: updates.email } : {}),
+      ...(updates.contact !== undefined ? { contact: updates.contact } : {}),
+      ...(updates.website !== undefined ? { website: updates.website } : {}),
+      ...(updates.address !== undefined ? { address: updates.address } : {}),
+    },
+  });
+
+  if (updates.email) {
+    await getOrCreateLead(existing.url);
+  }
+
+  const architect = mapArchitectRow(row);
+  return { ...architect, slug: slugFromPracticeUrl(architect.url) };
+}

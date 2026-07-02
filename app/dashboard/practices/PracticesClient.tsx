@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { AddPracticeForm } from "@/components/practices/AddPracticeForm";
+import { EditPracticeModal } from "@/components/practices/EditPracticeModal";
 import { getBestAddressFromFields } from "@/lib/address-display";
 import { gmailComposeUrl } from "@/lib/gmail-compose";
 
@@ -101,6 +102,7 @@ export function PracticesClient() {
 	} | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [refreshKey, setRefreshKey] = useState(0);
+	const [editing, setEditing] = useState<Architect | null>(null);
 	const [columnsOpen, setColumnsOpen] = useState(false);
 	const [visible, setVisible] =
 		useState<Record<ColumnId, boolean>>(DEFAULT_VISIBLE);
@@ -158,6 +160,24 @@ export function PracticesClient() {
 
 	return (
 		<div>
+			{editing ? (
+				<EditPracticeModal
+					practice={editing}
+					onClose={() => setEditing(null)}
+					onSaved={(updated) => {
+						setData((current) =>
+							current
+								? {
+										...current,
+										items: current.items.map((item) =>
+											item.url === updated.url ? { ...item, ...updated } : item,
+										),
+									}
+								: current,
+						);
+					}}
+				/>
+			) : null}
 			<div className="mb-6">
 				<AddPracticeForm
 					onCreated={() => {
@@ -415,12 +435,21 @@ export function PracticesClient() {
 											)}
 											{visible.actions && (
 												<td className="px-4 py-3 whitespace-nowrap">
-													<Link
-														href={`/dashboard/practices/${encodeURIComponent(slugFromUrl(p.url))}`}
-														className="text-sm font-medium text-brand-400 hover:text-brand-300"
-													>
-														View
-													</Link>
+													<div className="flex items-center gap-3">
+														<button
+															type="button"
+															onClick={() => setEditing(p)}
+															className="text-sm font-medium text-slate-300 hover:text-white"
+														>
+															Edit
+														</button>
+														<Link
+															href={`/dashboard/practices/${encodeURIComponent(slugFromUrl(p.url))}`}
+															className="text-sm font-medium text-brand-400 hover:text-brand-300"
+														>
+															View
+														</Link>
+													</div>
 												</td>
 											)}
 										</tr>
