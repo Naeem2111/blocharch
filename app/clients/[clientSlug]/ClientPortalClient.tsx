@@ -10,6 +10,7 @@ import { asAvatarTextTone } from "@/lib/avatar-text-tone";
 import { clientPortalPath } from "@/lib/client-slug";
 import { daysUntilDueFromIso, projectDueColor } from "@/lib/project-color-scale";
 import { computeProjectTimeline } from "@/lib/project-timeline";
+import { PublicThemeToggle } from "@/components/client-portal/PublicThemeToggle";
 import type { PublicClientPortalData, PublicClientPortalProject } from "@/lib/public-client-portal";
 
 type Tab = "tracker" | "completed";
@@ -39,7 +40,7 @@ function ProjectCard({ project, showTasks }: { project: PublicClientPortalProjec
 
   return (
     <article
-      className="relative rounded-xl border border-white/[0.08] bg-[#0f1419] p-4 sm:p-5"
+      className="client-portal-card relative rounded-xl border border-white/[0.08] bg-white/[0.03] p-4 sm:p-5"
       style={{ borderLeftWidth: 3, borderLeftColor: accent }}
     >
       <div className="flex items-start justify-between gap-3">
@@ -53,8 +54,12 @@ function ProjectCard({ project, showTasks }: { project: PublicClientPortalProjec
           )}
         </div>
         <span
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-bold uppercase tracking-wide"
-          style={{ backgroundColor: `${project.statusBadge.color}18`, color: project.statusBadge.color }}
+          className="client-portal-status-badge inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-bold uppercase tracking-wide"
+          style={{
+            backgroundColor: `${project.statusBadge.color}28`,
+            color: project.statusBadge.color,
+            borderColor: `${project.statusBadge.color}40`,
+          }}
         >
           <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: project.statusBadge.color }} />
           {project.statusBadge.label}
@@ -87,11 +92,11 @@ function ProjectCard({ project, showTasks }: { project: PublicClientPortalProjec
             <span className="text-sm text-slate-300">{project.leadName}</span>
           </div>
         ) : (
-          <span className="text-xs text-slate-600">Lead assigned soon</span>
+          <span className="text-xs text-slate-500">Lead assigned soon</span>
         )}
         {project.leadName ? (
-          <span className="inline-flex items-center gap-1.5 text-[10px] text-sky-400">
-            <span className="h-1.5 w-1.5 rounded-full bg-sky-400" />
+          <span className="inline-flex items-center gap-1.5 text-[10px] text-sky-400 client-portal-accent-sky">
+            <span className="h-1.5 w-1.5 rounded-full bg-sky-400 client-portal-accent-sky-dot" />
             Athlete assigned
           </span>
         ) : null}
@@ -109,7 +114,7 @@ function ProjectCard({ project, showTasks }: { project: PublicClientPortalProjec
           {tasksOpen ? (
             <ul className="mt-2 space-y-2">
               {project.openTasks.map((task) => (
-                <li key={task.id} className="rounded-lg bg-white/[0.03] px-3 py-2 text-xs">
+                <li key={task.id} className="client-portal-task rounded-lg bg-white/[0.03] px-3 py-2 text-xs">
                   <p className="font-medium text-slate-200">{task.title}</p>
                   <p className="text-slate-500">{task.columnTitle}</p>
                 </li>
@@ -133,7 +138,7 @@ function CompletedRow({ project }: { project: PublicClientPortalProject }) {
 
   return (
     <article
-      className="grid gap-3 rounded-xl border border-white/[0.08] bg-[#0f1419] p-4 sm:grid-cols-[1fr_auto_auto_auto] sm:items-center"
+      className="client-portal-card grid gap-3 rounded-xl border border-white/[0.08] bg-white/[0.03] p-4 sm:grid-cols-[1fr_auto_auto_auto] sm:items-center"
       style={{ borderLeftWidth: 3, borderLeftColor: accent }}
     >
       <div className="min-w-0">
@@ -160,11 +165,11 @@ function CompletedRow({ project }: { project: PublicClientPortalProject }) {
       <div className="text-xs text-slate-400">
         {project.dueDate ? <p>Due {formatShortDate(project.dueDate)}</p> : null}
         {project.handoverDate ? (
-          <p className="text-emerald-400">Handover {formatShortDate(project.handoverDate)}</p>
+          <p className="text-emerald-400 client-portal-accent-emerald">Handover {formatShortDate(project.handoverDate)}</p>
         ) : null}
       </div>
       {outcome ? (
-        <span className="inline-flex w-fit items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-1 text-[10px] font-semibold uppercase text-emerald-300">
+        <span className="client-portal-outcome-badge inline-flex w-fit items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-1 text-[10px] font-semibold uppercase text-emerald-300">
           ↑ {outcome}
         </span>
       ) : (
@@ -204,15 +209,15 @@ export function ClientPortalClient({
 
   return (
     <div className="flex min-h-screen">
-      <aside className="hidden w-56 shrink-0 flex-col border-r border-white/[0.06] bg-[#060a0e] px-4 py-6 lg:flex">
+      <aside className="client-portal-sidebar hidden w-56 shrink-0 flex-col border-r border-white/[0.06] bg-[var(--bg-sidebar)] px-4 py-6 lg:flex">
         <p className="text-lg font-semibold tracking-tight text-white">Blocharch.</p>
-        <p className="mt-8 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Your account</p>
+        <p className="mt-8 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Your account</p>
         <nav className="mt-3 space-y-1">
           <button
             type="button"
             onClick={() => setTab("tracker")}
-            className={`block w-full rounded-lg px-3 py-2 text-left text-sm ${
-              tab === "tracker" ? "bg-white/[0.08] text-white" : "text-slate-400 hover:bg-white/[0.04]"
+            className={`client-portal-nav block w-full rounded-lg px-3 py-2 text-left text-sm ${
+              tab === "tracker" ? "client-portal-nav-active bg-white/[0.08] text-white" : "text-slate-400 hover:bg-white/[0.04]"
             }`}
           >
             Project tracker
@@ -220,17 +225,20 @@ export function ClientPortalClient({
           <button
             type="button"
             onClick={() => setTab("completed")}
-            className={`block w-full rounded-lg px-3 py-2 text-left text-sm ${
-              tab === "completed" ? "bg-white/[0.08] text-white" : "text-slate-400 hover:bg-white/[0.04]"
+            className={`client-portal-nav block w-full rounded-lg px-3 py-2 text-left text-sm ${
+              tab === "completed" ? "client-portal-nav-active bg-white/[0.08] text-white" : "text-slate-400 hover:bg-white/[0.04]"
             }`}
           >
             Completed projects
           </button>
         </nav>
+        <div className="mt-auto pt-6">
+          <PublicThemeToggle />
+        </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="border-b border-white/[0.06] px-4 py-5 sm:px-8">
+      <div className="client-portal-main flex min-w-0 flex-1 flex-col">
+        <header className="client-portal-header border-b border-white/[0.06] px-4 py-5 sm:px-8">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="flex min-w-0 items-start gap-4">
               <ClientAvatar
@@ -250,12 +258,15 @@ export function ClientPortalClient({
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-lg border border-white/[0.1] bg-white/[0.04] px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-300">
+              <span className="client-portal-badge rounded-lg border border-white/[0.1] bg-white/[0.04] px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-300">
                 Active lanes {data.client.activeLaneCount}
               </span>
-              <span className="rounded-lg border border-brand-500/40 bg-brand-500/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-brand-200">
+              <span className="client-portal-badge client-portal-badge-brand rounded-lg border border-brand-500/40 bg-brand-500/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-brand-200">
                 Client view
               </span>
+              <div className="lg:hidden">
+                <PublicThemeToggle />
+              </div>
             </div>
           </div>
 
@@ -263,14 +274,14 @@ export function ClientPortalClient({
             <button
               type="button"
               onClick={() => setTab("tracker")}
-              className={`rounded-lg px-3 py-1.5 text-xs ${tab === "tracker" ? "bg-white/10 text-white" : "text-slate-500"}`}
+              className={`client-portal-nav rounded-lg px-3 py-1.5 text-xs ${tab === "tracker" ? "client-portal-nav-active bg-white/10 text-white" : "text-slate-500"}`}
             >
               Project tracker
             </button>
             <button
               type="button"
               onClick={() => setTab("completed")}
-              className={`rounded-lg px-3 py-1.5 text-xs ${tab === "completed" ? "bg-white/10 text-white" : "text-slate-500"}`}
+              className={`client-portal-nav rounded-lg px-3 py-1.5 text-xs ${tab === "completed" ? "client-portal-nav-active bg-white/10 text-white" : "text-slate-500"}`}
             >
               Completed
             </button>
@@ -281,8 +292,8 @@ export function ClientPortalClient({
           {tab === "tracker" ? (
             <div className="grid gap-6 xl:grid-cols-[minmax(0,300px)_1fr]">
               <section>
-                <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Project due dates</h2>
-                <div className="mt-3 rounded-xl border border-white/[0.08] bg-[#0f1419] p-4">
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Project due dates</h2>
+                <div className="client-portal-card mt-3 rounded-xl border border-white/[0.08] bg-white/[0.03] p-4">
                   <MiniMonthCalendar
                     month={calendarMonth}
                     marks={dueMarks}
@@ -345,7 +356,7 @@ export function ClientPortalClient({
           )}
         </main>
 
-        <footer className="border-t border-white/[0.06] px-4 py-4 text-center text-[11px] text-slate-600 sm:px-8">
+        <footer className="client-portal-footer border-t border-white/[0.06] px-4 py-4 text-center text-[11px] text-slate-500 sm:px-8">
           Powered by Blocharch ·{" "}
           <Link href={clientPortalPath(slug)} className="text-slate-500 hover:text-slate-400">
             Client portal
