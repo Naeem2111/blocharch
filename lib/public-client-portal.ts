@@ -1,7 +1,10 @@
 import type { OpsProjectPhase, OpsProjectStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { findDoneColumnId } from "@/lib/planner-completed";
-import { isActiveProjectStatus } from "@/lib/planner-project-sync";
+import {
+  isClientPortalActiveProject,
+  isClientPortalCompletedProject,
+} from "@/lib/client-portal-projects";
 import { PROJECT_PHASE_LABELS, PROJECT_STATUS_LABELS } from "@/lib/ops-constants";
 
 export type PublicClientPortalTask = {
@@ -16,6 +19,7 @@ export type PublicClientPortalTask = {
 export type PublicClientPortalProject = {
   id: string;
   name: string;
+  projectNumber: string;
   address: string | null;
   currentStage: OpsProjectPhase;
   currentStageLabel: string;
@@ -24,12 +28,14 @@ export type PublicClientPortalProject = {
   statusBadge: { label: string; color: string };
   startDate: string | null;
   dueDate: string | null;
+  handoverDate: string | null;
   progressPercent: number;
   leadName: string | null;
   leadPhotoUrl: string | null;
   leadPhotoBgColor: string | null;
   leadPhotoTextTone: string | null;
   openTasks: PublicClientPortalTask[];
+  deadlineBeatenDays: number | null;
 };
 
 export type PublicClientPortalData = {
@@ -41,10 +47,17 @@ export type PublicClientPortalData = {
     logoTextTone: string | null;
     activeLaneCount: number;
   };
-  projects: PublicClientPortalProject[];
+  activeProjects: PublicClientPortalProject[];
+  completedProjects: PublicClientPortalProject[];
 };
 
-function clientStatusBadge(status: OpsProjectStatus): { label: string; color: string } {
+function clientStatusBadge(
+  status: OpsProjectStatus,
+  progressPercent: number
+): { label: string; color: string } {
+  if (status === "completed" && progressPercent < 100) {
+    return { label: "On track", color: "#22c55e" };
+  }
   switch (status) {
     case "waiting_on_feedback":
       return { label: "In review", color: "#3b82f6" };
@@ -56,6 +69,10 @@ function clientStatusBadge(status: OpsProjectStatus): { label: string; color: st
       return { label: "Scheduled", color: "#64748b" };
     case "blocked":
       return { label: "Blocked", color: "#ef4444" };
+    case "completed":
+      return { label: "Completed", color: "#22c55e" };
+    case "handed_over":
+      return { label: "Handed over", color: "#64748b" };
     default:
       return { label: PROJECT_STATUS_LABELS[status], color: "#64748b" };
   }
@@ -63,6 +80,52 @@ function clientStatusBadge(status: OpsProjectStatus): { label: string; color: st
 
 function isoDate(d: Date | null | undefined): string | null {
   return d ? d.toISOString().slice(0, 10) : null;
+}
+
+function mapProject(
+  p: {
+    id: string;
+    name: string;
+    projectNumber: string;
+    address: string | null;
+    currentStage: OpsProjectPhase;
+    currentStatus: OpsProjectStatus;
+    startDate: Date | null;
+    dueDate: Date | null;
+    handoverDate: Date | null;
+    progressPercent: number | null;
+    deadlineBeatenDays: number | null;
+    assignedAthlete: {
+      fullName: string;
+      profilePhotoUrl: string | null;
+      profilePhotoBgColor: string | null;
+      profilePhotoTextTone: string | null;
+    } | null;
+  },
+  openTasks: PublicClientPortalTask[]
+): PublicClientPortalProject {
+  const progressPercent = p.progressPercent ?? 0;
+  return {
+    id: p.id,
+    name: p.name,
+    projectNumber: p.projectNumber,
+    address: p.address,
+    currentStage: p.currentStage,
+    currentStageLabel: PROJECT_PHASE_LABELS[p.currentStage],
+    currentStatus: p.currentStatus,
+    currentStatusLabel: PROJECT_STATUS_LABELS[p.currentStatus],
+    statusBadge: clientStatusBadge(p.currentStatus, progressPercent),
+    startDate: isoDate(p.startDate),
+    dueDate: isoDate(p.dueDate),
+    handoverDate: isoDate(p.handoverDate),
+    progressPercent,
+    leadName: p.assignedAthlete?.fullName ?? null,
+    leadPhotoUrl: p.assignedAthlete?.profilePhotoUrl ?? null,
+    leadPhotoBgColor: p.assignedAthlete?.profilePhotoBgColor ?? null,
+    leadPhotoTextTone: p.assignedAthlete?.profilePhotoTextTone ?? null,
+    openTasks,
+    deadlineBeatenDays: p.deadlineBeatenDays,
+  };
 }
 
 export async function getPublicClientPortal(clientSlug: string): Promise<PublicClientPortalData | null> {
@@ -94,11 +157,9 @@ export async function getPublicClientPortal(clientSlug: string): Promise<PublicC
     },
   });
 
-  const activeProjects = projects.filter((p) => isActiveProjectStatus(p.currentStatus));
-  const projectIds = activeProjects.map((p) => p.id);
-
+  const allProjectIds = projects.map((p) => p.id);
   const boards = await prisma.plannerBoard.findMany({
-    where: { kind: "project", opsProjectId: { in: projectIds } },
+    where: { kind: "project", opsProjectId: { in: allProjectIds } },
     include: {
       columns: { orderBy: { sortOrder: "asc" }, select: { id: true, title: true } },
     },
@@ -141,6 +202,8 @@ export async function getPublicClientPortal(clientSlug: string): Promise<PublicC
     );
   }
 
+  const mapped = projects.map((p) => mapProject(p, tasksByProjectId.get(p.id) ?? []));
+
   return {
     client: {
       name: client.name,
@@ -150,23 +213,7 @@ export async function getPublicClientPortal(clientSlug: string): Promise<PublicC
       logoTextTone: client.logoTextTone,
       activeLaneCount: client.commercial?.activeLaneCount ?? 1,
     },
-    projects: activeProjects.map((p) => ({
-      id: p.id,
-      name: p.name,
-      address: p.address,
-      currentStage: p.currentStage,
-      currentStageLabel: PROJECT_PHASE_LABELS[p.currentStage],
-      currentStatus: p.currentStatus,
-      currentStatusLabel: PROJECT_STATUS_LABELS[p.currentStatus],
-      statusBadge: clientStatusBadge(p.currentStatus),
-      startDate: isoDate(p.startDate),
-      dueDate: isoDate(p.dueDate),
-      progressPercent: p.progressPercent ?? 0,
-      leadName: p.assignedAthlete?.fullName ?? null,
-      leadPhotoUrl: p.assignedAthlete?.profilePhotoUrl ?? null,
-      leadPhotoBgColor: p.assignedAthlete?.profilePhotoBgColor ?? null,
-      leadPhotoTextTone: p.assignedAthlete?.profilePhotoTextTone ?? null,
-      openTasks: tasksByProjectId.get(p.id) ?? [],
-    })),
+    activeProjects: mapped.filter(isClientPortalActiveProject),
+    completedProjects: mapped.filter(isClientPortalCompletedProject),
   };
 }

@@ -11,5 +11,5 @@ export default async function ClientPortalPage({
   const data = await getPublicClientPortal(clientSlug);
   if (!data) notFound();
 
-  return <ClientPortalClient data={data} />;
+  return <ClientPortalClient data={data} slug={clientSlug} initialTab="tracker" />;
 }
