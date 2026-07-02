@@ -9,8 +9,9 @@ export function projectDueColor(daysUntilDue: number | null): string {
 }
 
 export function daysUntilDueFromIso(dueDate: string | null): number | null {
-  if (!dueDate) return null;
-  const due = new Date(`${dueDate}T12:00:00`);
+  if (!dueDate?.trim()) return null;
+  const dateOnly = dueDate.includes("T") ? dueDate.slice(0, 10) : dueDate.trim();
+  const due = new Date(`${dateOnly}T12:00:00`);
   if (Number.isNaN(due.getTime())) return null;
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());

@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
           notes: lead.notes,
           lastEmailedAt: lead.lastEmailedAt,
           lastContactedAt: lead.lastContactedAt,
-          followUpDueAt: lead.followUpDueAt,
+          followUpDueAt: dbLead?.followUpDueAt?.toISOString() ?? lead.followUpDueAt,
           followUpStatus,
           lastCommunicationType: lastCommType
             ? COMMUNICATION_TYPE_LABELS[lastCommType as keyof typeof COMMUNICATION_TYPE_LABELS] ??
