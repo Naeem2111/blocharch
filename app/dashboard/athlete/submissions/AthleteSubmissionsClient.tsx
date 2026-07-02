@@ -378,7 +378,9 @@ export function AthleteSubmissionsClient() {
             className="rounded border-white/20"
           />
           Backlogged session
-          <span className="text-xs text-slate-500">— late entry; overdue is a reminder only, not a block</span>
+          <span className="text-xs text-slate-500">
+            — late entry for a past date; completion and deadline-beaten stats use this session date when progress hits 100%
+          </span>
         </label>
         <label className="text-xs text-slate-400 md:col-span-3">
           Daily note (optional)

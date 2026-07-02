@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { dateOnlyUtc } from "@/lib/ops-hours";
 import {
   computeDeadlineBeatenDays,
   projectCompletionDate,
@@ -11,14 +12,53 @@ import {
 /** Progress when a completed project is moved back to active work. */
 export const REACTIVATION_PROGRESS_PERCENT = 90;
 
-async function latestCompletionPercentForProject(projectId: string): Promise<number | null> {
+type LatestCompletionLog = {
+  progressPercent: number;
+  submissionDate: Date;
+  isBackloggedSession: boolean;
+};
+
+async function latestCompletionLogForProject(
+  projectId: string
+): Promise<LatestCompletionLog | null> {
   const latest = await prisma.opsSubmissionLineItem.findFirst({
     where: { projectId, completionPercent: { not: null } },
     orderBy: [{ submission: { submissionDate: "desc" } }, { submission: { updatedAt: "desc" } }],
-    select: { completionPercent: true },
+    select: {
+      completionPercent: true,
+      submission: {
+        select: {
+          submissionDate: true,
+          isBackloggedSession: true,
+        },
+      },
+    },
   });
   if (!latest || latest.completionPercent == null) return null;
-  return Math.max(0, Math.min(100, Math.round(Number(latest.completionPercent))));
+  return {
+    progressPercent: Math.max(0, Math.min(100, Math.round(Number(latest.completionPercent)))),
+    submissionDate: latest.submission.submissionDate,
+    isBackloggedSession: latest.submission.isBackloggedSession,
+  };
+}
+
+/** When a backlogged log marks 100%, use that session date so deadlines reflect actual work timing. */
+export function resolveCompletedAtFromLog(log: LatestCompletionLog | null): Date {
+  if (!log || log.progressPercent < 100) return projectCompletionDate();
+  if (log.isBackloggedSession) return dateOnlyUtc(log.submissionDate);
+  return projectCompletionDate();
+}
+
+function completionMetrics(
+  dueDate: Date | null,
+  log: LatestCompletionLog | null
+): { completedAt: Date; deadlineBeatenDays: number | null } {
+  const completedAt = resolveCompletedAtFromLog(log);
+  const deadlineBeatenDays =
+    dueDate && log && log.progressPercent >= 100
+      ? computeDeadlineBeatenDays(dueDate, completedAt)
+      : null;
+  return { completedAt, deadlineBeatenDays };
 }
 
 /** Recalculate project progress from all daily log line items and sync completion state. */
@@ -37,18 +77,15 @@ export async function syncProjectProgressForProjects(projectIds: string[]) {
     });
     if (!before) continue;
 
-    const maxFromLogs = await latestCompletionPercentForProject(projectId);
+    const latestLog = await latestCompletionLogForProject(projectId);
     const progressPercent =
-      maxFromLogs ?? before.progressPercent ?? 0;
+      latestLog?.progressPercent ?? before.progressPercent ?? 0;
 
     const wasCompleted =
       before.currentStatus === "completed" || before.currentStatus === "handed_over";
 
     if (progressPercent >= 100 && isActiveProjectStatus(before.currentStatus) && before.assignedAthleteId) {
-      const completedAt = projectCompletionDate();
-      const deadlineBeatenDays = before.dueDate
-        ? computeDeadlineBeatenDays(before.dueDate, completedAt)
-        : null;
+      const { completedAt, deadlineBeatenDays } = completionMetrics(before.dueDate, latestLog);
 
       const completed = await prisma.opsProject.update({
         where: { id: projectId },
@@ -78,6 +115,19 @@ export async function syncProjectProgressForProjects(projectIds: string[]) {
           name: completed.name,
         }
       );
+      continue;
+    }
+
+    if (wasCompleted && progressPercent >= 100) {
+      const { completedAt, deadlineBeatenDays } = completionMetrics(before.dueDate, latestLog);
+      await prisma.opsProject.update({
+        where: { id: projectId },
+        data: {
+          progressPercent,
+          completedAt,
+          deadlineBeatenDays,
+        },
+      });
       continue;
     }
 
