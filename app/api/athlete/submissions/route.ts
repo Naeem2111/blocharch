@@ -1,12 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import type { OpsProjectPhase, OpsTaskType, OpsUrgencyStatus } from "@prisma/client";
-import {
-  isOpsProjectPhase,
-  isOpsTaskType,
-  isOpsUrgencyStatus,
-} from "@/lib/ops-constants";
+import type { OpsUrgencyStatus } from "@prisma/client";
 import {
   athleteMonthlySummary,
   requireAthletePortalSession,
@@ -14,53 +9,9 @@ import {
 import { computeMonthlyHoursSummary, dateOnlyUtc, parseDateOnly } from "@/lib/ops-hours";
 import { buildDailyHourAlerts, isSubmissionEditable } from "@/lib/ops-alerts";
 import { lockStaleSubmissions } from "@/lib/ops-commercial";
-import { syncProjectProgressFromLineItems } from "@/lib/sync-project-progress";
-
-type LineItemInput = {
-  clientId: string;
-  projectId: string;
-  projectPhase: OpsProjectPhase;
-  taskType: OpsTaskType;
-  taskTypes: string[];
-  hoursWorked: number;
-  completionPercent?: number | null;
-  urgencyStatus?: OpsUrgencyStatus;
-  completedSummary?: string | null;
-  notes?: string | null;
-};
-
-function parseLineItems(raw: unknown): LineItemInput[] | null {
-  if (!Array.isArray(raw) || raw.length === 0) return null;
-  const items: LineItemInput[] = [];
-  for (const row of raw) {
-    if (!row || typeof row !== "object") return null;
-    const o = row as Record<string, unknown>;
-    const hoursWorked = Number(o.hoursWorked);
-    if (!Number.isFinite(hoursWorked) || hoursWorked <= 0) return null;
-    const projectPhase = String(o.projectPhase || "");
-    if (!isOpsProjectPhase(projectPhase)) return null;
-    const rawTypes = Array.isArray(o.taskTypes)
-      ? o.taskTypes.map((t) => String(t)).filter((t) => isOpsTaskType(t))
-      : [];
-    const taskType = rawTypes[0] ?? (isOpsTaskType(String(o.taskType || "")) ? String(o.taskType) : "");
-    if (!isOpsTaskType(taskType)) return null;
-    const taskTypes = rawTypes.length > 0 ? rawTypes : [taskType];
-    const urgency = String(o.urgencyStatus || "normal");
-    items.push({
-      clientId: String(o.clientId || "").trim(),
-      projectId: String(o.projectId || "").trim(),
-      projectPhase,
-      taskType,
-      taskTypes,
-      hoursWorked,
-      completionPercent: o.completionPercent != null ? Number(o.completionPercent) : null,
-      urgencyStatus: isOpsUrgencyStatus(urgency) ? urgency : "normal",
-      completedSummary: o.completedSummary ? String(o.completedSummary) : null,
-      notes: o.notes ? String(o.notes) : null,
-    });
-  }
-  return items;
-}
+import { parseSubmissionLineItems } from "@/lib/ops-submission-mutate";
+import { syncProjectProgressForProjects } from "@/lib/sync-project-progress";
+import { projectDisplayFields } from "@/lib/project-display";
 
 export async function GET(request: NextRequest) {
   const gate = await requireAthletePortalSession(request);
@@ -69,14 +20,20 @@ export async function GET(request: NextRequest) {
 
   await lockStaleSubmissions(athlete.id);
 
+  // Clear legacy auto-locks (submission locks feature disabled)
+  await prisma.opsDailySubmission.updateMany({
+    where: { athleteId: athlete.id, lockedAt: { not: null } },
+    data: { lockedAt: null },
+  });
+
   const submissions = await prisma.opsDailySubmission.findMany({
     where: { athleteId: athlete.id },
     orderBy: { submissionDate: "desc" },
-    take: 30,
+    take: 60,
     include: {
       lineItems: {
         include: {
-          project: { select: { name: true, projectNumber: true } },
+          project: { select: { name: true, projectNumber: true, currentStage: true } },
           client: { select: { name: true } },
         },
       },
@@ -91,25 +48,30 @@ export async function GET(request: NextRequest) {
       wellbeingScore: s.wellbeingScore,
       checkInRequested: s.checkInRequested,
       dailyNote: s.dailyNote,
+      isBackloggedSession: s.isBackloggedSession,
       totalHours: Number(s.totalHours),
       lockedAt: s.lockedAt?.toISOString() ?? null,
       editable: isSubmissionEditable(s.submissionDate, s.lockedAt),
       alerts: buildDailyHourAlerts(Number(s.totalHours)),
-      lineItems: s.lineItems.map((li) => ({
-        id: li.id,
-        clientId: li.clientId,
-        projectId: li.projectId,
-        clientName: li.client.name,
-        projectName: li.project.name,
-        projectNumber: li.project.projectNumber,
-        projectPhase: li.projectPhase,
-        taskType: li.taskType,
-        taskTypes: li.taskTypes?.length ? li.taskTypes : [li.taskType],
-        hoursWorked: Number(li.hoursWorked),
-        completedSummary: li.completedSummary,
-        completionPercent: li.completionPercent,
-        notes: li.notes,
-      })),
+      lineItems: s.lineItems.map((li) => {
+        const { displayTitle } = projectDisplayFields(li.project);
+        return {
+          id: li.id,
+          clientId: li.clientId,
+          projectId: li.projectId,
+          clientName: li.client.name,
+          projectName: li.project.name,
+          projectDisplayTitle: displayTitle,
+          projectNumber: li.project.projectNumber,
+          projectPhase: li.projectPhase,
+          taskType: li.taskType,
+          taskTypes: li.taskTypes?.length ? li.taskTypes : [li.taskType],
+          hoursWorked: Number(li.hoursWorked),
+          completedSummary: li.completedSummary,
+          completionPercent: li.completionPercent,
+          notes: li.notes,
+        };
+      }),
     })),
   });
 }
@@ -123,7 +85,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const dateRaw = body.submissionDate ? String(body.submissionDate) : "";
     const submissionDate = parseDateOnly(dateRaw) ?? dateOnlyUtc(new Date());
-    const lineItems = parseLineItems(body.lineItems);
+    const lineItems = parseSubmissionLineItems(body.lineItems);
+    const isBackloggedSession = Boolean(body.isBackloggedSession);
+
     if (!lineItems) {
       return NextResponse.json({ error: "At least one valid project entry is required" }, { status: 400 });
     }
@@ -145,7 +109,10 @@ export async function POST(request: NextRequest) {
       },
     });
     if (existing?.lockedAt) {
-      return NextResponse.json({ error: "This submission is locked — ask admin to unlock" }, { status: 400 });
+      return NextResponse.json(
+        { error: "This submission is locked — ask admin to unlock under Ops → Submissions" },
+        { status: 400 }
+      );
     }
 
     for (const li of lineItems) {
@@ -170,7 +137,9 @@ export async function POST(request: NextRequest) {
             wellbeingScore,
             checkInRequested: Boolean(body.checkInRequested),
             dailyNote: body.dailyNote ? String(body.dailyNote).trim() : null,
+            isBackloggedSession,
             totalHours,
+            lockedAt: null,
           },
         });
         await tx.opsSubmissionLineItem.createMany({
@@ -201,6 +170,7 @@ export async function POST(request: NextRequest) {
           wellbeingScore,
           checkInRequested: Boolean(body.checkInRequested),
           dailyNote: body.dailyNote ? String(body.dailyNote).trim() : null,
+          isBackloggedSession,
           totalHours,
           lineItems: {
             create: lineItems.map((li) => ({
@@ -230,7 +200,9 @@ export async function POST(request: NextRequest) {
       return created;
     });
 
-    await syncProjectProgressFromLineItems(lineItems).catch(() => {});
+    await syncProjectProgressForProjects(lineItems.map((li) => li.projectId)).catch((err) => {
+      console.error("Failed to sync project progress from daily log", err);
+    });
 
     const monthSummary = await athleteMonthlySummary(athlete);
     const todayHours = Number(submission.totalHours);
@@ -247,6 +219,7 @@ export async function POST(request: NextRequest) {
           id: submission.id,
           submissionDate: submission.submissionDate.toISOString().slice(0, 10),
           totalHours: Number(submission.totalHours),
+          isBackloggedSession: submission.isBackloggedSession,
         },
         calculation: {
           todayHours,

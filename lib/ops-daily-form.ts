@@ -3,7 +3,7 @@ import { PROJECT_PHASE_LABELS, TASK_TYPE_LABELS } from "@/lib/ops-constants";
 
 /** V2: combined phase options shown in daily tracker UI. */
 export const DAILY_PROJECT_PHASE_OPTIONS: { value: OpsProjectPhase; label: string }[] = [
-  { value: "survey_conversion", label: "Survey Conversion / Existing Pack" },
+  { value: "survey_conversion", label: "Survey Conversion (Existing Drawings)" },
   { value: "proposed_drawings", label: PROJECT_PHASE_LABELS.proposed_drawings },
   { value: "planning_submission", label: PROJECT_PHASE_LABELS.planning_submission },
   { value: "tender_construction_pack", label: PROJECT_PHASE_LABELS.tender_construction_pack },

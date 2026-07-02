@@ -509,7 +509,7 @@ model OpsProject {
   outboxTasks     OpsOutboxTask[]
   checkInRequests OpsCheckInRequest[]
 
-  @@unique([clientId, projectNumber])
+  @@index([clientId, projectNumber])
   @@index([assignedAthleteId])
   @@index([projectLeadAthleteId])
   @@map("ops_projects")
@@ -627,7 +627,11 @@ model OpsDailySubmission {
   checkInRequested Boolean  @default(false) @map("check_in_requested")
   dailyNote        String?  @map("daily_note") @db.Text
   totalHours       Decimal  @default(0) @map("total_hours") @db.Decimal(6, 2)
+  /** Athlete marked this as a backlogged / late session (exempt from auto-lock). */
+  isBackloggedSession Boolean  @default(false) @map("is_backlogged_session")
   lockedAt         DateTime? @map("locked_at")
+  /** Set when admin unlocks; prevents auto-lock from re-locking until admin locks again. */
+  adminUnlockedAt  DateTime? @map("admin_unlocked_at")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 

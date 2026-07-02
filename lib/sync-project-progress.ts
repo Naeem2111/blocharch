@@ -8,19 +8,23 @@ import {
   syncProjectAfterOpsUpdate,
 } from "@/lib/planner-project-sync";
 
-/** Apply latest completion % from a daily log to assigned projects. */
-export async function syncProjectProgressFromLineItems(
-  lineItems: Array<{ projectId: string; completionPercent?: number | null }>
-) {
-  const byProject = new Map<string, number>();
-  for (const li of lineItems) {
-    if (li.completionPercent == null || !Number.isFinite(li.completionPercent)) continue;
-    const pct = Math.max(0, Math.min(100, Math.round(li.completionPercent)));
-    const prev = byProject.get(li.projectId);
-    if (prev === undefined || pct > prev) byProject.set(li.projectId, pct);
-  }
+/** Progress when a completed project is moved back to active work. */
+export const REACTIVATION_PROGRESS_PERCENT = 90;
 
-  for (const [projectId, progressPercent] of Array.from(byProject.entries())) {
+async function latestCompletionPercentForProject(projectId: string): Promise<number | null> {
+  const latest = await prisma.opsSubmissionLineItem.findFirst({
+    where: { projectId, completionPercent: { not: null } },
+    orderBy: [{ submission: { submissionDate: "desc" } }, { submission: { updatedAt: "desc" } }],
+    select: { completionPercent: true },
+  });
+  if (!latest || latest.completionPercent == null) return null;
+  return Math.max(0, Math.min(100, Math.round(Number(latest.completionPercent))));
+}
+
+/** Recalculate project progress from all daily log line items and sync completion state. */
+export async function syncProjectProgressForProjects(projectIds: string[]) {
+  const uniqueIds = Array.from(new Set(projectIds.filter(Boolean)));
+  for (const projectId of uniqueIds) {
     const before = await prisma.opsProject.findUnique({
       where: { id: projectId },
       select: {
@@ -33,21 +37,14 @@ export async function syncProjectProgressFromLineItems(
     });
     if (!before) continue;
 
-    const updated = await prisma.opsProject.update({
-      where: { id: projectId },
-      data: { progressPercent },
-      select: {
-        assignedAthleteId: true,
-        currentStatus: true,
-        name: true,
-      },
-    });
+    const maxFromLogs = await latestCompletionPercentForProject(projectId);
+    const progressPercent =
+      maxFromLogs ?? before.progressPercent ?? 0;
 
-    if (
-      progressPercent >= 100 &&
-      isActiveProjectStatus(before.currentStatus) &&
-      updated.assignedAthleteId
-    ) {
+    const wasCompleted =
+      before.currentStatus === "completed" || before.currentStatus === "handed_over";
+
+    if (progressPercent >= 100 && isActiveProjectStatus(before.currentStatus) && before.assignedAthleteId) {
       const completedAt = projectCompletionDate();
       const deadlineBeatenDays = before.dueDate
         ? computeDeadlineBeatenDays(before.dueDate, completedAt)
@@ -56,6 +53,7 @@ export async function syncProjectProgressFromLineItems(
       const completed = await prisma.opsProject.update({
         where: { id: projectId },
         data: {
+          progressPercent: 100,
           currentStatus: "completed",
           completedAt,
           deadlineBeatenDays,
@@ -80,6 +78,51 @@ export async function syncProjectProgressFromLineItems(
           name: completed.name,
         }
       );
+      continue;
     }
+
+    if (wasCompleted && progressPercent < 100) {
+      const reactivated = await prisma.opsProject.update({
+        where: { id: projectId },
+        data: {
+          progressPercent,
+          currentStatus: "in_progress",
+          completedAt: null,
+          deadlineBeatenDays: null,
+        },
+        select: {
+          assignedAthleteId: true,
+          currentStatus: true,
+          name: true,
+        },
+      });
+
+      await syncProjectAfterOpsUpdate(
+        projectId,
+        {
+          assignedAthleteId: before.assignedAthleteId,
+          currentStatus: before.currentStatus,
+          name: before.name,
+        },
+        {
+          assignedAthleteId: reactivated.assignedAthleteId,
+          currentStatus: reactivated.currentStatus,
+          name: reactivated.name,
+        }
+      );
+      continue;
+    }
+
+    await prisma.opsProject.update({
+      where: { id: projectId },
+      data: { progressPercent },
+    });
   }
+}
+
+/** @deprecated Prefer syncProjectProgressForProjects after persisting line items. */
+export async function syncProjectProgressFromLineItems(
+  lineItems: Array<{ projectId: string; completionPercent?: number | null }>
+) {
+  await syncProjectProgressForProjects(lineItems.map((li) => li.projectId));
 }

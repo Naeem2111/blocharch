@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AthleteAvatar } from "@/components/ops/AthleteAvatar";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
+import { ArchiveProjectDetailPanel } from "@/components/ops/ArchiveProjectDetailPanel";
 import { asAvatarTextTone } from "@/lib/avatar-text-tone";
 import {
   COMPLEXITY_LABELS,
@@ -24,6 +25,9 @@ type FilterOptionAthlete = { id: string; fullName: string; athleteCode: string }
 type ArchiveProject = {
   id: string;
   name: string;
+  displayTitle?: string;
+  stageLabel?: string;
+  address: string | null;
   projectNumber: string;
   clientId: string;
   clientName: string;
@@ -132,6 +136,7 @@ export function OpsArchivesClient() {
   const [athleteFilterId, setAthleteFilterId] = useState("");
   const [clients, setClients] = useState<FilterOption[]>([]);
   const [athletes, setAthletes] = useState<FilterOptionAthlete[]>([]);
+  const [detailProjectId, setDetailProjectId] = useState<string | null>(null);
 
   useEffect(() => {
     void Promise.all([fetch("/api/ops/clients"), fetch("/api/ops/athletes")])
@@ -331,16 +336,17 @@ export function OpsArchivesClient() {
                         <th className="px-4 py-3 font-medium">Completed</th>
                         <th className="px-4 py-3 font-medium">Handover</th>
                         <th className="px-4 py-3 font-medium">Progress</th>
+                        <th className="px-4 py-3 font-medium" />
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/[0.06]">
                       {group.projects.map((p) => (
                         <tr key={p.id} className="bg-white/[0.02]">
                           <td className="px-4 py-3">
-                            <p className="font-medium text-white">{p.name}</p>
+                            <p className="font-medium text-white">{p.displayTitle ?? p.name}</p>
                             <p className="text-xs text-slate-500">
-                              {p.projectNumber} · {COMPLEXITY_LABELS[p.complexity]} ·{" "}
-                              {PROJECT_PHASE_LABELS[p.currentStage]}
+                              {p.projectNumber}
+                              {p.address ? ` · ${p.address}` : ""} · {COMPLEXITY_LABELS[p.complexity]}
                             </p>
                           </td>
                           <td className="px-4 py-3 text-slate-300">
@@ -377,6 +383,15 @@ export function OpsArchivesClient() {
                           </td>
                           <td className="px-4 py-3 text-slate-300">{formatDate(p.handoverDate)}</td>
                           <td className="px-4 py-3 text-slate-300">{p.progressPercent ?? "—"}%</td>
+                          <td className="px-4 py-3">
+                            <button
+                              type="button"
+                              onClick={() => setDetailProjectId(p.id)}
+                              className="text-xs text-brand-300 hover:text-brand-200"
+                            >
+                              Open
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -528,6 +543,9 @@ export function OpsArchivesClient() {
             </table>
           )}
         </div>
+      ) : null}
+      {detailProjectId ? (
+        <ArchiveProjectDetailPanel projectId={detailProjectId} onClose={() => setDetailProjectId(null)} />
       ) : null}
     </div>
   );

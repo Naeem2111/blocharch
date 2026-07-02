@@ -2,6 +2,7 @@ import type { OpsProjectStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { athleteProfileVisual } from "@/lib/athlete-profile-visual";
 import { findDoneColumnId } from "@/lib/planner-completed";
+import { projectDisplayFields } from "@/lib/project-display";
 
 export type OpsArchivesFilters = {
   clientId?: string;
@@ -261,9 +262,14 @@ export async function buildOpsArchives(filters: OpsArchivesFilters = {}) {
       clients,
       athletes,
     },
-    projects: projects.map((p) => ({
+    projects: projects.map((p) => {
+      const { displayTitle, stageLabel } = projectDisplayFields(p);
+      return {
       id: p.id,
       name: p.name,
+      displayTitle,
+      stageLabel,
+      address: p.address,
       projectNumber: p.projectNumber,
       clientId: p.clientId,
       clientName: p.client.name,
@@ -283,7 +289,8 @@ export async function buildOpsArchives(filters: OpsArchivesFilters = {}) {
       completedAt: p.completedAt?.toISOString().slice(0, 10) ?? null,
       deadlineBeatenDays: p.deadlineBeatenDays,
       updatedAt: p.updatedAt.toISOString(),
-    })),
+    };
+    }),
     tasks,
     loggedCompletions: lineItems.map((li) => ({
       id: li.id,

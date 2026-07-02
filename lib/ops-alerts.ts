@@ -82,8 +82,7 @@ export function submissionEditCutoffUtc(now = new Date()): Date {
   return d;
 }
 
-/** Editable when not locked. Admin unlock clears lockedAt so any past log can be edited again. */
-export function isSubmissionEditable(submissionDate: Date, lockedAt: Date | null): boolean {
-  void submissionDate;
+/** Daily logs are editable by default. Manual lock (ops PATCH) is the only restriction. */
+export function isSubmissionEditable(_submissionDate: Date, lockedAt: Date | null): boolean {
   return lockedAt == null;
 }

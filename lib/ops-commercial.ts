@@ -8,7 +8,7 @@ import {
 } from "@/lib/ops-constants";
 import { computeMonthlyHoursSummary, monthEndUtc, monthStartUtc } from "@/lib/ops-hours";
 import { getCostConversionSnapshot } from "@/lib/ops-exchange";
-import { OPS_ALERT_THRESHOLDS, submissionEditCutoffUtc } from "@/lib/ops-alerts";
+import { OPS_ALERT_THRESHOLDS } from "@/lib/ops-alerts";
 import { countPendingCheckInRequests } from "@/lib/check-in-admin";
 import { buildBeatenDeadlines, type BeatenDeadlinesByAthlete } from "@/lib/analytics-deadlines";
 
@@ -874,14 +874,7 @@ export async function buildOpsOverview(
   };
 }
 
-export async function lockStaleSubmissions(athleteId?: string) {
-  const cutoff = submissionEditCutoffUtc();
-  await prisma.opsDailySubmission.updateMany({
-    where: {
-      ...(athleteId ? { athleteId } : {}),
-      lockedAt: null,
-      submissionDate: { lt: cutoff },
-    },
-    data: { lockedAt: new Date() },
-  });
+export async function lockStaleSubmissions(_athleteId?: string) {
+  // Auto-lock disabled — athletes can edit previous daily logs by default.
+  // Manual lock/unlock remains available via Commercial if re-enabled later.
 }

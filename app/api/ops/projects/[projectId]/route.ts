@@ -9,13 +9,130 @@ import {
 import { requireOpsSession } from "@/lib/ops-access";
 import { parseDateOnly } from "@/lib/ops-hours";
 import { syncProjectAfterOpsUpdate } from "@/lib/planner-project-sync";
-import {
-  normalizeAthleteProjectCode,
-  validateAthleteProjectCodeDb,
-} from "@/lib/ops-project-code";
+import { normalizeAthleteProjectCode } from "@/lib/ops-project-code";
+import { projectDisplayFields } from "@/lib/project-display";
 import type { OpsProjectStatus } from "@prisma/client";
 
 type RouteContext = { params: Promise<{ projectId: string }> };
+
+function serializeOpsProject(
+  project: {
+    id: string;
+    clientId: string;
+    assignedAthleteId: string | null;
+    projectLeadAthleteId: string | null;
+    name: string;
+    projectNumber: string;
+    address: string | null;
+    projectLead: string | null;
+    complexity: string;
+    startDate: Date | null;
+    dueDate: Date | null;
+    handoverDate: Date | null;
+    currentStage: Parameters<typeof projectDisplayFields>[0]["currentStage"];
+    currentStatus: string;
+    progressPercent: number | null;
+    completedAt: Date | null;
+    deadlineBeatenDays: number | null;
+    notes: string | null;
+    blockerFlag: boolean;
+    checkInRequested: boolean;
+    client: { id: string; name: string };
+    assignedAthlete: { id: string; fullName: string; athleteCode: string } | null;
+    projectLeadAthlete: { id: string; fullName: string; athleteCode: string } | null;
+  },
+  hoursLogged: number
+) {
+  const { displayTitle, stageLabel } = projectDisplayFields(project);
+  return {
+    id: project.id,
+    clientId: project.clientId,
+    clientName: project.client.name,
+    assignedAthleteId: project.assignedAthleteId,
+    assignedAthleteName: project.assignedAthlete?.fullName ?? null,
+    assignedAthleteCode: project.assignedAthlete?.athleteCode ?? null,
+    projectLeadAthleteId: project.projectLeadAthleteId,
+    projectLeadAthleteName: project.projectLeadAthlete?.fullName ?? null,
+    name: project.name,
+    displayTitle,
+    stageLabel,
+    projectNumber: project.projectNumber,
+    address: project.address,
+    projectLead: project.projectLead,
+    complexity: project.complexity,
+    startDate: project.startDate?.toISOString().slice(0, 10) ?? null,
+    dueDate: project.dueDate?.toISOString().slice(0, 10) ?? null,
+    handoverDate: project.handoverDate?.toISOString().slice(0, 10) ?? null,
+    currentStage: project.currentStage,
+    currentStatus: project.currentStatus,
+    progressPercent: project.progressPercent,
+    completedAt: project.completedAt?.toISOString().slice(0, 10) ?? null,
+    deadlineBeatenDays: project.deadlineBeatenDays,
+    hoursLogged,
+    notes: project.notes,
+    blockerFlag: project.blockerFlag,
+    checkInRequested: project.checkInRequested,
+  };
+}
+
+export async function GET(_request: NextRequest, context: RouteContext) {
+  const gate = await requireOpsSession(_request);
+  if (gate instanceof NextResponse) return gate;
+
+  const { projectId } = await context.params;
+  const project = await prisma.opsProject.findUnique({
+    where: { id: projectId },
+    include: {
+      client: { select: { id: true, name: true } },
+      assignedAthlete: { select: { id: true, fullName: true, athleteCode: true } },
+      projectLeadAthlete: { select: { id: true, fullName: true, athleteCode: true } },
+    },
+  });
+  if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
+
+  const hoursAgg = await prisma.opsSubmissionLineItem.aggregate({
+    where: { projectId },
+    _sum: { hoursWorked: true },
+  });
+
+  const submissions = await prisma.opsDailySubmission.findMany({
+    where: { lineItems: { some: { projectId } } },
+    orderBy: { submissionDate: "desc" },
+    take: 60,
+    include: {
+      athlete: { select: { fullName: true, athleteCode: true } },
+      lineItems: {
+        where: { projectId },
+        include: {
+          client: { select: { name: true } },
+        },
+      },
+    },
+  });
+
+  return NextResponse.json({
+    project: serializeOpsProject(project, Number(hoursAgg._sum.hoursWorked ?? 0)),
+    submissions: submissions.map((s) => ({
+      id: s.id,
+      submissionDate: s.submissionDate.toISOString().slice(0, 10),
+      athleteName: s.athlete.fullName,
+      athleteCode: s.athlete.athleteCode,
+      totalHours: Number(s.totalHours),
+      isBackloggedSession: s.isBackloggedSession,
+      dailyNote: s.dailyNote,
+      lineItems: s.lineItems.map((li) => ({
+        id: li.id,
+        projectPhase: li.projectPhase,
+        taskType: li.taskType,
+        taskTypes: li.taskTypes,
+        hoursWorked: Number(li.hoursWorked),
+        completionPercent: li.completionPercent,
+        completedSummary: li.completedSummary,
+        notes: li.notes,
+      })),
+    })),
+  });
+}
 
 export async function PATCH(request: NextRequest, context: RouteContext) {
   const gate = await requireOpsSession(request);
@@ -58,6 +175,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (body.address !== undefined) data.address = body.address ? String(body.address).trim() : null;
     if (body.projectLead !== undefined) data.projectLead = body.projectLead ? String(body.projectLead).trim() : null;
     if (body.notes !== undefined) data.notes = body.notes ? String(body.notes).trim() : null;
+    if (body.progressPercent !== undefined) {
+      const pct = body.progressPercent == null ? null : Math.max(0, Math.min(100, Math.round(Number(body.progressPercent))));
+      data.progressPercent = pct;
+    }
 
     if (body.complexity != null) {
       const c = String(body.complexity);
@@ -86,30 +207,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
     }
 
-    const nextClientId = existing.clientId;
-    const nextProjectNumber =
-      typeof data.projectNumber === "string" ? data.projectNumber : existing.projectNumber;
-    const nextAthleteId =
-      data.assignedAthleteId !== undefined
-        ? (data.assignedAthleteId as string | null)
-        : existing.assignedAthleteId;
-
-    const codeError = await validateAthleteProjectCodeDb(prisma, {
-      clientId: nextClientId,
-      code: nextProjectNumber,
-      assignedAthleteId: nextAthleteId,
-      excludeProjectId: projectId,
-    });
-    if (codeError) return NextResponse.json({ error: codeError }, { status: 400 });
-
     const project = await prisma.opsProject.update({
       where: { id: projectId },
-      data,
       include: {
         client: { select: { id: true, name: true } },
         assignedAthlete: { select: { id: true, fullName: true, athleteCode: true } },
         projectLeadAthlete: { select: { id: true, fullName: true, athleteCode: true } },
       },
+      data,
     });
 
     await syncProjectAfterOpsUpdate(
@@ -126,34 +231,15 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       }
     ).catch(() => {});
 
-    return NextResponse.json({
-      project: {
-        id: project.id,
-        clientId: project.clientId,
-        clientName: project.client.name,
-        assignedAthleteId: project.assignedAthleteId,
-        assignedAthleteName: project.assignedAthlete?.fullName ?? null,
-        projectLeadAthleteId: project.projectLeadAthleteId,
-        projectLeadAthleteName: project.projectLeadAthlete?.fullName ?? null,
-        name: project.name,
-        projectNumber: project.projectNumber,
-        address: project.address,
-        projectLead: project.projectLead,
-        complexity: project.complexity,
-        startDate: project.startDate?.toISOString().slice(0, 10) ?? null,
-        dueDate: project.dueDate?.toISOString().slice(0, 10) ?? null,
-        handoverDate: project.handoverDate?.toISOString().slice(0, 10) ?? null,
-        currentStage: project.currentStage,
-        currentStatus: project.currentStatus,
-        notes: project.notes,
-        blockerFlag: project.blockerFlag,
-        checkInRequested: project.checkInRequested,
-      },
+    const hoursAgg = await prisma.opsSubmissionLineItem.aggregate({
+      where: { projectId },
+      _sum: { hoursWorked: true },
     });
-  } catch (err) {
-    if (err && typeof err === "object" && "code" in err && err.code === "P2002") {
-      return NextResponse.json({ error: "Project number already exists for this client" }, { status: 400 });
-    }
+
+    return NextResponse.json({
+      project: serializeOpsProject(project, Number(hoursAgg._sum.hoursWorked ?? 0)),
+    });
+  } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 }

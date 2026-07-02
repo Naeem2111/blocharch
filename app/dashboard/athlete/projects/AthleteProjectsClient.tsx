@@ -10,6 +10,7 @@ import {
   PROJECT_PHASE_LABELS,
   PROJECT_STATUS_LABELS,
 } from "@/lib/ops-constants";
+import { formatProjectFullTitle } from "@/lib/project-display";
 import { clientMetaFromNestedClient, groupProjectsByClient } from "@/lib/ops-project-groups";
 import { daysUntilDueFromIso, projectDueColor } from "@/lib/project-color-scale";
 import { computeProjectTimeline } from "@/lib/project-timeline";
@@ -25,6 +26,8 @@ type ProjectClient = {
 type ProjectRow = {
   id: string;
   name: string;
+  displayTitle?: string;
+  stageLabel?: string;
   projectNumber: string;
   address: string | null;
   complexity: keyof typeof COMPLEXITY_LABELS;
@@ -238,7 +241,9 @@ export function AthleteProjectsClient() {
         >
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
-              <h2 className="font-semibold text-white">{p.name}</h2>
+              <h2 className="font-semibold text-white">
+                {p.displayTitle ?? formatProjectFullTitle(p.name, p.currentStage)}
+              </h2>
               <p className="text-xs text-slate-500">{p.projectNumber}</p>
               <p
                 className={`mt-2 text-xs ${

@@ -9,6 +9,7 @@ import { DAILY_PROJECT_PHASE_OPTIONS, DAILY_TASK_TYPE_OPTIONS } from "@/lib/ops-
 type AssignedProject = {
   id: string;
   name: string;
+  displayTitle?: string;
   projectNumber: string;
   complexity: string;
   client: { id: string; name: string };
@@ -42,6 +43,7 @@ type PastSubmission = {
   wellbeingScore: number | null;
   checkInRequested: boolean;
   dailyNote: string | null;
+  isBackloggedSession?: boolean;
   lockedAt: string | null;
   editable: boolean;
   alerts: Array<{ code: string; severity: string; message: string }>;
@@ -87,6 +89,7 @@ export function AthleteSubmissionsClient() {
   const [checkInModalOpen, setCheckInModalOpen] = useState(false);
   const [checkInDetailsSubmitted, setCheckInDetailsSubmitted] = useState(false);
   const [dailyNote, setDailyNote] = useState("");
+  const [isBackloggedSession, setIsBackloggedSession] = useState(false);
   const [lines, setLines] = useState<LineItemForm[]>([emptyLine()]);
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [calendarMonth, setCalendarMonth] = useState(() => new Date().toISOString().slice(0, 7));
@@ -101,6 +104,7 @@ export function AthleteSubmissionsClient() {
     setCalendarMonth(sub.submissionDate.slice(0, 7));
     setWellbeingScore(String(sub.wellbeingScore ?? 5));
     setDailyNote(sub.dailyNote ?? "");
+    setIsBackloggedSession(!!sub.isBackloggedSession);
     setCheckInDetailsSubmitted(!!sub.checkInRequested);
     setFormLocked(!sub.editable);
     setLines(
@@ -142,6 +146,7 @@ export function AthleteSubmissionsClient() {
     setCalendarMonth(today.slice(0, 7));
     setWellbeingScore("5");
     setDailyNote("");
+    setIsBackloggedSession(false);
     setCheckInDetailsSubmitted(false);
     setLines([emptyLine()]);
     setFormLocked(false);
@@ -196,6 +201,7 @@ export function AthleteSubmissionsClient() {
     setFormLocked(false);
     setWellbeingScore("5");
     setDailyNote("");
+    setIsBackloggedSession(false);
     setCheckInDetailsSubmitted(false);
     setLines([emptyLine()]);
     setError("");
@@ -254,6 +260,7 @@ export function AthleteSubmissionsClient() {
           submissionDate: selectedDate,
           wellbeingScore: Number(wellbeingScore),
           dailyNote,
+          isBackloggedSession,
           checkInRequested: checkInDetailsSubmitted,
           lineItems,
         }),
@@ -362,6 +369,17 @@ export function AthleteSubmissionsClient() {
             <span className="text-xs text-brand-300">— details submitted</span>
           ) : null}
         </label>
+        <label className="flex items-center gap-2 text-sm text-slate-300 md:col-span-3">
+          <input
+            type="checkbox"
+            checked={isBackloggedSession}
+            disabled={formLocked}
+            onChange={(e) => setIsBackloggedSession(e.target.checked)}
+            className="rounded border-white/20"
+          />
+          Backlogged session
+          <span className="text-xs text-slate-500">— late entry; overdue is a reminder only, not a block</span>
+        </label>
         <label className="text-xs text-slate-400 md:col-span-3">
           Daily note (optional)
           <textarea
@@ -404,7 +422,7 @@ export function AthleteSubmissionsClient() {
                   <option value="">Select project…</option>
                   {projects.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.client.name} — {p.name} ({p.projectNumber})
+                      {p.client.name} — {p.displayTitle ?? p.name} ({p.projectNumber})
                     </option>
                   ))}
                 </select>

@@ -11,9 +11,7 @@ import {
   serializeProjectForAthlete,
 } from "@/lib/ops-access";
 import { syncProjectAfterOpsUpdate } from "@/lib/planner-project-sync";
-
-/** Progress when a completed project is moved back to active work. */
-const REACTIVATION_PROGRESS_PERCENT = 90;
+import { REACTIVATION_PROGRESS_PERCENT } from "@/lib/sync-project-progress";
 
 type RouteContext = { params: Promise<{ projectId: string }> };
 
@@ -67,10 +65,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       }
       data.currentStatus = status;
       if (wasCompleted && status === "in_progress") {
-        const pct = project.progressPercent;
-        if (pct != null && pct >= 100) {
-          data.progressPercent = REACTIVATION_PROGRESS_PERCENT;
-        }
+        data.progressPercent = REACTIVATION_PROGRESS_PERCENT;
         data.completedAt = null;
         data.deadlineBeatenDays = null;
       }
@@ -89,6 +84,20 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       data,
       select: athleteProjectSelect,
     });
+
+    if (data.currentStatus === "in_progress" && (project.currentStatus === "completed" || project.currentStatus === "handed_over")) {
+      const latestLine = await prisma.opsSubmissionLineItem.findFirst({
+        where: { projectId, completionPercent: { not: null } },
+        orderBy: [{ submission: { submissionDate: "desc" } }, { submission: { updatedAt: "desc" } }],
+        select: { id: true },
+      });
+      if (latestLine) {
+        await prisma.opsSubmissionLineItem.update({
+          where: { id: latestLine.id },
+          data: { completionPercent: REACTIVATION_PROGRESS_PERCENT },
+        });
+      }
+    }
 
     if (data.currentStatus !== undefined) {
       await syncProjectAfterOpsUpdate(

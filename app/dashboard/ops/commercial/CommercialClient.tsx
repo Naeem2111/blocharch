@@ -102,15 +102,6 @@ type CommercialSettings = {
   liveQuote: { gbpToZarRate: number; asOf: string; source: string } | null;
 };
 
-type AdminSubmission = {
-  id: string;
-  athleteName: string;
-  athleteCode: string;
-  submissionDate: string;
-  totalHours: number;
-  lockedAt: string | null;
-};
-
 function currentMonth(): string {
   const d = new Date();
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
@@ -123,7 +114,6 @@ export function CommercialClient() {
   const [ledger, setLedger] = useState<CommercialData | null>(null);
   const [rates, setRates] = useState<ExchangeRate[]>([]);
   const [fxSettings, setFxSettings] = useState<CommercialSettings | null>(null);
-  const [submissions, setSubmissions] = useState<AdminSubmission[]>([]);
   const [loading, setLoading] = useState(true);
   const [rateForm, setRateForm] = useState({ effectiveMonth: currentMonth(), gbpToZarRate: "24", rateType: "reporting" });
   const [error, setError] = useState("");
@@ -160,19 +150,16 @@ export function CommercialClient() {
     setLoading(true);
     const q = new URLSearchParams({ month });
     if (clientId) q.set("clientId", clientId);
-    const [cr, rr, sr, fx] = await Promise.all([
+    const [cr, rr, fx] = await Promise.all([
       fetch(`/api/ops/commercial?${q}`),
       fetch("/api/ops/exchange-rates"),
-      fetch("/api/ops/submissions"),
       fetch("/api/ops/commercial-settings"),
     ]);
     const cj = await cr.json();
     const rj = await rr.json();
-    const sj = await sr.json();
     const fj = await fx.json();
     if (cr.ok) setLedger(cj);
     if (rr.ok) setRates(rj.rates || []);
-    if (sr.ok) setSubmissions(sj.submissions || []);
     if (fx.ok) setFxSettings(fj);
     setLoading(false);
   }, [month, clientId]);
@@ -228,31 +215,6 @@ export function CommercialClient() {
     }
     setMsg("Exchange rate saved.");
     void load();
-  }
-
-  async function unlockSubmission(id: string) {
-    setError("");
-    const r = await fetch(`/api/ops/submissions/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ unlock: true }),
-    });
-    const j = await r.json();
-    if (!r.ok) {
-      setError(j.error || "Could not unlock");
-      return;
-    }
-    setMsg("Submission unlocked.");
-    void load();
-  }
-
-  async function lockSubmission(id: string) {
-    const r = await fetch(`/api/ops/submissions/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lock: true }),
-    });
-    if (r.ok) void load();
   }
 
   if (loading && !ledger) return <p className="text-sm text-slate-500">Loading commercial data…</p>;
@@ -637,40 +599,10 @@ export function CommercialClient() {
         </div>
 
         <div className="card-tool rounded-xl p-5">
-          <h2 className="text-sm font-semibold text-white">Submission locks</h2>
-          <p className="mt-1 text-xs text-slate-500">Unlock to let athletes edit past daily logs.</p>
-          <ul className="mt-4 max-h-80 space-y-2 overflow-y-auto">
-            {submissions.slice(0, 20).map((s) => (
-              <li
-                key={s.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white/[0.03] px-3 py-2 text-sm"
-              >
-                <span className="text-slate-300">
-                  {s.submissionDate} · {s.athleteName} · {s.totalHours}h
-                </span>
-                {s.lockedAt ? (
-                  <button
-                    type="button"
-                    onClick={() => void unlockSubmission(s.id)}
-                    className="text-xs text-brand-300 hover:text-brand-200"
-                  >
-                    Unlock
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => void lockSubmission(s.id)}
-                    className="text-xs text-slate-500 hover:text-slate-300"
-                  >
-                    Lock
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-          {submissions.length === 0 ? (
-            <p className="mt-2 text-sm text-slate-500">No submissions yet.</p>
-          ) : null}
+          <h2 className="text-sm font-semibold text-white">Daily logs</h2>
+          <p className="mt-1 text-xs text-slate-500">
+            Athletes can edit previous daily logs by default. Manage submissions under Ops → Submissions.
+          </p>
         </div>
       </div>
 

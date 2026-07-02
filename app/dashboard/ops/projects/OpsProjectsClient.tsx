@@ -11,7 +11,7 @@ import {
 } from "@/lib/ops-constants";
 import { daysUntilDueFromIso, projectDueColor } from "@/lib/project-color-scale";
 import { computeProjectTimeline } from "@/lib/project-timeline";
-import { validateAthleteProjectCodeLocal } from "@/lib/ops-project-code";
+import { formatProjectFullTitle } from "@/lib/project-display";
 
 type ClientOption = {
   id: string;
@@ -34,6 +34,7 @@ type ProjectRow = {
   projectLeadAthleteName: string | null;
   athleteCode: string | null;
   name: string;
+  displayTitle?: string;
   projectNumber: string;
   address: string | null;
   projectLead: string | null;
@@ -54,6 +55,7 @@ const emptyCreate = {
   projectNumber: "",
   address: "",
   projectLeadAthleteId: "",
+  currentStage: "existing_drawings",
   complexity: "medium",
   dueDate: "",
 };
@@ -73,6 +75,7 @@ export function OpsProjectsClient() {
   const [msg, setMsg] = useState("");
   const [form, setForm] = useState(emptyCreate);
   const [clientFilterId, setClientFilterId] = useState("");
+  const [scope, setScope] = useState<"active" | "all">("active");
   const [editForm, setEditForm] = useState({
     assignedAthleteId: "",
     projectLeadAthleteId: "",
@@ -90,7 +93,7 @@ export function OpsProjectsClient() {
 
   const load = useCallback(async () => {
     const [pr, cr, ar] = await Promise.all([
-      fetch("/api/ops/projects"),
+      fetch(`/api/ops/projects?scope=${scope}`),
       fetch("/api/ops/clients"),
       fetch("/api/ops/athletes"),
     ]);
@@ -125,7 +128,7 @@ export function OpsProjectsClient() {
         }))
       );
     setLoading(false);
-  }, []);
+  }, [scope]);
 
   useEffect(() => {
     void load();
@@ -133,10 +136,6 @@ export function OpsProjectsClient() {
 
   async function createProject(e: React.FormEvent) {
     e.preventDefault();
-    if (createCodeError) {
-      setError(createCodeError);
-      return;
-    }
     setError("");
     const r = await fetch("/api/ops/projects", {
       method: "POST",
@@ -181,10 +180,6 @@ export function OpsProjectsClient() {
   }
 
   async function saveEdit(id: string) {
-    if (editCodeError) {
-      setError(editCodeError);
-      return;
-    }
     setError("");
     const r = await fetch(`/api/ops/projects/${id}`, {
       method: "PATCH",
@@ -228,47 +223,6 @@ export function OpsProjectsClient() {
     setMsg("Project deleted.");
     await load();
   }
-
-  const projectRowsForValidation = useMemo(
-    () => projects.map((p) => ({ id: p.id, clientId: p.clientId, projectNumber: p.projectNumber })),
-    [projects]
-  );
-
-  const createCodeError = useMemo(
-    () =>
-      form.clientId
-        ? validateAthleteProjectCodeLocal({
-            code: form.projectNumber,
-            clientId: form.clientId,
-            assignedAthleteId: form.assignedAthleteId || null,
-            projects: projectRowsForValidation,
-            athletes,
-          })
-        : null,
-    [form.clientId, form.projectNumber, form.assignedAthleteId, projectRowsForValidation, athletes]
-  );
-
-  const editCodeError = useMemo(
-    () =>
-      editingId && editClientId
-        ? validateAthleteProjectCodeLocal({
-            code: editForm.projectNumber,
-            clientId: editClientId,
-            assignedAthleteId: editForm.assignedAthleteId || null,
-            excludeProjectId: editingId,
-            projects: projectRowsForValidation,
-            athletes,
-          })
-        : null,
-    [
-      editingId,
-      editClientId,
-      editForm.projectNumber,
-      editForm.assignedAthleteId,
-      projectRowsForValidation,
-      athletes,
-    ]
-  );
 
   const filteredProjects = useMemo(() => {
     if (!clientFilterId) return projects;
@@ -318,7 +272,7 @@ export function OpsProjectsClient() {
     setForm((f) => ({
       ...f,
       assignedAthleteId: athleteId,
-      projectNumber: athleteId ? athleteCodeById(athleteId) : "",
+      projectNumber: f.projectNumber || (athleteId ? athleteCodeById(athleteId) : ""),
     }));
   }
 
@@ -326,7 +280,6 @@ export function OpsProjectsClient() {
     setEditForm((f) => ({
       ...f,
       assignedAthleteId: athleteId,
-      projectNumber: athleteId ? athleteCodeById(athleteId) : "",
     }));
   }
 
@@ -384,10 +337,17 @@ export function OpsProjectsClient() {
               <input
                 value={editForm.projectNumber}
                 onChange={(e) => setEditForm((f) => ({ ...f, projectNumber: e.target.value }))}
-                placeholder="e.g. JD01"
+                placeholder="Can repeat across projects — same client/address allowed"
                 className={inputClass}
               />
-              {editCodeError ? <span className="mt-1 block text-[11px] text-red-400">{editCodeError}</span> : null}
+            </label>
+            <label className="text-xs text-slate-400 md:col-span-2">
+              Address
+              <input
+                value={editForm.address}
+                onChange={(e) => setEditForm((f) => ({ ...f, address: e.target.value }))}
+                className={inputClass}
+              />
             </label>
             <label className="text-xs text-slate-400">Complexity<select value={editForm.complexity} onChange={(e) => setEditForm((f) => ({ ...f, complexity: e.target.value }))} className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
             <label className="text-xs text-slate-400">Stage<select value={editForm.currentStage} onChange={(e) => setEditForm((f) => ({ ...f, currentStage: e.target.value }))} className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm">{Object.entries(PROJECT_PHASE_LABELS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
@@ -398,9 +358,8 @@ export function OpsProjectsClient() {
             <div className="flex flex-wrap gap-2 md:col-span-2">
               <button
                 type="button"
-                disabled={!!editCodeError}
                 onClick={() => void saveEdit(p.id)}
-                className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-slate-950"
               >
                 Save
               </button>
@@ -411,9 +370,12 @@ export function OpsProjectsClient() {
         ) : (
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0">
-              <h2 className="font-semibold text-white">{p.name}</h2>
+              <h2 className="font-semibold text-white">
+                {p.displayTitle ?? formatProjectFullTitle(p.name, p.currentStage)}
+              </h2>
               <p className="text-xs text-slate-500">
-                {p.projectNumber}
+                ID {p.id.slice(0, 8)} · {p.projectNumber}
+                {p.address ? ` · ${p.address}` : ""}
                 {p.assignedAthleteName ? ` · ${p.assignedAthleteName}` : " · Unassigned"}
               </p>
               {p.projectLeadAthleteName ? (
@@ -458,6 +420,17 @@ export function OpsProjectsClient() {
               ? ` for ${selectedFilterClient?.name ?? "client"}`
               : ` · ${projectsByClient.length} client${projectsByClient.length === 1 ? "" : "s"}`}
           </p>
+          <label className="text-xs text-slate-400 pb-2">
+            View
+            <select
+              value={scope}
+              onChange={(e) => setScope(e.target.value as "active" | "all")}
+              className="select-console mt-1 block min-w-[10rem] rounded-md px-3 py-2 text-sm"
+            >
+              <option value="active">Active only</option>
+              <option value="all">All (incl. completed)</option>
+            </select>
+          </label>
           <label className="text-xs text-slate-400">
             Client / firm
             <select
@@ -553,26 +526,47 @@ export function OpsProjectsClient() {
             </select>
             <span className="mt-1 block text-[10px] text-slate-500">Shown to clients; can differ from assigned athlete</span>
           </label>
-          <label className="text-xs text-slate-400">Name<input required value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
+          <label className="text-xs text-slate-400">
+            Stage / package
+            <select
+              required
+              value={form.currentStage}
+              onChange={(e) => setForm((f) => ({ ...f, currentStage: e.target.value }))}
+              className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
+            >
+              {Object.entries(PROJECT_PHASE_LABELS).map(([k, label]) => (
+                <option key={k} value={k}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-xs text-slate-400">Project title<input required value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. 86 Bishops Road" className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
           <label className="text-xs text-slate-400">
             Athlete code
             <input
-              required
               value={form.projectNumber}
               onChange={(e) => setForm((f) => ({ ...f, projectNumber: e.target.value }))}
-              placeholder="Prefilled from athlete; editable"
+              placeholder="Defaults from athlete — can repeat per client"
               className={inputClass}
             />
-            {createCodeError ? <span className="mt-1 block text-[11px] text-red-400">{createCodeError}</span> : null}
           </label>
           <label className="text-xs text-slate-400 md:col-span-2">Address<input value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
           <label className="text-xs text-slate-400">Due<input type="date" value={form.dueDate} onChange={(e) => setForm((f) => ({ ...f, dueDate: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
+          {form.name || form.address ? (
+            <p className="text-xs text-slate-500 md:col-span-2">
+              Full title preview:{" "}
+              {formatProjectFullTitle(
+                form.name || form.address,
+                form.currentStage as keyof typeof PROJECT_PHASE_LABELS
+              )}
+            </p>
+          ) : null}
           {error ? <p className="text-sm text-red-400 md:col-span-2">{error}</p> : null}
           <div className="flex gap-2 md:col-span-2">
             <button
               type="submit"
-              disabled={!!createCodeError}
-              className="rounded-lg bg-white/[0.08] px-4 py-2 text-sm text-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg bg-white/[0.08] px-4 py-2 text-sm text-slate-100"
             >
               Create
             </button>

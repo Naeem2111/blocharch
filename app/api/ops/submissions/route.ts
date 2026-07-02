@@ -1,24 +1,44 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { pendingCheckInAthleteIds } from "@/lib/check-in-admin";
 import { prisma } from "@/lib/prisma";
+import type { OpsUrgencyStatus } from "@prisma/client";
+import { pendingCheckInAthleteIds } from "@/lib/check-in-admin";
 import { requireOpsSession } from "@/lib/ops-access";
+import { parseDateOnly } from "@/lib/ops-hours";
+import { parseSubmissionLineItems } from "@/lib/ops-submission-mutate";
+import { syncProjectProgressForProjects } from "@/lib/sync-project-progress";
+import { projectDisplayFields } from "@/lib/project-display";
 
 export async function GET(request: NextRequest) {
   const gate = await requireOpsSession(request);
   if (gate instanceof NextResponse) return gate;
 
-  const limit = Math.min(500, Math.max(1, parseInt(request.nextUrl.searchParams.get("limit") || "120", 10)));
+  const limit = Math.min(500, Math.max(1, parseInt(request.nextUrl.searchParams.get("limit") || "200", 10)));
+  const projectId = request.nextUrl.searchParams.get("projectId")?.trim() || null;
+  const athleteId = request.nextUrl.searchParams.get("athleteId")?.trim() || null;
 
   const submissions = await prisma.opsDailySubmission.findMany({
+    where: {
+      ...(athleteId ? { athleteId } : {}),
+      ...(projectId ? { lineItems: { some: { projectId } } } : {}),
+    },
     orderBy: [{ submissionDate: "desc" }, { updatedAt: "desc" }],
     take: limit,
     include: {
-      athlete: { select: { fullName: true, athleteCode: true, profilePhotoUrl: true, profilePhotoBgColor: true, profilePhotoTextTone: true } },
+      athlete: {
+        select: {
+          id: true,
+          fullName: true,
+          athleteCode: true,
+          profilePhotoUrl: true,
+          profilePhotoBgColor: true,
+          profilePhotoTextTone: true,
+        },
+      },
       lineItems: {
         include: {
-          project: { select: { name: true } },
-          client: { select: { name: true, logoUrl: true, logoBgColor: true, logoTextTone: true } },
+          project: { select: { id: true, name: true, currentStage: true, projectNumber: true } },
+          client: { select: { id: true, name: true, logoUrl: true, logoBgColor: true, logoTextTone: true } },
         },
       },
     },
@@ -41,24 +61,33 @@ export async function GET(request: NextRequest) {
       checkInRequested: s.checkInRequested,
       checkInNeedsAction: s.checkInRequested && pendingAthletes.has(s.athleteId),
       dailyNote: s.dailyNote,
+      isBackloggedSession: s.isBackloggedSession,
       lockedAt: s.lockedAt?.toISOString() ?? null,
       updatedAt: s.updatedAt.toISOString(),
-      lineItems: s.lineItems.map((li) => ({
-        projectName: li.project.name,
-        clientName: li.client.name,
-        clientLogoUrl: li.client.logoUrl,
-        clientLogoBgColor: li.client.logoBgColor,
-        clientLogoTextTone: li.client.logoTextTone,
-        projectPhase: li.projectPhase,
-        taskType: li.taskType,
-        taskTypes: li.taskTypes?.length ? li.taskTypes : [li.taskType],
-        hoursWorked: Number(li.hoursWorked),
-        completionPercent: li.completionPercent,
-        blockerFlag: li.blockerFlag,
-        blockerNote: li.blockerNote,
-        completedSummary: li.completedSummary,
-        notes: li.notes,
-      })),
+      lineItems: s.lineItems.map((li) => {
+        const { displayTitle } = projectDisplayFields(li.project);
+        return {
+          id: li.id,
+          clientId: li.clientId,
+          projectId: li.projectId,
+          projectName: li.project.name,
+          projectDisplayTitle: displayTitle,
+          projectNumber: li.project.projectNumber,
+          clientName: li.client.name,
+          clientLogoUrl: li.client.logoUrl,
+          clientLogoBgColor: li.client.logoBgColor,
+          clientLogoTextTone: li.client.logoTextTone,
+          projectPhase: li.projectPhase,
+          taskType: li.taskType,
+          taskTypes: li.taskTypes?.length ? li.taskTypes : [li.taskType],
+          hoursWorked: Number(li.hoursWorked),
+          completionPercent: li.completionPercent,
+          blockerFlag: li.blockerFlag,
+          blockerNote: li.blockerNote,
+          completedSummary: li.completedSummary,
+          notes: li.notes,
+        };
+      }),
     })),
   });
 }

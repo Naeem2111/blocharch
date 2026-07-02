@@ -6,6 +6,7 @@ import type { SessionUser } from "@/lib/auth";
 import { canAccessModule, canAccessOpsOverview } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { computeMonthlyHoursSummary, monthEndUtc, monthStartUtc } from "@/lib/ops-hours";
+import { projectDisplayFields } from "@/lib/project-display";
 
 export async function requireOpsSession(
   request: NextRequest
@@ -122,8 +123,11 @@ export const athleteProjectSelect = {
 } satisfies Prisma.OpsProjectSelect;
 
 export function serializeProjectForAthlete(project: Prisma.OpsProjectGetPayload<{ select: typeof athleteProjectSelect }>) {
+  const { displayTitle, stageLabel } = projectDisplayFields(project);
   return {
     ...project,
+    displayTitle,
+    stageLabel,
     startDate: project.startDate?.toISOString().slice(0, 10) ?? null,
     dueDate: project.dueDate?.toISOString().slice(0, 10) ?? null,
     handoverDate: project.handoverDate?.toISOString().slice(0, 10) ?? null,

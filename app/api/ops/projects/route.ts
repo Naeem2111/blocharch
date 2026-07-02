@@ -9,16 +9,25 @@ import {
 import { requireOpsSession } from "@/lib/ops-access";
 import { parseDateOnly } from "@/lib/ops-hours";
 import { syncProjectBoardOnAssign } from "@/lib/planner-project-sync";
-import {
-  normalizeAthleteProjectCode,
-  validateAthleteProjectCodeDb,
-} from "@/lib/ops-project-code";
+import { normalizeAthleteProjectCode } from "@/lib/ops-project-code";
+import { projectDisplayFields } from "@/lib/project-display";
+
+const ACTIVE_STATUSES = ["completed", "handed_over"] as const;
 
 export async function GET(request: NextRequest) {
   const gate = await requireOpsSession(request);
   if (gate instanceof NextResponse) return gate;
 
+  const scope = request.nextUrl.searchParams.get("scope") || "active";
+  const where =
+    scope === "all"
+      ? {}
+      : scope === "archived"
+        ? { currentStatus: { in: [...ACTIVE_STATUSES] } }
+        : { currentStatus: { notIn: [...ACTIVE_STATUSES] } };
+
   const projects = await prisma.opsProject.findMany({
+    where,
     orderBy: [{ dueDate: "asc" }, { name: "asc" }],
     include: {
       client: { select: { id: true, name: true, logoUrl: true, logoBgColor: true, logoTextTone: true } },
@@ -28,34 +37,40 @@ export async function GET(request: NextRequest) {
   });
 
   return NextResponse.json({
-    projects: projects.map((p) => ({
-      id: p.id,
-      clientId: p.clientId,
-      clientName: p.client.name,
-      clientLogoUrl: p.client.logoUrl,
-      clientLogoBgColor: p.client.logoBgColor,
-      clientLogoTextTone: p.client.logoTextTone,
-      assignedAthleteId: p.assignedAthleteId,
-      assignedAthleteName: p.assignedAthlete?.fullName ?? null,
-      projectLeadAthleteId: p.projectLeadAthleteId,
-      projectLeadAthleteName: p.projectLeadAthlete?.fullName ?? null,
-      athleteCode: p.assignedAthlete?.athleteCode ?? null,
-      name: p.name,
-      projectNumber: p.projectNumber,
-      address: p.address,
-      projectLead: p.projectLead,
-      complexity: p.complexity,
-      startDate: p.startDate?.toISOString().slice(0, 10) ?? null,
-      dueDate: p.dueDate?.toISOString().slice(0, 10) ?? null,
-      handoverDate: p.handoverDate?.toISOString().slice(0, 10) ?? null,
-      currentStage: p.currentStage,
-      currentStatus: p.currentStatus,
-      progressPercent: p.progressPercent,
-      notes: p.notes,
-      blockerFlag: p.blockerFlag,
-      checkInRequested: p.checkInRequested,
-      updatedAt: p.updatedAt.toISOString(),
-    })),
+    projects: projects.map((p) => {
+      const { displayTitle, stageLabel } = projectDisplayFields(p);
+      return {
+        id: p.id,
+        clientId: p.clientId,
+        clientName: p.client.name,
+        clientLogoUrl: p.client.logoUrl,
+        clientLogoBgColor: p.client.logoBgColor,
+        clientLogoTextTone: p.client.logoTextTone,
+        assignedAthleteId: p.assignedAthleteId,
+        assignedAthleteName: p.assignedAthlete?.fullName ?? null,
+        projectLeadAthleteId: p.projectLeadAthleteId,
+        projectLeadAthleteName: p.projectLeadAthlete?.fullName ?? null,
+        athleteCode: p.assignedAthlete?.athleteCode ?? null,
+        name: p.name,
+        displayTitle,
+        stageLabel,
+        projectNumber: p.projectNumber,
+        address: p.address,
+        projectLead: p.projectLead,
+        complexity: p.complexity,
+        startDate: p.startDate?.toISOString().slice(0, 10) ?? null,
+        dueDate: p.dueDate?.toISOString().slice(0, 10) ?? null,
+        handoverDate: p.handoverDate?.toISOString().slice(0, 10) ?? null,
+        currentStage: p.currentStage,
+        currentStatus: p.currentStatus,
+        progressPercent: p.progressPercent,
+        completedAt: p.completedAt?.toISOString().slice(0, 10) ?? null,
+        notes: p.notes,
+        blockerFlag: p.blockerFlag,
+        checkInRequested: p.checkInRequested,
+        updatedAt: p.updatedAt.toISOString(),
+      };
+    }),
   });
 }
 
@@ -66,35 +81,12 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const clientId = String(body.clientId || "").trim();
-    const name = String(body.name || "").trim();
-    const projectNumber = normalizeAthleteProjectCode(String(body.projectNumber || ""));
+    let name = String(body.name || "").trim();
     const assignedAthleteId = body.assignedAthleteId ? String(body.assignedAthleteId).trim() : null;
 
     const projectLeadAthleteId = body.projectLeadAthleteId
       ? String(body.projectLeadAthleteId).trim()
       : null;
-
-    if (!clientId || !name || !assignedAthleteId || !projectNumber) {
-      return NextResponse.json({ error: "Client, name, athlete, and athlete code are required" }, { status: 400 });
-    }
-
-    const client = await prisma.opsClient.findUnique({ where: { id: clientId } });
-    if (!client) return NextResponse.json({ error: "Client not found" }, { status: 404 });
-
-    const athlete = await prisma.opsAthlete.findUnique({ where: { id: assignedAthleteId } });
-    if (!athlete) return NextResponse.json({ error: "Athlete not found" }, { status: 404 });
-
-    if (projectLeadAthleteId) {
-      const leadAthlete = await prisma.opsAthlete.findUnique({ where: { id: projectLeadAthleteId } });
-      if (!leadAthlete) return NextResponse.json({ error: "Project lead not found" }, { status: 404 });
-    }
-
-    const codeError = await validateAthleteProjectCodeDb(prisma, {
-      clientId,
-      code: projectNumber,
-      assignedAthleteId,
-    });
-    if (codeError) return NextResponse.json({ error: codeError }, { status: 400 });
 
     const complexity = isOpsProjectComplexity(String(body.complexity || ""))
       ? body.complexity
@@ -106,6 +98,40 @@ export async function POST(request: NextRequest) {
       ? body.currentStatus
       : "not_started";
 
+    const client = await prisma.opsClient.findUnique({ where: { id: clientId } });
+    if (!client) return NextResponse.json({ error: "Client not found" }, { status: 404 });
+
+    const athlete = assignedAthleteId
+      ? await prisma.opsAthlete.findUnique({ where: { id: assignedAthleteId } })
+      : null;
+    if (assignedAthleteId && !athlete) {
+      return NextResponse.json({ error: "Athlete not found" }, { status: 404 });
+    }
+
+    const projectNumber = normalizeAthleteProjectCode(
+      String(body.projectNumber || athlete?.athleteCode || "")
+    );
+
+    if (!clientId || !assignedAthleteId || !projectNumber) {
+      return NextResponse.json(
+        { error: "Client, assigned athlete, and athlete code are required" },
+        { status: 400 }
+      );
+    }
+
+    const address = body.address ? String(body.address).trim() : null;
+    if (!name && address) {
+      name = address;
+    }
+    if (!name) {
+      return NextResponse.json({ error: "Project title is required" }, { status: 400 });
+    }
+
+    if (projectLeadAthleteId) {
+      const leadAthlete = await prisma.opsAthlete.findUnique({ where: { id: projectLeadAthleteId } });
+      if (!leadAthlete) return NextResponse.json({ error: "Project lead not found" }, { status: 404 });
+    }
+
     const project = await prisma.opsProject.create({
       data: {
         clientId,
@@ -113,7 +139,7 @@ export async function POST(request: NextRequest) {
         projectLeadAthleteId,
         name,
         projectNumber,
-        address: body.address ? String(body.address).trim() : null,
+        address,
         projectLead: body.projectLead ? String(body.projectLead).trim() : null,
         complexity,
         currentStage,
@@ -129,11 +155,9 @@ export async function POST(request: NextRequest) {
       await syncProjectBoardOnAssign(project.id).catch(() => {});
     }
 
-    return NextResponse.json({ project: { id: project.id, name: project.name } }, { status: 201 });
-  } catch (err) {
-    if (err && typeof err === "object" && "code" in err && err.code === "P2002") {
-      return NextResponse.json({ error: "This athlete code is already used for this client" }, { status: 400 });
-    }
+    const { displayTitle } = projectDisplayFields(project);
+    return NextResponse.json({ project: { id: project.id, name: project.name, displayTitle } }, { status: 201 });
+  } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 }
