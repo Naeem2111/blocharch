@@ -652,7 +652,9 @@ model OpsSubmissionLineItem {
   id                String           @id @default(uuid())
   submissionId      String           @map("submission_id")
   clientId          String           @map("client_id")
-  projectId         String           @map("project_id")
+  projectId         String?          @map("project_id")
+  /** Internal client housekeeping — no project progress or client portal visibility. */
+  isHousekeeping    Boolean          @default(false) @map("is_housekeeping")
   projectPhase      OpsProjectPhase  @map("project_phase")
   taskType          OpsTaskType      @map("task_type")
   taskTypes         String[]         @default([]) @map("task_types")
@@ -667,7 +669,7 @@ model OpsSubmissionLineItem {
 
   submission OpsDailySubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
   client     OpsClient          @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  project    OpsProject         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project    OpsProject?        @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([submissionId])
   @@index([projectId])

@@ -1,5 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import { geocodeArchitectFromFields } from "../lib/geocode-architect.ts";
+import { geocodeArchitectFromFields } from "../lib/geocode-architect";
 
 const prisma = new PrismaClient();
 

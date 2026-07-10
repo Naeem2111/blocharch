@@ -87,6 +87,8 @@ export type CreateOutreachLogInput = {
   nextAction?: string;
 };
 
+export type UpdateOutreachLogInput = CreateOutreachLogInput;
+
 function startOfDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
@@ -342,6 +344,131 @@ export async function createOutreachLog(
 
   const summary = await getOutreachSummary(practiceUrl);
   return { log: mapLog(log), summary };
+}
+
+function validateOutreachInput(input: CreateOutreachLogInput): Date {
+  if (!LEAD_STAGES.includes(input.stageAtLog)) throw new Error("Invalid stage");
+  if (!COMMUNICATION_TYPES.includes(input.communicationType)) {
+    throw new Error("Invalid communication type");
+  }
+  if (!COMMUNICATION_DIRECTIONS.includes(input.direction)) {
+    throw new Error("Invalid direction");
+  }
+  const contactDate = new Date(input.contactDate);
+  if (Number.isNaN(contactDate.getTime())) throw new Error("Invalid contact date");
+  return contactDate;
+}
+
+function resolveFollowUpDueAt(
+  stageAtLog: LeadStage,
+  followUpDueAt: string | null | undefined
+): Date | null {
+  const parsed = followUpDueAt ? parseDateOnly(followUpDueAt) : null;
+  if (REMINDER_STOP_STAGES.includes(stageAtLog) && followUpDueAt === undefined) {
+    return null;
+  }
+  return parsed;
+}
+
+/** Recompute lead stage and follow-up fields from remaining outreach logs. */
+export async function reconcileLeadFromLogs(leadId: string): Promise<void> {
+  const remaining = await prisma.leadOutreachLog.findMany({
+    where: { leadId },
+    orderBy: [{ contactDate: "desc" }, { createdAt: "desc" }],
+  });
+
+  if (remaining.length === 0) {
+    await prisma.lead.update({
+      where: { id: leadId },
+      data: {
+        stage: "cold",
+        followUpDueAt: null,
+        lastContactedAt: null,
+        lastEmailedAt: null,
+        lastCommunicationType: null,
+        touchCount: 0,
+        nextAction: null,
+      },
+    });
+    return;
+  }
+
+  const latest = remaining[0]!;
+  const touchCount = countOutboundTouches(remaining);
+  const latestOutbound = remaining.find((l) => l.direction === "outbound");
+  const stage = computeEffectiveStage(
+    normalizeLeadStage(latest.stageAtLog),
+    latest.followUpDueAt
+  );
+
+  await prisma.lead.update({
+    where: { id: leadId },
+    data: {
+      stage,
+      followUpDueAt: latest.followUpDueAt,
+      lastContactedAt: latest.contactDate,
+      lastCommunicationType: latest.communicationType,
+      touchCount,
+      nextAction: latest.nextAction,
+      lastEmailedAt: latestOutbound?.contactDate ?? null,
+    },
+  });
+}
+
+async function getOutreachLogForPractice(practiceUrl: string, logId: string) {
+  const lead = await prisma.lead.findUnique({ where: { architectUrl: practiceUrl } });
+  if (!lead) return null;
+  const log = await prisma.leadOutreachLog.findFirst({
+    where: { id: logId, leadId: lead.id },
+  });
+  return log ? { lead, log } : null;
+}
+
+export async function updateOutreachLog(
+  practiceUrl: string,
+  logId: string,
+  input: UpdateOutreachLogInput
+): Promise<{ log: OutreachLogRecord; summary: OutreachSummary }> {
+  const found = await getOutreachLogForPractice(practiceUrl, logId);
+  if (!found) throw new Error("Log entry not found");
+
+  const contactDate = validateOutreachInput(input);
+  const nextFollowUp = resolveFollowUpDueAt(input.stageAtLog, input.followUpDueAt);
+
+  const updated = await prisma.leadOutreachLog.update({
+    where: { id: logId },
+    data: {
+      stageAtLog: input.stageAtLog,
+      communicationType: input.communicationType,
+      direction: input.direction,
+      contactPerson: input.contactPerson?.trim() || null,
+      emailAddress: input.emailAddress?.trim() || null,
+      subject: input.subject?.trim() || null,
+      messageBody: input.messageBody?.trim() || null,
+      replyReceived: input.replyReceived?.trim() || null,
+      internalNotes: input.internalNotes?.trim() || null,
+      contactDate,
+      followUpDueAt: nextFollowUp,
+      nextAction: input.nextAction?.trim() || null,
+    },
+  });
+
+  await reconcileLeadFromLogs(found.lead.id);
+  const summary = await getOutreachSummary(practiceUrl);
+  return { log: mapLog(updated), summary };
+}
+
+export async function deleteOutreachLog(
+  practiceUrl: string,
+  logId: string
+): Promise<{ summary: OutreachSummary }> {
+  const found = await getOutreachLogForPractice(practiceUrl, logId);
+  if (!found) throw new Error("Log entry not found");
+
+  await prisma.leadOutreachLog.delete({ where: { id: logId } });
+  await reconcileLeadFromLogs(found.lead.id);
+  const summary = await getOutreachSummary(practiceUrl);
+  return { summary };
 }
 
 export type MarketingNotificationItem = {

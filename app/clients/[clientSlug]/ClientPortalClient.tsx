@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { ClientPortalBrandMark } from "@/components/client-portal/ClientPortalBrandMark";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
 import { AthleteAvatar } from "@/components/ops/AthleteAvatar";
 import { MiniMonthCalendar } from "@/components/MiniMonthCalendar";
@@ -198,7 +199,7 @@ export function ClientPortalClient({
   return (
     <div className="flex min-h-screen">
       <aside className="client-portal-sidebar hidden w-56 shrink-0 flex-col border-r border-white/[0.06] bg-[var(--bg-sidebar)] px-4 py-6 lg:flex">
-        <p className="text-lg font-semibold tracking-tight text-white">Blocharch.</p>
+        <ClientPortalBrandMark />
         <p className="mt-8 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Your account</p>
         <nav className="mt-3 space-y-1">
           <button

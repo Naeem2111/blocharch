@@ -32,9 +32,41 @@ function formatDateTime(iso?: string): string {
   return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
-function LogEntryCard({ log, defaultOpen }: { log: OutreachLogRecord; defaultOpen?: boolean }) {
+function LogEntryCard({
+  log,
+  slug,
+  defaultOpen,
+  onEdit,
+  onDeleted,
+}: {
+  log: OutreachLogRecord;
+  slug: string;
+  defaultOpen?: boolean;
+  onEdit: (log: OutreachLogRecord) => void;
+  onDeleted: (summary: OutreachSummary) => void;
+}) {
   const [open, setOpen] = useState(defaultOpen ?? false);
+  const [deleting, setDeleting] = useState(false);
   const stageColor = LEAD_STAGE_COLORS[log.stageAtLog] ?? "#64748b";
+
+  async function remove() {
+    if (!window.confirm("Delete this outreach log entry?")) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(
+        `/api/leads/${encodeURIComponent(slug)}/outreach-log/${encodeURIComponent(log.id)}`,
+        { method: "DELETE" }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        window.alert(data.error || "Could not delete log entry");
+        return;
+      }
+      onDeleted(data.summary);
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   return (
     <article className="rounded-xl border border-white/[0.08] bg-white/[0.02] ring-1 ring-white/[0.04]">
@@ -105,10 +137,44 @@ function LogEntryCard({ log, defaultOpen }: { log: OutreachLogRecord; defaultOpe
             <p className="text-xs text-slate-400">Follow-up due: {formatDate(log.followUpDueAt)}</p>
           ) : null}
           {log.nextAction ? <p className="text-xs text-brand-300">Next action: {log.nextAction}</p> : null}
+          <div className="flex flex-wrap gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => onEdit(log)}
+              className="rounded-lg border border-white/[0.12] px-3 py-1.5 text-xs text-slate-300 hover:bg-white/[0.06]"
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              onClick={() => void remove()}
+              disabled={deleting}
+              className="rounded-lg border border-red-500/30 px-3 py-1.5 text-xs text-red-300 hover:bg-red-500/10 disabled:opacity-50"
+            >
+              {deleting ? "Deleting…" : "Delete"}
+            </button>
+          </div>
         </div>
       ) : null}
     </article>
   );
+}
+
+function logToForm(log: OutreachLogRecord) {
+  return {
+    stageAtLog: log.stageAtLog,
+    communicationType: log.communicationType,
+    direction: log.direction,
+    contactPerson: log.contactPerson ?? "",
+    emailAddress: log.emailAddress ?? "",
+    subject: log.subject ?? "",
+    messageBody: log.messageBody ?? "",
+    replyReceived: log.replyReceived ?? "",
+    internalNotes: log.internalNotes ?? "",
+    contactDate: log.contactDate.slice(0, 10),
+    followUpDueAt: log.followUpDueAt?.slice(0, 10) ?? "",
+    nextAction: log.nextAction ?? "",
+  };
 }
 
 function OutreachLogForm({
@@ -116,43 +182,62 @@ function OutreachLogForm({
   defaultStage,
   defaultEmail,
   defaultContact,
+  editingLog,
   onCreated,
+  onUpdated,
+  onCancelEdit,
 }: {
   slug: string;
   defaultStage: LeadStage;
   defaultEmail?: string;
   defaultContact?: string;
+  editingLog?: OutreachLogRecord | null;
   onCreated: (log: OutreachLogRecord, summary: OutreachSummary) => void;
+  onUpdated?: (log: OutreachLogRecord, summary: OutreachSummary) => void;
+  onCancelEdit?: () => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const isEdit = !!editingLog;
+  const [open, setOpen] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [form, setForm] = useState({
-    stageAtLog: defaultStage,
-    communicationType: "first_email" as CommunicationType,
-    direction: "outbound" as CommunicationDirection,
-    contactPerson: defaultContact ?? "",
-    emailAddress: defaultEmail ?? "",
-    subject: "",
-    messageBody: "",
-    replyReceived: "",
-    internalNotes: "",
-    contactDate: new Date().toISOString().slice(0, 10),
-    followUpDueAt: "",
-    nextAction: "",
-  });
+  const [form, setForm] = useState(() =>
+    editingLog
+      ? logToForm(editingLog)
+      : {
+          stageAtLog: defaultStage,
+          communicationType: "first_email" as CommunicationType,
+          direction: "outbound" as CommunicationDirection,
+          contactPerson: defaultContact ?? "",
+          emailAddress: defaultEmail ?? "",
+          subject: "",
+          messageBody: "",
+          replyReceived: "",
+          internalNotes: "",
+          contactDate: new Date().toISOString().slice(0, 10),
+          followUpDueAt: "",
+          nextAction: "",
+        }
+  );
 
   useEffect(() => {
+    if (editingLog) {
+      setForm(logToForm(editingLog));
+      setOpen(true);
+      return;
+    }
     setForm((f) => ({ ...f, stageAtLog: defaultStage }));
-  }, [defaultStage]);
+  }, [defaultStage, editingLog]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     setError("");
     try {
-      const res = await fetch(`/api/leads/${encodeURIComponent(slug)}/outreach-log`, {
-        method: "POST",
+      const url = isEdit
+        ? `/api/leads/${encodeURIComponent(slug)}/outreach-log/${encodeURIComponent(editingLog!.id)}`
+        : `/api/leads/${encodeURIComponent(slug)}/outreach-log`;
+      const res = await fetch(url, {
+        method: isEdit ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
@@ -164,25 +249,32 @@ function OutreachLogForm({
         setError(data.error || "Failed to save log entry");
         return;
       }
-      onCreated(data.log, data.summary);
-      setOpen(false);
-      setForm((f) => ({
-        ...f,
-        subject: "",
-        messageBody: "",
-        replyReceived: "",
-        internalNotes: "",
-        followUpDueAt: "",
-        nextAction: "",
-        contactDate: new Date().toISOString().slice(0, 10),
-        stageAtLog: data.summary.effectiveStage,
-      }));
+      if (isEdit && onUpdated) {
+        onUpdated(data.log, data.summary);
+        onCancelEdit?.();
+      } else {
+        onCreated(data.log, data.summary);
+      }
+      if (!isEdit) {
+        setOpen(false);
+        setForm((f) => ({
+          ...f,
+          subject: "",
+          messageBody: "",
+          replyReceived: "",
+          internalNotes: "",
+          followUpDueAt: "",
+          nextAction: "",
+          contactDate: new Date().toISOString().slice(0, 10),
+          stageAtLog: data.summary.effectiveStage,
+        }));
+      }
     } finally {
       setSaving(false);
     }
   }
 
-  if (!open) {
+  if (!open && !isEdit) {
     return (
       <button
         type="button"
@@ -200,8 +292,17 @@ function OutreachLogForm({
       className="space-y-3 rounded-xl border border-brand-500/30 bg-brand-500/5 p-4"
     >
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-white">New outreach log</h3>
-        <button type="button" onClick={() => setOpen(false)} className="text-xs text-slate-500 hover:text-slate-300">
+        <h3 className="text-sm font-semibold text-white">
+          {isEdit ? "Edit outreach log" : "New outreach log"}
+        </h3>
+        <button
+          type="button"
+          onClick={() => {
+            if (isEdit) onCancelEdit?.();
+            else setOpen(false);
+          }}
+          className="text-xs text-slate-500 hover:text-slate-300"
+        >
           Cancel
         </button>
       </div>
@@ -333,7 +434,7 @@ function OutreachLogForm({
         </label>
       </div>
       <button type="submit" disabled={saving} className="btn-brand-primary rounded-lg px-4 py-2 text-sm disabled:opacity-50">
-        {saving ? "Saving…" : "Save log entry"}
+        {saving ? "Saving…" : isEdit ? "Save changes" : "Save log entry"}
       </button>
     </form>
   );
@@ -351,6 +452,7 @@ export function LeadOutreachPanel({
   const [logs, setLogs] = useState<OutreachLogRecord[]>([]);
   const [summary, setSummary] = useState<OutreachSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [editingLog, setEditingLog] = useState<OutreachLogRecord | null>(null);
 
   const reload = useCallback(async () => {
     const res = await fetch(`/api/leads/${encodeURIComponent(slug)}/outreach-log`);
@@ -367,6 +469,18 @@ export function LeadOutreachPanel({
   function onCreated(log: OutreachLogRecord, newSummary: OutreachSummary) {
     setLogs((prev) => [log, ...prev]);
     setSummary(newSummary);
+  }
+
+  function onUpdated(log: OutreachLogRecord, newSummary: OutreachSummary) {
+    setLogs((prev) => prev.map((row) => (row.id === log.id ? log : row)));
+    setSummary(newSummary);
+    setEditingLog(null);
+  }
+
+  function handleDeletedFromCard(logId: string, newSummary: OutreachSummary) {
+    setLogs((prev) => prev.filter((row) => row.id !== logId));
+    setSummary(newSummary);
+    if (editingLog?.id === logId) setEditingLog(null);
   }
 
   if (loading) return <p className="text-slate-500 text-sm">Loading outreach…</p>;
@@ -433,7 +547,10 @@ export function LeadOutreachPanel({
         defaultStage={summary?.effectiveStage ?? "cold"}
         defaultEmail={practiceEmail}
         defaultContact={practiceContact}
+        editingLog={editingLog}
         onCreated={onCreated}
+        onUpdated={onUpdated}
+        onCancelEdit={() => setEditingLog(null)}
       />
 
       <div>
@@ -443,7 +560,14 @@ export function LeadOutreachPanel({
         ) : (
           <div className="space-y-2">
             {logs.map((log, i) => (
-              <LogEntryCard key={log.id} log={log} defaultOpen={i === 0} />
+              <LogEntryCard
+                key={log.id}
+                log={log}
+                slug={slug}
+                defaultOpen={i === 0 && !editingLog}
+                onEdit={setEditingLog}
+                onDeleted={(newSummary) => handleDeletedFromCard(log.id, newSummary)}
+              />
             ))}
           </div>
         )}

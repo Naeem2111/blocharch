@@ -65,11 +65,34 @@ export async function GET(request: NextRequest) {
       lockedAt: s.lockedAt?.toISOString() ?? null,
       updatedAt: s.updatedAt.toISOString(),
       lineItems: s.lineItems.map((li) => {
+        if (li.isHousekeeping || !li.project) {
+          return {
+            id: li.id,
+            clientId: li.clientId,
+            projectId: li.projectId,
+            isHousekeeping: true,
+            projectName: "Client housekeeping",
+            projectDisplayTitle: "Client housekeeping",
+            projectNumber: "—",
+            clientName: li.client.name,
+            clientLogoUrl: li.client.logoUrl,
+            clientLogoBgColor: li.client.logoBgColor,
+            clientLogoTextTone: li.client.logoTextTone,
+            projectPhase: li.projectPhase,
+            taskType: li.taskType,
+            taskTypes: li.taskTypes?.length ? li.taskTypes : [li.taskType],
+            hoursWorked: Number(li.hoursWorked),
+            completionPercent: li.completionPercent,
+            completedSummary: li.completedSummary,
+            notes: li.notes,
+          };
+        }
         const { displayTitle } = projectDisplayFields(li.project);
         return {
           id: li.id,
           clientId: li.clientId,
           projectId: li.projectId,
+          isHousekeeping: false,
           projectName: li.project.name,
           projectDisplayTitle: displayTitle,
           projectNumber: li.project.projectNumber,

@@ -73,6 +73,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const nextLineItems = lineItems ?? existing.lineItems.map((li) => ({
       clientId: li.clientId,
       projectId: li.projectId,
+      isHousekeeping: li.isHousekeeping,
       projectPhase: li.projectPhase,
       taskType: li.taskType,
       taskTypes: li.taskTypes?.length ? li.taskTypes : [li.taskType],
@@ -84,6 +85,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }));
 
     for (const li of nextLineItems) {
+      if (li.isHousekeeping) continue;
+      if (!li.projectId) {
+        return NextResponse.json({ error: "Invalid project on line item" }, { status: 400 });
+      }
       const project = await prisma.opsProject.findFirst({
         where: { id: li.projectId, clientId: li.clientId },
       });
@@ -128,6 +133,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
           submissionId: existing.id,
           clientId: li.clientId,
           projectId: li.projectId,
+          isHousekeeping: li.isHousekeeping,
           projectPhase: li.projectPhase,
           taskType: li.taskType,
           taskTypes: li.taskTypes,
@@ -141,7 +147,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       return row;
     });
 
-    await syncProjectProgressForProjects(nextLineItems.map((li) => li.projectId)).catch(() => {});
+    await syncProjectProgressForProjects(
+      nextLineItems.map((li) => li.projectId).filter((id): id is string => !!id)
+    ).catch(() => {});
 
     return NextResponse.json({
       submission: {

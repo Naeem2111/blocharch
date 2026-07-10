@@ -17,6 +17,8 @@ type AssignedProject = {
 
 type LineItemForm = {
   key: string;
+  isHousekeeping: boolean;
+  clientId: string;
   projectId: string;
   projectPhase: string;
   taskTypes: string[];
@@ -24,6 +26,7 @@ type LineItemForm = {
   hoursWorked: string;
   completionPercent: number;
   completedSummary: string;
+  housekeepingNote: string;
 };
 
 type CalcPanel = {
@@ -49,10 +52,12 @@ type PastSubmission = {
   alerts: Array<{ code: string; severity: string; message: string }>;
   lineItems: Array<{
     id: string;
-    projectId: string;
+    projectId: string | null;
+    clientId?: string;
     clientName: string;
     projectName: string;
     projectNumber: string;
+    isHousekeeping?: boolean;
     projectPhase: string;
     taskType: string;
     taskTypes?: string[];
@@ -66,6 +71,8 @@ type PastSubmission = {
 function emptyLine(): LineItemForm {
   return {
     key: crypto.randomUUID(),
+    isHousekeeping: false,
+    clientId: "",
     projectId: "",
     projectPhase: "survey_conversion",
     taskTypes: ["plans"],
@@ -73,11 +80,29 @@ function emptyLine(): LineItemForm {
     hoursWorked: "",
     completionPercent: 0,
     completedSummary: "",
+    housekeepingNote: "",
+  };
+}
+
+function emptyHousekeepingLine(): LineItemForm {
+  return {
+    key: crypto.randomUUID(),
+    isHousekeeping: true,
+    clientId: "",
+    projectId: "",
+    projectPhase: "housekeeping_internal",
+    taskTypes: ["admin_housekeeping"],
+    taskTypeOther: "",
+    hoursWorked: "",
+    completionPercent: 0,
+    completedSummary: "",
+    housekeepingNote: "",
   };
 }
 
 export function AthleteSubmissionsClient() {
   const [projects, setProjects] = useState<AssignedProject[]>([]);
+  const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
   const [pastSubmissions, setPastSubmissions] = useState<PastSubmission[]>([]);
   const [monthlyHourCap, setMonthlyHourCap] = useState(160);
   const [loading, setLoading] = useState(true);
@@ -111,19 +136,24 @@ export function AthleteSubmissionsClient() {
       sub.lineItems.length > 0
         ? sub.lineItems.map((li) => ({
             key: crypto.randomUUID(),
-            projectId: li.projectId,
+            isHousekeeping: !!li.isHousekeeping,
+            clientId: li.isHousekeeping ? (li.clientId ?? "") : "",
+            projectId: li.projectId ?? "",
             projectPhase: li.projectPhase,
             taskTypes:
               li.taskTypes && li.taskTypes.length > 0
                 ? li.taskTypes
                 : li.taskType
                   ? [li.taskType]
-                  : ["plans"],
+                  : li.isHousekeeping
+                    ? ["admin_housekeeping"]
+                    : ["plans"],
             hoursWorked: String(li.hoursWorked),
             completionPercent: li.completionPercent ?? 0,
             completedSummary: li.completedSummary ?? "",
             taskTypeOther:
               li.taskTypes?.includes("other") && li.notes ? String(li.notes) : "",
+            housekeepingNote: li.isHousekeeping && li.notes ? String(li.notes) : "",
           }))
         : [emptyLine()]
     );
@@ -158,7 +188,10 @@ export function AthleteSubmissionsClient() {
     const [pr, sr] = await Promise.all([fetch("/api/athlete/projects"), fetch("/api/athlete/submissions")]);
     const pj = await pr.json();
     const sj = await sr.json();
-    if (pr.ok) setProjects(pj.projects || []);
+    if (pr.ok) {
+      setProjects(pj.projects || []);
+      setClients(pj.clients || []);
+    }
     if (sr.ok) {
       const subs: PastSubmission[] = sj.submissions || [];
       setPastSubmissions(subs);
@@ -221,6 +254,10 @@ export function AthleteSubmissionsClient() {
     setLines((prev) => (prev.length <= 1 ? prev : prev.filter((li) => li.key !== key)));
   }
 
+  function addHousekeepingLine() {
+    setLines((prev) => [...prev, emptyHousekeepingLine()]);
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -228,8 +265,19 @@ export function AthleteSubmissionsClient() {
     setSaving(true);
     try {
       const lineItems = lines
-        .filter((li) => li.projectId && Number(li.hoursWorked) > 0)
+        .filter((li) => Number(li.hoursWorked) > 0 && (li.isHousekeeping ? li.clientId : li.projectId))
         .map((li) => {
+          if (li.isHousekeeping) {
+            if (!li.housekeepingNote.trim()) {
+              throw new Error("Add a short note for each housekeeping entry");
+            }
+            return {
+              clientId: li.clientId,
+              isHousekeeping: true,
+              hoursWorked: Number(li.hoursWorked),
+              notes: li.housekeepingNote.trim(),
+            };
+          }
           const project = projects.find((p) => p.id === li.projectId);
           if (!project) throw new Error("Invalid project");
           const taskTypes = li.taskTypes.length > 0 ? li.taskTypes : ["other"];
@@ -249,7 +297,7 @@ export function AthleteSubmissionsClient() {
         });
 
       if (lineItems.length === 0) {
-        setError("Add at least one project entry with hours.");
+        setError("Add at least one project or housekeeping entry with hours.");
         return;
       }
 
@@ -394,22 +442,96 @@ export function AthleteSubmissionsClient() {
       </div>
 
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-white">Project entries</h2>
-          <button
-            type="button"
-            onClick={addLine}
-            className="text-xs font-medium text-brand-300 hover:text-brand-200"
-          >
-            + Add project entry
-          </button>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-white">Work entries</h2>
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={addLine}
+              disabled={projects.length === 0}
+              className="text-xs font-medium text-brand-300 hover:text-brand-200 disabled:opacity-40"
+            >
+              + Add project entry
+            </button>
+            <button
+              type="button"
+              onClick={addHousekeepingLine}
+              disabled={clients.length === 0}
+              className="text-xs font-medium text-slate-300 hover:text-white disabled:opacity-40"
+            >
+              + Add client housekeeping
+            </button>
+          </div>
         </div>
 
-        {projects.length === 0 ? (
-          <p className="text-sm text-slate-500">No assigned projects — you cannot log work yet.</p>
+        {projects.length === 0 && clients.length === 0 ? (
+          <p className="text-sm text-slate-500">No assigned clients yet — you cannot log work.</p>
         ) : null}
 
         {lines.map((li) => {
+          if (li.isHousekeeping) {
+            return (
+              <div key={li.key} className="card-tool grid gap-3 rounded-xl border border-amber-500/20 p-4 md:grid-cols-2">
+                <p className="text-xs font-semibold uppercase tracking-wider text-amber-300/90 md:col-span-2">
+                  Client housekeeping
+                </p>
+                <p className="text-[11px] text-slate-500 md:col-span-2">
+                  Internal client work only — not tied to a project and not shown on the client portal.
+                </p>
+                <label className="text-xs text-slate-400 md:col-span-2">
+                  Client
+                  <select
+                    required
+                    value={li.clientId}
+                    onChange={(e) => updateLine(li.key, { clientId: e.target.value })}
+                    className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
+                  >
+                    <option value="">Select client…</option>
+                    {clients.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-xs text-slate-400">
+                  Hours worked
+                  <input
+                    type="number"
+                    min={0.25}
+                    step={0.25}
+                    required
+                    value={li.hoursWorked}
+                    disabled={formLocked}
+                    onChange={(e) => updateLine(li.key, { hoursWorked: e.target.value })}
+                    className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+                  />
+                </label>
+                <label className="text-xs text-slate-400 md:col-span-2">
+                  What was done <span className="text-red-400">*</span>
+                  <textarea
+                    required
+                    value={li.housekeepingNote}
+                    disabled={formLocked}
+                    onChange={(e) => updateLine(li.key, { housekeepingNote: e.target.value })}
+                    rows={2}
+                    className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+                    placeholder="e.g. File tidy, inbox catch-up, admin for Icon Architects"
+                  />
+                </label>
+                {lines.length > 1 ? (
+                  <button
+                    type="button"
+                    onClick={() => removeLine(li.key)}
+                    className="text-xs text-slate-500 hover:text-red-300 md:col-span-2 md:text-left"
+                  >
+                    Remove entry
+                  </button>
+                ) : null}
+              </div>
+            );
+          }
+
           const project = projects.find((p) => p.id === li.projectId);
           return (
             <div key={li.key} className="card-tool grid gap-3 rounded-xl p-4 md:grid-cols-2">
@@ -418,7 +540,14 @@ export function AthleteSubmissionsClient() {
                 <select
                   required
                   value={li.projectId}
-                  onChange={(e) => updateLine(li.key, { projectId: e.target.value })}
+                  onChange={(e) => {
+                    const projectId = e.target.value;
+                    const p = projects.find((x) => x.id === projectId);
+                    updateLine(li.key, {
+                      projectId,
+                      clientId: p?.client.id ?? "",
+                    });
+                  }}
                   className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
                 >
                   <option value="">Select project…</option>
@@ -574,7 +703,7 @@ export function AthleteSubmissionsClient() {
 
       <button
         type="submit"
-        disabled={saving || projects.length === 0 || formLocked}
+        disabled={saving || (projects.length === 0 && clients.length === 0) || formLocked}
         className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-brand-500 disabled:opacity-50"
       >
         {saving ? "Saving…" : editingId ? "Update daily log" : "Save daily log"}

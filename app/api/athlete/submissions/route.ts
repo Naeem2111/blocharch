@@ -54,11 +54,31 @@ export async function GET(request: NextRequest) {
       editable: isSubmissionEditable(s.submissionDate, s.lockedAt),
       alerts: buildDailyHourAlerts(Number(s.totalHours)),
       lineItems: s.lineItems.map((li) => {
+        if (li.isHousekeeping || !li.project) {
+          return {
+            id: li.id,
+            clientId: li.clientId,
+            projectId: li.projectId,
+            isHousekeeping: true,
+            clientName: li.client.name,
+            projectName: "Client housekeeping",
+            projectDisplayTitle: "Client housekeeping",
+            projectNumber: "—",
+            projectPhase: li.projectPhase,
+            taskType: li.taskType,
+            taskTypes: li.taskTypes?.length ? li.taskTypes : [li.taskType],
+            hoursWorked: Number(li.hoursWorked),
+            completedSummary: li.completedSummary,
+            completionPercent: li.completionPercent,
+            notes: li.notes,
+          };
+        }
         const { displayTitle } = projectDisplayFields(li.project);
         return {
           id: li.id,
           clientId: li.clientId,
           projectId: li.projectId,
+          isHousekeeping: false,
           clientName: li.client.name,
           projectName: li.project.name,
           projectDisplayTitle: displayTitle,
@@ -116,8 +136,17 @@ export async function POST(request: NextRequest) {
     }
 
     for (const li of lineItems) {
+      if (li.isHousekeeping) {
+        const link = await prisma.opsProject.findFirst({
+          where: { assignedAthleteId: athlete.id, clientId: li.clientId },
+        });
+        if (!link) {
+          return NextResponse.json({ error: "Invalid client for housekeeping entry" }, { status: 400 });
+        }
+        continue;
+      }
       const project = await prisma.opsProject.findFirst({
-        where: { id: li.projectId, assignedAthleteId: athlete.id, clientId: li.clientId },
+        where: { id: li.projectId!, assignedAthleteId: athlete.id, clientId: li.clientId },
       });
       if (!project) {
         return NextResponse.json({ error: "Invalid project selection" }, { status: 400 });
@@ -147,6 +176,7 @@ export async function POST(request: NextRequest) {
             submissionId: existing.id,
             clientId: li.clientId,
             projectId: li.projectId,
+            isHousekeeping: li.isHousekeeping,
             projectPhase: li.projectPhase,
             taskType: li.taskType,
             taskTypes: li.taskTypes,
@@ -176,6 +206,7 @@ export async function POST(request: NextRequest) {
             create: lineItems.map((li) => ({
               clientId: li.clientId,
               projectId: li.projectId,
+              isHousekeeping: li.isHousekeeping,
               projectPhase: li.projectPhase,
               taskType: li.taskType,
               taskTypes: li.taskTypes,
@@ -191,16 +222,21 @@ export async function POST(request: NextRequest) {
       });
 
       if (body.checkInRequested) {
-        await tx.opsProject.updateMany({
-          where: { id: { in: lineItems.map((li) => li.projectId) } },
-          data: { checkInRequested: true },
-        });
+        const projectIds = lineItems.map((li) => li.projectId).filter((id): id is string => !!id);
+        if (projectIds.length > 0) {
+          await tx.opsProject.updateMany({
+            where: { id: { in: projectIds } },
+            data: { checkInRequested: true },
+          });
+        }
       }
 
       return created;
     });
 
-    await syncProjectProgressForProjects(lineItems.map((li) => li.projectId)).catch((err) => {
+    await syncProjectProgressForProjects(
+      lineItems.map((li) => li.projectId).filter((id): id is string => !!id)
+    ).catch((err) => {
       console.error("Failed to sync project progress from daily log", err);
     });
 

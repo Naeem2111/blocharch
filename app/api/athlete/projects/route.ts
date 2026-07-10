@@ -21,5 +21,14 @@ export async function GET(request: NextRequest) {
     select: athleteProjectSelect,
   });
 
-  return NextResponse.json({ projects: projects.map(serializeProjectForAthlete) });
+  const clients = await prisma.opsClient.findMany({
+    where: { projects: { some: { assignedAthleteId: athlete.id } } },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
+
+  return NextResponse.json({
+    projects: projects.map(serializeProjectForAthlete),
+    clients,
+  });
 }

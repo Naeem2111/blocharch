@@ -7,7 +7,8 @@ import {
 
 export type SubmissionLineItemInput = {
   clientId: string;
-  projectId: string;
+  projectId: string | null;
+  isHousekeeping: boolean;
   projectPhase: OpsProjectPhase;
   taskType: OpsTaskType;
   taskTypes: string[];
@@ -26,6 +27,31 @@ export function parseSubmissionLineItems(raw: unknown): SubmissionLineItemInput[
     const o = row as Record<string, unknown>;
     const hoursWorked = Number(o.hoursWorked);
     if (!Number.isFinite(hoursWorked) || hoursWorked <= 0) return null;
+    const clientId = String(o.clientId || "").trim();
+    if (!clientId) return null;
+
+    const isHousekeeping = Boolean(o.isHousekeeping);
+    if (isHousekeeping) {
+      const notes = o.notes ? String(o.notes).trim() : "";
+      if (!notes) return null;
+      items.push({
+        clientId,
+        projectId: null,
+        isHousekeeping: true,
+        projectPhase: "housekeeping_internal",
+        taskType: "admin_housekeeping",
+        taskTypes: ["admin_housekeeping"],
+        hoursWorked,
+        completionPercent: null,
+        urgencyStatus: "normal",
+        completedSummary: null,
+        notes,
+      });
+      continue;
+    }
+
+    const projectId = String(o.projectId || "").trim();
+    if (!projectId) return null;
     const projectPhase = String(o.projectPhase || "");
     if (!isOpsProjectPhase(projectPhase)) return null;
     const rawTypes = Array.isArray(o.taskTypes)
@@ -36,8 +62,9 @@ export function parseSubmissionLineItems(raw: unknown): SubmissionLineItemInput[
     const taskTypes = rawTypes.length > 0 ? rawTypes : [taskType];
     const urgency = String(o.urgencyStatus || "normal");
     items.push({
-      clientId: String(o.clientId || "").trim(),
-      projectId: String(o.projectId || "").trim(),
+      clientId,
+      projectId,
+      isHousekeeping: false,
       projectPhase,
       taskType,
       taskTypes,
