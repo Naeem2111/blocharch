@@ -149,6 +149,73 @@ function resolveCompletedColumnId(columns: ColumnRow[]): string | null {
   return null;
 }
 
+function optimisticCompleteTaskBoard(
+  board: BoardDetail,
+  taskId: string,
+  completed: boolean,
+  doneColumnId: string
+): BoardDetail {
+  let task: TaskRow | undefined;
+  const stripped = board.columns.map((col) => {
+    const idx = col.tasks.findIndex((t) => t.id === taskId);
+    if (idx < 0) return col;
+    task = col.tasks[idx];
+    return { ...col, tasks: col.tasks.filter((t) => t.id !== taskId) };
+  });
+  if (!task) return board;
+  const destId = completed
+    ? doneColumnId
+    : board.columns.find((c) => c.id !== doneColumnId)?.id ?? board.columns[0]!.id;
+  return {
+    ...board,
+    columns: stripped.map((col) =>
+      col.id === destId ? { ...col, tasks: [...col.tasks, task!] } : col
+    ),
+  };
+}
+
+function PlannerDoneToggle({
+  checked,
+  disabled,
+  onToggle,
+  title,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  onToggle: (next: boolean) => void;
+  title: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={checked}
+      title={title}
+      disabled={disabled}
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggle(!checked);
+      }}
+      onPointerDown={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
+      className={`planner-done-toggle mt-0.5 shrink-0 ${checked ? "planner-done-toggle-checked" : ""}`}
+    >
+      {checked ? (
+        <svg viewBox="0 0 12 12" className="h-2.5 w-2.5" aria-hidden>
+          <path
+            d="M2 6l3 3 5-5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      ) : null}
+    </button>
+  );
+}
+
 const PLANNER_SHORT_DESC_HINT =
   "Brief preview on the board. Paragraphs or lists work (– or • for bullets; line breaks stay).";
 
@@ -323,6 +390,13 @@ export function PlannerClient() {
   );
 
   async function toggleTaskCompleted(taskId: string, completed: boolean) {
+    const snapshot = detail;
+    if (snapshot && completedColumnId) {
+      const optimistic = optimisticCompleteTaskBoard(snapshot, taskId, completed, completedColumnId);
+      setDetail(optimistic);
+      setBoardDetailsById((prev) => ({ ...prev, [snapshot.id]: optimistic }));
+    }
+
     const r = await fetch(`/api/planner/tasks/${encodeURIComponent(taskId)}/complete`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -330,12 +404,18 @@ export function PlannerClient() {
     });
     if (!r.ok) {
       const j = await r.json().catch(() => ({}));
+      if (snapshot) {
+        setDetail(snapshot);
+        setBoardDetailsById((prev) => ({ ...prev, [snapshot.id]: snapshot }));
+      }
       window.alert((j as { error?: string }).error || "Could not update task");
       return;
     }
-    if (allBoardsView) await loadAllBoardDetails();
-    else if (boardId) await loadDetail(boardId);
-    await refreshBoards();
+    void (async () => {
+      if (allBoardsView) await loadAllBoardDetails();
+      else if (boardId) await loadDetail(boardId);
+      await refreshBoards();
+    })();
   }
 
   const canUseTeamRoster = currentRole === "admin" || currentRole === "manager";
@@ -1684,27 +1764,11 @@ export function PlannerClient() {
                       >
                         <div className="flex items-start gap-2">
                           {showDoneTick ? (
-                            <label
-                              className="mt-0.5 shrink-0 cursor-pointer"
-                              onClick={(e) => e.stopPropagation()}
-                              onPointerDown={(e) => e.stopPropagation()}
-                              onKeyDown={(e) => e.stopPropagation()}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isInDoneColumn}
-                                title={
-                                  isInDoneColumn
-                                    ? "Restore to previous board"
-                                    : "Mark complete"
-                                }
-                                onChange={(e) => {
-                                  e.stopPropagation();
-                                  void toggleTaskCompleted(t.id, e.target.checked);
-                                }}
-                                className="h-3.5 w-3.5 rounded border-white/20 bg-white/[0.06] text-brand-500 focus:ring-brand-500"
-                              />
-                            </label>
+                            <PlannerDoneToggle
+                              checked={isInDoneColumn}
+                              title={isInDoneColumn ? "Restore to previous column" : "Mark complete"}
+                              onToggle={(next) => void toggleTaskCompleted(t.id, next)}
+                            />
                           ) : null}
                           <div className="min-w-0 flex-1">
                             <p className="font-medium text-white">{t.title}</p>

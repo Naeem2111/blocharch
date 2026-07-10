@@ -1,4 +1,5 @@
 import { getBestAddressFromFields } from "@/lib/address-display";
+import { geocodeAndPersistArchitect } from "@/lib/geocode-architect";
 import { getOrCreateLead } from "@/lib/leads";
 import { prisma } from "@/lib/prisma";
 import {
@@ -129,6 +130,14 @@ export async function createManualPractice(
 
   await getOrCreateLead(url);
 
+  if (input.address?.trim()) {
+    try {
+      await geocodeAndPersistArchitect(row.id, input.address.trim(), name);
+    } catch (err) {
+      console.error("Failed to geocode manual practice on create", row.id, err);
+    }
+  }
+
   return {
     url: row.url,
     name: row.name,
@@ -252,6 +261,14 @@ export async function updateArchitect(
 
   if (updates.email) {
     await getOrCreateLead(existing.url);
+  }
+
+  if (updates.address !== undefined) {
+    try {
+      await geocodeAndPersistArchitect(row.id, updates.address ?? "", row.name);
+    } catch (err) {
+      console.error("Failed to geocode practice on address update", row.id, err);
+    }
   }
 
   const architect = mapArchitectRow(row);

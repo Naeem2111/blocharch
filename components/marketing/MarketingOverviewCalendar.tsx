@@ -25,6 +25,73 @@ function shiftMonth(month: string, delta: number): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
 }
 
+function practiceHref(slug: string) {
+  return `/dashboard/practices/${encodeURIComponent(slug)}`;
+}
+
+function FollowUpRow({
+  item,
+  showDate = false,
+  variant = "default",
+}: {
+  item: MarketingDueDateItem;
+  showDate?: boolean;
+  variant?: "default" | "attention";
+}) {
+  const isAttention = item.followUpStatus === "overdue" || item.followUpStatus === "due_today";
+  const dateClass =
+    item.followUpStatus === "overdue"
+      ? "text-red-300 font-medium"
+      : item.followUpStatus === "due_today"
+        ? "text-amber-300 font-medium"
+        : "text-slate-300";
+
+  return (
+    <li
+      className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 ${
+        variant === "attention"
+          ? "border-white/[0.1] bg-white/[0.04]"
+          : "border-white/[0.08] bg-white/[0.02]"
+      }`}
+    >
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href={practiceHref(item.practiceSlug)}
+            className="font-medium text-white hover:text-brand-300"
+          >
+            {item.practiceName}
+          </Link>
+          <LeadStageTag stage={item.effectiveStage} compact />
+          <FollowUpTimeTag followUpDueAt={item.followUpDueAt} compact />
+        </div>
+        {item.nextAction ? (
+          <p className="mt-1 text-xs text-slate-300">Next: {item.nextAction}</p>
+        ) : null}
+      </div>
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
+        {showDate ? (
+          <span className={`text-xs ${dateClass}`}>{formatShortDate(toDateOnly(item.followUpDueAt))}</span>
+        ) : null}
+        {isAttention && variant === "attention" ? (
+          <span
+            className="rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase"
+            style={{
+              color: item.followUpStatus === "overdue" ? "#fca5a5" : "#fcd34d",
+              backgroundColor: item.followUpStatus === "overdue" ? "#dc262622" : "#f59e0b22",
+            }}
+          >
+            {item.followUpStatus === "overdue" ? "Overdue" : "Due today"}
+          </span>
+        ) : null}
+        <Link href={practiceHref(item.practiceSlug)} className="btn-brand-primary rounded-lg px-3 py-1.5 text-xs">
+          View
+        </Link>
+      </div>
+    </li>
+  );
+}
+
 export function MarketingOverviewCalendar({ items }: { items: MarketingDueDateItem[] }) {
   const [calendarMonth, setCalendarMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -50,11 +117,24 @@ export function MarketingOverviewCalendar({ items }: { items: MarketingDueDateIt
     [items, selectedDate]
   );
 
+  const attentionItems = useMemo(
+    () =>
+      items
+        .filter((item) => item.followUpStatus === "overdue" || item.followUpStatus === "due_today")
+        .sort((a, b) => new Date(a.followUpDueAt).getTime() - new Date(b.followUpDueAt).getTime()),
+    [items]
+  );
+
   const upcomingItems = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     return items
-      .filter((item) => new Date(toDateOnly(item.followUpDueAt)) >= today)
+      .filter(
+        (item) =>
+          item.followUpStatus !== "overdue" &&
+          item.followUpStatus !== "due_today" &&
+          new Date(toDateOnly(item.followUpDueAt)) > today
+      )
       .slice(0, 8);
   }, [items]);
 
@@ -63,7 +143,7 @@ export function MarketingOverviewCalendar({ items }: { items: MarketingDueDateIt
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-white">Marketing follow-ups</h2>
-          <p className="mt-1 text-sm text-slate-400">Upcoming outreach due dates from Lead nurturing</p>
+          <p className="mt-1 text-sm text-slate-300">Upcoming outreach due dates from Lead nurturing</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link
@@ -76,7 +156,7 @@ export function MarketingOverviewCalendar({ items }: { items: MarketingDueDateIt
             href="/dashboard/marketing/notifications"
             className="rounded-lg border border-brand-500/30 bg-brand-500/10 px-3 py-1.5 text-xs font-medium text-brand-200 hover:bg-brand-500/15"
           >
-            Due today / overdue
+            All notifications
           </Link>
         </div>
       </div>
@@ -121,7 +201,7 @@ export function MarketingOverviewCalendar({ items }: { items: MarketingDueDateIt
               setCalendarMonth(date.slice(0, 7));
             }}
           />
-          <div className="mt-4 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-500">
+          <div className="mt-4 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-400">
             <span className="inline-flex items-center gap-1">
               <span className="h-2 w-2 rounded-full bg-red-500" /> Overdue
             </span>
@@ -138,69 +218,62 @@ export function MarketingOverviewCalendar({ items }: { items: MarketingDueDateIt
               <span className="h-2 w-2 rounded-full bg-emerald-500" /> 14+ days
             </span>
           </div>
-          <p className="mt-3 text-xs text-slate-500">
+          <p className="mt-3 text-xs text-slate-400">
             {monthItems.length} follow-up{monthItems.length === 1 ? "" : "s"} this month
+            {attentionItems.length > 0 ? (
+              <span className="text-amber-300"> · {attentionItems.length} need attention</span>
+            ) : null}
           </p>
         </div>
 
         <div className="space-y-6">
           <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              {formatShortDate(selectedDate)}
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-300/90">
+              Due today / overdue
             </h3>
-            {selectedItems.length === 0 ? (
-              <p className="mt-2 text-sm text-slate-500">No follow-ups due on this date.</p>
+            {attentionItems.length === 0 ? (
+              <p className="mt-2 text-sm text-slate-400">No follow-ups need attention right now.</p>
             ) : (
               <ul className="mt-3 space-y-2">
-                {selectedItems.map((item) => (
-                  <li
-                    key={`${item.practiceUrl}-${item.followUpDueAt}`}
-                    className="rounded-xl border border-white/[0.08] bg-white/[0.02] px-4 py-3"
-                  >
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Link
-                        href={`/dashboard/practices/${encodeURIComponent(item.practiceSlug)}`}
-                        className="font-medium text-white hover:text-brand-300"
-                      >
-                        {item.practiceName}
-                      </Link>
-                      <LeadStageTag stage={item.effectiveStage} compact />
-                      <FollowUpTimeTag followUpDueAt={item.followUpDueAt} compact />
-                    </div>
-                    {item.nextAction ? (
-                      <p className="mt-1 text-xs text-slate-400">Next: {item.nextAction}</p>
-                    ) : null}
-                  </li>
+                {attentionItems.map((item) => (
+                  <FollowUpRow
+                    key={`attention-${item.practiceUrl}`}
+                    item={item}
+                    showDate
+                    variant="attention"
+                  />
                 ))}
               </ul>
             )}
           </div>
 
           <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Upcoming</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-300">
+              {formatShortDate(selectedDate)}
+            </h3>
+            {selectedItems.length === 0 ? (
+              <p className="mt-2 text-sm text-slate-400">No follow-ups due on this date.</p>
+            ) : (
+              <ul className="mt-3 space-y-2">
+                {selectedItems.map((item) => (
+                  <FollowUpRow
+                    key={`${item.practiceUrl}-${item.followUpDueAt}`}
+                    item={item}
+                    showDate
+                  />
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-300">Upcoming</h3>
             {upcomingItems.length === 0 ? (
-              <p className="mt-2 text-sm text-slate-500">No scheduled follow-ups ahead.</p>
+              <p className="mt-2 text-sm text-slate-400">No scheduled follow-ups ahead.</p>
             ) : (
               <ul className="mt-3 space-y-2">
                 {upcomingItems.map((item) => (
-                  <li
-                    key={`upcoming-${item.practiceUrl}`}
-                    className="flex items-center justify-between gap-3 rounded-lg px-1 py-1.5 text-sm"
-                  >
-                    <div className="flex min-w-0 items-center gap-2">
-                      <Link
-                        href={`/dashboard/practices/${encodeURIComponent(item.practiceSlug)}`}
-                        className="min-w-0 truncate text-slate-200 hover:text-brand-300"
-                      >
-                        {item.practiceName}
-                      </Link>
-                      <LeadStageTag stage={item.effectiveStage} compact />
-                      <FollowUpTimeTag followUpDueAt={item.followUpDueAt} compact />
-                    </div>
-                    <span className="shrink-0 text-xs text-slate-500">
-                      {formatShortDate(toDateOnly(item.followUpDueAt))}
-                    </span>
-                  </li>
+                  <FollowUpRow key={`upcoming-${item.practiceUrl}`} item={item} showDate />
                 ))}
               </ul>
             )}
