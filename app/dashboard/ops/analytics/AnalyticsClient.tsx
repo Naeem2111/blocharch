@@ -43,6 +43,7 @@ type BeatenDeadlinesByAthlete = {
     dueDate: string;
     completedDate: string;
     daysBeaten: number;
+    beatenLabel?: string;
   }>;
 };
 
@@ -234,6 +235,7 @@ export function AnalyticsClient() {
           profilePhotoUrl: a.profilePhotoUrl,
           profilePhotoBgColor: a.profilePhotoBgColor,
           profilePhotoTextTone: a.profilePhotoTextTone,
+          beatenLabel: p.beatenLabel,
         }))
       ),
     [data]
@@ -400,7 +402,7 @@ export function AnalyticsClient() {
                       <td className="px-3 py-2 tabular-nums">{row.completedDate}</td>
                       <td className="px-3 py-2 tabular-nums">{row.dueDate}</td>
                       <td className="px-3 py-2 tabular-nums font-medium text-emerald-300">
-                        {row.daysBeaten}d early
+                        {row.beatenLabel ?? `${row.daysBeaten}d early`}
                       </td>
                     </tr>
                   ))}

@@ -8,6 +8,8 @@ import {
 } from "@/lib/ops-constants";
 import { requireOpsSession } from "@/lib/ops-access";
 import { parseDateOnly } from "@/lib/ops-hours";
+import { parseProjectDueInput } from "@/lib/project-deadline";
+import { serializeOpsProjectRow } from "@/lib/ops-project-serialize";
 import { syncProjectBoardOnAssign } from "@/lib/planner-project-sync";
 import { normalizeAthleteProjectCode } from "@/lib/ops-project-code";
 import { projectDisplayFields } from "@/lib/project-display";
@@ -38,41 +40,19 @@ export async function GET(request: NextRequest) {
   });
 
   return NextResponse.json({
-    projects: projects.map((p) => {
-      const { displayTitle, stageLabel } = projectDisplayFields(p);
-      return {
-        id: p.id,
-        clientId: p.clientId,
+    projects: projects.map((p) =>
+      serializeOpsProjectRow(p, {
         clientName: p.client.name,
         clientLogoUrl: p.client.logoUrl,
         clientLogoBgColor: p.client.logoBgColor,
         clientLogoTextTone: p.client.logoTextTone,
-        assignedAthleteId: p.assignedAthleteId,
         assignedAthleteName: p.assignedAthlete?.fullName ?? null,
-        projectLeadContactId: p.projectLeadContactId,
         projectLeadContactName: p.projectLeadContact?.name ?? null,
         projectLeadContactEmail: p.projectLeadContact?.email ?? null,
         athleteCode: p.assignedAthlete?.athleteCode ?? null,
-        name: p.name,
-        displayTitle,
-        stageLabel,
-        projectNumber: p.projectNumber,
-        address: p.address,
-        projectLead: p.projectLead,
-        complexity: p.complexity,
-        startDate: p.startDate?.toISOString().slice(0, 10) ?? null,
-        dueDate: p.dueDate?.toISOString().slice(0, 10) ?? null,
-        handoverDate: p.handoverDate?.toISOString().slice(0, 10) ?? null,
-        currentStage: p.currentStage,
-        currentStatus: p.currentStatus,
-        progressPercent: p.progressPercent,
-        completedAt: p.completedAt?.toISOString().slice(0, 10) ?? null,
-        notes: p.notes,
-        blockerFlag: p.blockerFlag,
-        checkInRequested: p.checkInRequested,
         updatedAt: p.updatedAt.toISOString(),
-      };
-    }),
+      })
+    ),
   });
 }
 
@@ -146,7 +126,7 @@ export async function POST(request: NextRequest) {
         currentStage,
         currentStatus,
         startDate: body.startDate ? parseDateOnly(String(body.startDate)) : null,
-        dueDate: body.dueDate ? parseDateOnly(String(body.dueDate)) : null,
+        dueDate: parseProjectDueInput(body),
         handoverDate: body.handoverDate ? parseDateOnly(String(body.handoverDate)) : null,
         notes: body.notes ? String(body.notes).trim() : null,
       },

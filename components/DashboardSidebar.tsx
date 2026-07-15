@@ -998,11 +998,11 @@ export function DashboardSidebar({
 
 	return (
 		<aside
-			className={`fixed inset-y-0 left-0 z-50 flex w-[min(85vw,280px)] flex-col border-r border-white/[0.06] bg-[var(--bg-sidebar)] transition-transform duration-200 ease-out lg:relative lg:z-auto lg:w-[260px] lg:min-h-screen lg:flex-shrink-0 lg:translate-x-0 ${
+			className={`dashboard-sidebar fixed inset-y-0 left-0 z-50 flex h-screen w-[min(85vw,280px)] flex-col overflow-hidden border-r border-white/[0.06] bg-[var(--bg-sidebar)] transition-transform duration-200 ease-out lg:sticky lg:top-0 lg:z-auto lg:w-[260px] lg:flex-shrink-0 lg:translate-x-0 ${
 				mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
 			}`}
 		>
-			<div className="border-b border-white/[0.06] px-4 pb-4 pt-5">
+			<div className="shrink-0 border-b border-white/[0.06] px-4 pb-4 pt-5">
 				<BrandMark logoSize="xl" />
 				<p className="mt-3 text-xs leading-relaxed text-slate-500">
 					Blocharch console — marketing, project operations, and athlete
@@ -1021,7 +1021,7 @@ export function DashboardSidebar({
 				</a>
 			</div>
 			{showConsoleViewSwitcher ? (
-				<div className="border-b border-white/[0.06] px-3 py-3">
+				<div className="shrink-0 border-b border-white/[0.06] px-3 py-3">
 					<AdminViewSwitcher
 						userId={user.id}
 						username={user.username}
@@ -1032,8 +1032,9 @@ export function DashboardSidebar({
 					/>
 				</div>
 			) : null}
+			<div className="dashboard-sidebar-scroll flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain">
 			<nav
-				className="flex-1 space-y-1 overflow-y-auto overscroll-y-contain p-3"
+				className="space-y-1 p-3"
 				aria-label="Main"
 			>
 				<p className="hidden px-1 pb-2 text-[10px] text-slate-600 lg:block">
@@ -1109,10 +1110,11 @@ export function DashboardSidebar({
 					);
 				})}
 			</nav>
-			<div className="border-t border-white/[0.06] px-3 py-3">
+			</div>
+			<div className="shrink-0 border-t border-white/[0.06] px-3 py-3">
 				<ThemeToggle />
 			</div>
-			<div className="border-t border-white/[0.06] p-4">
+			<div className="shrink-0 border-t border-white/[0.06] p-4">
 				<div className="flex items-center justify-between gap-2 rounded-lg bg-white/[0.03] px-3 py-2.5 ring-1 ring-white/[0.06]">
 					<div className="min-w-0">
 						<p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">

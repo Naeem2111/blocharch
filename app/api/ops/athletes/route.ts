@@ -4,7 +4,7 @@ import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/password";
 import { requireOpsSession } from "@/lib/ops-access";
-import { isAdminOnlyAccount } from "@/lib/admin-only-accounts";
+import { listReportingAthletes } from "@/lib/reporting-athletes";
 import { parseDateOnly } from "@/lib/ops-hours";
 import { parseImageUrlField } from "@/lib/image-url";
 import { parseHexColor } from "@/lib/hex-color";
@@ -15,18 +15,19 @@ export async function GET(request: NextRequest) {
   const gate = await requireOpsSession(request);
   if (gate instanceof NextResponse) return gate;
 
-  const athletes = await prisma.opsAthlete.findMany({
-    orderBy: { fullName: "asc" },
-    include: {
-      user: { select: { id: true, username: true, disabled: true, role: true } },
+  const athletes = await listReportingAthletes();
+
+  const counts = await prisma.opsAthlete.findMany({
+    where: { id: { in: athletes.map((a) => a.id) } },
+    select: {
+      id: true,
       _count: { select: { projects: true, submissions: true } },
     },
   });
+  const countById = new Map(counts.map((row) => [row.id, row._count]));
 
   return NextResponse.json({
-    athletes: athletes
-      .filter((a) => !isAdminOnlyAccount(a.user.username))
-      .map((a) => ({
+    athletes: athletes.map((a) => ({
       id: a.id,
       userId: a.userId,
       username: a.user.username,
@@ -42,8 +43,8 @@ export async function GET(request: NextRequest) {
       profilePhotoUrl: a.profilePhotoUrl,
       profilePhotoBgColor: a.profilePhotoBgColor,
       profilePhotoTextTone: a.profilePhotoTextTone,
-      projectCount: a._count.projects,
-      submissionCount: a._count.submissions,
+      projectCount: countById.get(a.id)?.projects ?? 0,
+      submissionCount: countById.get(a.id)?.submissions ?? 0,
     })),
   });
 }

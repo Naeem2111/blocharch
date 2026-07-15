@@ -15,6 +15,12 @@ import {
 import { daysUntilDueFromIso, projectDueColor } from "@/lib/project-color-scale";
 import { computeProjectTimeline } from "@/lib/project-timeline";
 import { formatProjectFullTitle } from "@/lib/project-display";
+import { formatProjectDueAt } from "@/lib/project-deadline";
+import { splitDueAtIso } from "@/lib/planner-due-datetime";
+import {
+  emptyProjectDueFields,
+  ProjectDueDateTimeFields,
+} from "@/components/ops/ProjectDueDateTimeFields";
 
 type ClientContactOption = { id: string; name: string; email: string | null };
 
@@ -50,6 +56,7 @@ type ProjectRow = {
   currentStatus: keyof typeof PROJECT_STATUS_LABELS;
   startDate: string | null;
   dueDate: string | null;
+  dueAt: string | null;
   handoverDate: string | null;
   notes: string | null;
   progressPercent: number | null;
@@ -64,7 +71,7 @@ const emptyCreate = {
   projectLeadContactId: "",
   currentStage: "survey_conversion",
   complexity: "medium",
-  dueDate: "",
+  ...emptyProjectDueFields(),
 };
 
 const inputClass =
@@ -93,7 +100,7 @@ export function OpsProjectsClient() {
     currentStage: "survey_conversion",
     currentStatus: "not_started",
     startDate: "",
-    dueDate: "",
+    ...emptyProjectDueFields(),
     handoverDate: "",
     notes: "",
   });
@@ -158,6 +165,8 @@ export function OpsProjectsClient() {
         assignedAthleteId: form.assignedAthleteId || null,
         projectLeadContactId: form.projectLeadContactId || null,
         dueDate: form.dueDate || null,
+        dueTime: form.dueTime || null,
+        dueAmPm: form.dueAmPm,
       }),
     });
     const j = await r.json();
@@ -172,6 +181,7 @@ export function OpsProjectsClient() {
 
   function startEdit(p: ProjectRow) {
     const athleteId = p.assignedAthleteId ?? "";
+    const due = splitDueAtIso(p.dueAt ?? (p.dueDate ? `${p.dueDate}T17:00:00` : null));
     setEditingId(p.id);
     setEditClientId(p.clientId);
     setEditForm({
@@ -184,7 +194,9 @@ export function OpsProjectsClient() {
       currentStage: p.currentStage,
       currentStatus: p.currentStatus,
       startDate: p.startDate ?? "",
-      dueDate: p.dueDate ?? "",
+      dueDate: due.date,
+      dueTime: due.time || emptyProjectDueFields().dueTime,
+      dueAmPm: due.ampm,
       handoverDate: p.handoverDate ?? "",
       notes: p.notes ?? "",
     });
@@ -208,6 +220,8 @@ export function OpsProjectsClient() {
         currentStatus: editForm.currentStatus,
         startDate: editForm.startDate || null,
         dueDate: editForm.dueDate || null,
+        dueTime: editForm.dueTime || null,
+        dueAmPm: editForm.dueAmPm,
         handoverDate: editForm.handoverDate || null,
         notes: editForm.notes || null,
       }),
@@ -305,7 +319,8 @@ export function OpsProjectsClient() {
       dueDate: p.dueDate,
       handoverDate: p.handoverDate,
     });
-    const daysUntil = daysUntilDueFromIso(p.dueDate);
+    const daysUntil = daysUntilDueFromIso(p.dueAt ?? p.dueDate);
+    const dueLabel = formatProjectDueAt(p.dueAt ?? (p.dueDate ? `${p.dueDate}T17:00:00` : null));
     const accent = projectDueColor(daysUntil);
 
     return (
@@ -388,7 +403,15 @@ export function OpsProjectsClient() {
               </select>
             </label>
             <label className="text-xs text-slate-400">Status<select value={editForm.currentStatus} onChange={(e) => setEditForm((f) => ({ ...f, currentStatus: e.target.value }))} className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm">{Object.entries(PROJECT_STATUS_LABELS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
-            <label className="text-xs text-slate-400">Due<input type="date" value={editForm.dueDate} onChange={(e) => setEditForm((f) => ({ ...f, dueDate: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
+            <ProjectDueDateTimeFields
+              className="md:col-span-2"
+              value={{
+                dueDate: editForm.dueDate,
+                dueTime: editForm.dueTime,
+                dueAmPm: editForm.dueAmPm,
+              }}
+              onChange={(due) => setEditForm((f) => ({ ...f, ...due }))}
+            />
             <label className="text-xs text-slate-400">Handover<input type="date" value={editForm.handoverDate} onChange={(e) => setEditForm((f) => ({ ...f, handoverDate: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.04] px-3 py-2 text-sm text-white" /></label>
             <label className="text-xs text-slate-400 md:col-span-2">Notes<textarea value={editForm.notes} onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))} rows={2} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
             <div className="flex flex-wrap gap-2 md:col-span-2">
@@ -431,7 +454,7 @@ export function OpsProjectsClient() {
               >
                 {displayProjectStageLabel(p.currentStage)} · {PROJECT_STATUS_LABELS[p.currentStatus]}
                 {timeline.daysActive != null ? ` · ${timeline.daysActive} days active` : ""}
-                {timeline.label ? ` · ${timeline.label}` : ""}
+                {dueLabel ? ` · Due ${dueLabel}` : timeline.label ? ` · ${timeline.label}` : ""}
               </p>
               <div className="mt-3 max-w-md">
                 <ProjectProgressBar percent={p.progressPercent ?? 0} />
@@ -607,7 +630,15 @@ export function OpsProjectsClient() {
             />
           </label>
           <label className="text-xs text-slate-400 md:col-span-2">Address<input value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
-          <label className="text-xs text-slate-400">Due<input type="date" value={form.dueDate} onChange={(e) => setForm((f) => ({ ...f, dueDate: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
+          <ProjectDueDateTimeFields
+            className="md:col-span-2"
+            value={{
+              dueDate: form.dueDate,
+              dueTime: form.dueTime,
+              dueAmPm: form.dueAmPm,
+            }}
+            onChange={(due) => setForm((f) => ({ ...f, ...due }))}
+          />
           {form.name || form.address ? (
             <p className="text-xs text-slate-500 md:col-span-2">
               Full title preview:{" "}

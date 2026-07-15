@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requirePlannerSession } from "@/lib/planner-access";
+import { listReportingAthletes } from "@/lib/reporting-athletes";
 
 /** Athletes + assignable projects for Outbox form (admin/manager). */
 export async function GET(request: NextRequest) {
@@ -14,11 +15,7 @@ export async function GET(request: NextRequest) {
   }
 
   const [athletes, projects] = await Promise.all([
-    prisma.opsAthlete.findMany({
-      where: { status: "active" },
-      orderBy: { fullName: "asc" },
-      select: { id: true, fullName: true, athleteCode: true, profilePhotoUrl: true },
-    }),
+    listReportingAthletes({ status: "active" }),
     prisma.opsProject.findMany({
       where: {
         assignedAthleteId: { not: null },
@@ -35,7 +32,12 @@ export async function GET(request: NextRequest) {
   ]);
 
   return NextResponse.json({
-    athletes,
+    athletes: athletes.map((a) => ({
+      id: a.id,
+      fullName: a.fullName,
+      athleteCode: a.athleteCode,
+      profilePhotoUrl: a.profilePhotoUrl,
+    })),
     projects: projects.map((p) => ({
       id: p.id,
       name: p.name,

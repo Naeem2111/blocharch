@@ -30,6 +30,7 @@ export type PublicClientPortalProject = {
   statusBadge: { label: string; color: string };
   startDate: string | null;
   dueDate: string | null;
+  dueAt: string | null;
   handoverDate: string | null;
   progressPercent: number;
   leadName: string | null;
@@ -38,6 +39,7 @@ export type PublicClientPortalProject = {
   leadPhotoTextTone: string | null;
   openTasks: PublicClientPortalTask[];
   deadlineBeatenDays: number | null;
+  deadlineBeatenMinutes: number | null;
   laneNumber: number;
   assignedAthleteName: string | null;
 };
@@ -100,6 +102,7 @@ function mapProject(
     handoverDate: Date | null;
     progressPercent: number | null;
     deadlineBeatenDays: number | null;
+    deadlineBeatenMinutes: number | null;
     projectLeadContact: {
       name: string;
       email: string | null;
@@ -130,6 +133,7 @@ function mapProject(
     statusBadge: clientStatusBadge(p.currentStatus, progressPercent),
     startDate: isoDate(p.startDate),
     dueDate: isoDate(p.dueDate),
+    dueAt: p.dueDate?.toISOString() ?? null,
     handoverDate: isoDate(p.handoverDate),
     progressPercent,
     leadName: contact?.name ?? legacyAthlete?.fullName ?? p.projectLead ?? null,
@@ -138,6 +142,7 @@ function mapProject(
     leadPhotoTextTone: contact ? null : legacyAthlete?.profilePhotoTextTone ?? null,
     openTasks,
     deadlineBeatenDays: p.deadlineBeatenDays,
+    deadlineBeatenMinutes: p.deadlineBeatenMinutes,
     laneNumber,
     assignedAthleteName: p.assignedAthlete?.fullName ?? null,
   };

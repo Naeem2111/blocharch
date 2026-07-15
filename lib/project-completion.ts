@@ -1,16 +1,42 @@
-import { dateOnlyUtc } from "@/lib/ops-hours";
+import {
+  computeDeadlineBeat,
+  completionAtFromSubmissionDate,
+} from "@/lib/project-deadline";
 
-/** Days completed before due date (positive = early). Null if no due date or not early. */
+/** @deprecated Use computeDeadlineBeat — days only, for legacy callers. */
 export function computeDeadlineBeatenDays(
   dueDate: Date,
   completedDate: Date
 ): number | null {
-  const due = dateOnlyUtc(dueDate);
-  const completed = dateOnlyUtc(completedDate);
-  if (completed >= due) return null;
-  return Math.ceil((due.getTime() - completed.getTime()) / 86400000);
+  const beat = computeDeadlineBeat(dueDate, completedDate);
+  if (beat.minutes == null) return null;
+  const days = Math.floor(beat.minutes / 1440);
+  return days > 0 ? days : null;
+}
+
+export function computeDeadlineBeatMetrics(
+  dueAt: Date,
+  completedAt: Date
+): { deadlineBeatenMinutes: number | null; deadlineBeatenDays: number | null } {
+  const beat = computeDeadlineBeat(dueAt, completedAt);
+  if (beat.minutes == null) {
+    return { deadlineBeatenMinutes: null, deadlineBeatenDays: null };
+  }
+  return {
+    deadlineBeatenMinutes: beat.minutes,
+    deadlineBeatenDays: beat.days != null && beat.days > 0 ? beat.days : null,
+  };
 }
 
 export function projectCompletionDate(now = new Date()): Date {
-  return dateOnlyUtc(now);
+  return now;
+}
+
+export function projectCompletionFromLog(
+  log: { submissionDate: Date; isBackloggedSession: boolean } | null,
+  now = new Date()
+): Date {
+  if (!log) return now;
+  if (log.isBackloggedSession) return completionAtFromSubmissionDate(log.submissionDate);
+  return now;
 }

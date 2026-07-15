@@ -489,16 +489,18 @@ model OpsProject {
   projectLead       String?             @map("project_lead")
   complexity        OpsProjectComplexity @default(medium)
   startDate         DateTime?           @map("start_date") @db.Date
-  dueDate           DateTime?           @map("due_date") @db.Date
+  dueDate           DateTime?           @map("due_date")
   handoverDate      DateTime?           @map("handover_date") @db.Date
   currentStage      OpsProjectPhase     @default(survey_conversion) @map("current_stage")
   currentStatus     OpsProjectStatus    @default(not_started) @map("current_status")
   /** Latest progress % from daily log (0–100). */
   progressPercent   Int?                @map("progress_percent")
-  /** Date the project was marked complete (from daily log or handover). */
-  completedAt       DateTime?           @map("completed_at") @db.Date
-  /** Days finished before due date; null if not early or no due date. */
+  /** When the project was marked complete (from daily log or handover). */
+  completedAt       DateTime?           @map("completed_at")
+  /** Days finished before due (legacy display; 0 when only hours/minutes early). */
   deadlineBeatenDays Int?               @map("deadline_beaten_days")
+  /** Minutes finished before due datetime; null if not early. */
+  deadlineBeatenMinutes Int?            @map("deadline_beaten_minutes")
   notes             String?             @db.Text
   blockerFlag       Boolean             @default(false) @map("blocker_flag")
   checkInRequested  Boolean             @default(false) @map("check_in_requested")

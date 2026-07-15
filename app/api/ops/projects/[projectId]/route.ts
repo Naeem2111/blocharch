@@ -13,69 +13,29 @@ import { reactivateProjectOnAthleteReassign, syncProjectProgressForProjects } fr
 import { normalizeAthleteProjectCode } from "@/lib/ops-project-code";
 import { projectDisplayFields } from "@/lib/project-display";
 import { validateProjectLeadContactDb } from "@/lib/ops-project-lead";
+import { deleteProjectAndSyncSubmissions } from "@/lib/sync-submission-totals";
+import { parseProjectDueInput } from "@/lib/project-deadline";
+import { serializeOpsProjectRow } from "@/lib/ops-project-serialize";
 import type { OpsProjectStatus } from "@prisma/client";
 
 type RouteContext = { params: Promise<{ projectId: string }> };
 
 function serializeOpsProject(
-  project: {
-    id: string;
-    clientId: string;
-    assignedAthleteId: string | null;
-    projectLeadContactId: string | null;
-    name: string;
-    projectNumber: string;
-    address: string | null;
-    projectLead: string | null;
-    complexity: string;
-    startDate: Date | null;
-    dueDate: Date | null;
-    handoverDate: Date | null;
-    currentStage: Parameters<typeof projectDisplayFields>[0]["currentStage"];
-    currentStatus: string;
-    progressPercent: number | null;
-    completedAt: Date | null;
-    deadlineBeatenDays: number | null;
-    notes: string | null;
-    blockerFlag: boolean;
-    checkInRequested: boolean;
+  project: Parameters<typeof serializeOpsProjectRow>[0] & {
     client: { id: string; name: string };
     assignedAthlete: { id: string; fullName: string; athleteCode: string } | null;
     projectLeadContact: { id: string; name: string; email: string | null } | null;
   },
   hoursLogged: number
 ) {
-  const { displayTitle, stageLabel } = projectDisplayFields(project);
-  return {
-    id: project.id,
-    clientId: project.clientId,
+  return serializeOpsProjectRow(project, {
     clientName: project.client.name,
-    assignedAthleteId: project.assignedAthleteId,
     assignedAthleteName: project.assignedAthlete?.fullName ?? null,
     assignedAthleteCode: project.assignedAthlete?.athleteCode ?? null,
-    projectLeadContactId: project.projectLeadContactId,
     projectLeadContactName: project.projectLeadContact?.name ?? null,
     projectLeadContactEmail: project.projectLeadContact?.email ?? null,
-    name: project.name,
-    displayTitle,
-    stageLabel,
-    projectNumber: project.projectNumber,
-    address: project.address,
-    projectLead: project.projectLead,
-    complexity: project.complexity,
-    startDate: project.startDate?.toISOString().slice(0, 10) ?? null,
-    dueDate: project.dueDate?.toISOString().slice(0, 10) ?? null,
-    handoverDate: project.handoverDate?.toISOString().slice(0, 10) ?? null,
-    currentStage: project.currentStage,
-    currentStatus: project.currentStatus,
-    progressPercent: project.progressPercent,
-    completedAt: project.completedAt?.toISOString().slice(0, 10) ?? null,
-    deadlineBeatenDays: project.deadlineBeatenDays,
     hoursLogged,
-    notes: project.notes,
-    blockerFlag: project.blockerFlag,
-    checkInRequested: project.checkInRequested,
-  };
+  });
 }
 
 export async function GET(_request: NextRequest, context: RouteContext) {
@@ -173,6 +133,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         data.progressPercent = reopen.progressPercent;
         data.completedAt = reopen.completedAt;
         data.deadlineBeatenDays = reopen.deadlineBeatenDays;
+        data.deadlineBeatenMinutes = reopen.deadlineBeatenMinutes;
       }
     }
     if (body.projectNumber != null) {
@@ -212,7 +173,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
 
     if (body.startDate !== undefined) data.startDate = body.startDate ? parseDateOnly(String(body.startDate)) : null;
-    if (body.dueDate !== undefined) data.dueDate = body.dueDate ? parseDateOnly(String(body.dueDate)) : null;
+    if (body.dueDate !== undefined || body.dueAt !== undefined || body.dueTime !== undefined || body.dueAmPm !== undefined) {
+      data.dueDate = parseProjectDueInput({
+        dueAt: body.dueAt,
+        dueDate: body.dueDate,
+        dueTime: body.dueTime,
+        dueAmPm: body.dueAmPm,
+      });
+    }
     if (body.handoverDate !== undefined) data.handoverDate = body.handoverDate ? parseDateOnly(String(body.handoverDate)) : null;
 
     if (body.blockerFlag !== undefined) data.blockerFlag = Boolean(body.blockerFlag);
@@ -266,9 +234,8 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
   if (gate instanceof NextResponse) return gate;
 
   const { projectId } = await context.params;
-  const existing = await prisma.opsProject.findUnique({ where: { id: projectId } });
-  if (!existing) return NextResponse.json({ error: "Project not found" }, { status: 404 });
+  const deleted = await deleteProjectAndSyncSubmissions(projectId);
+  if (!deleted) return NextResponse.json({ error: "Project not found" }, { status: 404 });
 
-  await prisma.opsProject.delete({ where: { id: projectId } });
   return NextResponse.json({ ok: true });
 }

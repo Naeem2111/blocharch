@@ -2,14 +2,18 @@ import type { Prisma } from "@prisma/client";
 import { athleteProfileVisual } from "@/lib/athlete-profile-visual";
 import { prisma } from "@/lib/prisma";
 import { dateOnlyUtc, monthEndUtc, monthStartUtc } from "@/lib/ops-hours";
+import { computeDeadlineBeat, formatDeadlineBeat } from "@/lib/project-deadline";
 
 export type BeatenDeadlineProject = {
   projectId: string;
   projectName: string;
   clientName: string;
   dueDate: string;
+  dueAt: string | null;
   completedDate: string;
+  minutesBeaten: number;
   daysBeaten: number;
+  beatenLabel: string;
 };
 
 export type BeatenDeadlinesByAthlete = {
@@ -20,15 +24,33 @@ export type BeatenDeadlinesByAthlete = {
   profilePhotoTextTone: string | null;
   beatenCount: number;
   totalDaysBeaten: number;
+  totalMinutesBeaten: number;
   averageDaysBeaten: number;
   projects: BeatenDeadlineProject[];
 };
 
-function daysBetween(start: Date, end: Date): number {
-  return Math.ceil((end.getTime() - start.getTime()) / 86400000);
+function resolveBeatenMinutes(
+  project: {
+    dueDate: Date;
+    completedAt: Date | null;
+    handoverDate: Date | null;
+    updatedAt: Date;
+    deadlineBeatenMinutes: number | null;
+    deadlineBeatenDays: number | null;
+  },
+  completed: Date
+): number | null {
+  if (project.deadlineBeatenMinutes != null && project.deadlineBeatenMinutes > 0) {
+    return project.deadlineBeatenMinutes;
+  }
+  if (project.deadlineBeatenDays != null && project.deadlineBeatenDays > 0) {
+    return project.deadlineBeatenDays * 1440;
+  }
+  const beat = computeDeadlineBeat(project.dueDate, completed);
+  return beat.minutes;
 }
 
-/** Projects completed before due date in the selected month. */
+/** Projects completed before due datetime in the selected month. */
 export async function buildBeatenDeadlines(
   reference: Date,
   clientId?: string | null,
@@ -68,51 +90,52 @@ export async function buildBeatenDeadlines(
 
     const completed =
       p.completedAt != null
-        ? dateOnlyUtc(p.completedAt)
+        ? p.completedAt
         : p.handoverDate
           ? dateOnlyUtc(p.handoverDate)
           : dateOnlyUtc(p.updatedAt);
-    if (completed < from || completed > to) continue;
+    if (dateOnlyUtc(completed) < from || dateOnlyUtc(completed) > to) continue;
 
-    const due = dateOnlyUtc(p.dueDate);
-    const daysBeaten =
-      p.deadlineBeatenDays != null && p.deadlineBeatenDays > 0
-        ? p.deadlineBeatenDays
-        : completed >= due
-          ? null
-          : daysBetween(completed, due);
-    if (daysBeaten == null || daysBeaten <= 0) continue;
-    const athleteId = p.assignedAthlete.id;
+    const minutesBeaten = resolveBeatenMinutes(p, completed);
+    if (minutesBeaten == null || minutesBeaten <= 0) continue;
+
+    const daysBeaten = Math.floor(minutesBeaten / 1440);
+    const athleteKey = p.assignedAthlete.id;
     const profile = athleteProfileVisual(p.assignedAthlete);
-    const entry = byAthlete.get(athleteId) ?? {
-      athleteId,
+    const entry = byAthlete.get(athleteKey) ?? {
+      athleteId: athleteKey,
       athleteName: p.assignedAthlete.fullName,
       ...profile,
       beatenCount: 0,
       totalDaysBeaten: 0,
+      totalMinutesBeaten: 0,
       averageDaysBeaten: 0,
       projects: [],
     };
 
     entry.beatenCount += 1;
+    entry.totalMinutesBeaten += minutesBeaten;
     entry.totalDaysBeaten += daysBeaten;
     entry.projects.push({
       projectId: p.id,
       projectName: p.name,
       clientName: p.client.name,
-      dueDate: due.toISOString().slice(0, 10),
-      completedDate: completed.toISOString().slice(0, 10),
+      dueDate: p.dueDate.toISOString().slice(0, 10),
+      dueAt: p.dueDate.toISOString(),
+      completedDate: completed.toISOString(),
+      minutesBeaten,
       daysBeaten,
+      beatenLabel: formatDeadlineBeat(minutesBeaten) ?? `${minutesBeaten}m early`,
     });
-    byAthlete.set(athleteId, entry);
+    byAthlete.set(athleteKey, entry);
   }
 
   return Array.from(byAthlete.values())
     .map((a) => ({
       ...a,
       averageDaysBeaten:
-        a.beatenCount > 0 ? Math.round((a.totalDaysBeaten / a.beatenCount) * 10) / 10 : 0,
-      projects: a.projects.sort((x, y) => y.daysBeaten - x.daysBeaten),
+        a.beatenCount > 0 ? Math.round((a.totalMinutesBeaten / a.beatenCount / 1440) * 10) / 10 : 0,
+      projects: a.projects.sort((x, y) => y.minutesBeaten - x.minutesBeaten),
     }))
-    .sort((a, b) => b.beatenCount - a.beatenCount || b.totalDaysBeaten - a.totalDaysBeaten);
+    .sort((a, b) => b.beatenCount - a.beatenCount || b.totalMinutesBeaten - a.totalMinutesBeaten);
 }

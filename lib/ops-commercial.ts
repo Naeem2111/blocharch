@@ -11,6 +11,8 @@ import { getCostConversionSnapshot } from "@/lib/ops-exchange";
 import { OPS_ALERT_THRESHOLDS } from "@/lib/ops-alerts";
 import { countPendingCheckInRequests } from "@/lib/check-in-admin";
 import { buildBeatenDeadlines, type BeatenDeadlinesByAthlete } from "@/lib/analytics-deadlines";
+import { formatProjectDueAt } from "@/lib/project-deadline";
+import { listReportingAthletes, monthSubmissionHoursByAthlete } from "@/lib/reporting-athletes";
 
 export { LANE_MONTHLY_HOURS };
 
@@ -213,7 +215,7 @@ export async function buildCommercialLedger(reference: Date): Promise<Commercial
         submission: { include: { athlete: true } },
       },
     }),
-    prisma.opsAthlete.findMany({ where: { status: "active" } }),
+    listReportingAthletes({ status: "active" }),
   ]);
 
   const hoursByClient = new Map<string, number>();
@@ -398,6 +400,22 @@ export async function buildCommercialLedger(reference: Date): Promise<Commercial
     }
   }
 
+  for (const athlete of athletes) {
+    if (athleteTotalsMap.has(athlete.id)) continue;
+    const cost = athleteCostMap.get(athlete.id);
+    const monthHours = cost?.monthHours ?? 0;
+    if (monthHours <= 0) continue;
+    const profile = athleteProfileVisual(athlete);
+    athleteTotalsMap.set(athlete.id, {
+      athleteId: athlete.id,
+      athleteName: athlete.fullName,
+      ...profile,
+      hoursWorked: monthHours,
+      revenueGbp: 0,
+      marginGbp: round2(0 - (cost?.costGbp ?? 0)),
+    });
+  }
+
   const athleteTotals = Array.from(athleteTotalsMap.values()).map((t) => {
     const cost = athleteCostMap.get(t.athleteId);
     const costGbp = cost?.costGbp ?? 0;
@@ -576,6 +594,28 @@ export async function buildAnalytics(
     }
   }
 
+  const [reportingAthletes, monthHoursByAthlete] = await Promise.all([
+    listReportingAthletes({ status: "active" }),
+    monthSubmissionHoursByAthlete(from, to),
+  ]);
+
+  for (const athlete of reportingAthletes) {
+    if (athleteId && athlete.id !== athleteId) continue;
+    const monthHours = monthHoursByAthlete.get(athlete.id) ?? 0;
+    if (monthHours <= 0) continue;
+    const existing = athleteHoursMap.get(athlete.id);
+    if (existing) {
+      if (existing.hours < monthHours) existing.hours = monthHours;
+      continue;
+    }
+    const profile = athleteProfileVisual(athlete);
+    athleteHoursMap.set(athlete.id, {
+      name: athlete.fullName,
+      ...profile,
+      hours: monthHours,
+    });
+  }
+
   const now = dateOnlyUtc(new Date());
   const projectFilter = {
     ...(clientId ? { clientId } : {}),
@@ -722,6 +762,8 @@ export async function buildAnalytics(
         clientLogoBgColor: p.client.logoBgColor,
         clientLogoTextTone: p.client.logoTextTone,
         dueDate: due.toISOString().slice(0, 10),
+        dueAt: due.toISOString(),
+        dueLabel: formatProjectDueAt(due),
         daysUntilDue,
         progressPercent: p.progressPercent ?? 0,
         currentStatus: p.currentStatus,
@@ -736,6 +778,8 @@ export async function buildAnalytics(
       clientLogoBgColor: p.client.logoBgColor,
       clientLogoTextTone: p.client.logoTextTone,
       dueDate: p.dueDate!.toISOString().slice(0, 10),
+      dueAt: p.dueDate!.toISOString(),
+      dueLabel: formatProjectDueAt(p.dueDate),
       progressPercent: p.progressPercent ?? 0,
       currentStatus: p.currentStatus,
       assignedAthleteName: p.assignedAthlete?.fullName ?? null,
@@ -758,9 +802,9 @@ export async function buildOpsOverview(
   const beatenDeadlinesByAthlete = await buildBeatenDeadlines(reference);
   const beatenMap = new Map(beatenDeadlinesByAthlete.map((a) => [a.athleteId, a]));
 
-  const [activeAthletes, activeProjects, openBlockers, checkInRequests, dailySubmissions] =
+  const [activeAthletes, activeProjects, openBlockers, checkInRequests, dailySubmissions, reportingAthletes] =
     await Promise.all([
-      prisma.opsAthlete.count({ where: { status: "active" } }),
+      listReportingAthletes({ status: "active" }).then((rows) => rows.length),
       prisma.opsProject.count({
         where: { currentStatus: { notIn: ["completed", "handed_over"] } },
       }),
@@ -770,6 +814,7 @@ export async function buildOpsOverview(
         where: { submissionDate: { gte: from, lte: to } },
         select: { totalHours: true },
       }),
+      listReportingAthletes({ status: "active" }),
     ]);
 
   let daily12Count = 0;
@@ -780,14 +825,17 @@ export async function buildOpsOverview(
     else if (h >= OPS_ALERT_THRESHOLDS.dailyWarningHours) daily12Count++;
   }
 
-  const athletes = await prisma.opsAthlete.findMany({ where: { status: "active" } });
+  const athletes = reportingAthletes;
+  const athleteMonthHours = new Map<string, number>();
   let capExceededCount = 0;
   for (const a of athletes) {
     const agg = await prisma.opsDailySubmission.aggregate({
       where: { athleteId: a.id, submissionDate: { gte: from, lte: to } },
       _sum: { totalHours: true },
     });
-    if (Number(agg._sum.totalHours ?? 0) > a.monthlyHourCap) capExceededCount++;
+    const monthHours = Number(agg._sum.totalHours ?? 0);
+    athleteMonthHours.set(a.id, monthHours);
+    if (monthHours > a.monthlyHourCap) capExceededCount++;
   }
 
   type PerformerRow = {
@@ -842,6 +890,25 @@ export async function buildOpsOverview(
       beatenCount: beaten.beatenCount,
       totalDaysBeaten: beaten.totalDaysBeaten,
       averageDaysBeaten: beaten.averageDaysBeaten,
+    });
+  }
+
+  for (const athlete of athletes) {
+    if (performerMap.has(athlete.id)) continue;
+    const monthHours = athleteMonthHours.get(athlete.id) ?? 0;
+    if (monthHours <= 0) continue;
+    const profile = athleteProfileById.get(athlete.id) ?? athleteProfileVisual(athlete);
+    performerMap.set(athlete.id, {
+      athleteId: athlete.id,
+      athleteName: athlete.fullName,
+      ...profile,
+      hoursWorked: round2(monthHours),
+      revenueGbp: 0,
+      marginGbp: 0,
+      marginPercent: 0,
+      beatenCount: 0,
+      totalDaysBeaten: 0,
+      averageDaysBeaten: 0,
     });
   }
 

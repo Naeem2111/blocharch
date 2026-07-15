@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requirePlannerSession } from "@/lib/planner-access";
-import { isAdminOnlyAccount } from "@/lib/admin-only-accounts";
+import { listReportingAthletes } from "@/lib/reporting-athletes";
 
 /** Active athletes for Project planner → Team roster (admin/manager). */
 export async function GET(request: NextRequest) {
@@ -14,19 +14,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const athletes = await prisma.opsAthlete.findMany({
-    where: { status: "active" },
-    orderBy: { fullName: "asc" },
-    include: {
-      user: { select: { id: true, username: true, disabled: true } },
-      _count: { select: { projects: true } },
-    },
+  const athletes = await listReportingAthletes({ status: "active" });
+
+  const counts = await prisma.opsAthlete.findMany({
+    where: { id: { in: athletes.map((a) => a.id) } },
+    select: { id: true, _count: { select: { projects: true } } },
   });
+  const countById = new Map(counts.map((row) => [row.id, row._count.projects]));
 
   return NextResponse.json({
-    athletes: athletes
-      .filter((a) => !isAdminOnlyAccount(a.user.username))
-      .map((a) => ({
+    athletes: athletes.map((a) => ({
       id: a.id,
       userId: a.userId,
       fullName: a.fullName,
@@ -35,7 +32,7 @@ export async function GET(request: NextRequest) {
       profilePhotoUrl: a.profilePhotoUrl,
       profilePhotoBgColor: a.profilePhotoBgColor,
       profilePhotoTextTone: a.profilePhotoTextTone,
-      activeProjects: a._count.projects,
+      activeProjects: countById.get(a.id) ?? 0,
     })),
   });
 }

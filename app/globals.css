@@ -638,24 +638,34 @@ input.progress-slider::-moz-range-thumb {
   scrollbar-color: rgb(100 116 139 / 0.45) transparent;
 }
 
-.client-portal-sidebar-scroll::-webkit-scrollbar {
+.dashboard-sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(100 116 139 / 0.45) transparent;
+}
+
+.client-portal-sidebar-scroll::-webkit-scrollbar,
+.dashboard-sidebar-scroll::-webkit-scrollbar {
   width: 6px;
 }
 
-.client-portal-sidebar-scroll::-webkit-scrollbar-thumb {
+.client-portal-sidebar-scroll::-webkit-scrollbar-thumb,
+.dashboard-sidebar-scroll::-webkit-scrollbar-thumb {
   border-radius: 9999px;
   background-color: rgb(100 116 139 / 0.45);
 }
 
-.client-portal-sidebar-scroll::-webkit-scrollbar-thumb:hover {
+.client-portal-sidebar-scroll::-webkit-scrollbar-thumb:hover,
+.dashboard-sidebar-scroll::-webkit-scrollbar-thumb:hover {
   background-color: rgb(148 163 184 / 0.55);
 }
 
-[data-theme="light"] .client-portal-sidebar-scroll {
+[data-theme="light"] .client-portal-sidebar-scroll,
+[data-theme="light"] .dashboard-sidebar-scroll {
   scrollbar-color: rgb(148 163 184 / 0.65) transparent;
 }
 
-[data-theme="light"] .client-portal-sidebar-scroll::-webkit-scrollbar-thumb {
+[data-theme="light"] .client-portal-sidebar-scroll::-webkit-scrollbar-thumb,
+[data-theme="light"] .dashboard-sidebar-scroll::-webkit-scrollbar-thumb {
   background-color: rgb(148 163 184 / 0.65);
 }
 

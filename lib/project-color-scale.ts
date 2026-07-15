@@ -10,11 +10,8 @@ export function projectDueColor(daysUntilDue: number | null): string {
 
 export function daysUntilDueFromIso(dueDate: string | null): number | null {
   if (!dueDate?.trim()) return null;
-  const dateOnly = dueDate.includes("T") ? dueDate.slice(0, 10) : dueDate.trim();
-  const due = new Date(`${dateOnly}T12:00:00`);
+  const due = new Date(dueDate.includes("T") ? dueDate : `${dueDate.trim()}T17:00:00`);
   if (Number.isNaN(due.getTime())) return null;
   const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate());
-  return Math.round((dueDay.getTime() - today.getTime()) / 86400000);
+  return Math.ceil((due.getTime() - now.getTime()) / 86400000);
 }

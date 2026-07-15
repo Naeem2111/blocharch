@@ -1,8 +1,7 @@
 import { prisma } from "@/lib/prisma";
-import { dateOnlyUtc } from "@/lib/ops-hours";
 import {
-  computeDeadlineBeatenDays,
-  projectCompletionDate,
+  computeDeadlineBeatMetrics,
+  projectCompletionFromLog,
 } from "@/lib/project-completion";
 import {
   isActiveProjectStatus,
@@ -49,23 +48,29 @@ async function latestCompletionLogForProject(
   };
 }
 
-/** When a backlogged log marks 100%, use that session date so deadlines reflect actual work timing. */
+/** When a backlogged log marks 100%, use end of that session date for deadline comparison. */
 export function resolveCompletedAtFromLog(log: LatestCompletionLog | null): Date {
-  if (!log || log.progressPercent < 100) return projectCompletionDate();
-  if (log.isBackloggedSession) return dateOnlyUtc(log.submissionDate);
-  return projectCompletionDate();
+  if (!log || log.progressPercent < 100) return projectCompletionFromLog(null);
+  return projectCompletionFromLog({
+    submissionDate: log.submissionDate,
+    isBackloggedSession: log.isBackloggedSession,
+  });
 }
 
 function completionMetrics(
   dueDate: Date | null,
   log: LatestCompletionLog | null
-): { completedAt: Date; deadlineBeatenDays: number | null } {
+): {
+  completedAt: Date;
+  deadlineBeatenDays: number | null;
+  deadlineBeatenMinutes: number | null;
+} {
   const completedAt = resolveCompletedAtFromLog(log);
-  const deadlineBeatenDays =
-    dueDate && log && log.progressPercent >= 100
-      ? computeDeadlineBeatenDays(dueDate, completedAt)
-      : null;
-  return { completedAt, deadlineBeatenDays };
+  if (!dueDate || !log || log.progressPercent < 100) {
+    return { completedAt, deadlineBeatenDays: null, deadlineBeatenMinutes: null };
+  }
+  const beat = computeDeadlineBeatMetrics(dueDate, completedAt);
+  return { completedAt, ...beat };
 }
 
 const INACTIVE_PROJECT_STATUSES = new Set(["completed", "handed_over"]);
@@ -76,7 +81,13 @@ export async function reactivateProjectOnAthleteReassign(
   previousAthleteId: string | null,
   nextAthleteId: string | null,
   currentStatus: string
-): Promise<{ currentStatus: "in_progress"; progressPercent: number; completedAt: null; deadlineBeatenDays: null } | null> {
+): Promise<{
+  currentStatus: "in_progress";
+  progressPercent: number;
+  completedAt: null;
+  deadlineBeatenDays: null;
+  deadlineBeatenMinutes: null;
+} | null> {
   if (!nextAthleteId || nextAthleteId === previousAthleteId) return null;
   if (!INACTIVE_PROJECT_STATUSES.has(currentStatus)) return null;
 
@@ -88,6 +99,7 @@ export async function reactivateProjectOnAthleteReassign(
     progressPercent,
     completedAt: null,
     deadlineBeatenDays: null,
+    deadlineBeatenMinutes: null,
   };
 }
 
@@ -115,7 +127,10 @@ export async function syncProjectProgressForProjects(projectIds: string[]) {
       before.currentStatus === "completed" || before.currentStatus === "handed_over";
 
     if (progressPercent >= 100 && isActiveProjectStatus(before.currentStatus) && before.assignedAthleteId) {
-      const { completedAt, deadlineBeatenDays } = completionMetrics(before.dueDate, latestLog);
+      const { completedAt, deadlineBeatenDays, deadlineBeatenMinutes } = completionMetrics(
+        before.dueDate,
+        latestLog
+      );
 
       const completed = await prisma.opsProject.update({
         where: { id: projectId },
@@ -124,6 +139,7 @@ export async function syncProjectProgressForProjects(projectIds: string[]) {
           currentStatus: "completed",
           completedAt,
           deadlineBeatenDays,
+          deadlineBeatenMinutes,
         },
         select: {
           assignedAthleteId: true,
@@ -149,13 +165,17 @@ export async function syncProjectProgressForProjects(projectIds: string[]) {
     }
 
     if (wasCompleted && progressPercent >= 100) {
-      const { completedAt, deadlineBeatenDays } = completionMetrics(before.dueDate, latestLog);
+      const { completedAt, deadlineBeatenDays, deadlineBeatenMinutes } = completionMetrics(
+        before.dueDate,
+        latestLog
+      );
       await prisma.opsProject.update({
         where: { id: projectId },
         data: {
           progressPercent,
           completedAt,
           deadlineBeatenDays,
+          deadlineBeatenMinutes,
         },
       });
       continue;
@@ -169,6 +189,7 @@ export async function syncProjectProgressForProjects(projectIds: string[]) {
           currentStatus: "in_progress",
           completedAt: null,
           deadlineBeatenDays: null,
+          deadlineBeatenMinutes: null,
         },
         select: {
           assignedAthleteId: true,

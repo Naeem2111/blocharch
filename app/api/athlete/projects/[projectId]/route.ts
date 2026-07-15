@@ -34,6 +34,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       progressPercent?: number;
       completedAt?: null;
       deadlineBeatenDays?: null;
+      deadlineBeatenMinutes?: null;
       notes?: string | null;
     } = {};
 
@@ -68,6 +69,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         data.progressPercent = REACTIVATION_PROGRESS_PERCENT;
         data.completedAt = null;
         data.deadlineBeatenDays = null;
+        data.deadlineBeatenMinutes = null;
       }
     }
 

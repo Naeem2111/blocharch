@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { athleteProfileVisual } from "@/lib/athlete-profile-visual";
 import { findDoneColumnId } from "@/lib/planner-completed";
 import { projectDisplayFields } from "@/lib/project-display";
+import { listReportingAthletes } from "@/lib/reporting-athletes";
 
 export type OpsArchivesFilters = {
   clientId?: string;
@@ -101,11 +102,7 @@ export async function buildOpsArchives(filters: OpsArchivesFilters = {}) {
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
-    prisma.opsAthlete.findMany({
-      where: { status: "active" },
-      select: { id: true, fullName: true, athleteCode: true },
-      orderBy: { fullName: "asc" },
-    }),
+    listReportingAthletes({ status: "active" }),
   ]);
 
   type BoardContext = {

@@ -77,18 +77,15 @@ export async function GET(request: NextRequest) {
     },
   });
 
+  const beatenWhere = {
+    assignedAthleteId: athlete.id,
+    OR: [{ deadlineBeatenMinutes: { gt: 0 } }, { deadlineBeatenDays: { gt: 0 } }],
+  };
+
   const [beatenCount, beatenDeadlineProjects] = await Promise.all([
-    prisma.opsProject.count({
-      where: {
-        assignedAthleteId: athlete.id,
-        deadlineBeatenDays: { gt: 0 },
-      },
-    }),
+    prisma.opsProject.count({ where: beatenWhere }),
     prisma.opsProject.findMany({
-      where: {
-        assignedAthleteId: athlete.id,
-        deadlineBeatenDays: { gt: 0 },
-      },
+      where: beatenWhere,
       orderBy: [{ completedAt: "desc" }, { updatedAt: "desc" }],
       take: 10,
       select: {
@@ -97,28 +94,37 @@ export async function GET(request: NextRequest) {
         dueDate: true,
         completedAt: true,
         deadlineBeatenDays: true,
+        deadlineBeatenMinutes: true,
         client: { select: { name: true } },
       },
     }),
   ]);
 
-  const totalDaysAgg = await prisma.opsProject.aggregate({
-    where: {
-      assignedAthleteId: athlete.id,
-      deadlineBeatenDays: { gt: 0 },
-    },
-    _sum: { deadlineBeatenDays: true },
+  const totalMinutesAgg = await prisma.opsProject.aggregate({
+    where: beatenWhere,
+    _sum: { deadlineBeatenMinutes: true, deadlineBeatenDays: true },
   });
+
+  const totalMinutesBeaten =
+    Number(totalMinutesAgg._sum?.deadlineBeatenMinutes ?? 0) ||
+    Number(totalMinutesAgg._sum?.deadlineBeatenDays ?? 0) * 1440;
 
   const beatenDeadlines = {
     count: beatenCount,
-    totalDaysBeaten: totalDaysAgg._sum?.deadlineBeatenDays ?? 0,
+    totalDaysBeaten: Math.floor(totalMinutesBeaten / 1440),
+    totalMinutesBeaten,
     recent: beatenDeadlineProjects.map((p) => ({
       id: p.id,
       name: p.name,
       clientName: p.client.name,
       dueDate: p.dueDate?.toISOString().slice(0, 10) ?? null,
-      completedAt: p.completedAt?.toISOString().slice(0, 10) ?? null,
+      dueAt: p.dueDate?.toISOString() ?? null,
+      completedAt: p.completedAt?.toISOString() ?? null,
+      minutesBeaten:
+        p.deadlineBeatenMinutes ??
+        (p.deadlineBeatenDays != null && p.deadlineBeatenDays > 0
+          ? p.deadlineBeatenDays * 1440
+          : 0),
       daysBeaten: p.deadlineBeatenDays ?? 0,
     })),
   };

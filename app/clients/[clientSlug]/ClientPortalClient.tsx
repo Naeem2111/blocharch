@@ -19,6 +19,7 @@ import {
 	projectDueColor,
 } from "@/lib/project-color-scale";
 import { clientPortalProjectBeatDeadline } from "@/lib/client-portal-projects";
+import { formatDeadlineBeat, formatProjectDueAt } from "@/lib/project-deadline";
 import { PublicThemeToggle } from "@/components/client-portal/PublicThemeToggle";
 import type {
 	PublicClientPortalData,
@@ -141,7 +142,12 @@ function ProjectCard({ project }: { project: PublicClientPortalProject }) {
 
 function CompletedRow({ project }: { project: PublicClientPortalProject }) {
 	const outcome =
-		project.deadlineBeatenDays != null && project.deadlineBeatenDays > 0
+		project.deadlineBeatenMinutes != null && project.deadlineBeatenMinutes > 0
+			? {
+					label: formatDeadlineBeat(project.deadlineBeatenMinutes) ?? "Early",
+					early: true,
+				}
+			: project.deadlineBeatenDays != null && project.deadlineBeatenDays > 0
 			? {
 					label: `${project.deadlineBeatenDays} day${project.deadlineBeatenDays === 1 ? "" : "s"} early`,
 					early: true,
@@ -187,7 +193,9 @@ function CompletedRow({ project }: { project: PublicClientPortalProject }) {
 			</span>
 
 			<div className="text-sm text-slate-300">
-				{project.dueDate ? formatShortDate(project.dueDate) : "—"}
+				{project.dueAt || project.dueDate
+					? formatProjectDueAt(project.dueAt ?? `${project.dueDate}T17:00:00`)
+					: "—"}
 			</div>
 
 			<div className="text-sm font-medium text-emerald-400 client-portal-accent-emerald">
