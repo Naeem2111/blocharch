@@ -123,7 +123,11 @@ function EntryTypeSegment({
         role="radio"
         aria-checked={value === "project"}
         disabled={disabled || !canSelectProject}
-        onClick={() => onChange("project")}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (!disabled && canSelectProject) onChange("project");
+        }}
         className={`rounded-lg px-3 py-2.5 text-left transition ${
           value === "project"
             ? "bg-brand-500/20 text-brand-100 ring-1 ring-brand-500/40 shadow-sm shadow-brand-500/10"
@@ -140,7 +144,11 @@ function EntryTypeSegment({
         role="radio"
         aria-checked={value === "housekeeping"}
         disabled={disabled || !canSelectHousekeeping}
-        onClick={() => onChange("housekeeping")}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (!disabled && canSelectHousekeeping) onChange("housekeeping");
+        }}
         className={`rounded-lg px-3 py-2.5 text-left transition ${
           value === "housekeeping"
             ? "bg-amber-500/20 text-amber-100 ring-1 ring-amber-500/40 shadow-sm shadow-amber-500/10"
@@ -269,6 +277,22 @@ export function AthleteSubmissionsClient() {
     [pastSubmissions]
   );
 
+  const housekeepingClients = useMemo(() => {
+    const map = new Map<string, { id: string; name: string }>();
+    for (const c of clients) map.set(c.id, c);
+    for (const p of projects) map.set(p.client.id, { id: p.client.id, name: p.client.name });
+    for (const sub of pastSubmissions) {
+      for (const li of sub.lineItems) {
+        if (li.clientId && li.clientName) {
+          map.set(li.clientId, { id: li.clientId, name: li.clientName });
+        }
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [clients, projects, pastSubmissions]);
+
+  const canLogHousekeeping = housekeepingClients.length > 0;
+
   function onPickDate(date: string) {
     setSelectedDate(date);
     setCalendarMonth(date.slice(0, 7));
@@ -307,7 +331,13 @@ export function AthleteSubmissionsClient() {
   }
 
   function addHousekeepingLine() {
-    setLines((prev) => [...prev, emptyHousekeepingLine()]);
+    setLines((prev) => {
+      const line = emptyHousekeepingLine();
+      if (housekeepingClients.length === 1) {
+        line.clientId = housekeepingClients[0].id;
+      }
+      return [...prev, line];
+    });
   }
 
   function switchLineEntryType(key: string, isHousekeeping: boolean) {
@@ -316,7 +346,11 @@ export function AthleteSubmissionsClient() {
         if (li.key !== key || li.isHousekeeping === isHousekeeping) return li;
         const hoursWorked = li.hoursWorked;
         if (isHousekeeping) {
-          return { ...emptyHousekeepingLine(), key, hoursWorked };
+          const next = { ...emptyHousekeepingLine(), key, hoursWorked };
+          if (housekeepingClients.length === 1) {
+            next.clientId = housekeepingClients[0].id;
+          }
+          return next;
         }
         return { ...emptyLine(), key, hoursWorked };
       })
@@ -498,7 +532,7 @@ export function AthleteSubmissionsClient() {
           </p>
         </div>
 
-        {!formLocked && (projects.length > 0 || clients.length > 0) ? (
+        {!formLocked && (projects.length > 0 || canLogHousekeeping) ? (
           <div className="grid gap-3 sm:grid-cols-2">
             <button
               type="button"
@@ -516,7 +550,7 @@ export function AthleteSubmissionsClient() {
             <button
               type="button"
               onClick={addHousekeepingLine}
-              disabled={clients.length === 0}
+              disabled={!canLogHousekeeping}
               className="group card-tool card-tool-hover flex flex-col items-start gap-2 rounded-xl border-l-4 border-l-amber-500/70 p-4 text-left disabled:cursor-not-allowed disabled:opacity-40"
             >
               <span className="text-sm font-semibold text-amber-200 group-hover:text-amber-100">
@@ -529,7 +563,7 @@ export function AthleteSubmissionsClient() {
           </div>
         ) : null}
 
-        {projects.length === 0 && clients.length === 0 ? (
+        {projects.length === 0 && !canLogHousekeeping ? (
           <p className="text-sm text-slate-500">No assigned clients yet — you cannot log work.</p>
         ) : null}
 
@@ -564,7 +598,7 @@ export function AthleteSubmissionsClient() {
                     onChange={(type) => switchLineEntryType(li.key, type === "housekeeping")}
                     disabled={formLocked}
                     canSelectProject={projects.length > 0}
-                    canSelectHousekeeping={clients.length > 0}
+                    canSelectHousekeeping={canLogHousekeeping}
                   />
                 </div>
                 <label className="text-xs text-slate-400 md:col-span-2">
@@ -576,7 +610,7 @@ export function AthleteSubmissionsClient() {
                     className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
                   >
                     <option value="">Select client…</option>
-                    {clients.map((c) => (
+                    {housekeepingClients.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name}
                       </option>
@@ -625,7 +659,7 @@ export function AthleteSubmissionsClient() {
                   onChange={(type) => switchLineEntryType(li.key, type === "housekeeping")}
                   disabled={formLocked}
                   canSelectProject={projects.length > 0}
-                  canSelectHousekeeping={clients.length > 0}
+                  canSelectHousekeeping={canLogHousekeeping}
                 />
               </div>
               <label className="text-xs text-slate-400 md:col-span-2">
@@ -787,7 +821,7 @@ export function AthleteSubmissionsClient() {
 
       <button
         type="submit"
-        disabled={saving || (projects.length === 0 && clients.length === 0) || formLocked}
+        disabled={saving || (projects.length === 0 && !canLogHousekeeping) || formLocked}
         className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-brand-500 disabled:opacity-50"
       >
         {saving ? "Saving…" : editingId ? "Update daily log" : "Save daily log"}

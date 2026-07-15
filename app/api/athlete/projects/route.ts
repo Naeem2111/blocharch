@@ -27,8 +27,15 @@ export async function GET(request: NextRequest) {
     orderBy: { name: "asc" },
   });
 
+  const clientById = new Map(clients.map((c) => [c.id, c]));
+  for (const project of projects) {
+    if (!clientById.has(project.client.id)) {
+      clientById.set(project.client.id, { id: project.client.id, name: project.client.name });
+    }
+  }
+
   return NextResponse.json({
     projects: projects.map(serializeProjectForAthlete),
-    clients,
+    clients: Array.from(clientById.values()).sort((a, b) => a.name.localeCompare(b.name)),
   });
 }
