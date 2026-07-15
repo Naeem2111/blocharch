@@ -4,7 +4,7 @@ const nextConfig = {
     return [
       {
         source: "/favicon.ico",
-        destination: "/brand/blocharch-logo.png",
+        destination: "/brand/favicon-192.png",
         permanent: false,
       },
     ];

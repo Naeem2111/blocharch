@@ -4,6 +4,7 @@ import { verifyPassword } from "@/lib/password";
 import { requestIsSecure } from "@/lib/request-https";
 import { buildSessionPayload, defaultSessionExpirySeconds, signSessionToken } from "@/lib/session-token";
 import { findUserByUsername } from "@/lib/users-store";
+import { ensureLinkedAthleteProfile } from "@/lib/ops-athlete-profile";
 import { THEME_COOKIE, themeCookieMaxAge } from "@/lib/theme";
 
 export async function POST(request: NextRequest) {
@@ -29,7 +30,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid username or password" }, { status: 401 });
     }
 
-    const token = await signSessionToken(buildSessionPayload(user.id, user.role));
+    if (user.role === "admin") {
+      const { passwordHash: _, ...sessionUser } = user;
+      await ensureLinkedAthleteProfile(sessionUser);
+    }
+
+    const token = await signSessionToken(
+      buildSessionPayload(user.id, user.role, user.username),
+    );
     const secure = requestIsSecure(request);
 
     const res = NextResponse.json({ ok: true });

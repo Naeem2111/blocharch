@@ -2,28 +2,38 @@
 
 import { useRouter } from "next/navigation";
 import {
-	ADMIN_CONSOLE_VIEWS,
+	adminConsoleViewsForUser,
 	type AdminConsoleView,
 	homePathForAdminView,
 	saveAdminConsoleView,
 } from "@/lib/admin-console-view";
+import { isAdminOnlyAccount } from "@/lib/admin-only-accounts";
 
 export function AdminViewSwitcher({
 	userId,
+	username,
 	value,
+	onChange,
 	onNavigate,
 }: {
 	userId: string;
+	username: string;
 	value: AdminConsoleView;
+	onChange: (view: AdminConsoleView) => void;
 	onNavigate?: () => void;
 }) {
 	const router = useRouter();
+	const views = adminConsoleViewsForUser(username);
+	const adminOnly = isAdminOnlyAccount(username);
 
 	function handleChange(next: AdminConsoleView) {
 		if (next === value) return;
 		saveAdminConsoleView(userId, next);
-		router.push(homePathForAdminView(next));
-		onNavigate?.();
+		onChange(next);
+		if (next !== "all") {
+			router.push(homePathForAdminView(next));
+			onNavigate?.();
+		}
 	}
 
 	return (
@@ -38,7 +48,7 @@ export function AdminViewSwitcher({
 					className="field-console w-full rounded-lg px-3 py-2 text-sm text-slate-200"
 					aria-label="Switch console view"
 				>
-					{ADMIN_CONSOLE_VIEWS.map((view) => (
+					{views.map((view) => (
 						<option key={view.id} value={view.id}>
 							{view.label}
 						</option>
@@ -46,7 +56,9 @@ export function AdminViewSwitcher({
 				</select>
 			</label>
 			<p className="mt-2 text-[10px] leading-relaxed text-slate-600">
-				Switch perspective — you still have full access to every area.
+				{adminOnly
+					? "Filter the sidebar by area. This account stays admin-only."
+					: "Filter the sidebar by role perspective. Staff admins also have an athlete profile for assignment and reporting."}
 			</p>
 		</div>
 	);

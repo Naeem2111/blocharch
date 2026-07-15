@@ -4,9 +4,11 @@ import {
 	isMarketingDashboardPath,
 	isOpsDashboardPath,
 } from "@/lib/permissions";
+import { isAdminOnlyAccount } from "@/lib/admin-only-accounts";
 
 /** Admin-only sidebar perspective — one role view at a time. */
 export type AdminConsoleView =
+	| "all"
 	| "marketing"
 	| "operations"
 	| "athlete"
@@ -19,6 +21,19 @@ export const ADMIN_CONSOLE_VIEWS: {
 	sections: readonly string[];
 	home: string;
 }[] = [
+	{
+		id: "all",
+		label: "Show all",
+		sections: [
+			"marketing",
+			"onboarding",
+			"ops",
+			"athlete_portal",
+			"planner",
+			"admin",
+		],
+		home: "/dashboard",
+	},
 	{
 		id: "marketing",
 		label: "Marketing",
@@ -51,6 +66,13 @@ export const ADMIN_CONSOLE_VIEWS: {
 	},
 ];
 
+export function adminConsoleViewsForUser(username: string) {
+	if (isAdminOnlyAccount(username)) {
+		return ADMIN_CONSOLE_VIEWS.filter((view) => view.id !== "athlete");
+	}
+	return ADMIN_CONSOLE_VIEWS;
+}
+
 const STORAGE_PREFIX = "blocharch.admin-view.v1:";
 
 export function adminConsoleViewStorageKey(userId: string): string {
@@ -71,6 +93,9 @@ export function adminViewFromPath(pathname: string): AdminConsoleView {
 }
 
 export function sectionsForAdminView(view: AdminConsoleView): readonly string[] {
+	if (view === "all") {
+		return ADMIN_CONSOLE_VIEWS[0].sections;
+	}
 	return (
 		ADMIN_CONSOLE_VIEWS.find((v) => v.id === view)?.sections ?? ["marketing"]
 	);

@@ -8,6 +8,8 @@ export type SessionRole = "admin" | "manager" | "user";
 export type SessionPayload = {
   sub: string;
   role: SessionRole;
+  /** Lowercase username — for admin-only account checks in middleware. */
+  uname?: string;
   exp: number;
 };
 
@@ -89,21 +91,27 @@ export async function verifySessionToken(token: string): Promise<SessionPayload 
   const o = parsed as Record<string, unknown>;
   const sub = typeof o.sub === "string" ? o.sub : "";
   const role = o.role === "admin" || o.role === "user" || o.role === "manager" ? o.role : null;
+  const uname = typeof o.uname === "string" ? o.uname : undefined;
   const exp = typeof o.exp === "number" ? o.exp : 0;
   if (!sub || !role || !exp) return null;
   const now = Math.floor(Date.now() / 1000);
   if (exp <= now) return null;
-  return { sub, role, exp };
+  return { sub, role, ...(uname ? { uname } : {}), exp };
 }
 
 export function defaultSessionExpirySeconds(): number {
   return 60 * 60 * 24 * 7;
 }
 
-export function buildSessionPayload(userId: string, role: SessionRole): SessionPayload {
+export function buildSessionPayload(
+  userId: string,
+  role: SessionRole,
+  username?: string,
+): SessionPayload {
   return {
     sub: userId,
     role,
+    ...(username ? { uname: username.trim().toLowerCase() } : {}),
     exp: Math.floor(Date.now() / 1000) + defaultSessionExpirySeconds(),
   };
 }

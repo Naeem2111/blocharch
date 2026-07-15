@@ -8,16 +8,17 @@ import { prisma } from "@/lib/prisma";
 import { computeMonthlyHoursSummary, monthEndUtc, monthStartUtc } from "@/lib/ops-hours";
 import { projectDisplayFields } from "@/lib/project-display";
 import { ensureLinkedAthleteProfile } from "@/lib/ops-athlete-profile";
+import { isStaffAdmin } from "@/lib/admin-only-accounts";
 
 export async function requireOpsSession(
   request: NextRequest
 ): Promise<{ user: SessionUser } | NextResponse> {
   const session = await getSessionFromRequest(request);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!canAccessModule(session.user.role, "ops")) {
+  if (!canAccessModule(session.user.role, "ops", session.user.username)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  if (session.user.role === "admin") {
+  if (isStaffAdmin(session.user)) {
     await ensureLinkedAthleteProfile(session.user);
   }
   return { user: session.user };
@@ -32,6 +33,9 @@ export async function requireOpsOverviewSession(
   if (!canAccessOpsOverview(session.user.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  if (isStaffAdmin(session.user)) {
+    await ensureLinkedAthleteProfile(session.user);
+  }
   return { user: session.user };
 }
 
@@ -40,7 +44,7 @@ export async function requireAthletePortalSession(
 ): Promise<{ user: SessionUser; athlete: OpsAthlete } | NextResponse> {
   const session = await getSessionFromRequest(request);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!canAccessModule(session.user.role, "athlete_portal")) {
+  if (!canAccessModule(session.user.role, "athlete_portal", session.user.username)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

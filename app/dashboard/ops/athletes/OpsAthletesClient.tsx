@@ -10,6 +10,7 @@ import { DEFAULT_AVATAR_BG } from "@/lib/hex-color";
 type AthleteRow = {
   id: string;
   username: string;
+  userRole?: string;
   fullName: string;
   athleteCode: string;
   email: string | null;
@@ -245,7 +246,15 @@ export function OpsAthletesClient() {
                     objectFit="cover"
                   />
                   <div>
-                    <p className="font-medium text-white">{a.fullName} <span className="text-slate-500">({a.athleteCode})</span></p>
+                    <p className="font-medium text-white">
+                      {a.fullName}{" "}
+                      <span className="text-slate-500">({a.athleteCode})</span>
+                      {a.userRole === "admin" ? (
+                        <span className="ml-1.5 rounded bg-brand-500/15 px-1 py-0.5 text-[9px] font-semibold uppercase text-brand-400">
+                          admin
+                        </span>
+                      ) : null}
+                    </p>
                     <p className="text-xs text-slate-500">{a.username} · {a.monthlyHourCap}h cap · R{a.baseMonthlyPayZar.toLocaleString()} · {a.projectCount} projects</p>
                   </div>
                 </div>

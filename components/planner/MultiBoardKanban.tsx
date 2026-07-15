@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import type { KanbanBoardDetail, KanbanTaskRow } from "@/lib/planner-board-mutation";
 import { KanbanTaskMovePad } from "@/components/planner/KanbanTaskMovePad";
+import { PlannerDoneToggle } from "@/components/planner/PlannerDoneToggle";
 import { taskNudgeAvailability, type NudgeDirection } from "@/lib/planner-task-nudge";
 import { startDragAutoScroll, stopDragAutoScroll, trackDragPointer } from "@/lib/planner-drag-scroll";
 import { createDragHighlightScheduler } from "@/lib/planner-drag-ui";
@@ -65,6 +66,7 @@ export function MultiBoardKanban({
   onNudgeTask,
 }: Props) {
   const [dragTaskId, setDragTaskId] = useState<string | null>(null);
+  const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [dropTargetColumnId, setDropTargetColumnId] = useState<string | null>(null);
   const [taskDropGuide, setTaskDropGuide] = useState<{
@@ -315,19 +317,26 @@ export function MultiBoardKanban({
                             }}
                             className={`planner-task-card cursor-pointer rounded-lg border border-white/[0.06] bg-white/[0.04] p-2 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50 ${
                               isSelected ? "ring-2 ring-brand-500/45 bg-brand-500/[0.08]" : ""
-                            } ${dragTaskId === t.id ? "opacity-40" : "hover:bg-white/[0.07]"}`}
+                            } ${completingTaskId === t.id ? "planner-task-card-completing" : ""} ${
+                              dragTaskId === t.id ? "opacity-40" : "hover:bg-white/[0.07]"
+                            }`}
                           >
                             <div className="flex gap-2">
                               {showDoneTick && onToggleComplete ? (
-                                <input
-                                  type="checkbox"
+                                <PlannerDoneToggle
                                   checked={isInDoneColumn}
-                                  onClick={(e) => e.stopPropagation()}
-                                  onChange={(e) => {
-                                    e.stopPropagation();
-                                    onToggleComplete(t.id, e.target.checked);
-                                  }}
-                                  className="mt-0.5"
+                                  title={
+                                    isInDoneColumn
+                                      ? "Restore to previous column"
+                                      : "Mark complete"
+                                  }
+                                  onCompletingStart={() => setCompletingTaskId(t.id)}
+                                  onCompletingEnd={() =>
+                                    setCompletingTaskId((current) =>
+                                      current === t.id ? null : current,
+                                    )
+                                  }
+                                  onToggle={(next) => onToggleComplete(t.id, next)}
                                 />
                               ) : null}
                               <div className="min-w-0 flex-1">

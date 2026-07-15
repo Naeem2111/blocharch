@@ -48,7 +48,7 @@ export async function requireAdminRequest(
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (!canAccessModule(session.user.role, "admin")) {
+  if (!canAccessModule(session.user.role, "admin", session.user.username)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   return session;
@@ -56,24 +56,24 @@ export async function requireAdminRequest(
 
 export async function requireAdminPage() {
   const session = await getSession();
-  if (!session || !canAccessModule(session.user.role, "admin")) {
-    redirect(defaultDashboardPath(session?.user.role ?? "user"));
+  if (!session || !canAccessModule(session.user.role, "admin", session.user.username)) {
+    redirect(defaultDashboardPath(session?.user.role ?? "user", session?.user.username));
   }
   return session;
 }
 
 export async function requireOpsPage() {
   const session = await getSession();
-  if (!session || !canAccessModule(session.user.role, "ops")) {
-    redirect(defaultDashboardPath(session?.user.role ?? "user"));
+  if (!session || !canAccessModule(session.user.role, "ops", session.user.username)) {
+    redirect(defaultDashboardPath(session?.user.role ?? "user", session?.user.username));
   }
   return session;
 }
 
 export async function requireAthletePage() {
   const session = await getSession();
-  if (!session || !canAccessModule(session.user.role, "athlete_portal")) {
-    redirect(defaultDashboardPath(session?.user.role ?? "user"));
+  if (!session || !canAccessModule(session.user.role, "athlete_portal", session.user.username)) {
+    redirect(defaultDashboardPath(session?.user.role ?? "user", session?.user.username));
   }
   return session;
 }

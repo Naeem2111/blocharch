@@ -6,6 +6,7 @@ import type { SessionUser } from "@/lib/auth";
 import { canAccessModule } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { ensureLinkedAthleteProfile } from "@/lib/ops-athlete-profile";
+import { isStaffAdmin } from "@/lib/admin-only-accounts";
 
 /** Load slots / read book-call data — athletes only for writes; admin may load manual slots. */
 export async function requireBookCallReadAccess(
@@ -13,12 +14,12 @@ export async function requireBookCallReadAccess(
 ): Promise<{ user: SessionUser; athlete: OpsAthlete | null } | NextResponse> {
   const session = await getSessionFromRequest(request);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!canAccessModule(session.user.role, "athlete_portal")) {
+  if (!canAccessModule(session.user.role, "athlete_portal", session.user.username)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   let athlete = await prisma.opsAthlete.findUnique({ where: { userId: session.user.id } });
-  if (!athlete) {
+  if (!athlete && isStaffAdmin(session.user)) {
     athlete = await ensureLinkedAthleteProfile(session.user);
   }
   if (!athlete) {

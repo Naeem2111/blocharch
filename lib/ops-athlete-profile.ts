@@ -1,10 +1,8 @@
 import type { OpsAthlete } from "@prisma/client";
 import type { SessionUser } from "@/lib/auth";
+import { isStaffAdmin } from "@/lib/admin-only-accounts";
 import { prisma } from "@/lib/prisma";
 import { ensureAthleteSystemBoards } from "@/lib/planner-system-boards";
-
-/** Staff roles that get an OpsAthlete profile so they can be assigned to projects. */
-const AUTO_LINK_ROLES = new Set<SessionUser["role"]>(["admin"]);
 
 function titleCaseUsername(username: string): string {
   return username
@@ -25,9 +23,9 @@ async function resolveUniqueAthleteCode(username: string): Promise<string> {
   return candidate;
 }
 
-/** Ensure admin accounts have a linked OpsAthlete row (idempotent). */
+/** Staff admins get an OpsAthlete profile for project assignment and reporting. */
 export async function ensureLinkedAthleteProfile(user: SessionUser): Promise<OpsAthlete | null> {
-  if (!AUTO_LINK_ROLES.has(user.role)) return null;
+  if (!isStaffAdmin(user)) return null;
 
   const existing = await prisma.opsAthlete.findUnique({ where: { userId: user.id } });
   if (existing) return existing;

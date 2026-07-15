@@ -22,10 +22,10 @@ export const metadata: Metadata = {
   description: "Directory, map, and lead tools — Blocharch internal console.",
   icons: {
     icon: [
-      { url: brandAssets.favicon, type: "image/png", sizes: "100x100" },
+      { url: brandAssets.favicon, type: "image/png", sizes: "192x192" },
       { url: brandAssets.favicon, type: "image/png", sizes: "32x32" },
     ],
-    apple: brandAssets.favicon,
+    apple: [{ url: brandAssets.favicon, type: "image/png", sizes: "192x192" }],
   },
 };
 

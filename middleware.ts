@@ -29,6 +29,7 @@ export async function middleware(request: NextRequest) {
   const payload = cookie ? await verifySessionToken(cookie) : null;
   const isAuthenticated = payload !== null;
   const role = roleFromPayload(payload);
+  const username = payload?.uname ?? null;
 
   // /login: never redirect authenticated users here — RSC flight requests break on 302.
   // Server `app/login/page.tsx` calls redirect() when a session exists instead.
@@ -45,20 +46,20 @@ export async function middleware(request: NextRequest) {
     apiKey === process.env.N8N_API_KEY;
 
   if ((isAdminDashboardPath(path) || isAdminApiPath(path)) && !n8nAuthorized) {
-    if (!role || !canAccessModule(role, "admin")) {
+    if (!role || !canAccessModule(role, "admin", username)) {
       if (isApi) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
-      return NextResponse.redirect(new URL(defaultDashboardPath(role ?? "user"), request.url));
+      return NextResponse.redirect(new URL(defaultDashboardPath(role ?? "user", username), request.url));
     }
   }
 
   if ((isMarketingDashboardPath(path) || isMarketingApiPath(path)) && !n8nAuthorized) {
-    if (!role || !canAccessModule(role, "marketing")) {
+    if (!role || !canAccessModule(role, "marketing", username)) {
       if (isApi) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
-      return NextResponse.redirect(new URL(defaultDashboardPath(role ?? "user"), request.url));
+      return NextResponse.redirect(new URL(defaultDashboardPath(role ?? "user", username), request.url));
     }
   }
 
@@ -70,16 +71,16 @@ export async function middleware(request: NextRequest) {
       if (isApi) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
-      return NextResponse.redirect(new URL(defaultDashboardPath(role ?? "user"), request.url));
+      return NextResponse.redirect(new URL(defaultDashboardPath(role ?? "user", username), request.url));
     }
   }
 
   if ((isAthleteDashboardPath(path) || isAthleteApiPath(path)) && !n8nAuthorized) {
-    if (!role || !canAccessModule(role, "athlete_portal")) {
+    if (!role || !canAccessModule(role, "athlete_portal", username)) {
       if (isApi) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
-      return NextResponse.redirect(new URL(defaultDashboardPath(role ?? "user"), request.url));
+      return NextResponse.redirect(new URL(defaultDashboardPath(role ?? "user", username), request.url));
     }
   }
 
@@ -94,7 +95,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (path === "/") {
-    return NextResponse.redirect(new URL(defaultDashboardPath(role ?? "user"), request.url));
+    return NextResponse.redirect(new URL(defaultDashboardPath(role ?? "user", username), request.url));
   }
 
   return NextResponse.next();

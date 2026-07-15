@@ -645,7 +645,10 @@ input.progress-slider::-moz-range-thumb {
   background: rgb(255 255 255 / 0.06);
   color: #fff;
   cursor: pointer;
-  transition: background-color 120ms ease, border-color 120ms ease, transform 80ms ease;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
 }
 
 .planner-done-toggle:hover {
@@ -653,14 +656,68 @@ input.progress-slider::-moz-range-thumb {
   background: rgb(6 182 212 / 0.12);
 }
 
-.planner-done-toggle:active {
-  transform: scale(0.94);
-}
-
 .planner-done-toggle-checked {
   border-color: rgb(34 211 238 / 0.85);
   background: rgb(6 182 212 / 0.85);
   color: #0f172a;
+}
+
+.planner-done-toggle-animating {
+  animation: planner-done-pop 420ms cubic-bezier(0.34, 1.4, 0.64, 1);
+  box-shadow: 0 0 0 2px rgb(6 182 212 / 0.35);
+}
+
+@keyframes planner-done-pop {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.planner-done-check {
+  width: 0.625rem;
+  height: 0.625rem;
+  opacity: 0;
+  transform: scale(0.4);
+}
+
+.planner-done-check-visible {
+  opacity: 1;
+  transform: scale(1);
+  transition:
+    opacity 120ms ease,
+    transform 200ms cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+.planner-done-check-path {
+  stroke-dasharray: 14;
+  stroke-dashoffset: 14;
+}
+
+.planner-done-toggle-checked .planner-done-check-path,
+.planner-done-toggle-animating .planner-done-check-path {
+  animation: planner-done-check-draw 280ms ease forwards 100ms;
+}
+
+.planner-done-toggle-checked:not(.planner-done-toggle-animating) .planner-done-check-path {
+  stroke-dashoffset: 0;
+  animation: none;
+}
+
+@keyframes planner-done-check-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.planner-task-card-completing {
+  box-shadow: 0 0 0 2px rgb(6 182 212 / 0.28);
+  transition: box-shadow 200ms ease;
 }
 
 [data-theme="light"] .planner-done-toggle {

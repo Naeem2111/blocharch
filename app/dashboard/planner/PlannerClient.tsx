@@ -6,6 +6,7 @@ import { composeDueAtIso, splitDueAtIso } from "@/lib/planner-due-datetime";
 import { KanbanTaskMovePad } from "@/components/planner/KanbanTaskMovePad";
 import { BlocharchOutboxPanel } from "@/components/planner/BlocharchOutboxPanel";
 import { MultiBoardKanban } from "@/components/planner/MultiBoardKanban";
+import { PlannerDoneToggle } from "@/components/planner/PlannerDoneToggle";
 import { PlannerLabelChip, plannerLabelChipStyle } from "@/components/planner/PlannerLabelChip";
 import {
   boardDetailAfterCrossBoardMove,
@@ -174,48 +175,6 @@ function optimisticCompleteTaskBoard(
   };
 }
 
-function PlannerDoneToggle({
-  checked,
-  disabled,
-  onToggle,
-  title,
-}: {
-  checked: boolean;
-  disabled?: boolean;
-  onToggle: (next: boolean) => void;
-  title: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="checkbox"
-      aria-checked={checked}
-      title={title}
-      disabled={disabled}
-      onClick={(e) => {
-        e.stopPropagation();
-        onToggle(!checked);
-      }}
-      onPointerDown={(e) => e.stopPropagation()}
-      onKeyDown={(e) => e.stopPropagation()}
-      className={`planner-done-toggle mt-0.5 shrink-0 ${checked ? "planner-done-toggle-checked" : ""}`}
-    >
-      {checked ? (
-        <svg viewBox="0 0 12 12" className="h-2.5 w-2.5" aria-hidden>
-          <path
-            d="M2 6l3 3 5-5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ) : null}
-    </button>
-  );
-}
-
 const PLANNER_SHORT_DESC_HINT =
   "Brief preview on the board. Paragraphs or lists work (– or • for bullets; line breaks stay).";
 
@@ -292,6 +251,7 @@ export function PlannerClient() {
   const [taskOpen, setTaskOpen] = useState<{ columnId: string } | null>(null);
   const [editTask, setEditTask] = useState<TaskRow & { columnId: string } | null>(null);
   const [dragTaskId, setDragTaskId] = useState<string | null>(null);
+  const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
   const [dropTargetColumnId, setDropTargetColumnId] = useState<string | null>(null);
   /** Drop stripe: insert before row id (null = end of column). */
   const [taskDropGuide, setTaskDropGuide] = useState<{
@@ -1757,6 +1717,8 @@ export function PlannerClient() {
                         } ${
                           isSelected ? "ring-2 ring-brand-500/45 bg-brand-500/[0.08]" : ""
                         } ${
+                          completingTaskId === t.id ? "planner-task-card-completing" : ""
+                        } ${
                           dragTaskId === t.id
                             ? "opacity-35 scale-[0.985] shadow-inner ring-1 ring-brand-500/30"
                             : ""
@@ -1767,6 +1729,12 @@ export function PlannerClient() {
                             <PlannerDoneToggle
                               checked={isInDoneColumn}
                               title={isInDoneColumn ? "Restore to previous column" : "Mark complete"}
+                              onCompletingStart={() => setCompletingTaskId(t.id)}
+                              onCompletingEnd={() =>
+                                setCompletingTaskId((current) =>
+                                  current === t.id ? null : current,
+                                )
+                              }
                               onToggle={(next) => void toggleTaskCompleted(t.id, next)}
                             />
                           ) : null}

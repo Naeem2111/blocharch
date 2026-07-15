@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requirePlannerSession } from "@/lib/planner-access";
+import { isAdminOnlyAccount } from "@/lib/admin-only-accounts";
 
 /** Active athletes for Project planner → Team roster (admin/manager). */
 export async function GET(request: NextRequest) {
@@ -23,7 +24,9 @@ export async function GET(request: NextRequest) {
   });
 
   return NextResponse.json({
-    athletes: athletes.map((a) => ({
+    athletes: athletes
+      .filter((a) => !isAdminOnlyAccount(a.user.username))
+      .map((a) => ({
       id: a.id,
       userId: a.userId,
       fullName: a.fullName,

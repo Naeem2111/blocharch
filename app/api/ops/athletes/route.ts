@@ -4,6 +4,7 @@ import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/password";
 import { requireOpsSession } from "@/lib/ops-access";
+import { isAdminOnlyAccount } from "@/lib/admin-only-accounts";
 import { parseDateOnly } from "@/lib/ops-hours";
 import { parseImageUrlField } from "@/lib/image-url";
 import { parseHexColor } from "@/lib/hex-color";
@@ -17,16 +18,19 @@ export async function GET(request: NextRequest) {
   const athletes = await prisma.opsAthlete.findMany({
     orderBy: { fullName: "asc" },
     include: {
-      user: { select: { id: true, username: true, disabled: true } },
+      user: { select: { id: true, username: true, disabled: true, role: true } },
       _count: { select: { projects: true, submissions: true } },
     },
   });
 
   return NextResponse.json({
-    athletes: athletes.map((a) => ({
+    athletes: athletes
+      .filter((a) => !isAdminOnlyAccount(a.user.username))
+      .map((a) => ({
       id: a.id,
       userId: a.userId,
       username: a.user.username,
+      userRole: a.user.role,
       fullName: a.fullName,
       athleteCode: a.athleteCode,
       email: a.email,

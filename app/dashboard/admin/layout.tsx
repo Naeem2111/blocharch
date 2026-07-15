@@ -8,8 +8,8 @@ export default async function AdminSectionLayout({
   children: React.ReactNode;
 }) {
   const session = await getSession();
-  if (!session || !canAccessModule(session.user.role, "admin")) {
-    redirect(defaultDashboardPath(session?.user.role ?? "user"));
+  if (!session || !canAccessModule(session.user.role, "admin", session.user.username)) {
+    redirect(defaultDashboardPath(session?.user.role ?? "user", session?.user.username));
   }
   return children;
 }

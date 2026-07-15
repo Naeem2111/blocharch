@@ -1,4 +1,5 @@
 import type { UserRole } from "@/lib/users-store";
+import { isAdminOnlyAccount } from "@/lib/admin-only-accounts";
 
 /** Feature areas within the single Blocharch console domain. */
 export type AppModule = "marketing" | "planner" | "admin" | "ops" | "athlete_portal";
@@ -16,8 +17,19 @@ const MODULE_ROLES: Record<AppModule, readonly UserRole[]> = {
   athlete_portal: ["admin", "user"],
 };
 
-export function canAccessModule(role: UserRole, module: AppModule): boolean {
-  return MODULE_ROLES[module].includes(role);
+export function canAccessModule(
+	role: UserRole,
+	module: AppModule,
+	username?: string | null,
+): boolean {
+	if (role === "admin") {
+		if (username && isAdminOnlyAccount(username)) {
+			if (module === "athlete_portal") return false;
+			return MODULE_ROLES[module].includes("admin");
+		}
+		return true;
+	}
+	return MODULE_ROLES[module].includes(role);
 }
 
 /** Ops overview + athlete performance (managers) vs full ops console (admin). */
@@ -39,10 +51,13 @@ export function canAccessOpsApiPath(role: UserRole, path: string): boolean {
 }
 
 /** First screen after login for each role. */
-export function defaultDashboardPath(role: UserRole): string {
-  if (canAccessModule(role, "marketing")) return "/dashboard";
-  if (canAccessModule(role, "athlete_portal")) return "/dashboard/athlete";
-  return "/dashboard/planner";
+export function defaultDashboardPath(
+	role: UserRole,
+	username?: string | null,
+): string {
+	if (canAccessModule(role, "marketing", username)) return "/dashboard";
+	if (canAccessModule(role, "athlete_portal", username)) return "/dashboard/athlete";
+	return "/dashboard/planner";
 }
 
 export function isMarketingDashboardPath(path: string): boolean {

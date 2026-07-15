@@ -24,6 +24,7 @@ import {
 } from "@/lib/sidebar-nav-order";
 import {
 	adminViewFromPath,
+	loadAdminConsoleView,
 	sectionsForAdminView,
 	type AdminConsoleView,
 } from "@/lib/admin-console-view";
@@ -831,6 +832,17 @@ export function DashboardSidebar({
 	const [dropItemIndex, setDropItemIndex] = useState<number | null>(null);
 	const [dragSection, setDragSection] = useState<DragSectionState>(null);
 	const [dropSectionIndex, setDropSectionIndex] = useState<number | null>(null);
+	const [adminView, setAdminView] = useState<AdminConsoleView>("all");
+
+	useEffect(() => {
+		if (user.role !== "admin") return;
+		const saved = loadAdminConsoleView(user.id);
+		if (saved === "all") {
+			setAdminView("all");
+		} else {
+			setAdminView(adminViewFromPath(pathname));
+		}
+	}, [user.id, user.role, pathname]);
 
 	useEffect(() => {
 		const saved = loadSidebarNavOrder(user.id);
@@ -843,9 +855,9 @@ export function DashboardSidebar({
 		let cancelled = false;
 		async function loadBadges() {
 			const urls: string[] = [];
-			if (canAccessModule(user.role, "ops"))
+			if (canAccessModule(user.role, "ops", user.username))
 				urls.push("/api/ops/sidebar-badges");
-			if (canAccessModule(user.role, "athlete_portal"))
+			if (canAccessModule(user.role, "athlete_portal", user.username))
 				urls.push("/api/athlete/sidebar-badges");
 			if (!urls.length) return;
 			const results = await Promise.all(
@@ -890,25 +902,22 @@ export function DashboardSidebar({
 		[navOrder?.collapsedSections],
 	);
 
-	const adminView = useMemo((): AdminConsoleView | null => {
-		if (user.role !== "admin") return null;
-		return adminViewFromPath(pathname);
-	}, [user.role, pathname]);
+	const adminViewActive = user.role === "admin" ? adminView : null;
 
 	const visibleSections = useMemo(() => {
 		const filtered = NAV_SECTIONS.filter((section) => {
 			if (section.id === "onboarding" || section.id === "ops") {
 				if (section.id === "ops") return canAccessOpsOverview(user.role);
-				return canAccessModule(user.role, section.module);
+				return canAccessModule(user.role, section.module, user.username);
 			}
-			if (!canAccessModule(user.role, section.module)) return false;
+			if (!canAccessModule(user.role, section.module, user.username)) return false;
 			if (section.id === "planner" && user.role === "user") return false;
 			return true;
 		});
 		const viewFiltered =
-			user.role === "admin" && adminView
+			user.role === "admin" && adminViewActive && adminViewActive !== "all"
 				? filtered.filter((section) =>
-						sectionsForAdminView(adminView).includes(section.id),
+						sectionsForAdminView(adminViewActive).includes(section.id),
 					)
 				: filtered;
 		const ordered = applySectionOrder(viewFiltered, navOrder?.sections);
@@ -922,7 +931,7 @@ export function DashboardSidebar({
 				items: applyItemOrder(items, navOrder?.items[section.id]),
 			};
 		});
-	}, [user.role, navOrder, adminView]);
+	}, [user.role, navOrder, adminViewActive]);
 
 	const persistSectionOrder = (ids: string[]) => {
 		setNavOrder((prev) => ({
@@ -1006,11 +1015,13 @@ export function DashboardSidebar({
 					</span>
 				</a>
 			</div>
-			{user.role === "admin" && adminView ? (
+			{user.role === "admin" ? (
 				<div className="border-b border-white/[0.06] px-3 py-3">
 					<AdminViewSwitcher
 						userId={user.id}
+						username={user.username}
 						value={adminView}
+						onChange={setAdminView}
 						onNavigate={onNavigate}
 					/>
 				</div>
