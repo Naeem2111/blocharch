@@ -2,8 +2,10 @@ import type { OpsProjectPhase, OpsProjectStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { findDoneColumnId } from "@/lib/planner-completed";
 import {
+  deriveClientPortalLaneNumber,
   isClientPortalActiveProject,
   isClientPortalCompletedProject,
+  isHousekeepingClientProject,
 } from "@/lib/client-portal-projects";
 import { PROJECT_STATUS_LABELS, displayProjectStageLabel } from "@/lib/ops-constants";
 
@@ -36,6 +38,8 @@ export type PublicClientPortalProject = {
   leadPhotoTextTone: string | null;
   openTasks: PublicClientPortalTask[];
   deadlineBeatenDays: number | null;
+  laneNumber: number;
+  assignedAthleteName: string | null;
 };
 
 export type PublicClientPortalData = {
@@ -66,7 +70,7 @@ function clientStatusBadge(
     case "in_progress":
       return { label: "On track", color: "#22c55e" };
     case "not_started":
-      return { label: "Scheduled", color: "#64748b" };
+      return { label: "Scheduled", color: "#94a3b8" };
     case "blocked":
       return { label: "Blocked", color: "#ef4444" };
     case "completed":
@@ -106,8 +110,10 @@ function mapProject(
       profilePhotoBgColor: string | null;
       profilePhotoTextTone: string | null;
     } | null;
+    assignedAthlete: { fullName: string } | null;
   },
-  openTasks: PublicClientPortalTask[]
+  openTasks: PublicClientPortalTask[],
+  laneNumber: number
 ): PublicClientPortalProject {
   const progressPercent = p.progressPercent ?? 0;
   const contact = p.projectLeadContact;
@@ -132,6 +138,8 @@ function mapProject(
     leadPhotoTextTone: contact ? null : legacyAthlete?.profilePhotoTextTone ?? null,
     openTasks,
     deadlineBeatenDays: p.deadlineBeatenDays,
+    laneNumber,
+    assignedAthleteName: p.assignedAthlete?.fullName ?? null,
   };
 }
 
@@ -162,10 +170,14 @@ export async function getPublicClientPortal(clientSlug: string): Promise<PublicC
           profilePhotoTextTone: true,
         },
       },
+      assignedAthlete: { select: { fullName: true } },
     },
   });
 
-  const allProjectIds = projects.map((p) => p.id);
+  const clientProjects = projects.filter((p) => !isHousekeepingClientProject(p));
+  const activeLaneCount = client.commercial?.activeLaneCount ?? 1;
+
+  const allProjectIds = clientProjects.map((p) => p.id);
   const boards = await prisma.plannerBoard.findMany({
     where: { kind: "project", opsProjectId: { in: allProjectIds } },
     include: {
@@ -210,7 +222,13 @@ export async function getPublicClientPortal(clientSlug: string): Promise<PublicC
     );
   }
 
-  const mapped = projects.map((p) => mapProject(p, tasksByProjectId.get(p.id) ?? []));
+  const mapped = clientProjects.map((p) =>
+    mapProject(
+      p,
+      tasksByProjectId.get(p.id) ?? [],
+      deriveClientPortalLaneNumber(p.projectNumber, activeLaneCount)
+    )
+  );
 
   return {
     client: {
@@ -219,7 +237,7 @@ export async function getPublicClientPortal(clientSlug: string): Promise<PublicC
       logoUrl: client.logoUrl,
       logoBgColor: client.logoBgColor,
       logoTextTone: client.logoTextTone,
-      activeLaneCount: client.commercial?.activeLaneCount ?? 1,
+      activeLaneCount,
     },
     activeProjects: mapped.filter(isClientPortalActiveProject),
     completedProjects: mapped.filter(isClientPortalCompletedProject),
