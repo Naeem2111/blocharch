@@ -35,15 +35,45 @@ function formatShortDate(iso: string | null): string {
 	return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
-function formatDateRange(
-	start: string | null,
-	due: string | null,
-): string | null {
-	if (start && due)
-		return `${formatShortDate(start)} – ${formatShortDate(due)}`;
-	if (due) return `Due ${formatShortDate(due)}`;
-	if (start) return `From ${formatShortDate(start)}`;
-	return null;
+function formatDateRange(start: string | null): string | null {
+	if (!start) return null;
+	return `From ${formatShortDate(start)}`;
+}
+
+function DueDateHighlight({
+	project,
+	className = "",
+}: {
+	project: PublicClientPortalProject;
+	className?: string;
+}) {
+	const dueIso = project.dueAt ?? (project.dueDate ? `${project.dueDate}T17:00:00` : null);
+	if (!dueIso) {
+		return <span className={`text-sm text-slate-600 ${className}`}>—</span>;
+	}
+
+	const accent = projectDueColor(daysUntilDueFromIso(project.dueDate));
+	const label = formatProjectDueAt(dueIso);
+
+	return (
+		<div
+			className={`client-portal-due-block inline-flex min-w-[7.5rem] flex-col items-center justify-center rounded-lg px-3 py-2.5 text-center ${className}`}
+			style={{
+				backgroundColor: `${accent}24`,
+				boxShadow: `inset 0 0 0 1.5px ${accent}55`,
+			}}
+		>
+			<span
+				className="text-[10px] font-bold uppercase tracking-wider"
+				style={{ color: accent }}
+			>
+				Due
+			</span>
+			<span className="client-portal-due-date-value mt-0.5 text-sm font-semibold leading-tight">
+				{label}
+			</span>
+		</div>
+	);
 }
 
 function leadInitials(name: string): string {
@@ -64,12 +94,10 @@ const NOTIFICATION_ICON: Record<
 
 function ProjectCard({ project }: { project: PublicClientPortalProject }) {
 	const accent = projectDueColor(daysUntilDueFromIso(project.dueDate));
-	const dateRange = formatDateRange(project.startDate, project.dueDate);
-	const metaParts = [
-		project.currentStageLabel,
-		`Lane ${project.laneNumber}`,
-		dateRange,
-	].filter(Boolean);
+	const startLabel = formatDateRange(project.startDate);
+	const metaParts = [project.currentStageLabel, `Lane ${project.laneNumber}`, startLabel].filter(
+		Boolean,
+	);
 
 	return (
 		<article className="client-portal-card relative rounded-xl border border-white/[0.08] bg-white/[0.03] p-4 sm:p-5">
@@ -99,6 +127,12 @@ function ProjectCard({ project }: { project: PublicClientPortalProject }) {
 			</div>
 
 			<p className="mt-2.5 text-xs text-slate-400">{metaParts.join(" · ")}</p>
+
+			{project.dueDate || project.dueAt ? (
+				<div className="mt-3">
+					<DueDateHighlight project={project} />
+				</div>
+			) : null}
 
 			<div className="mt-4">
 				<ProjectProgressBar percent={project.progressPercent} />
@@ -192,11 +226,7 @@ function CompletedRow({ project }: { project: PublicClientPortalProject }) {
 				Lane {project.laneNumber}
 			</span>
 
-			<div className="text-sm text-slate-300">
-				{project.dueAt || project.dueDate
-					? formatProjectDueAt(project.dueAt ?? `${project.dueDate}T17:00:00`)
-					: "—"}
-			</div>
+			<DueDateHighlight project={project} />
 
 			<div className="text-sm font-medium text-emerald-400 client-portal-accent-emerald">
 				{project.handoverDate ? formatShortDate(project.handoverDate) : "—"}
@@ -440,36 +470,38 @@ export function ClientPortalClient({
 
 				<main className="flex-1 px-4 py-6 sm:px-8">
 					{tab === "tracker" ? (
-						<div className="grid gap-6 xl:grid-cols-[minmax(0,280px)_1fr]">
+						<div className="grid gap-6 xl:grid-cols-[minmax(0,360px)_1fr]">
 							<section>
 								<h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
 									Project due dates
 								</h2>
-								<div className="client-portal-card mt-3 rounded-xl border border-white/[0.08] bg-white/[0.03] p-4">
+								<div className="client-portal-card mt-3 rounded-xl border border-white/[0.08] bg-white/[0.03] p-5">
 									<MiniMonthCalendar
+										size="lg"
+										markStyle="fill"
 										month={calendarMonth}
 										marks={dueMarks}
 										onSelectDate={(date) => setCalendarMonth(date.slice(0, 7))}
 									/>
-									<div className="mt-4 flex flex-wrap gap-x-3 gap-y-1.5 text-[10px] text-slate-500">
-										<span className="inline-flex items-center gap-1.5">
-											<span className="h-2 w-2 rounded-full bg-red-500" />
+									<div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500">
+										<span className="inline-flex items-center gap-2">
+											<span className="h-2.5 w-2.5 rounded-sm border border-red-500/40 bg-red-500/30" />
 											Overdue
 										</span>
-										<span className="inline-flex items-center gap-1.5">
-											<span className="h-2 w-2 rounded-full bg-orange-500" />
+										<span className="inline-flex items-center gap-2">
+											<span className="h-2.5 w-2.5 rounded-sm border border-orange-500/40 bg-orange-500/30" />
 											1–3 days
 										</span>
-										<span className="inline-flex items-center gap-1.5">
-											<span className="h-2 w-2 rounded-full bg-yellow-400" />
+										<span className="inline-flex items-center gap-2">
+											<span className="h-2.5 w-2.5 rounded-sm border border-yellow-400/40 bg-yellow-400/30" />
 											4–7 days
 										</span>
-										<span className="inline-flex items-center gap-1.5">
-											<span className="h-2 w-2 rounded-full bg-sky-500" />
+										<span className="inline-flex items-center gap-2">
+											<span className="h-2.5 w-2.5 rounded-sm border border-sky-500/40 bg-sky-500/30" />
 											8–14 days
 										</span>
-										<span className="inline-flex items-center gap-1.5">
-											<span className="h-2 w-2 rounded-full bg-emerald-500" />
+										<span className="inline-flex items-center gap-2">
+											<span className="h-2.5 w-2.5 rounded-sm border border-emerald-500/40 bg-emerald-500/30" />
 											14+ days
 										</span>
 									</div>

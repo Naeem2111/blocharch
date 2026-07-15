@@ -384,6 +384,18 @@
   --tw-ring-color: rgb(6 182 212 / 0.45) !important;
 }
 
+.client-portal-due-block .client-portal-due-date-value {
+  color: #f8fafc;
+}
+
+[data-theme="light"] .client-portal-due-block .client-portal-due-date-value {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .mini-month-calendar-lg .mini-calendar-day[style*="box-shadow"] {
+  font-weight: 600;
+}
+
 [data-theme="light"] .due-date-calendar-grid {
   background-color: rgb(203 213 225 / 0.65) !important;
   border-color: rgb(148 163 184 / 0.55) !important;

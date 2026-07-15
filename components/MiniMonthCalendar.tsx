@@ -19,12 +19,18 @@ export function MiniMonthCalendar({
   selectedDate,
   onSelectDate,
   className = "",
+  size = "sm",
+  markStyle = "dot",
 }: {
   month: string;
   marks?: CalendarMark[];
   selectedDate?: string;
   onSelectDate?: (date: string) => void;
   className?: string;
+  /** sm = compact (dashboard); lg = client portal */
+  size?: "sm" | "lg";
+  /** dot = indicator under day; fill = highlight entire day cell */
+  markStyle?: "dot" | "fill";
 }) {
   const { year, monthIndex } = parseMonth(month);
   const firstDay = new Date(year, monthIndex, 1);
@@ -50,13 +56,31 @@ export function MiniMonthCalendar({
 
   const monthLabel = firstDay.toLocaleString("en-GB", { month: "long", year: "numeric" });
   const pad = (n: number) => String(n).padStart(2, "0");
+  const isLg = size === "lg";
 
   return (
-    <div className={`mini-month-calendar ${className}`}>
-      <p className="mini-calendar-title text-xs font-medium text-slate-400">{monthLabel}</p>
-      <div className="mt-2 grid grid-cols-7 gap-1 text-center text-[10px]">
+    <div
+      className={`mini-month-calendar ${isLg ? "mini-month-calendar-lg" : ""} ${className}`}
+    >
+      <p
+        className={`mini-calendar-title font-medium text-slate-400 ${
+          isLg ? "text-sm" : "text-xs"
+        }`}
+      >
+        {monthLabel}
+      </p>
+      <div
+        className={`mt-2 grid grid-cols-7 text-center ${
+          isLg ? "gap-1.5 text-sm" : "gap-1 text-[10px]"
+        }`}
+      >
         {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => (
-          <span key={`${d}-${i}`} className="mini-calendar-weekday py-1 font-medium text-slate-600">
+          <span
+            key={`${d}-${i}`}
+            className={`mini-calendar-weekday font-medium text-slate-600 ${
+              isLg ? "py-1.5 text-xs" : "py-1"
+            }`}
+          >
             {d}
           </span>
         ))}
@@ -64,6 +88,8 @@ export function MiniMonthCalendar({
           if (day == null) return <span key={`e-${i}`} />;
           const iso = `${year}-${pad(monthIndex + 1)}-${pad(day)}`;
           const dayMarks = markByDay.get(day) ?? [];
+          const markColor = dayMarks[0]?.color ?? "#3b82f6";
+          const hasFillMark = markStyle === "fill" && dayMarks.length > 0;
           const isSelected = selectedDate === iso;
           const clickable = !!onSelectDate;
           const Tag = clickable ? "button" : "div";
@@ -73,16 +99,29 @@ export function MiniMonthCalendar({
               type={clickable ? "button" : undefined}
               onClick={clickable ? () => onSelectDate!(iso) : undefined}
               title={dayMarks.map((m) => m.label).filter(Boolean).join(", ") || undefined}
-              className={`mini-calendar-day relative rounded-md py-1.5 tabular-nums transition-colors ${
+              style={
+                hasFillMark && !isSelected
+                  ? {
+                      backgroundColor: `${markColor}30`,
+                      boxShadow: `inset 0 0 0 1.5px ${markColor}66`,
+                      color: markColor,
+                    }
+                  : undefined
+              }
+              className={`mini-calendar-day relative rounded-md tabular-nums transition-colors ${
+                isLg ? "py-3 text-sm" : "py-1.5"
+              } ${
                 isSelected
                   ? "mini-calendar-day-selected bg-brand-500/25 font-semibold text-brand-100 ring-1 ring-brand-500/40"
-                  : clickable
-                    ? "text-slate-300 hover:bg-white/[0.06]"
-                    : "text-slate-400"
+                  : hasFillMark
+                    ? "font-semibold"
+                    : clickable
+                      ? "text-slate-300 hover:bg-white/[0.06]"
+                      : "text-slate-400"
               }`}
             >
               {day}
-              {dayMarks.length > 0 ? (
+              {markStyle === "dot" && dayMarks.length > 0 ? (
                 <span className="absolute bottom-0.5 left-1/2 flex -translate-x-1/2 gap-0.5">
                   {dayMarks.slice(0, 3).map((m, j) => (
                     <span
