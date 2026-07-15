@@ -629,7 +629,6 @@ model OpsDailySubmission {
   id               String   @id @default(uuid())
   athleteId        String   @map("athlete_id")
   submissionDate   DateTime @map("submission_date") @db.Date
-  wellbeingScore   Int?     @map("wellbeing_score")
   checkInRequested Boolean  @default(false) @map("check_in_requested")
   dailyNote        String?  @map("daily_note") @db.Text
   totalHours       Decimal  @default(0) @map("total_hours") @db.Decimal(6, 2)

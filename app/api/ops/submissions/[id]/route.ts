@@ -57,8 +57,6 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Invalid submission date" }, { status: 400 });
     }
 
-    const wellbeingScore =
-      body.wellbeingScore != null ? Math.max(1, Math.min(10, Number(body.wellbeingScore))) : existing.wellbeingScore;
     const isBackloggedSession =
       body.isBackloggedSession !== undefined ? Boolean(body.isBackloggedSession) : existing.isBackloggedSession;
     const dailyNote =
@@ -119,7 +117,6 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         where: { id: existing.id },
         data: {
           submissionDate,
-          wellbeingScore,
           checkInRequested,
           dailyNote,
           isBackloggedSession,

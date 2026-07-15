@@ -6,14 +6,8 @@ import {
 } from "@/lib/permissions";
 import { isAdminOnlyAccount } from "@/lib/admin-only-accounts";
 
-/** Admin-only sidebar perspective — one role view at a time. */
-export type AdminConsoleView =
-	| "all"
-	| "marketing"
-	| "operations"
-	| "athlete"
-	| "planner"
-	| "admin";
+/** Admin sidebar perspective — role-based console views. */
+export type AdminConsoleView = "all" | "admin" | "manager" | "athlete";
 
 export const ADMIN_CONSOLE_VIEWS: {
 	id: AdminConsoleView;
@@ -35,36 +29,36 @@ export const ADMIN_CONSOLE_VIEWS: {
 		home: "/dashboard",
 	},
 	{
-		id: "marketing",
-		label: "Marketing",
-		sections: ["marketing"],
-		home: "/dashboard",
-	},
-	{
-		id: "operations",
-		label: "Athlete operations",
-		sections: ["onboarding", "ops"],
+		id: "admin",
+		label: "Admin",
+		sections: ["onboarding", "ops", "planner", "admin"],
 		home: "/dashboard/ops",
 	},
 	{
+		id: "manager",
+		label: "Manager",
+		sections: ["marketing", "ops"],
+		home: "/dashboard",
+	},
+	{
 		id: "athlete",
-		label: "My workspace",
+		label: "Athlete",
 		sections: ["athlete_portal"],
 		home: "/dashboard/athlete",
 	},
-	{
-		id: "planner",
-		label: "Project planner",
-		sections: ["planner"],
-		home: "/dashboard/planner",
-	},
-	{
-		id: "admin",
-		label: "Users & access",
-		sections: ["admin"],
-		home: "/dashboard/admin",
-	},
 ];
+
+const LEGACY_VIEW_MAP: Record<string, AdminConsoleView> = {
+	marketing: "manager",
+	operations: "admin",
+	planner: "admin",
+};
+
+export function canShowAdminConsoleViewSwitcher(user: {
+	role: string;
+}): boolean {
+	return user.role === "admin";
+}
 
 export function adminConsoleViewsForUser(username: string) {
 	if (isAdminOnlyAccount(username)) {
@@ -83,21 +77,24 @@ export function isAdminConsoleView(value: string): value is AdminConsoleView {
 	return ADMIN_CONSOLE_VIEWS.some((v) => v.id === value);
 }
 
+function normalizeStoredView(raw: string): AdminConsoleView | null {
+	if (isAdminConsoleView(raw)) return raw;
+	return LEGACY_VIEW_MAP[raw] ?? null;
+}
+
 export function adminViewFromPath(pathname: string): AdminConsoleView {
 	if (isAdminDashboardPath(pathname)) return "admin";
 	if (isAthleteDashboardPath(pathname)) return "athlete";
-	if (pathname.startsWith("/dashboard/planner")) return "planner";
-	if (isOpsDashboardPath(pathname)) return "operations";
-	if (isMarketingDashboardPath(pathname)) return "marketing";
-	return "marketing";
+	if (pathname.startsWith("/dashboard/planner")) return "admin";
+	if (isOpsDashboardPath(pathname)) return "admin";
+	if (isMarketingDashboardPath(pathname)) return "manager";
+	return "manager";
 }
 
 export function sectionsForAdminView(view: AdminConsoleView): readonly string[] {
-	if (view === "all") {
-		return ADMIN_CONSOLE_VIEWS[0].sections;
-	}
 	return (
-		ADMIN_CONSOLE_VIEWS.find((v) => v.id === view)?.sections ?? ["marketing"]
+		ADMIN_CONSOLE_VIEWS.find((v) => v.id === view)?.sections ??
+		ADMIN_CONSOLE_VIEWS[0].sections
 	);
 }
 
@@ -109,8 +106,8 @@ export function loadAdminConsoleView(userId: string): AdminConsoleView | null {
 	if (typeof window === "undefined") return null;
 	try {
 		const raw = localStorage.getItem(adminConsoleViewStorageKey(userId));
-		if (!raw || !isAdminConsoleView(raw)) return null;
-		return raw;
+		if (!raw) return null;
+		return normalizeStoredView(raw);
 	} catch {
 		return null;
 	}
@@ -122,4 +119,12 @@ export function saveAdminConsoleView(
 ): void {
 	if (typeof window === "undefined") return;
 	localStorage.setItem(adminConsoleViewStorageKey(userId), view);
+}
+
+/** Manager role sees ops overview only — same filter for admin "Manager" console view. */
+export function useManagerOpsNavFilter(
+	role: string,
+	adminView: AdminConsoleView | null,
+): boolean {
+	return role === "manager" || adminView === "manager";
 }

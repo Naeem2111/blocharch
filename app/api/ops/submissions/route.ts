@@ -57,7 +57,6 @@ export async function GET(request: NextRequest) {
       profilePhotoTextTone: s.athlete.profilePhotoTextTone,
       submissionDate: s.submissionDate.toISOString().slice(0, 10),
       totalHours: Number(s.totalHours),
-      wellbeingScore: s.wellbeingScore,
       checkInRequested: s.checkInRequested,
       checkInNeedsAction: s.checkInRequested && pendingAthletes.has(s.athleteId),
       dailyNote: s.dailyNote,

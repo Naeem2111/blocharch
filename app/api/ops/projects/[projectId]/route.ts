@@ -9,6 +9,7 @@ import {
 import { requireOpsSession } from "@/lib/ops-access";
 import { parseDateOnly } from "@/lib/ops-hours";
 import { syncProjectAfterOpsUpdate } from "@/lib/planner-project-sync";
+import { reactivateProjectOnAthleteReassign, syncProjectProgressForProjects } from "@/lib/sync-project-progress";
 import { normalizeAthleteProjectCode } from "@/lib/ops-project-code";
 import { projectDisplayFields } from "@/lib/project-display";
 import { validateProjectLeadContactDb } from "@/lib/ops-project-lead";
@@ -160,6 +161,19 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         if (!athlete) return NextResponse.json({ error: "Athlete not found" }, { status: 404 });
       }
       data.assignedAthleteId = aid;
+
+      const reopen = await reactivateProjectOnAthleteReassign(
+        projectId,
+        existing.assignedAthleteId,
+        aid,
+        existing.currentStatus
+      );
+      if (reopen) {
+        data.currentStatus = reopen.currentStatus;
+        data.progressPercent = reopen.progressPercent;
+        data.completedAt = reopen.completedAt;
+        data.deadlineBeatenDays = reopen.deadlineBeatenDays;
+      }
     }
     if (body.projectNumber != null) {
       const projectNumber = normalizeAthleteProjectCode(String(body.projectNumber));
@@ -231,6 +245,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         name: project.name,
       }
     ).catch(() => {});
+
+    await syncProjectProgressForProjects([projectId]).catch(() => {});
 
     const hoursAgg = await prisma.opsSubmissionLineItem.aggregate({
       where: { projectId },

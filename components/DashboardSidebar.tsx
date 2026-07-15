@@ -27,6 +27,8 @@ import {
 	loadAdminConsoleView,
 	sectionsForAdminView,
 	type AdminConsoleView,
+	canShowAdminConsoleViewSwitcher,
+	useManagerOpsNavFilter,
 } from "@/lib/admin-console-view";
 
 type NavItem = {
@@ -834,15 +836,17 @@ export function DashboardSidebar({
 	const [dropSectionIndex, setDropSectionIndex] = useState<number | null>(null);
 	const [adminView, setAdminView] = useState<AdminConsoleView>("all");
 
+	const showConsoleViewSwitcher = canShowAdminConsoleViewSwitcher(user);
+
 	useEffect(() => {
-		if (user.role !== "admin") return;
+		if (!showConsoleViewSwitcher) return;
 		const saved = loadAdminConsoleView(user.id);
 		if (saved === "all") {
 			setAdminView("all");
 		} else {
 			setAdminView(adminViewFromPath(pathname));
 		}
-	}, [user.id, user.role, pathname]);
+	}, [user.id, user.role, pathname, showConsoleViewSwitcher]);
 
 	useEffect(() => {
 		const saved = loadSidebarNavOrder(user.id);
@@ -902,7 +906,8 @@ export function DashboardSidebar({
 		[navOrder?.collapsedSections],
 	);
 
-	const adminViewActive = user.role === "admin" ? adminView : null;
+	const adminViewActive = showConsoleViewSwitcher ? adminView : null;
+	const managerOpsNav = useManagerOpsNavFilter(user.role, adminViewActive);
 
 	const visibleSections = useMemo(() => {
 		const filtered = NAV_SECTIONS.filter((section) => {
@@ -915,7 +920,7 @@ export function DashboardSidebar({
 			return true;
 		});
 		const viewFiltered =
-			user.role === "admin" && adminViewActive && adminViewActive !== "all"
+			showConsoleViewSwitcher && adminViewActive && adminViewActive !== "all"
 				? filtered.filter((section) =>
 						sectionsForAdminView(adminViewActive).includes(section.id),
 					)
@@ -923,7 +928,7 @@ export function DashboardSidebar({
 		const ordered = applySectionOrder(viewFiltered, navOrder?.sections);
 		return ordered.map((section) => {
 			const items =
-				section.id === "ops" && user.role === "manager"
+				section.id === "ops" && managerOpsNav
 					? section.items.filter((item) => item.href === "/dashboard/ops")
 					: section.items;
 			return {
@@ -931,7 +936,7 @@ export function DashboardSidebar({
 				items: applyItemOrder(items, navOrder?.items[section.id]),
 			};
 		});
-	}, [user.role, navOrder, adminViewActive]);
+	}, [user.role, user.username, navOrder, adminViewActive, managerOpsNav, showConsoleViewSwitcher]);
 
 	const persistSectionOrder = (ids: string[]) => {
 		setNavOrder((prev) => ({
@@ -1015,11 +1020,12 @@ export function DashboardSidebar({
 					</span>
 				</a>
 			</div>
-			{user.role === "admin" ? (
+			{showConsoleViewSwitcher ? (
 				<div className="border-b border-white/[0.06] px-3 py-3">
 					<AdminViewSwitcher
 						userId={user.id}
 						username={user.username}
+						role={user.role}
 						value={adminView}
 						onChange={setAdminView}
 						onNavigate={onNavigate}

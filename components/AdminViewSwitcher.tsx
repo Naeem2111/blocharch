@@ -3,26 +3,35 @@
 import { useRouter } from "next/navigation";
 import {
 	adminConsoleViewsForUser,
+	canShowAdminConsoleViewSwitcher,
 	type AdminConsoleView,
 	homePathForAdminView,
 	saveAdminConsoleView,
 } from "@/lib/admin-console-view";
 import { isAdminOnlyAccount } from "@/lib/admin-only-accounts";
+import type { UserRole } from "@/lib/users-store";
 
 export function AdminViewSwitcher({
 	userId,
 	username,
+	role,
 	value,
 	onChange,
 	onNavigate,
 }: {
 	userId: string;
 	username: string;
+	role: UserRole;
 	value: AdminConsoleView;
 	onChange: (view: AdminConsoleView) => void;
 	onNavigate?: () => void;
 }) {
 	const router = useRouter();
+
+	if (!canShowAdminConsoleViewSwitcher({ role })) {
+		return null;
+	}
+
 	const views = adminConsoleViewsForUser(username);
 	const adminOnly = isAdminOnlyAccount(username);
 
@@ -57,8 +66,8 @@ export function AdminViewSwitcher({
 			</label>
 			<p className="mt-2 text-[10px] leading-relaxed text-slate-600">
 				{adminOnly
-					? "Filter the sidebar by area. This account stays admin-only."
-					: "Filter the sidebar by role perspective. Staff admins also have an athlete profile for assignment and reporting."}
+					? "Preview the console as Admin, Manager, or Show all. This account stays admin-only."
+					: "Preview the console as Admin, Manager, Athlete, or Show all."}
 			</p>
 		</div>
 	);

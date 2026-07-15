@@ -33,7 +33,6 @@ type Submission = {
   profilePhotoTextTone: string | null;
   submissionDate: string;
   totalHours: number;
-  wellbeingScore: number | null;
   checkInRequested: boolean;
   checkInNeedsAction: boolean;
   dailyNote: string | null;

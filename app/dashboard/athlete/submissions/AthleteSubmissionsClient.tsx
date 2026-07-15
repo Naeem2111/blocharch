@@ -43,7 +43,6 @@ type PastSubmission = {
   id: string;
   submissionDate: string;
   totalHours: number;
-  wellbeingScore: number | null;
   checkInRequested: boolean;
   dailyNote: string | null;
   isBackloggedSession?: boolean;
@@ -110,7 +109,6 @@ export function AthleteSubmissionsClient() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [calc, setCalc] = useState<CalcPanel | null>(null);
-  const [wellbeingScore, setWellbeingScore] = useState("5");
   const [checkInModalOpen, setCheckInModalOpen] = useState(false);
   const [checkInDetailsSubmitted, setCheckInDetailsSubmitted] = useState(false);
   const [dailyNote, setDailyNote] = useState("");
@@ -127,7 +125,6 @@ export function AthleteSubmissionsClient() {
     setEditingId(sub.id);
     setSelectedDate(sub.submissionDate);
     setCalendarMonth(sub.submissionDate.slice(0, 7));
-    setWellbeingScore(String(sub.wellbeingScore ?? 5));
     setDailyNote(sub.dailyNote ?? "");
     setIsBackloggedSession(!!sub.isBackloggedSession);
     setCheckInDetailsSubmitted(!!sub.checkInRequested);
@@ -174,7 +171,6 @@ export function AthleteSubmissionsClient() {
     setEditingId(null);
     setSelectedDate(today);
     setCalendarMonth(today.slice(0, 7));
-    setWellbeingScore("5");
     setDailyNote("");
     setIsBackloggedSession(false);
     setCheckInDetailsSubmitted(false);
@@ -232,7 +228,6 @@ export function AthleteSubmissionsClient() {
     }
     setEditingId(null);
     setFormLocked(false);
-    setWellbeingScore("5");
     setDailyNote("");
     setIsBackloggedSession(false);
     setCheckInDetailsSubmitted(false);
@@ -306,7 +301,6 @@ export function AthleteSubmissionsClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           submissionDate: selectedDate,
-          wellbeingScore: Number(wellbeingScore),
           dailyNote,
           isBackloggedSession,
           checkInRequested: checkInDetailsSubmitted,
@@ -348,7 +342,7 @@ export function AthleteSubmissionsClient() {
     <div className="space-y-8">
     <form onSubmit={submit} className="space-y-6">
       <div className="card-tool grid gap-4 rounded-xl p-4 lg:grid-cols-[1fr,minmax(220px,280px)]">
-        <div className="grid gap-4 md:grid-cols-3">
+        <div>
         <label className="text-xs text-slate-400">
           Date
           <input
@@ -357,21 +351,6 @@ export function AthleteSubmissionsClient() {
             onChange={(e) => onPickDate(e.target.value)}
             className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
           />
-        </label>
-        <label className="text-xs text-slate-400">
-          Wellbeing (1–10)
-          <select
-            value={wellbeingScore}
-            onChange={(e) => setWellbeingScore(e.target.value)}
-            disabled={formLocked}
-            className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
-          >
-            {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
         </label>
         </div>
         <div className="border-t border-white/[0.06] pt-4 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">

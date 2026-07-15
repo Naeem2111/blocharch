@@ -19,10 +19,17 @@ type LatestCompletionLog = {
 };
 
 async function latestCompletionLogForProject(
-  projectId: string
+  projectId: string,
+  athleteId?: string | null
 ): Promise<LatestCompletionLog | null> {
   const latest = await prisma.opsSubmissionLineItem.findFirst({
-    where: { projectId, completionPercent: { not: null } },
+    where: {
+      projectId,
+      completionPercent: { not: null },
+      ...(athleteId
+        ? { submission: { athleteId } }
+        : {}),
+    },
     orderBy: [{ submission: { submissionDate: "desc" } }, { submission: { updatedAt: "desc" } }],
     select: {
       completionPercent: true,
@@ -59,6 +66,29 @@ function completionMetrics(
       ? computeDeadlineBeatenDays(dueDate, completedAt)
       : null;
   return { completedAt, deadlineBeatenDays };
+}
+
+const INACTIVE_PROJECT_STATUSES = new Set(["completed", "handed_over"]);
+
+/** When ops reassigns a finished project, reopen it for the client portal and athlete workspace. */
+export async function reactivateProjectOnAthleteReassign(
+  projectId: string,
+  previousAthleteId: string | null,
+  nextAthleteId: string | null,
+  currentStatus: string
+): Promise<{ currentStatus: "in_progress"; progressPercent: number; completedAt: null; deadlineBeatenDays: null } | null> {
+  if (!nextAthleteId || nextAthleteId === previousAthleteId) return null;
+  if (!INACTIVE_PROJECT_STATUSES.has(currentStatus)) return null;
+
+  const latestForAssignee = await latestCompletionLogForProject(projectId, nextAthleteId);
+  const progressPercent = latestForAssignee?.progressPercent ?? 0;
+
+  return {
+    currentStatus: "in_progress",
+    progressPercent,
+    completedAt: null,
+    deadlineBeatenDays: null,
+  };
 }
 
 /** Recalculate project progress from all daily log line items and sync completion state. */

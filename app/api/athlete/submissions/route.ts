@@ -45,7 +45,6 @@ export async function GET(request: NextRequest) {
     submissions: submissions.map((s) => ({
       id: s.id,
       submissionDate: s.submissionDate.toISOString().slice(0, 10),
-      wellbeingScore: s.wellbeingScore,
       checkInRequested: s.checkInRequested,
       dailyNote: s.dailyNote,
       isBackloggedSession: s.isBackloggedSession,
@@ -154,8 +153,6 @@ export async function POST(request: NextRequest) {
     }
 
     const totalHours = lineItems.reduce((sum, li) => sum + li.hoursWorked, 0);
-    const wellbeingScore =
-      body.wellbeingScore != null ? Math.max(1, Math.min(10, Number(body.wellbeingScore))) : null;
 
     const submission = await prisma.$transaction(async (tx) => {
       if (existing) {
@@ -163,7 +160,6 @@ export async function POST(request: NextRequest) {
         await tx.opsDailySubmission.update({
           where: { id: existing.id },
           data: {
-            wellbeingScore,
             checkInRequested: Boolean(body.checkInRequested),
             dailyNote: body.dailyNote ? String(body.dailyNote).trim() : null,
             isBackloggedSession,
@@ -197,7 +193,6 @@ export async function POST(request: NextRequest) {
         data: {
           athleteId: athlete.id,
           submissionDate,
-          wellbeingScore,
           checkInRequested: Boolean(body.checkInRequested),
           dailyNote: body.dailyNote ? String(body.dailyNote).trim() : null,
           isBackloggedSession,
