@@ -146,6 +146,7 @@ model Architect {
   email       String?
   address     String?
   contact     String?
+  phone       String?
   description String?
   yearsActive String?  @map("years_active")
   staff       String?

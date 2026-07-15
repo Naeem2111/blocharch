@@ -15,6 +15,7 @@ interface Architect {
 	email: string;
 	address: string;
 	contact: string;
+	phone: string;
 	description: string;
 	years_active: string;
 	staff: string;
@@ -25,6 +26,7 @@ const COLUMN_IDS = [
 	"name",
 	"email",
 	"contact",
+	"phone",
 	"website",
 	"address",
 	"years_active",
@@ -41,6 +43,7 @@ const COLUMN_LABELS: Record<ColumnId, string> = {
 	name: "Name",
 	email: "Email",
 	contact: "Contact",
+	phone: "Contact number",
 	website: "Website",
 	address: "Address",
 	years_active: "Years active",
@@ -57,6 +60,7 @@ const DEFAULT_VISIBLE: Record<ColumnId, boolean> = {
 	name: true,
 	email: true,
 	contact: true,
+	phone: true,
 	website: true,
 	address: true,
 	years_active: true,
@@ -333,6 +337,11 @@ export function PracticesClient() {
 											{visible.contact && (
 												<td className="px-4 py-3 text-slate-300 text-sm max-w-[12rem]">
 													{p.contact || "—"}
+												</td>
+											)}
+											{visible.phone && (
+												<td className="px-4 py-3 text-slate-300 text-sm max-w-[12rem] whitespace-nowrap">
+													{p.phone || "—"}
 												</td>
 											)}
 											{visible.website && (

@@ -23,6 +23,7 @@ export async function POST(request: NextRequest) {
       name: body.name,
       email: body.email,
       contact: typeof body.contact === "string" ? body.contact : undefined,
+      phone: typeof body.phone === "string" ? body.phone : undefined,
       website: typeof body.website === "string" ? body.website : undefined,
       address: typeof body.address === "string" ? body.address : undefined,
     });

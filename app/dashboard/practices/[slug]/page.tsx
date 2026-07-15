@@ -82,6 +82,14 @@ export default async function PracticeDetailPage({
               <p className="text-slate-200">{practice.contact}</p>
             </div>
           )}
+          {practice.phone && (
+            <div>
+              <p className="text-slate-500 text-xs font-medium uppercase tracking-wider mb-1">
+                Contact number
+              </p>
+              <p className="text-slate-200">{practice.phone}</p>
+            </div>
+          )}
           {practice.address && (
             <div>
               <p className="text-slate-500 text-xs font-medium uppercase tracking-wider mb-1">

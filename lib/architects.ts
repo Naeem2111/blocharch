@@ -17,6 +17,7 @@ export interface Architect {
   email: string;
   address: string;
   contact: string;
+  phone: string;
   description: string;
   years_active: string;
   staff: string;
@@ -39,6 +40,7 @@ export async function loadArchitects(): Promise<Architect[]> {
     email: r.email || "",
     address: r.address || "",
     contact: r.contact || "",
+    phone: r.phone || "",
     description: r.description || "",
     years_active: r.yearsActive || "",
     staff: r.staff || "",
@@ -73,7 +75,8 @@ export async function searchArchitects(params: {
         a.description?.toLowerCase().includes(q) ||
         a.email?.toLowerCase().includes(q) ||
         a.address?.toLowerCase().includes(q) ||
-        a.contact?.toLowerCase().includes(q)
+        a.contact?.toLowerCase().includes(q) ||
+        a.phone?.toLowerCase().includes(q)
     );
   }
 
@@ -91,6 +94,7 @@ export type CreateManualPracticeInput = {
   name: string;
   email: string;
   contact?: string;
+  phone?: string;
   website?: string;
   address?: string;
 };
@@ -121,6 +125,7 @@ export async function createManualPractice(
       name,
       email,
       contact: input.contact?.trim() || null,
+      phone: input.phone?.trim() || null,
       website: input.website?.trim() || null,
       address: input.address?.trim() || null,
       socials: [],
@@ -146,6 +151,7 @@ export async function createManualPractice(
     email: row.email || "",
     address: row.address || "",
     contact: row.contact || "",
+    phone: row.phone || "",
     description: row.description || "",
     years_active: row.yearsActive || "",
     staff: row.staff || "",
@@ -158,6 +164,7 @@ export type UpdatePracticeInput = {
   name?: string;
   email?: string | null;
   contact?: string | null;
+  phone?: string | null;
   website?: string | null;
   address?: string | null;
 };
@@ -170,6 +177,7 @@ function mapArchitectRow(r: {
   email: string | null;
   address: string | null;
   contact: string | null;
+  phone: string | null;
   description: string | null;
   yearsActive: string | null;
   staff: string | null;
@@ -183,6 +191,7 @@ function mapArchitectRow(r: {
     email: r.email || "",
     address: r.address || "",
     contact: r.contact || "",
+    phone: r.phone || "",
     description: r.description || "",
     years_active: r.yearsActive || "",
     staff: r.staff || "",
@@ -241,6 +250,9 @@ export async function updateArchitect(
   if (input.contact !== undefined) {
     updates.contact = input.contact?.trim() || null;
   }
+  if (input.phone !== undefined) {
+    updates.phone = input.phone?.trim() || null;
+  }
   if (input.website !== undefined) {
     updates.website = input.website?.trim() || null;
   }
@@ -254,6 +266,7 @@ export async function updateArchitect(
       ...(updates.name !== undefined ? { name: updates.name } : {}),
       ...(updates.email !== undefined ? { email: updates.email } : {}),
       ...(updates.contact !== undefined ? { contact: updates.contact } : {}),
+      ...(updates.phone !== undefined ? { phone: updates.phone } : {}),
       ...(updates.website !== undefined ? { website: updates.website } : {}),
       ...(updates.address !== undefined ? { address: updates.address } : {}),
     },

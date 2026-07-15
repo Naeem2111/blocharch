@@ -709,7 +709,7 @@ export function DashboardSidebar({
       }`}
     >
       <div className="border-b border-white/[0.06] px-4 py-5">
-        <BrandMark />
+        <BrandMark logoSize="xl" />
         <p className="mt-3 text-xs leading-relaxed text-slate-500">
           Blocharch console — marketing, project operations, and athlete workflows in one place.
         </p>

@@ -7,11 +7,25 @@ type Props = {
   compact?: boolean;
   /** Vertical, centered — for login */
   variant?: "row" | "stack";
+  /** Sidebar header size (default row logo is 40px; xl is 5×). */
+  logoSize?: "default" | "xl";
 };
 
+const LOGO_DISPLAY = {
+  default: { className: "h-10 w-10", width: 100, height: 100 },
+  xl: { className: "h-[12.5rem] w-[12.5rem]", width: 500, height: 500 },
+  stack: { className: "h-20 w-20 max-h-[5.5rem] max-w-[5.5rem]", width: 100, height: 100 },
+} as const;
+
 /** Blocharch logo + Console label. */
-export function BrandMark({ className = "", compact = false, variant = "row" }: Props) {
+export function BrandMark({
+  className = "",
+  compact = false,
+  variant = "row",
+  logoSize = "default",
+}: Props) {
   const stack = variant === "stack";
+  const logo = stack ? LOGO_DISPLAY.stack : LOGO_DISPLAY[logoSize];
 
   return (
     <Link
@@ -23,14 +37,10 @@ export function BrandMark({ className = "", compact = false, variant = "row" }: 
       <Image
         src={brandAssets.logo}
         alt="Blocharch"
-        width={100}
-        height={100}
+        width={logo.width}
+        height={logo.height}
         priority
-        className={
-          stack
-            ? "h-20 w-20 max-h-[5.5rem] max-w-[5.5rem] object-contain dark:mix-blend-normal"
-            : "h-10 w-10 object-contain object-left dark:mix-blend-normal"
-        }
+        className={`${logo.className} object-contain object-left dark:mix-blend-normal`}
       />
       {!compact && (
         <span className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">

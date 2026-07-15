@@ -18,6 +18,7 @@ export function AddPracticeForm({
     name: "",
     email: "",
     contact: "",
+    phone: "",
     website: "",
     address: "",
   });
@@ -40,7 +41,7 @@ export function AddPracticeForm({
       }
       setCreated({ slug: data.slug, name: data.name });
       onCreated?.(data);
-      setForm({ name: "", email: "", contact: "", website: "", address: "" });
+      setForm({ name: "", email: "", contact: "", phone: "", website: "", address: "" });
       if (compact) setOpen(false);
     } finally {
       setSaving(false);
@@ -125,6 +126,16 @@ export function AddPracticeForm({
             <input
               value={form.contact}
               onChange={(e) => setForm({ ...form, contact: e.target.value })}
+              className="field-console mt-1 w-full rounded-lg px-3 py-2 text-sm"
+              placeholder="Optional"
+            />
+          </label>
+          <label className="block text-xs text-slate-400">
+            Contact number
+            <input
+              type="tel"
+              value={form.phone}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
               className="field-console mt-1 w-full rounded-lg px-3 py-2 text-sm"
               placeholder="Optional"
             />

@@ -5,6 +5,7 @@ import { getSessionFromRequest } from "@/lib/auth";
 import type { SessionUser } from "@/lib/auth";
 import { canAccessModule } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
+import { ensureLinkedAthleteProfile } from "@/lib/ops-athlete-profile";
 
 /** Load slots / read book-call data — athletes only for writes; admin may load manual slots. */
 export async function requireBookCallReadAccess(
@@ -16,11 +17,10 @@ export async function requireBookCallReadAccess(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  if (session.user.role === "admin") {
-    return { user: session.user, athlete: null };
+  let athlete = await prisma.opsAthlete.findUnique({ where: { userId: session.user.id } });
+  if (!athlete) {
+    athlete = await ensureLinkedAthleteProfile(session.user);
   }
-
-  const athlete = await prisma.opsAthlete.findUnique({ where: { userId: session.user.id } });
   if (!athlete) {
     return NextResponse.json({ error: "No athlete profile linked to this account" }, { status: 404 });
   }

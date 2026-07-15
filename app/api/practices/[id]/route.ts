@@ -35,6 +35,7 @@ export async function PATCH(
     name?: string;
     email?: string | null;
     contact?: string | null;
+    phone?: string | null;
     website?: string | null;
     address?: string | null;
   } = {};
@@ -42,6 +43,7 @@ export async function PATCH(
   if (typeof body.name === "string") updates.name = body.name;
   if (body.email === null || typeof body.email === "string") updates.email = body.email;
   if (body.contact === null || typeof body.contact === "string") updates.contact = body.contact;
+  if (body.phone === null || typeof body.phone === "string") updates.phone = body.phone;
   if (body.website === null || typeof body.website === "string") updates.website = body.website;
   if (body.address === null || typeof body.address === "string") updates.address = body.address;
 

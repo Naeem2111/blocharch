@@ -8,6 +8,7 @@ type Practice = {
   name: string;
   email: string;
   contact: string;
+  phone: string;
   website: string;
   address: string;
 };
@@ -28,6 +29,7 @@ export function EditPracticeModal({
     name: practice.name,
     email: practice.email,
     contact: practice.contact,
+    phone: practice.phone,
     website: practice.website,
     address: practice.address,
   });
@@ -37,6 +39,7 @@ export function EditPracticeModal({
       name: practice.name,
       email: practice.email,
       contact: practice.contact,
+      phone: practice.phone,
       website: practice.website,
       address: practice.address,
     });
@@ -62,6 +65,7 @@ export function EditPracticeModal({
         name: data.name ?? form.name,
         email: data.email ?? "",
         contact: data.contact ?? "",
+        phone: data.phone ?? "",
         website: data.website ?? "",
         address: data.address ?? "",
       });
@@ -116,6 +120,16 @@ export function EditPracticeModal({
             <input
               value={form.contact}
               onChange={(e) => setForm({ ...form, contact: e.target.value })}
+              className="field-console mt-1 w-full rounded-lg px-3 py-2 text-sm"
+              placeholder="Optional"
+            />
+          </label>
+          <label className="block text-xs text-slate-400">
+            Contact number
+            <input
+              type="tel"
+              value={form.phone}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
               className="field-console mt-1 w-full rounded-lg px-3 py-2 text-sm"
               placeholder="Optional"
             />

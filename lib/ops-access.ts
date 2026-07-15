@@ -7,6 +7,7 @@ import { canAccessModule, canAccessOpsOverview } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { computeMonthlyHoursSummary, monthEndUtc, monthStartUtc } from "@/lib/ops-hours";
 import { projectDisplayFields } from "@/lib/project-display";
+import { ensureLinkedAthleteProfile } from "@/lib/ops-athlete-profile";
 
 export async function requireOpsSession(
   request: NextRequest
@@ -15,6 +16,9 @@ export async function requireOpsSession(
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!canAccessModule(session.user.role, "ops")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  if (session.user.role === "admin") {
+    await ensureLinkedAthleteProfile(session.user);
   }
   return { user: session.user };
 }
@@ -40,14 +44,10 @@ export async function requireAthletePortalSession(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  if (session.user.role === "admin") {
-    return NextResponse.json(
-      { error: "Admin preview requires an athlete account link — use ops athlete manager." },
-      { status: 400 }
-    );
+  let athlete = await prisma.opsAthlete.findUnique({ where: { userId: session.user.id } });
+  if (!athlete) {
+    athlete = await ensureLinkedAthleteProfile(session.user);
   }
-
-  const athlete = await prisma.opsAthlete.findUnique({ where: { userId: session.user.id } });
   if (!athlete) {
     return NextResponse.json({ error: "No athlete profile linked to this account" }, { status: 404 });
   }
