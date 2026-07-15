@@ -15,12 +15,12 @@ function readThemeFromDom(): ThemePreference {
   return normalizeTheme(document.documentElement.dataset.theme);
 }
 
-/** Visible crop box + oversized image to trim baked-in padding in logo PNGs. */
+/** Width + visible height ratio (trims empty padding baked into square logo PNGs). */
 const WORDMARK_SIZES = {
-  sm: { wrap: "h-[2.75rem] w-[10.5rem]", img: "h-[9rem] w-[10.5rem]" },
-  md: { wrap: "h-[3.5rem] w-[13rem]", img: "h-[11rem] w-[13rem]" },
-  lg: { wrap: "h-[4.25rem] w-[14rem]", img: "h-[12rem] w-[14rem]" },
-  xl: { wrap: "h-[5.5rem] w-[15rem]", img: "h-[14.5rem] w-[15rem]" },
+  sm: { width: "10.5rem", visibleRatio: 0.44 },
+  md: { width: "13rem", visibleRatio: 0.44 },
+  lg: { width: "14rem", visibleRatio: 0.44 },
+  xl: { width: "15rem", visibleRatio: 0.44 },
 } as const;
 
 export type WordmarkSize = keyof typeof WORDMARK_SIZES;
@@ -53,9 +53,11 @@ export function BlocharchWordmark({
 
   return (
     <span
-      className={`block shrink-0 overflow-hidden leading-none ${dims.wrap} ${
-        centered ? "mx-auto" : ""
-      } ${className}`}
+      className={`mb-0 block shrink-0 overflow-hidden leading-none ${centered ? "mx-auto" : ""} ${className}`}
+      style={{
+        width: dims.width,
+        height: `calc(${dims.width} * ${dims.visibleRatio})`,
+      }}
     >
       <Image
         src={logoSrc}
@@ -63,7 +65,7 @@ export function BlocharchWordmark({
         width={600}
         height={600}
         priority
-        className={`${dims.img} object-cover object-left-top`}
+        className="block h-auto w-full"
       />
     </span>
   );
