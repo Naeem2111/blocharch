@@ -1,12 +1,10 @@
 import type { PublicClientPortalProject } from "@/lib/public-client-portal";
-import { daysUntilDueFromIso } from "@/lib/project-color-scale";
+import {
+  clientPortalDeadlineBeatDescription,
+  clientPortalProjectBeatDeadline,
+} from "@/lib/client-portal-projects";
 
-export type ClientPortalNotificationKind =
-  | "deadline_approaching"
-  | "ready_for_review"
-  | "status_updated"
-  | "project_scheduled"
-  | "deadline_beaten";
+export type ClientPortalNotificationKind = "deadline_beaten";
 
 export type ClientPortalNotification = {
   id: string;
@@ -33,88 +31,31 @@ function relativeLabelFromIso(iso: string | null, fallback = "Recently"): string
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
-function formatDuePhrase(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(`${iso}T12:00:00`);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "long" });
-}
-
 export function buildClientPortalNotifications(
-  activeProjects: PublicClientPortalProject[],
+  _activeProjects: PublicClientPortalProject[],
   completedProjects: PublicClientPortalProject[]
 ): ClientPortalNotification[] {
-  const items: ClientPortalNotification[] = [];
+  const beaten = completedProjects
+    .filter((p) => clientPortalProjectBeatDeadline(p))
+    .sort((a, b) => {
+      const aTime = a.handoverDate
+        ? new Date(`${a.handoverDate}T12:00:00`).getTime()
+        : 0;
+      const bTime = b.handoverDate
+        ? new Date(`${b.handoverDate}T12:00:00`).getTime()
+        : 0;
+      return bTime - aTime;
+    });
 
-  for (const p of activeProjects) {
-    const days = daysUntilDueFromIso(p.dueDate);
-    if (days != null && days >= 0 && days <= 3) {
-      items.push({
-        id: `${p.id}-deadline`,
-        kind: "deadline_approaching",
-        title: `Deadline approaching — ${p.name}`,
-        description: `${p.currentStageLabel} ${days === 0 ? "is due today" : days === 1 ? "is due tomorrow" : `is due in ${days} days`}${p.dueDate ? `, ${formatDuePhrase(p.dueDate)}` : ""}.`,
-        timeLabel: days === 0 ? "Today" : days === 1 ? "Yesterday" : `${days} days ago`,
-        projectId: p.id,
-      });
-    }
-
-    if (p.currentStatus === "waiting_on_feedback") {
-      items.push({
-        id: `${p.id}-review`,
-        kind: "ready_for_review",
-        title: `Ready for review — ${p.name}`,
-        description: `${p.currentStageLabel} is ready for your feedback.`,
-        timeLabel: relativeLabelFromIso(p.dueDate, "Recently"),
-        projectId: p.id,
-      });
-    }
-
-    if (p.currentStatus === "not_started") {
-      items.push({
-        id: `${p.id}-scheduled`,
-        kind: "project_scheduled",
-        title: `Project scheduled — ${p.name}`,
-        description: p.startDate
-          ? `Work is scheduled from ${formatDuePhrase(p.startDate)}.`
-          : "This project has been scheduled and will start soon.",
-        timeLabel: relativeLabelFromIso(p.startDate, "Recently"),
-        projectId: p.id,
-      });
-    }
-
-    if (p.currentStatus === "in_progress" && days != null && days > 3) {
-      items.push({
-        id: `${p.id}-status`,
-        kind: "status_updated",
-        title: `Status updated — ${p.name}`,
-        description: `${p.currentStageLabel} is now in progress (${p.progressPercent}% complete).`,
-        timeLabel: relativeLabelFromIso(p.startDate, "Recently"),
-        projectId: p.id,
-      });
-    }
-  }
-
-  for (const p of completedProjects) {
-    if (p.deadlineBeatenDays != null && p.deadlineBeatenDays > 0) {
-      items.push({
-        id: `${p.id}-beaten`,
-        kind: "deadline_beaten",
-        title: `Deadline beaten — ${p.name}`,
-        description: `Delivered ${p.deadlineBeatenDays} day${p.deadlineBeatenDays === 1 ? "" : "s"} ahead of schedule.`,
-        timeLabel: relativeLabelFromIso(p.handoverDate, "Recently"),
-        projectId: p.id,
-      });
-    }
-  }
-
-  const kindOrder: Record<ClientPortalNotificationKind, number> = {
-    deadline_approaching: 0,
-    ready_for_review: 1,
-    status_updated: 2,
-    project_scheduled: 3,
-    deadline_beaten: 4,
-  };
-
-  return items.sort((a, b) => kindOrder[a.kind] - kindOrder[b.kind]);
+  return beaten.map((p) => {
+    const copy = clientPortalDeadlineBeatDescription(p);
+    return {
+      id: `${p.id}-beaten`,
+      kind: "deadline_beaten",
+      title: copy.title,
+      description: copy.description,
+      timeLabel: relativeLabelFromIso(p.handoverDate, "Recently"),
+      projectId: p.id,
+    };
+  });
 }

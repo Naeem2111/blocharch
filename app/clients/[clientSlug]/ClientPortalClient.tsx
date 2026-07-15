@@ -18,6 +18,7 @@ import {
 	daysUntilDueFromIso,
 	projectDueColor,
 } from "@/lib/project-color-scale";
+import { clientPortalProjectBeatDeadline } from "@/lib/client-portal-projects";
 import { PublicThemeToggle } from "@/components/client-portal/PublicThemeToggle";
 import type {
 	PublicClientPortalData,
@@ -57,10 +58,6 @@ const NOTIFICATION_ICON: Record<
 	ClientPortalNotificationKind,
 	{ glyph: string; bg: string; color: string }
 > = {
-	deadline_approaching: { glyph: "⏱", bg: "rgba(239,68,68,0.15)", color: "#f87171" },
-	ready_for_review: { glyph: "✓", bg: "rgba(34,197,94,0.15)", color: "#4ade80" },
-	status_updated: { glyph: "↻", bg: "rgba(59,130,246,0.15)", color: "#60a5fa" },
-	project_scheduled: { glyph: "▶", bg: "rgba(100,116,139,0.2)", color: "#94a3b8" },
 	deadline_beaten: { glyph: "★", bg: "rgba(234,179,8,0.15)", color: "#facc15" },
 };
 
@@ -320,13 +317,8 @@ export function ClientPortalClient({
 	const beatenSummary = useMemo(() => {
 		const total = data.completedProjects.length;
 		if (total === 0) return null;
-		const beaten = data.completedProjects.filter(
-			(p) =>
-				p.deadlineBeatenDays != null &&
-				(p.deadlineBeatenDays > 0 ||
-					(p.handoverDate &&
-						p.dueDate &&
-						p.handoverDate <= p.dueDate)),
+		const beaten = data.completedProjects.filter((p) =>
+			clientPortalProjectBeatDeadline(p),
 		).length;
 		const pct = Math.round((beaten / total) * 100);
 		return { beaten, total, pct };
@@ -347,7 +339,7 @@ export function ClientPortalClient({
 			? "Live view of active project status and deadlines."
 			: tab === "completed"
 				? "Completed projects · full delivery record"
-				: "Updates across your projects";
+				: "Beat deadline updates across your projects";
 
 	return (
 		<div className="flex min-h-screen">
@@ -598,7 +590,7 @@ export function ClientPortalClient({
 							<div className="client-portal-card mt-4 rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 sm:px-5">
 								{notifications.length === 0 ? (
 									<p className="py-8 text-center text-sm text-slate-500">
-										No notifications right now.
+										No beaten deadlines yet.
 									</p>
 								) : (
 									notifications.map((n) => (

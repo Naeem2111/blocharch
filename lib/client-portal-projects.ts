@@ -37,3 +37,40 @@ export function isClientPortalCompletedProject(project: {
 }): boolean {
   return !isClientPortalActiveProject(project);
 }
+
+/** Delivered on or before the due date (early or on time). */
+export function clientPortalProjectBeatDeadline(project: {
+  deadlineBeatenDays: number | null;
+  handoverDate: string | null;
+  dueDate: string | null;
+}): boolean {
+  if (project.deadlineBeatenDays != null && project.deadlineBeatenDays > 0) {
+    return true;
+  }
+  if (
+    project.handoverDate &&
+    project.dueDate &&
+    project.handoverDate <= project.dueDate
+  ) {
+    return true;
+  }
+  return false;
+}
+
+export function clientPortalDeadlineBeatDescription(project: {
+  name: string;
+  deadlineBeatenDays: number | null;
+  handoverDate: string | null;
+  dueDate: string | null;
+}): { title: string; description: string } {
+  if (project.deadlineBeatenDays != null && project.deadlineBeatenDays > 0) {
+    return {
+      title: `Deadline beaten — ${project.name}`,
+      description: `Delivered ${project.deadlineBeatenDays} day${project.deadlineBeatenDays === 1 ? "" : "s"} ahead of schedule.`,
+    };
+  }
+  return {
+    title: `Deadline beaten — ${project.name}`,
+    description: "Delivered on or ahead of the deadline.",
+  };
+}
