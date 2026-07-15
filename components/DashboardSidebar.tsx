@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BrandMark } from "@/components/BrandMark";
+import { AdminViewSwitcher } from "@/components/AdminViewSwitcher";
 import { LogoutButton } from "@/components/LogoutButton";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { BLOCHARCH_SITE } from "@/lib/blocharch-brand";
@@ -21,6 +22,11 @@ import {
 	saveSidebarNavOrder,
 	type SidebarNavOrder,
 } from "@/lib/sidebar-nav-order";
+import {
+	adminViewFromPath,
+	sectionsForAdminView,
+	type AdminConsoleView,
+} from "@/lib/admin-console-view";
 
 type NavItem = {
 	href: string;
@@ -884,6 +890,11 @@ export function DashboardSidebar({
 		[navOrder?.collapsedSections],
 	);
 
+	const adminView = useMemo((): AdminConsoleView | null => {
+		if (user.role !== "admin") return null;
+		return adminViewFromPath(pathname);
+	}, [user.role, pathname]);
+
 	const visibleSections = useMemo(() => {
 		const filtered = NAV_SECTIONS.filter((section) => {
 			if (section.id === "onboarding" || section.id === "ops") {
@@ -894,7 +905,13 @@ export function DashboardSidebar({
 			if (section.id === "planner" && user.role === "user") return false;
 			return true;
 		});
-		const ordered = applySectionOrder(filtered, navOrder?.sections);
+		const viewFiltered =
+			user.role === "admin" && adminView
+				? filtered.filter((section) =>
+						sectionsForAdminView(adminView).includes(section.id),
+					)
+				: filtered;
+		const ordered = applySectionOrder(viewFiltered, navOrder?.sections);
 		return ordered.map((section) => {
 			const items =
 				section.id === "ops" && user.role === "manager"
@@ -905,7 +922,7 @@ export function DashboardSidebar({
 				items: applyItemOrder(items, navOrder?.items[section.id]),
 			};
 		});
-	}, [user.role, navOrder]);
+	}, [user.role, navOrder, adminView]);
 
 	const persistSectionOrder = (ids: string[]) => {
 		setNavOrder((prev) => ({
@@ -971,9 +988,9 @@ export function DashboardSidebar({
 				mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
 			}`}
 		>
-			<div className="border-b border-white/[0.06] px-4 py-4">
+			<div className="border-b border-white/[0.06] px-4 pb-4 pt-5">
 				<BrandMark logoSize="xl" />
-				<p className="mt-2 text-xs leading-relaxed text-slate-500">
+				<p className="mt-3 text-xs leading-relaxed text-slate-500">
 					Blocharch console — marketing, project operations, and athlete
 					workflows in one place.
 				</p>
@@ -989,6 +1006,15 @@ export function DashboardSidebar({
 					</span>
 				</a>
 			</div>
+			{user.role === "admin" && adminView ? (
+				<div className="border-b border-white/[0.06] px-3 py-3">
+					<AdminViewSwitcher
+						userId={user.id}
+						value={adminView}
+						onNavigate={onNavigate}
+					/>
+				</div>
+			) : null}
 			<nav
 				className="flex-1 space-y-1 overflow-y-auto overscroll-y-contain p-3"
 				aria-label="Main"
