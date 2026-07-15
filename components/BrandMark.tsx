@@ -1,21 +1,22 @@
-import Image from "next/image";
+"use client";
+
 import Link from "next/link";
-import { brandAssets } from "@/lib/blocharch-brand";
+import { BlocharchWordmark, type WordmarkSize } from "@/components/BlocharchWordmark";
 
 type Props = {
   className?: string;
   compact?: boolean;
   /** Vertical, centered — for login */
   variant?: "row" | "stack";
-  /** Sidebar header size (default row logo is 40px; xl is 5×). */
+  /** Sidebar header size (xl is the enlarged dashboard logo). */
   logoSize?: "default" | "xl";
 };
 
-const LOGO_DISPLAY = {
-  default: { className: "h-10 w-10", width: 100, height: 100 },
-  xl: { className: "h-[12.5rem] w-[12.5rem]", width: 500, height: 500 },
-  stack: { className: "h-20 w-20 max-h-[5.5rem] max-w-[5.5rem]", width: 100, height: 100 },
-} as const;
+function resolveWordmarkSize(variant: "row" | "stack", logoSize: "default" | "xl"): WordmarkSize {
+  if (variant === "stack") return "lg";
+  if (logoSize === "xl") return "xl";
+  return "sm";
+}
 
 /** Blocharch logo + Console label. */
 export function BrandMark({
@@ -25,7 +26,6 @@ export function BrandMark({
   logoSize = "default",
 }: Props) {
   const stack = variant === "stack";
-  const logo = stack ? LOGO_DISPLAY.stack : LOGO_DISPLAY[logoSize];
 
   return (
     <Link
@@ -34,13 +34,9 @@ export function BrandMark({
         stack ? "flex-col items-center gap-3 text-center" : "flex-col gap-1.5 items-start"
       } ${className}`}
     >
-      <Image
-        src={brandAssets.logo}
-        alt="Blocharch"
-        width={logo.width}
-        height={logo.height}
-        priority
-        className={`${logo.className} object-contain object-left dark:mix-blend-normal`}
+      <BlocharchWordmark
+        size={resolveWordmarkSize(variant, logoSize)}
+        centered={stack}
       />
       {!compact && (
         <span className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">

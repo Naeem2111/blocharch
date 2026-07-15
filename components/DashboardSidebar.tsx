@@ -708,9 +708,9 @@ export function DashboardSidebar({
         mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
       }`}
     >
-      <div className="border-b border-white/[0.06] px-4 py-5">
+      <div className="border-b border-white/[0.06] px-4 py-4">
         <BrandMark logoSize="xl" />
-        <p className="mt-3 text-xs leading-relaxed text-slate-500">
+        <p className="mt-2 text-xs leading-relaxed text-slate-500">
           Blocharch console — marketing, project operations, and athlete workflows in one place.
         </p>
         <a
