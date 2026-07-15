@@ -8,7 +8,7 @@ export async function recalculateSubmissionTotals(
   submissionIds: Iterable<string>,
   db: Db = prisma
 ): Promise<void> {
-  const ids = [...new Set(submissionIds)];
+  const ids = Array.from(new Set(submissionIds));
   if (ids.length === 0) return;
 
   for (const submissionId of ids) {

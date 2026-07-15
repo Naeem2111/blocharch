@@ -15,6 +15,72 @@ import { REACTIVATION_PROGRESS_PERCENT } from "@/lib/sync-project-progress";
 
 type RouteContext = { params: Promise<{ projectId: string }> };
 
+export async function GET(request: NextRequest, context: RouteContext) {
+  const gate = await requireAthletePortalSession(request);
+  if (gate instanceof NextResponse) return gate;
+  const { athlete } = gate;
+
+  const { projectId } = await context.params;
+  const project = await prisma.opsProject.findFirst({
+    where: { id: projectId, assignedAthleteId: athlete.id },
+    select: {
+      ...athleteProjectSelect,
+      completedAt: true,
+      assignedAthlete: { select: { fullName: true, athleteCode: true } },
+    },
+  });
+  if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
+
+  const hoursAgg = await prisma.opsSubmissionLineItem.aggregate({
+    where: { projectId },
+    _sum: { hoursWorked: true },
+  });
+
+  const submissions = await prisma.opsDailySubmission.findMany({
+    where: { athleteId: athlete.id, lineItems: { some: { projectId } } },
+    orderBy: { submissionDate: "desc" },
+    take: 60,
+    include: {
+      athlete: { select: { fullName: true, athleteCode: true } },
+      lineItems: {
+        where: { projectId },
+      },
+    },
+  });
+
+  const serialized = serializeProjectForAthlete(project);
+
+  return NextResponse.json({
+    project: {
+      ...serialized,
+      clientName: project.client.name,
+      assignedAthleteName: project.assignedAthlete?.fullName ?? null,
+      assignedAthleteCode: project.assignedAthlete?.athleteCode ?? null,
+      hoursLogged: Number(hoursAgg._sum.hoursWorked ?? 0),
+      completedAt: project.completedAt?.toISOString().slice(0, 10) ?? null,
+    },
+    submissions: submissions.map((s) => ({
+      id: s.id,
+      submissionDate: s.submissionDate.toISOString().slice(0, 10),
+      athleteName: s.athlete.fullName,
+      athleteCode: s.athlete.athleteCode,
+      totalHours: Number(s.totalHours),
+      isBackloggedSession: s.isBackloggedSession,
+      dailyNote: s.dailyNote,
+      lineItems: s.lineItems.map((li) => ({
+        id: li.id,
+        projectPhase: li.projectPhase,
+        taskType: li.taskType,
+        taskTypes: li.taskTypes,
+        hoursWorked: Number(li.hoursWorked),
+        completionPercent: li.completionPercent,
+        completedSummary: li.completedSummary,
+        notes: li.notes,
+      })),
+    })),
+  });
+}
+
 export async function PATCH(request: NextRequest, context: RouteContext) {
   const gate = await requireAthletePortalSession(request);
   if (gate instanceof NextResponse) return gate;

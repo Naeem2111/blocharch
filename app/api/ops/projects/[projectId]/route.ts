@@ -11,7 +11,6 @@ import { parseDateOnly } from "@/lib/ops-hours";
 import { syncProjectAfterOpsUpdate } from "@/lib/planner-project-sync";
 import { reactivateProjectOnAthleteReassign, syncProjectProgressForProjects } from "@/lib/sync-project-progress";
 import { normalizeAthleteProjectCode } from "@/lib/ops-project-code";
-import { projectDisplayFields } from "@/lib/project-display";
 import { validateProjectLeadContactDb } from "@/lib/ops-project-lead";
 import { deleteProjectAndSyncSubmissions } from "@/lib/sync-submission-totals";
 import { parseProjectDueInput } from "@/lib/project-deadline";

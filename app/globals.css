@@ -727,19 +727,23 @@ input.progress-slider::-moz-range-thumb {
 }
 
 .planner-done-toggle:hover {
-  border-color: rgb(34 211 238 / 0.55);
-  background: rgb(6 182 212 / 0.12);
+  border-color: rgb(34 197 94 / 0.45);
+  background: rgb(34 197 94 / 0.1);
 }
 
 .planner-done-toggle-checked {
-  border-color: rgb(34 211 238 / 0.85);
-  background: rgb(6 182 212 / 0.85);
-  color: #0f172a;
+  border-color: rgb(34 197 94 / 0.9);
+  background: rgb(34 197 94 / 0.28);
+  color: rgb(22 163 74);
+  box-shadow: 0 0 0 1px rgb(34 197 94 / 0.2);
 }
 
 .planner-done-toggle-animating {
   animation: planner-done-pop 420ms cubic-bezier(0.34, 1.4, 0.64, 1);
-  box-shadow: 0 0 0 2px rgb(6 182 212 / 0.35);
+  border-color: rgb(34 197 94 / 0.9);
+  background: rgb(34 197 94 / 0.32);
+  color: rgb(22 163 74);
+  box-shadow: 0 0 0 2px rgb(34 197 94 / 0.35);
 }
 
 @keyframes planner-done-pop {
@@ -791,7 +795,7 @@ input.progress-slider::-moz-range-thumb {
 }
 
 .planner-task-card-completing {
-  box-shadow: 0 0 0 2px rgb(6 182 212 / 0.28);
+  box-shadow: 0 0 0 2px rgb(34 197 94 / 0.28);
   transition: box-shadow 200ms ease;
 }
 
@@ -802,7 +806,13 @@ input.progress-slider::-moz-range-thumb {
 }
 
 [data-theme="light"] .planner-done-toggle-checked {
-  border-color: rgb(8 145 178);
-  background: rgb(6 182 212);
-  color: #fff;
+  border-color: rgb(22 163 74);
+  background: rgb(220 252 231);
+  color: rgb(22 163 74);
+  box-shadow: 0 0 0 1px rgb(34 197 94 / 0.25);
+}
+
+[data-theme="light"] .planner-done-toggle-animating {
+  background: rgb(187 247 208);
+  box-shadow: 0 0 0 2px rgb(34 197 94 / 0.35);
 }

@@ -86,7 +86,8 @@ export async function buildBeatenDeadlines(
   const byAthlete = new Map<string, BeatenDeadlinesByAthlete>();
 
   for (const p of projects) {
-    if (!p.dueDate || !p.assignedAthlete) continue;
+    const dueDate = p.dueDate;
+    if (!dueDate || !p.assignedAthlete) continue;
 
     const completed =
       p.completedAt != null
@@ -96,7 +97,17 @@ export async function buildBeatenDeadlines(
           : dateOnlyUtc(p.updatedAt);
     if (dateOnlyUtc(completed) < from || dateOnlyUtc(completed) > to) continue;
 
-    const minutesBeaten = resolveBeatenMinutes(p, completed);
+    const minutesBeaten = resolveBeatenMinutes(
+      {
+        dueDate,
+        completedAt: p.completedAt,
+        handoverDate: p.handoverDate,
+        updatedAt: p.updatedAt,
+        deadlineBeatenMinutes: p.deadlineBeatenMinutes,
+        deadlineBeatenDays: p.deadlineBeatenDays,
+      },
+      completed
+    );
     if (minutesBeaten == null || minutesBeaten <= 0) continue;
 
     const daysBeaten = Math.floor(minutesBeaten / 1440);
@@ -120,8 +131,8 @@ export async function buildBeatenDeadlines(
       projectId: p.id,
       projectName: p.name,
       clientName: p.client.name,
-      dueDate: p.dueDate.toISOString().slice(0, 10),
-      dueAt: p.dueDate.toISOString(),
+      dueDate: dueDate.toISOString().slice(0, 10),
+      dueAt: dueDate.toISOString(),
       completedDate: completed.toISOString(),
       minutesBeaten,
       daysBeaten,

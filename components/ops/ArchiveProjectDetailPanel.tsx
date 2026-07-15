@@ -47,9 +47,13 @@ type SubmissionRow = {
 export function ArchiveProjectDetailPanel({
   projectId,
   onClose,
+  detailPath = "/api/ops/projects",
+  showOpsEditHint = true,
 }: {
   projectId: string;
   onClose: () => void;
+  detailPath?: string;
+  showOpsEditHint?: boolean;
 }) {
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [submissions, setSubmissions] = useState<SubmissionRow[]>([]);
@@ -58,7 +62,7 @@ export function ArchiveProjectDetailPanel({
 
   const load = useCallback(async () => {
     setLoading(true);
-    const r = await fetch(`/api/ops/projects/${encodeURIComponent(projectId)}`);
+    const r = await fetch(`${detailPath}/${encodeURIComponent(projectId)}`);
     const j = await r.json();
     if (!r.ok) {
       setError(j.error || "Could not load project");
@@ -69,7 +73,7 @@ export function ArchiveProjectDetailPanel({
     setSubmissions(j.submissions || []);
     setError("");
     setLoading(false);
-  }, [projectId]);
+  }, [projectId, detailPath]);
 
   useEffect(() => {
     void load();
@@ -169,9 +173,11 @@ export function ArchiveProjectDetailPanel({
               )}
             </div>
 
-            <p className="text-xs text-slate-500">
-              Edit this project from Ops → Projects (use “All” view) or ask ops to update archived records.
-            </p>
+            {showOpsEditHint ? (
+              <p className="text-xs text-slate-500">
+                Edit this project from Ops → Projects (use “All” view) or ask ops to update archived records.
+              </p>
+            ) : null}
           </div>
         ) : null}
       </div>

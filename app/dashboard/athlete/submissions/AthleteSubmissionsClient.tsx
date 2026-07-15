@@ -99,6 +99,63 @@ function emptyHousekeepingLine(): LineItemForm {
   };
 }
 
+function EntryTypeSegment({
+  value,
+  onChange,
+  disabled,
+  canSelectProject,
+  canSelectHousekeeping,
+}: {
+  value: "project" | "housekeeping";
+  onChange: (value: "project" | "housekeeping") => void;
+  disabled?: boolean;
+  canSelectProject: boolean;
+  canSelectHousekeeping: boolean;
+}) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Entry type"
+      className="grid grid-cols-2 gap-1 rounded-xl bg-white/[0.04] p-1 ring-1 ring-white/[0.08]"
+    >
+      <button
+        type="button"
+        role="radio"
+        aria-checked={value === "project"}
+        disabled={disabled || !canSelectProject}
+        onClick={() => onChange("project")}
+        className={`rounded-lg px-3 py-2.5 text-left transition ${
+          value === "project"
+            ? "bg-brand-500/20 text-brand-100 ring-1 ring-brand-500/40 shadow-sm shadow-brand-500/10"
+            : "text-slate-400 hover:bg-white/[0.04] hover:text-slate-200 disabled:opacity-40"
+        }`}
+      >
+        <span className="block text-sm font-semibold">Project work</span>
+        <span className="mt-0.5 block text-[11px] leading-snug opacity-80">
+          Log hours on an assigned project
+        </span>
+      </button>
+      <button
+        type="button"
+        role="radio"
+        aria-checked={value === "housekeeping"}
+        disabled={disabled || !canSelectHousekeeping}
+        onClick={() => onChange("housekeeping")}
+        className={`rounded-lg px-3 py-2.5 text-left transition ${
+          value === "housekeeping"
+            ? "bg-amber-500/20 text-amber-100 ring-1 ring-amber-500/40 shadow-sm shadow-amber-500/10"
+            : "text-slate-400 hover:bg-white/[0.04] hover:text-slate-200 disabled:opacity-40"
+        }`}
+      >
+        <span className="block text-sm font-semibold">Client housekeeping</span>
+        <span className="mt-0.5 block text-[11px] leading-snug opacity-80">
+          Internal admin — not shown on client portal
+        </span>
+      </button>
+    </div>
+  );
+}
+
 export function AthleteSubmissionsClient() {
   const [projects, setProjects] = useState<AssignedProject[]>([]);
   const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
@@ -251,6 +308,19 @@ export function AthleteSubmissionsClient() {
 
   function addHousekeepingLine() {
     setLines((prev) => [...prev, emptyHousekeepingLine()]);
+  }
+
+  function switchLineEntryType(key: string, isHousekeeping: boolean) {
+    setLines((prev) =>
+      prev.map((li) => {
+        if (li.key !== key || li.isHousekeeping === isHousekeeping) return li;
+        const hoursWorked = li.hoursWorked;
+        if (isHousekeeping) {
+          return { ...emptyHousekeepingLine(), key, hoursWorked };
+        }
+        return { ...emptyLine(), key, hoursWorked };
+      })
+    );
   }
 
   async function submit(e: React.FormEvent) {
@@ -421,42 +491,82 @@ export function AthleteSubmissionsClient() {
       </div>
 
       <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
           <h2 className="text-sm font-semibold text-white">Work entries</h2>
-          <div className="flex flex-wrap gap-3">
+          <p className="mt-1 text-xs text-slate-500">
+            Pick project work or client housekeeping for each entry — they use different fields.
+          </p>
+        </div>
+
+        {!formLocked && (projects.length > 0 || clients.length > 0) ? (
+          <div className="grid gap-3 sm:grid-cols-2">
             <button
               type="button"
               onClick={addLine}
               disabled={projects.length === 0}
-              className="text-xs font-medium text-brand-300 hover:text-brand-200 disabled:opacity-40"
+              className="group card-tool card-tool-hover flex flex-col items-start gap-2 rounded-xl border-l-4 border-l-brand-500/70 p-4 text-left disabled:cursor-not-allowed disabled:opacity-40"
             >
-              + Add project entry
+              <span className="text-sm font-semibold text-brand-200 group-hover:text-brand-100">
+                + Add project work
+              </span>
+              <span className="text-xs leading-relaxed text-slate-500">
+                Track hours, phase, tasks, and completion on an assigned project.
+              </span>
             </button>
             <button
               type="button"
               onClick={addHousekeepingLine}
               disabled={clients.length === 0}
-              className="text-xs font-medium text-slate-300 hover:text-white disabled:opacity-40"
+              className="group card-tool card-tool-hover flex flex-col items-start gap-2 rounded-xl border-l-4 border-l-amber-500/70 p-4 text-left disabled:cursor-not-allowed disabled:opacity-40"
             >
-              + Add client housekeeping
+              <span className="text-sm font-semibold text-amber-200 group-hover:text-amber-100">
+                + Add client housekeeping
+              </span>
+              <span className="text-xs leading-relaxed text-slate-500">
+                Internal admin for a client — not tied to a project and hidden from the portal.
+              </span>
             </button>
           </div>
-        </div>
+        ) : null}
 
         {projects.length === 0 && clients.length === 0 ? (
           <p className="text-sm text-slate-500">No assigned clients yet — you cannot log work.</p>
         ) : null}
 
-        {lines.map((li) => {
+        {lines.map((li, lineIndex) => {
+          const entryTypeHeader = (
+            <div className="flex flex-wrap items-center justify-between gap-3 md:col-span-2">
+              <p className="text-xs font-medium text-slate-500">
+                Entry {lineIndex + 1}
+                {lines.length > 1 ? (
+                  <button
+                    type="button"
+                    onClick={() => removeLine(li.key)}
+                    className="ml-3 text-slate-600 hover:text-red-300"
+                  >
+                    Remove
+                  </button>
+                ) : null}
+              </p>
+            </div>
+          );
+
           if (li.isHousekeeping) {
             return (
-              <div key={li.key} className="card-tool grid gap-3 rounded-xl border border-amber-500/20 p-4 md:grid-cols-2">
-                <p className="text-xs font-semibold uppercase tracking-wider text-amber-300/90 md:col-span-2">
-                  Client housekeeping
-                </p>
-                <p className="text-[11px] text-slate-500 md:col-span-2">
-                  Internal client work only — not tied to a project and not shown on the client portal.
-                </p>
+              <div
+                key={li.key}
+                className="card-tool grid gap-3 rounded-xl border border-amber-500/25 border-l-4 border-l-amber-500/70 bg-amber-500/[0.03] p-4 md:grid-cols-2"
+              >
+                {entryTypeHeader}
+                <div className="md:col-span-2">
+                  <EntryTypeSegment
+                    value="housekeeping"
+                    onChange={(type) => switchLineEntryType(li.key, type === "housekeeping")}
+                    disabled={formLocked}
+                    canSelectProject={projects.length > 0}
+                    canSelectHousekeeping={clients.length > 0}
+                  />
+                </div>
                 <label className="text-xs text-slate-400 md:col-span-2">
                   Client
                   <select
@@ -498,22 +608,26 @@ export function AthleteSubmissionsClient() {
                     placeholder="e.g. File tidy, inbox catch-up, admin for Icon Architects"
                   />
                 </label>
-                {lines.length > 1 ? (
-                  <button
-                    type="button"
-                    onClick={() => removeLine(li.key)}
-                    className="text-xs text-slate-500 hover:text-red-300 md:col-span-2 md:text-left"
-                  >
-                    Remove entry
-                  </button>
-                ) : null}
               </div>
             );
           }
 
           const project = projects.find((p) => p.id === li.projectId);
           return (
-            <div key={li.key} className="card-tool grid gap-3 rounded-xl p-4 md:grid-cols-2">
+            <div
+              key={li.key}
+              className="card-tool grid gap-3 rounded-xl border border-brand-500/20 border-l-4 border-l-brand-500/70 bg-brand-500/[0.02] p-4 md:grid-cols-2"
+            >
+              {entryTypeHeader}
+              <div className="md:col-span-2">
+                <EntryTypeSegment
+                  value="project"
+                  onChange={(type) => switchLineEntryType(li.key, type === "housekeeping")}
+                  disabled={formLocked}
+                  canSelectProject={projects.length > 0}
+                  canSelectHousekeeping={clients.length > 0}
+                />
+              </div>
               <label className="text-xs text-slate-400 md:col-span-2">
                 Project
                 <select
@@ -629,15 +743,6 @@ export function AthleteSubmissionsClient() {
                   className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
                 />
               </label>
-              {lines.length > 1 ? (
-                <button
-                  type="button"
-                  onClick={() => removeLine(li.key)}
-                  className="text-xs text-slate-500 hover:text-red-300 md:col-span-2 md:text-left"
-                >
-                  Remove entry
-                </button>
-              ) : null}
             </div>
           );
         })}

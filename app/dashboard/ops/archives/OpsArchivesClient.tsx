@@ -1,17 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ArchiveProjectDetailPanel } from "@/components/ops/ArchiveProjectDetailPanel";
+import {
+  ArchivedProjectsByClient,
+  type ArchivedProjectRow,
+} from "@/components/ops/ArchivedProjectsByClient";
 import { AthleteAvatar } from "@/components/ops/AthleteAvatar";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
-import { ArchiveProjectDetailPanel } from "@/components/ops/ArchiveProjectDetailPanel";
 import { asAvatarTextTone } from "@/lib/avatar-text-tone";
 import {
-  COMPLEXITY_LABELS,
   PROJECT_PHASE_LABELS,
-  PROJECT_STATUS_LABELS,
   TASK_TYPE_LABELS,
 } from "@/lib/ops-constants";
-import { groupProjectsByClient } from "@/lib/ops-project-groups";
 
 type FilterOption = {
   id: string;
@@ -22,32 +23,11 @@ type FilterOption = {
 };
 type FilterOptionAthlete = { id: string; fullName: string; athleteCode: string };
 
-type ArchiveProject = {
-  id: string;
-  name: string;
-  displayTitle?: string;
+type ArchiveProject = ArchivedProjectRow & {
   stageLabel?: string;
-  address: string | null;
-  projectNumber: string;
-  clientId: string;
-  clientName: string;
-  clientLogoUrl: string | null;
-  clientLogoBgColor: string | null;
-  clientLogoTextTone: string | null;
   assignedAthleteId: string | null;
-  assignedAthleteName: string | null;
-  assignedAthleteCode: string | null;
-  profilePhotoUrl: string | null;
-  profilePhotoBgColor: string | null;
-  profilePhotoTextTone: string | null;
-  currentStatus: keyof typeof PROJECT_STATUS_LABELS;
   currentStage: keyof typeof PROJECT_PHASE_LABELS;
-  complexity: keyof typeof COMPLEXITY_LABELS;
-  progressPercent: number | null;
   dueDate: string | null;
-  handoverDate: string | null;
-  completedAt: string | null;
-  deadlineBeatenDays: number | null;
 };
 
 type ArchiveTask = {
@@ -197,17 +177,6 @@ export function OpsArchivesClient() {
     void load();
   }, [load]);
 
-  const projectsByClient = useMemo(() => {
-    if (!data) return [];
-    return groupProjectsByClient(data.projects, (p) => ({
-      clientId: p.clientId,
-      clientName: p.clientName,
-      clientLogoUrl: p.clientLogoUrl,
-      clientLogoBgColor: p.clientLogoBgColor,
-      clientLogoTextTone: p.clientLogoTextTone,
-    }));
-  }, [data]);
-
   const tabCounts = useMemo(
     () => ({
       projects: data?.projects.length ?? 0,
@@ -305,102 +274,10 @@ export function OpsArchivesClient() {
       </div>
 
       {tab === "projects" ? (
-        <div className="space-y-8">
-          {projectsByClient.length === 0 ? (
-            <p className="text-sm text-slate-500">No completed projects match these filters.</p>
-          ) : (
-            projectsByClient.map((group) => (
-              <section key={group.clientId} className="space-y-3">
-                <div className="flex flex-wrap items-center gap-3 border-b border-white/[0.06] pb-2">
-                  <ClientAvatar
-                    name={group.clientName}
-                    logoUrl={group.clientLogoUrl}
-                    backgroundColor={group.clientLogoBgColor}
-                    textTone={asAvatarTextTone(group.clientLogoTextTone)}
-                    size={36}
-                  />
-                  <div>
-                    <h2 className="text-sm font-semibold text-white">{group.clientName}</h2>
-                    <p className="text-xs text-slate-500">
-                      {group.projects.length} archived project{group.projects.length === 1 ? "" : "s"}
-                    </p>
-                  </div>
-                </div>
-                <div className="overflow-x-auto rounded-xl ring-1 ring-white/[0.06]">
-                  <table className="min-w-full text-left text-sm">
-                    <thead className="bg-white/[0.03] text-xs uppercase text-slate-500">
-                      <tr>
-                        <th className="px-4 py-3 font-medium">Project</th>
-                        <th className="px-4 py-3 font-medium">Completed by</th>
-                        <th className="px-4 py-3 font-medium">Status</th>
-                        <th className="px-4 py-3 font-medium">Completed</th>
-                        <th className="px-4 py-3 font-medium">Handover</th>
-                        <th className="px-4 py-3 font-medium">Progress</th>
-                        <th className="px-4 py-3 font-medium" />
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/[0.06]">
-                      {group.projects.map((p) => (
-                        <tr key={p.id} className="bg-white/[0.02]">
-                          <td className="px-4 py-3">
-                            <p className="font-medium text-white">{p.displayTitle ?? p.name}</p>
-                            <p className="text-xs text-slate-500">
-                              {p.projectNumber}
-                              {p.address ? ` · ${p.address}` : ""} · {COMPLEXITY_LABELS[p.complexity]}
-                            </p>
-                          </td>
-                          <td className="px-4 py-3 text-slate-300">
-                            {p.assignedAthleteName ? (
-                              <span className="inline-flex items-center gap-2">
-                                <AthleteAvatar
-                                  name={p.assignedAthleteName}
-                                  photoUrl={p.profilePhotoUrl}
-                                  backgroundColor={p.profilePhotoBgColor}
-                                  textTone={asAvatarTextTone(p.profilePhotoTextTone)}
-                                  size={24}
-                                />
-                                <span>
-                                  {p.assignedAthleteName}
-                                  {p.assignedAthleteCode ? (
-                                    <span className="block text-xs text-slate-500">{p.assignedAthleteCode}</span>
-                                  ) : null}
-                                </span>
-                              </span>
-                            ) : (
-                              "Unassigned"
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-slate-300">
-                            {PROJECT_STATUS_LABELS[p.currentStatus]}
-                          </td>
-                          <td className="px-4 py-3 text-slate-300">
-                            {formatDate(p.completedAt ?? p.handoverDate)}
-                            {p.deadlineBeatenDays != null && p.deadlineBeatenDays > 0 ? (
-                              <span className="block text-xs text-brand-300">
-                                {p.deadlineBeatenDays} day{p.deadlineBeatenDays === 1 ? "" : "s"} early
-                              </span>
-                            ) : null}
-                          </td>
-                          <td className="px-4 py-3 text-slate-300">{formatDate(p.handoverDate)}</td>
-                          <td className="px-4 py-3 text-slate-300">{p.progressPercent ?? "—"}%</td>
-                          <td className="px-4 py-3">
-                            <button
-                              type="button"
-                              onClick={() => setDetailProjectId(p.id)}
-                              className="text-xs text-brand-300 hover:text-brand-200"
-                            >
-                              Open
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-            ))
-          )}
-        </div>
+        <ArchivedProjectsByClient
+          projects={data?.projects ?? []}
+          onOpen={setDetailProjectId}
+        />
       ) : null}
 
       {tab === "tasks" ? (
