@@ -93,54 +93,33 @@ export function DueDateCalendar({
           ))}
           {cells.map((cell, i) => {
             const items = cell.day ? byDay.get(cell.day) ?? [] : [];
-            const singleFill = items.length === 1 ? items[0] : null;
-            const cellAccent = singleFill ? urgencyColor(singleFill) : null;
-            const cellText = cellAccent ? projectDueFillTextColor(cellAccent) : undefined;
 
             return (
               <div
                 key={i}
                 className={`due-date-calendar-cell min-h-[7.5rem] p-2 sm:min-h-[8.5rem] sm:p-2.5 ${
                   cell.day ? "" : "due-date-calendar-cell-empty"
-                } ${cellAccent ? "due-date-calendar-cell-filled" : ""}`}
-                style={
-                  cellAccent
-                    ? {
-                        backgroundColor: cellAccent,
-                        boxShadow: "inset 0 0 0 1px rgba(15, 23, 42, 0.14)",
-                      }
-                    : undefined
-                }
+                }`}
               >
                 {cell.day ? (
                   <>
-                    <span
-                      className="due-date-calendar-day-num text-sm font-semibold tabular-nums"
-                      style={cellText ? { color: cellText } : undefined}
-                    >
+                    <span className="due-date-calendar-day-num text-sm font-semibold tabular-nums">
                       {cell.day}
                     </span>
                     <ul className="mt-1.5 space-y-1.5">
                       {items.map((p) => {
                         const accent = urgencyColor(p);
                         const textColor = projectDueFillTextColor(accent);
-                        const onFilledCell = singleFill?.id === p.id;
 
                         return (
                           <li
                             key={p.id}
-                            className={`due-date-calendar-event due-date-calendar-event-urgency rounded-md px-1.5 py-1 ${
-                              onFilledCell ? "bg-black/10" : ""
-                            }`}
-                            style={
-                              onFilledCell
-                                ? { color: textColor }
-                                : {
-                                    backgroundColor: accent,
-                                    color: textColor,
-                                    boxShadow: "inset 0 0 0 1px rgba(15, 23, 42, 0.14)",
-                                  }
-                            }
+                            className="due-date-calendar-event due-date-calendar-event-urgency rounded-md px-1.5 py-1"
+                            style={{
+                              backgroundColor: accent,
+                              color: textColor,
+                              boxShadow: "inset 0 0 0 1px rgba(15, 23, 42, 0.14)",
+                            }}
                             title={`${p.name} · ${p.clientName}`}
                           >
                             <p className="due-date-calendar-event-title text-xs font-semibold leading-snug">

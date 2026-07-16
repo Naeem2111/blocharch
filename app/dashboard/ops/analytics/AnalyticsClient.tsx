@@ -12,6 +12,7 @@ import {
   displayProjectStageLabel,
   PROJECT_STATUS_LABELS,
 } from "@/lib/ops-constants";
+import { projectDueColor } from "@/lib/project-color-scale";
 
 type ClientOption = {
   id: string;
@@ -484,9 +485,18 @@ export function AnalyticsClient() {
                 </tr>
               </thead>
               <tbody>
-                {data.dueDateRisk.map((p) => (
+                {data.dueDateRisk.map((p) => {
+                  const accent = projectDueColor(p.daysUntilDue);
+                  return (
                   <tr key={p.id} className="border-b border-white/[0.04] text-slate-300">
-                    <td className="px-3 py-2">{p.name}</td>
+                    <td className="relative px-3 py-2 pl-4">
+                      <span
+                        className="pointer-events-none absolute bottom-0 left-0 top-0 w-1.5 rounded-l-sm"
+                        style={{ backgroundColor: accent }}
+                        aria-hidden
+                      />
+                      {p.name}
+                    </td>
                     <td className="px-3 py-2">
                       <span className="inline-flex items-center gap-2">
                         <ClientAvatar
@@ -513,7 +523,8 @@ export function AnalyticsClient() {
                     </td>
                     <td className="px-3 py-2">{p.assignedAthleteName ?? "—"}</td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
