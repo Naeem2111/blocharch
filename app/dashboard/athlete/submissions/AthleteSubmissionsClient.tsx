@@ -164,6 +164,47 @@ function EntryTypeSegment({
   );
 }
 
+function lineItemValidationError(li: LineItemForm, projects: AssignedProject[]): string | null {
+  if (Number(li.hoursWorked) <= 0) return "Enter hours worked for this entry.";
+  if (li.isHousekeeping) {
+    if (!li.clientId) return "Select a client for housekeeping.";
+    if (!li.housekeepingNote.trim()) return "Add a short note for housekeeping.";
+    return null;
+  }
+  if (!li.projectId) return "Select a project for this entry.";
+  const project = projects.find((p) => p.id === li.projectId);
+  if (!project) return "Invalid project selection.";
+  const taskTypes = li.taskTypes.length > 0 ? li.taskTypes : ["other"];
+  if (taskTypes.includes("other") && !li.taskTypeOther.trim()) {
+    return "Please describe the “Other” task type.";
+  }
+  return null;
+}
+
+function lineItemToPayload(li: LineItemForm, projects: AssignedProject[]) {
+  if (li.isHousekeeping) {
+    return {
+      clientId: li.clientId,
+      isHousekeeping: true,
+      hoursWorked: Number(li.hoursWorked),
+      notes: li.housekeepingNote.trim(),
+    };
+  }
+  const project = projects.find((p) => p.id === li.projectId);
+  if (!project) throw new Error("Invalid project");
+  const taskTypes = li.taskTypes.length > 0 ? li.taskTypes : ["other"];
+  return {
+    clientId: project.client.id,
+    projectId: li.projectId,
+    projectPhase: li.projectPhase,
+    taskTypes,
+    hoursWorked: Number(li.hoursWorked),
+    completionPercent: li.completionPercent,
+    completedSummary: li.completedSummary || null,
+    notes: taskTypes.includes("other") ? li.taskTypeOther.trim() : null,
+  };
+}
+
 export function AthleteSubmissionsClient() {
   const [projects, setProjects] = useState<AssignedProject[]>([]);
   const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
@@ -178,7 +219,8 @@ export function AthleteSubmissionsClient() {
   const [checkInDetailsSubmitted, setCheckInDetailsSubmitted] = useState(false);
   const [dailyNote, setDailyNote] = useState("");
   const [isBackloggedSession, setIsBackloggedSession] = useState(false);
-  const [lines, setLines] = useState<LineItemForm[]>([emptyLine()]);
+  const [entryLines, setEntryLines] = useState<LineItemForm[]>([]);
+  const [draftEntry, setDraftEntry] = useState<LineItemForm | null>(null);
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [calendarMonth, setCalendarMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [formLocked, setFormLocked] = useState(false);
@@ -194,7 +236,7 @@ export function AthleteSubmissionsClient() {
     setIsBackloggedSession(!!sub.isBackloggedSession);
     setCheckInDetailsSubmitted(!!sub.checkInRequested);
     setFormLocked(!sub.editable);
-    setLines(
+    setEntryLines(
       sub.lineItems.length > 0
         ? sub.lineItems.map((li) => ({
             key: crypto.randomUUID(),
@@ -217,8 +259,9 @@ export function AthleteSubmissionsClient() {
               li.taskTypes?.includes("other") && li.notes ? String(li.notes) : "",
             housekeepingNote: li.isHousekeeping && li.notes ? String(li.notes) : "",
           }))
-        : [emptyLine()]
+        : []
     );
+    setDraftEntry(null);
     if (notify) setSuccess(notify);
   }
 
@@ -239,7 +282,8 @@ export function AthleteSubmissionsClient() {
     setDailyNote("");
     setIsBackloggedSession(false);
     setCheckInDetailsSubmitted(false);
-    setLines([emptyLine()]);
+    setEntryLines([]);
+    setDraftEntry(null);
     setFormLocked(false);
     setError("");
     setSuccess("");
@@ -312,49 +356,74 @@ export function AthleteSubmissionsClient() {
     setDailyNote("");
     setIsBackloggedSession(false);
     setCheckInDetailsSubmitted(false);
-    setLines([emptyLine()]);
+    setEntryLines([]);
+    setDraftEntry(null);
     setError("");
   }
 
-  const todayHoursPreview = lines.reduce((sum, li) => sum + (Number(li.hoursWorked) || 0), 0);
+  const todayHoursPreview =
+    entryLines.reduce((sum, li) => sum + (Number(li.hoursWorked) || 0), 0) +
+    (draftEntry ? Number(draftEntry.hoursWorked) || 0 : 0);
 
   function updateLine(key: string, patch: Partial<LineItemForm>) {
-    setLines((prev) => prev.map((li) => (li.key === key ? { ...li, ...patch } : li)));
+    if (draftEntry?.key === key) {
+      setDraftEntry({ ...draftEntry, ...patch });
+      return;
+    }
+    setEntryLines((prev) => prev.map((li) => (li.key === key ? { ...li, ...patch } : li)));
   }
 
-  function addLine() {
-    setLines((prev) => [...prev, emptyLine()]);
+  function startProjectDraft() {
+    if (formLocked || draftEntry) return;
+    setDraftEntry(emptyLine());
+    setError("");
   }
 
-  function removeLine(key: string) {
-    setLines((prev) => (prev.length <= 1 ? prev : prev.filter((li) => li.key !== key)));
+  function startHousekeepingDraft() {
+    if (formLocked || draftEntry) return;
+    const line = emptyHousekeepingLine();
+    if (housekeepingClients.length === 1) {
+      line.clientId = housekeepingClients[0].id;
+    }
+    setDraftEntry(line);
+    setError("");
   }
 
-  function addHousekeepingLine() {
-    setLines((prev) => {
-      const line = emptyHousekeepingLine();
-      if (housekeepingClients.length === 1) {
-        line.clientId = housekeepingClients[0].id;
-      }
-      return [...prev, line];
-    });
+  function discardDraft() {
+    setDraftEntry(null);
+    setError("");
+  }
+
+  function confirmDraftEntry() {
+    if (!draftEntry) return;
+    const validationError = lineItemValidationError(draftEntry, projects);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    setEntryLines((prev) => [...prev, draftEntry]);
+    setDraftEntry(null);
+    setError("");
+    setSuccess("Entry added. You can add another or save the daily log.");
+  }
+
+  function removeEntryLine(key: string) {
+    setEntryLines((prev) => prev.filter((li) => li.key !== key));
   }
 
   function switchLineEntryType(key: string, isHousekeeping: boolean) {
-    setLines((prev) =>
-      prev.map((li) => {
-        if (li.key !== key || li.isHousekeeping === isHousekeeping) return li;
-        const hoursWorked = li.hoursWorked;
-        if (isHousekeeping) {
-          const next = { ...emptyHousekeepingLine(), key, hoursWorked };
-          if (housekeepingClients.length === 1) {
-            next.clientId = housekeepingClients[0].id;
-          }
-          return next;
-        }
-        return { ...emptyLine(), key, hoursWorked };
-      })
-    );
+    if (draftEntry?.key !== key) return;
+    if (draftEntry.isHousekeeping === isHousekeeping) return;
+    const hoursWorked = draftEntry.hoursWorked;
+    if (isHousekeeping) {
+      const next = { ...emptyHousekeepingLine(), key, hoursWorked };
+      if (housekeepingClients.length === 1) {
+        next.clientId = housekeepingClients[0].id;
+      }
+      setDraftEntry(next);
+      return;
+    }
+    setDraftEntry({ ...emptyLine(), key, hoursWorked });
   }
 
   async function submit(e: React.FormEvent) {
@@ -363,37 +432,20 @@ export function AthleteSubmissionsClient() {
     setSuccess("");
     setSaving(true);
     try {
-      const lineItems = lines
-        .filter((li) => Number(li.hoursWorked) > 0 && (li.isHousekeeping ? li.clientId : li.projectId))
-        .map((li) => {
-          if (li.isHousekeeping) {
-            if (!li.housekeepingNote.trim()) {
-              throw new Error("Add a short note for each housekeeping entry");
-            }
-            return {
-              clientId: li.clientId,
-              isHousekeeping: true,
-              hoursWorked: Number(li.hoursWorked),
-              notes: li.housekeepingNote.trim(),
-            };
-          }
-          const project = projects.find((p) => p.id === li.projectId);
-          if (!project) throw new Error("Invalid project");
-          const taskTypes = li.taskTypes.length > 0 ? li.taskTypes : ["other"];
-          if (taskTypes.includes("other") && !li.taskTypeOther.trim()) {
-            throw new Error("Please describe the “Other” task type for each entry that uses it");
-          }
-          return {
-            clientId: project.client.id,
-            projectId: li.projectId,
-            projectPhase: li.projectPhase,
-            taskTypes,
-            hoursWorked: Number(li.hoursWorked),
-            completionPercent: li.completionPercent,
-            completedSummary: li.completedSummary || null,
-            notes: taskTypes.includes("other") ? li.taskTypeOther.trim() : null,
-          };
-        });
+      if (draftEntry) {
+        setError("Confirm or cancel your current entry before saving the daily log.");
+        return;
+      }
+
+      for (const li of entryLines) {
+        const validationError = lineItemValidationError(li, projects);
+        if (validationError) {
+          setError(validationError);
+          return;
+        }
+      }
+
+      const lineItems = entryLines.map((li) => lineItemToPayload(li, projects));
 
       if (lineItems.length === 0) {
         setError("Add at least one project or housekeeping entry with hours.");
@@ -528,15 +580,15 @@ export function AthleteSubmissionsClient() {
         <div>
           <h2 className="text-sm font-semibold text-white">Work entries</h2>
           <p className="mt-1 text-xs text-slate-500">
-            Pick project work or client housekeeping for each entry — they use different fields.
+            Choose project work or housekeeping to start an entry. Confirm each entry before adding another.
           </p>
         </div>
 
-        {!formLocked && (projects.length > 0 || canLogHousekeeping) ? (
+        {!formLocked && !draftEntry && (projects.length > 0 || canLogHousekeeping) ? (
           <div className="grid gap-3 sm:grid-cols-2">
             <button
               type="button"
-              onClick={addLine}
+              onClick={startProjectDraft}
               disabled={projects.length === 0}
               className="group card-tool card-tool-hover flex flex-col items-start gap-2 rounded-xl border-l-4 border-l-brand-500/70 p-4 text-left disabled:cursor-not-allowed disabled:opacity-40"
             >
@@ -549,7 +601,7 @@ export function AthleteSubmissionsClient() {
             </button>
             <button
               type="button"
-              onClick={addHousekeepingLine}
+              onClick={startHousekeepingDraft}
               disabled={!canLogHousekeeping}
               className="group card-tool card-tool-hover flex flex-col items-start gap-2 rounded-xl border-l-4 border-l-amber-500/70 p-4 text-left disabled:cursor-not-allowed disabled:opacity-40"
             >
@@ -563,24 +615,46 @@ export function AthleteSubmissionsClient() {
           </div>
         ) : null}
 
+        {!formLocked && draftEntry ? (
+          <p className="text-xs text-amber-300/90">
+            Finish this entry and click Confirm entry before adding another.
+          </p>
+        ) : null}
+
         {projects.length === 0 && !canLogHousekeeping ? (
           <p className="text-sm text-slate-500">No assigned clients yet — you cannot log work.</p>
         ) : null}
 
-        {lines.map((li, lineIndex) => {
+        {entryLines.length === 0 && !draftEntry && projects.length > 0 ? (
+          <p className="text-sm text-slate-500">
+            No entries yet — choose project work or client housekeeping above.
+          </p>
+        ) : null}
+
+        {[...entryLines, ...(draftEntry ? [draftEntry] : [])].map((li, lineIndex) => {
+          const isDraft = draftEntry?.key === li.key;
           const entryTypeHeader = (
             <div className="flex flex-wrap items-center justify-between gap-3 md:col-span-2">
               <p className="text-xs font-medium text-slate-500">
-                Entry {lineIndex + 1}
-                {lines.length > 1 ? (
+                {isDraft ? "Current entry" : `Entry ${lineIndex + 1}`}
+                {!isDraft ? (
                   <button
                     type="button"
-                    onClick={() => removeLine(li.key)}
-                    className="ml-3 text-slate-600 hover:text-red-300"
+                    onClick={() => removeEntryLine(li.key)}
+                    disabled={formLocked}
+                    className="ml-3 text-slate-600 hover:text-red-300 disabled:opacity-40"
                   >
                     Remove
                   </button>
-                ) : null}
+                ) : (
+                  <button
+                    type="button"
+                    onClick={discardDraft}
+                    className="ml-3 text-slate-600 hover:text-red-300"
+                  >
+                    Cancel
+                  </button>
+                )}
               </p>
             </div>
           );
@@ -589,14 +663,16 @@ export function AthleteSubmissionsClient() {
             return (
               <div
                 key={li.key}
-                className="card-tool grid gap-3 rounded-xl border border-amber-500/25 border-l-4 border-l-amber-500/70 bg-amber-500/[0.03] p-4 md:grid-cols-2"
+                className={`card-tool grid gap-3 rounded-xl border border-amber-500/25 border-l-4 border-l-amber-500/70 bg-amber-500/[0.03] p-4 md:grid-cols-2 ${
+                  isDraft ? "ring-1 ring-amber-500/25" : ""
+                }`}
               >
                 {entryTypeHeader}
                 <div className="md:col-span-2">
-                  <EntryTypeSegment
-                    value="housekeeping"
-                    onChange={(type) => switchLineEntryType(li.key, type === "housekeeping")}
-                    disabled={formLocked}
+                <EntryTypeSegment
+                  value="housekeeping"
+                  onChange={(type) => switchLineEntryType(li.key, type === "housekeeping")}
+                  disabled={formLocked || !isDraft}
                     canSelectProject={projects.length > 0}
                     canSelectHousekeeping={canLogHousekeeping}
                   />
@@ -642,6 +718,24 @@ export function AthleteSubmissionsClient() {
                     placeholder="e.g. File tidy, inbox catch-up, admin for Icon Architects"
                   />
                 </label>
+                {isDraft ? (
+                  <div className="flex flex-wrap gap-2 md:col-span-2">
+                    <button
+                      type="button"
+                      onClick={confirmDraftEntry}
+                      className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-brand-500"
+                    >
+                      Confirm entry
+                    </button>
+                    <button
+                      type="button"
+                      onClick={discardDraft}
+                      className="rounded-lg border border-white/[0.12] px-4 py-2 text-sm text-slate-400 hover:text-white"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : null}
               </div>
             );
           }
@@ -650,14 +744,16 @@ export function AthleteSubmissionsClient() {
           return (
             <div
               key={li.key}
-              className="card-tool grid gap-3 rounded-xl border border-brand-500/20 border-l-4 border-l-brand-500/70 bg-brand-500/[0.02] p-4 md:grid-cols-2"
+              className={`card-tool grid gap-3 rounded-xl border border-brand-500/20 border-l-4 border-l-brand-500/70 bg-brand-500/[0.02] p-4 md:grid-cols-2 ${
+                isDraft ? "ring-1 ring-brand-500/20" : ""
+              }`}
             >
               {entryTypeHeader}
               <div className="md:col-span-2">
                 <EntryTypeSegment
                   value="project"
                   onChange={(type) => switchLineEntryType(li.key, type === "housekeeping")}
-                  disabled={formLocked}
+                  disabled={formLocked || !isDraft}
                   canSelectProject={projects.length > 0}
                   canSelectHousekeeping={canLogHousekeeping}
                 />
@@ -777,6 +873,24 @@ export function AthleteSubmissionsClient() {
                   className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
                 />
               </label>
+              {isDraft ? (
+                <div className="flex flex-wrap gap-2 md:col-span-2">
+                  <button
+                    type="button"
+                    onClick={confirmDraftEntry}
+                    className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-brand-500"
+                  >
+                    Confirm entry
+                  </button>
+                  <button
+                    type="button"
+                    onClick={discardDraft}
+                    className="rounded-lg border border-white/[0.12] px-4 py-2 text-sm text-slate-400 hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : null}
             </div>
           );
         })}
@@ -821,7 +935,13 @@ export function AthleteSubmissionsClient() {
 
       <button
         type="submit"
-        disabled={saving || (projects.length === 0 && !canLogHousekeeping) || formLocked}
+        disabled={
+          saving ||
+          (projects.length === 0 && !canLogHousekeeping) ||
+          formLocked ||
+          entryLines.length === 0 ||
+          !!draftEntry
+        }
         className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-brand-500 disabled:opacity-50"
       >
         {saving ? "Saving…" : editingId ? "Update daily log" : "Save daily log"}
