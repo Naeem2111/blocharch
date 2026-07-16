@@ -25,6 +25,14 @@ function shiftMonth(month: string, delta: number): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
 }
 
+const DUE_DATE_LEGEND = [
+  { label: "Overdue", color: "#ef4444" },
+  { label: "1–3 days", color: "#f97316" },
+  { label: "4–7 days", color: "#eab308" },
+  { label: "8–14 days", color: "#3b82f6" },
+  { label: "14+ days", color: "#22c55e" },
+] as const;
+
 function practiceHref(slug: string) {
   return `/dashboard/practices/${encodeURIComponent(slug)}`;
 }
@@ -161,8 +169,8 @@ export function MarketingOverviewCalendar({ items }: { items: MarketingDueDateIt
         </div>
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,280px)_1fr]">
-        <div>
+      <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,22rem)_1fr] xl:grid-cols-[minmax(0,26rem)_1fr]">
+        <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-5">
           <div className="mb-3 flex items-center justify-between gap-2">
             <button
               type="button"
@@ -193,6 +201,8 @@ export function MarketingOverviewCalendar({ items }: { items: MarketingDueDateIt
             </button>
           </div>
           <MiniMonthCalendar
+            size="lg"
+            markStyle="fill"
             month={calendarMonth}
             marks={marks}
             selectedDate={selectedDate}
@@ -201,22 +211,16 @@ export function MarketingOverviewCalendar({ items }: { items: MarketingDueDateIt
               setCalendarMonth(date.slice(0, 7));
             }}
           />
-          <div className="mt-4 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-400">
-            <span className="inline-flex items-center gap-1">
-              <span className="h-2 w-2 rounded-full bg-red-500" /> Overdue
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <span className="h-2 w-2 rounded-full bg-amber-500" /> 1–3 days
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <span className="h-2 w-2 rounded-full bg-yellow-400" /> 4–7 days
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <span className="h-2 w-2 rounded-full bg-sky-500" /> 8–14 days
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" /> 14+ days
-            </span>
+          <div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-400">
+            {DUE_DATE_LEGEND.map((item) => (
+              <span key={item.label} className="inline-flex items-center gap-2">
+                <span
+                  className="h-2.5 w-2.5 rounded-sm shadow-[inset_0_0_0_1px_rgba(15,23,42,0.14)]"
+                  style={{ backgroundColor: item.color }}
+                />
+                {item.label}
+              </span>
+            ))}
           </div>
           <p className="mt-3 text-xs text-slate-400">
             {monthItems.length} follow-up{monthItems.length === 1 ? "" : "s"} this month
