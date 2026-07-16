@@ -29,6 +29,7 @@ export function MiniMonthCalendar({
   className = "",
   size = "sm",
   markStyle = "dot",
+  squareCells = false,
 }: {
   month: string;
   marks?: CalendarMark[];
@@ -39,6 +40,8 @@ export function MiniMonthCalendar({
   size?: "sm" | "lg";
   /** dot = indicator under day; fill = highlight entire day cell */
   markStyle?: "dot" | "fill";
+  /** lg only — 1:1 day cells instead of wide rectangles */
+  squareCells?: boolean;
 }) {
   const { year, monthIndex } = parseMonth(month);
   const firstDay = new Date(year, monthIndex, 1);
@@ -65,10 +68,13 @@ export function MiniMonthCalendar({
   const monthLabel = firstDay.toLocaleString("en-GB", { month: "long", year: "numeric" });
   const pad = (n: number) => String(n).padStart(2, "0");
   const isLg = size === "lg";
+  const squareLg = isLg && squareCells;
 
   return (
     <div
-      className={`mini-month-calendar ${isLg ? "mini-month-calendar-lg" : ""} ${className}`}
+      className={`mini-month-calendar ${isLg ? "mini-month-calendar-lg" : ""} ${
+        squareLg ? "mini-month-calendar-square" : ""
+      } ${className}`}
     >
       <p
         className={`mini-calendar-title font-medium text-slate-400 ${
@@ -93,7 +99,9 @@ export function MiniMonthCalendar({
           </span>
         ))}
         {cells.map((day, i) => {
-          if (day == null) return <span key={`e-${i}`} />;
+          if (day == null) {
+            return <span key={`e-${i}`} className={squareLg ? "aspect-square" : undefined} />;
+          }
           const iso = `${year}-${pad(monthIndex + 1)}-${pad(day)}`;
           const dayMarks = markByDay.get(day) ?? [];
           const markColor = dayMarks[0]?.color ?? "#3b82f6";
@@ -117,7 +125,11 @@ export function MiniMonthCalendar({
                   : undefined
               }
               className={`mini-calendar-day relative rounded-md tabular-nums transition-colors ${
-                isLg ? "py-3 text-sm" : "py-1.5"
+                squareLg
+                  ? "flex aspect-square items-center justify-center text-sm"
+                  : isLg
+                    ? "py-3 text-sm"
+                    : "py-1.5"
               } ${
                 isSelected
                   ? "mini-calendar-day-selected bg-brand-500/25 font-semibold text-brand-100 ring-1 ring-brand-500/40"

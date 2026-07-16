@@ -147,9 +147,10 @@ export function AthleteProjectsClient() {
       <div className="card-tool rounded-xl p-5">
         <h2 className="text-sm font-semibold text-white">Project due dates</h2>
         <MiniMonthCalendar
-          className="mt-4"
+          className="mt-4 max-w-md"
           size="lg"
           markStyle="fill"
+          squareCells
           month={calendarMonth}
           marks={dueMarks}
           onSelectDate={(date) => setCalendarMonth(date.slice(0, 7))}
