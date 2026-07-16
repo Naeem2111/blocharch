@@ -1,8 +1,69 @@
-import { composeDueAtIso, splitDueAtIso } from "@/lib/planner-due-datetime";
 import { dateOnlyUtc, parseDateOnly } from "@/lib/ops-hours";
 
-export const DEFAULT_PROJECT_DUE_TIME = "5:00";
+/** Blocharch wall-clock timezone for project due times. */
+export const PROJECT_DUE_TIMEZONE_OFFSET_HOURS = 2;
+
+export const DEFAULT_PROJECT_DUE_TIME = "5:30";
 export const DEFAULT_PROJECT_DUE_AMPM = "PM" as const;
+
+const pad = (n: number) => String(n).padStart(2, "0");
+
+function parseWallClockTime(
+  time: string,
+  ampm: "AM" | "PM"
+): { hours: number; minutes: number } | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(time.trim());
+  if (!m) return null;
+  let hours = Number(m[1]);
+  const minutes = Number(m[2]);
+  if (hours < 1 || hours > 12 || minutes < 0 || minutes > 59) return null;
+  if (ampm === "AM") {
+    if (hours === 12) hours = 0;
+  } else if (hours !== 12) {
+    hours += 12;
+  }
+  return { hours, minutes };
+}
+
+/** Convert calendar date + wall time in GMT+2 to a UTC instant. */
+export function projectDueAtFromWallClock(
+  date: string,
+  time: string,
+  ampm: "AM" | "PM"
+): Date | null {
+  const dateOnly = parseDateOnly(date);
+  if (!dateOnly) return null;
+  const parsed = parseWallClockTime(time, ampm);
+  if (!parsed) return null;
+  const wallMs = (parsed.hours * 60 + parsed.minutes) * 60 * 1000;
+  const offsetMs = PROJECT_DUE_TIMEZONE_OFFSET_HOURS * 60 * 60 * 1000;
+  return new Date(dateOnly.getTime() + wallMs - offsetMs);
+}
+
+export function splitProjectDueAtWallClock(iso: string | null | undefined): {
+  date: string;
+  time: string;
+  ampm: "AM" | "PM";
+} {
+  if (!iso) return { date: "", time: "", ampm: DEFAULT_PROJECT_DUE_AMPM };
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return { date: "", time: "", ampm: DEFAULT_PROJECT_DUE_AMPM };
+  const offsetMs = PROJECT_DUE_TIMEZONE_OFFSET_HOURS * 60 * 60 * 1000;
+  const wall = new Date(d.getTime() + offsetMs);
+  const date = `${wall.getUTCFullYear()}-${pad(wall.getUTCMonth() + 1)}-${pad(wall.getUTCDate())}`;
+  let h = wall.getUTCHours();
+  const ampm: "AM" | "PM" = h >= 12 ? "PM" : "AM";
+  if (h === 0) h = 12;
+  else if (h > 12) h -= 12;
+  const time = `${h}:${pad(wall.getUTCMinutes())}`;
+  return { date, time, ampm };
+}
+
+/** Fallback ISO when only a YYYY-MM-DD due date is known. */
+export function dueAtFallbackForDateOnly(dueDate: string): string {
+  const d = projectDueAtFromWallClock(dueDate, DEFAULT_PROJECT_DUE_TIME, DEFAULT_PROJECT_DUE_AMPM);
+  return d?.toISOString() ?? `${dueDate}T15:30:00.000Z`;
+}
 
 export type DeadlineBeat = {
   minutes: number | null;
@@ -49,7 +110,7 @@ export function formatProjectDueAt(dueAt: Date | string | null | undefined): str
   if (!dueAt) return null;
   const d = typeof dueAt === "string" ? new Date(dueAt) : dueAt;
   if (Number.isNaN(d.getTime())) return null;
-  const { date, time, ampm } = splitDueAtIso(d.toISOString());
+  const { date, time, ampm } = splitProjectDueAtWallClock(d.toISOString());
   if (!date) return null;
   if (!time) return date;
   return `${date} ${time} ${ampm}`;
@@ -85,21 +146,22 @@ export function parseProjectDueInput(body: {
   const timeRaw = body.dueTime != null ? String(body.dueTime).trim() : "";
   const ampmRaw = body.dueAmPm === "AM" ? "AM" : "PM";
   const time = timeRaw || DEFAULT_PROJECT_DUE_TIME;
-  const iso = composeDueAtIso(date, time, ampmRaw);
-  if (iso) {
-    const d = new Date(iso);
-    if (!Number.isNaN(d.getTime())) return d;
-  }
+  const ampm = (timeRaw ? ampmRaw : DEFAULT_PROJECT_DUE_AMPM) as "AM" | "PM";
+  const parsed = projectDueAtFromWallClock(date, time, ampm);
+  if (parsed) return parsed;
 
   const fallback = parseDateOnly(date);
   if (!fallback) return null;
   return applyDefaultDueTime(fallback);
 }
 
-/** Existing date-only deadlines → 5:00 PM on that day. */
+/** Date-only deadlines → 5:30 PM GMT+2 on that day. */
 export function applyDefaultDueTime(date: Date): Date {
-  const base = dateOnlyUtc(date);
-  return new Date(base.getTime() + 17 * 60 * 60 * 1000);
+  const dateStr = date.toISOString().slice(0, 10);
+  return (
+    projectDueAtFromWallClock(dateStr, DEFAULT_PROJECT_DUE_TIME, DEFAULT_PROJECT_DUE_AMPM) ??
+    new Date(dateOnlyUtc(date).getTime() + (15 * 60 + 30) * 60 * 1000)
+  );
 }
 
 /** Backlogged completion: end of the logged work day. */

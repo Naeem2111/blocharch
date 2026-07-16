@@ -1,3 +1,5 @@
+import { dueAtFallbackForDateOnly } from "@/lib/project-deadline";
+
 /** Fixed hex scale for project urgency by days until due (Blocharch palette). */
 export function projectDueColor(daysUntilDue: number | null): string {
   if (daysUntilDue == null) return "#64748b";
@@ -10,7 +12,7 @@ export function projectDueColor(daysUntilDue: number | null): string {
 
 export function daysUntilDueFromIso(dueDate: string | null): number | null {
   if (!dueDate?.trim()) return null;
-  const due = new Date(dueDate.includes("T") ? dueDate : `${dueDate.trim()}T17:00:00`);
+  const due = new Date(dueDate.includes("T") ? dueDate : dueAtFallbackForDateOnly(dueDate.trim()));
   if (Number.isNaN(due.getTime())) return null;
   const now = new Date();
   return Math.ceil((due.getTime() - now.getTime()) / 86400000);

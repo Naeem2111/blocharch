@@ -47,6 +47,7 @@ function FollowUpRow({
   variant?: "default" | "attention";
 }) {
   const isAttention = item.followUpStatus === "overdue" || item.followUpStatus === "due_today";
+  const accent = projectDueColor(daysUntilDueFromIso(toDateOnly(item.followUpDueAt)));
   const dateClass =
     item.followUpStatus === "overdue"
       ? "text-red-300 font-medium"
@@ -56,45 +57,52 @@ function FollowUpRow({
 
   return (
     <li
-      className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 ${
+      className={`relative overflow-hidden rounded-xl border px-4 py-3 ${
         variant === "attention"
           ? "border-white/[0.1] bg-white/[0.04]"
           : "border-white/[0.08] bg-white/[0.02]"
       }`}
     >
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <Link
-            href={practiceHref(item.practiceSlug)}
-            className="font-medium text-white hover:text-brand-300"
-          >
-            {item.practiceName}
-          </Link>
-          <LeadStageTag stage={item.effectiveStage} compact />
-          <FollowUpTimeTag followUpDueAt={item.followUpDueAt} compact />
+      <span
+        className="pointer-events-none absolute bottom-0 left-0 top-0 w-1 rounded-l-xl sm:w-1.5"
+        style={{ backgroundColor: accent }}
+        aria-hidden
+      />
+      <div className="flex flex-wrap items-center justify-between gap-3 pl-1">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href={practiceHref(item.practiceSlug)}
+              className="font-medium text-white hover:text-brand-300"
+            >
+              {item.practiceName}
+            </Link>
+            <LeadStageTag stage={item.effectiveStage} compact />
+            <FollowUpTimeTag followUpDueAt={item.followUpDueAt} compact />
+          </div>
+          {item.nextAction ? (
+            <p className="mt-1 text-xs text-slate-300">Next: {item.nextAction}</p>
+          ) : null}
         </div>
-        {item.nextAction ? (
-          <p className="mt-1 text-xs text-slate-300">Next: {item.nextAction}</p>
-        ) : null}
-      </div>
-      <div className="flex shrink-0 flex-wrap items-center gap-2">
-        {showDate ? (
-          <span className={`text-xs ${dateClass}`}>{formatShortDate(toDateOnly(item.followUpDueAt))}</span>
-        ) : null}
-        {isAttention && variant === "attention" ? (
-          <span
-            className="rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase"
-            style={{
-              color: item.followUpStatus === "overdue" ? "#fca5a5" : "#fcd34d",
-              backgroundColor: item.followUpStatus === "overdue" ? "#dc262622" : "#f59e0b22",
-            }}
-          >
-            {item.followUpStatus === "overdue" ? "Overdue" : "Due today"}
-          </span>
-        ) : null}
-        <Link href={practiceHref(item.practiceSlug)} className="btn-brand-primary rounded-lg px-3 py-1.5 text-xs">
-          View
-        </Link>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {showDate ? (
+            <span className={`text-xs ${dateClass}`}>{formatShortDate(toDateOnly(item.followUpDueAt))}</span>
+          ) : null}
+          {isAttention && variant === "attention" ? (
+            <span
+              className="rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase"
+              style={{
+                color: item.followUpStatus === "overdue" ? "#fca5a5" : "#fcd34d",
+                backgroundColor: item.followUpStatus === "overdue" ? "#dc262622" : "#f59e0b22",
+              }}
+            >
+              {item.followUpStatus === "overdue" ? "Overdue" : "Due today"}
+            </span>
+          ) : null}
+          <Link href={practiceHref(item.practiceSlug)} className="btn-brand-primary rounded-lg px-3 py-1.5 text-xs">
+            View
+          </Link>
+        </div>
       </div>
     </li>
   );

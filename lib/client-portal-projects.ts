@@ -1,5 +1,5 @@
 import type { OpsProjectPhase, OpsProjectStatus } from "@prisma/client";
-import { formatDeadlineBeat, projectBeatDeadline } from "@/lib/project-deadline";
+import { formatDeadlineBeat, projectBeatDeadline, dueAtFallbackForDateOnly } from "@/lib/project-deadline";
 import { dateOnlyUtc } from "@/lib/ops-hours";
 
 /** Internal / housekeeping work — hidden from client portal. */
@@ -62,7 +62,7 @@ export function clientPortalProjectBeatDeadline(project: {
 }): boolean {
   if (projectBeatDeadline(project)) return true;
   if (project.handoverDate && (project.dueAt || project.dueDate)) {
-    return handoverBeatsDue(project.handoverDate, project.dueAt ?? `${project.dueDate}T17:00:00`);
+    return handoverBeatsDue(project.handoverDate, project.dueAt ?? dueAtFallbackForDateOnly(project.dueDate!));
   }
   return false;
 }

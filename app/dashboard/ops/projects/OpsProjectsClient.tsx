@@ -15,8 +15,7 @@ import {
 import { daysUntilDueFromIso, projectDueColor } from "@/lib/project-color-scale";
 import { computeProjectTimeline } from "@/lib/project-timeline";
 import { formatProjectFullTitle } from "@/lib/project-display";
-import { formatProjectDueAt } from "@/lib/project-deadline";
-import { splitDueAtIso } from "@/lib/planner-due-datetime";
+import { formatProjectDueAt, dueAtFallbackForDateOnly, splitProjectDueAtWallClock } from "@/lib/project-deadline";
 import {
   emptyProjectDueFields,
   ProjectDueDateTimeFields,
@@ -291,7 +290,7 @@ export function OpsProjectsClient() {
       p.assignedAthleteId ??
       assignedAthleteIds[0] ??
       "";
-    const due = splitDueAtIso(p.dueAt ?? (p.dueDate ? `${p.dueDate}T17:00:00` : null));
+    const due = splitProjectDueAtWallClock(p.dueAt ?? (p.dueDate ? dueAtFallbackForDateOnly(p.dueDate) : null));
     setEditingId(p.id);
     setEditClientId(p.clientId);
     setEditForm({
@@ -417,7 +416,7 @@ export function OpsProjectsClient() {
       handoverDate: p.handoverDate,
     });
     const daysUntil = daysUntilDueFromIso(p.dueAt ?? p.dueDate);
-    const dueLabel = formatProjectDueAt(p.dueAt ?? (p.dueDate ? `${p.dueDate}T17:00:00` : null));
+    const dueLabel = formatProjectDueAt(p.dueAt ?? (p.dueDate ? dueAtFallbackForDateOnly(p.dueDate) : null));
     const accent = projectDueColor(daysUntil);
 
     return (

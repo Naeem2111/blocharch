@@ -56,7 +56,7 @@ export function ProjectDueDateTimeFields({
         </select>
       </label>
       <p className="text-[10px] text-slate-500 sm:col-span-3">
-        Defaults to {DEFAULT_PROJECT_DUE_TIME} {DEFAULT_PROJECT_DUE_AMPM} when time is left blank.
+        Defaults to {DEFAULT_PROJECT_DUE_TIME} {DEFAULT_PROJECT_DUE_AMPM} GMT+2 when time is left blank.
       </p>
     </div>
   );

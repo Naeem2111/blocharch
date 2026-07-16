@@ -19,7 +19,7 @@ import {
 	projectDueColor,
 } from "@/lib/project-color-scale";
 import { clientPortalProjectBeatDeadline } from "@/lib/client-portal-projects";
-import { formatDeadlineBeat, formatProjectDueAt } from "@/lib/project-deadline";
+import { formatDeadlineBeat, formatProjectDueAt, dueAtFallbackForDateOnly } from "@/lib/project-deadline";
 import { PublicThemeToggle } from "@/components/client-portal/PublicThemeToggle";
 import type {
 	PublicClientPortalData,
@@ -50,7 +50,7 @@ function DueDateHighlight({
 	/** Fill table cell width; default is compact inline for cards */
 	block?: boolean;
 }) {
-	const dueIso = project.dueAt ?? (project.dueDate ? `${project.dueDate}T17:00:00` : null);
+	const dueIso = project.dueAt ?? (project.dueDate ? dueAtFallbackForDateOnly(project.dueDate) : null);
 	if (!dueIso) {
 		return <span className={`text-sm text-slate-600 ${className}`}>—</span>;
 	}
