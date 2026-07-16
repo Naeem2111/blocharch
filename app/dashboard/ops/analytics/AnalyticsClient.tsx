@@ -82,6 +82,7 @@ type AnalyticsData = {
     clientLogoBgColor: string | null;
     clientLogoTextTone: string | null;
     dueDate: string;
+    dueAt?: string | null;
     progressPercent: number;
     currentStatus: string;
     assignedAthleteName: string | null;

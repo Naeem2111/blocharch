@@ -2,6 +2,8 @@
 
 import { useMemo } from "react";
 
+import { projectDueFillTextColor } from "@/lib/project-color-scale";
+
 export type CalendarMark = {
   date: string;
   label?: string;
@@ -15,10 +17,7 @@ function parseMonth(month: string): { year: number; monthIndex: number } {
 
 /** Contrasting label color on solid urgency fills. */
 function calendarFillTextColor(bg: string): string {
-  const c = bg.toLowerCase();
-  if (c === "#eab308") return "#422006";
-  if (c === "#64748b") return "#f8fafc";
-  return "#ffffff";
+  return projectDueFillTextColor(bg);
 }
 
 export function MiniMonthCalendar({

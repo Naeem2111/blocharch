@@ -10,6 +10,14 @@ export function projectDueColor(daysUntilDue: number | null): string {
   return "#22c55e";
 }
 
+/** Contrasting text on solid urgency fills (matches MiniMonthCalendar). */
+export function projectDueFillTextColor(bg: string): string {
+  const c = bg.toLowerCase();
+  if (c === "#eab308") return "#422006";
+  if (c === "#64748b") return "#f8fafc";
+  return "#ffffff";
+}
+
 export function daysUntilDueFromIso(dueDate: string | null): number | null {
   if (!dueDate?.trim()) return null;
   const due = new Date(dueDate.includes("T") ? dueDate : dueAtFallbackForDateOnly(dueDate.trim()));

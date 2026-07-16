@@ -411,7 +411,7 @@
   font-weight: 600;
 }
 
-[data-theme="light"] .due-date-calendar-cell {
+[data-theme="light"] .due-date-calendar-cell:not(.due-date-calendar-cell-filled) {
   background-color: rgb(255 255 255 / 1) !important;
 }
 
@@ -419,17 +419,17 @@
   background-color: rgb(248 250 252 / 1) !important;
 }
 
-[data-theme="light"] .due-date-calendar-day-num {
+[data-theme="light"] .due-date-calendar-cell:not(.due-date-calendar-cell-filled) .due-date-calendar-day-num {
   color: #0f172a !important;
   font-weight: 600;
 }
 
-[data-theme="light"] .due-date-calendar-event {
+[data-theme="light"] .due-date-calendar-event:not(.due-date-calendar-event-urgency) {
   background-color: rgb(241 245 249 / 1) !important;
   border: 1px solid rgb(203 213 225 / 0.85);
 }
 
-[data-theme="light"] .due-date-calendar-event-title {
+[data-theme="light"] .due-date-calendar-event:not(.due-date-calendar-event-urgency) .due-date-calendar-event-title {
   color: #1e293b !important;
 }
 
