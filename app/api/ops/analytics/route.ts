@@ -14,8 +14,14 @@ export async function GET(request: NextRequest) {
   const gate = await requireOpsSession(request);
   if (gate instanceof NextResponse) return gate;
 
+  const monthParam = request.nextUrl.searchParams.get("month")?.trim() || "";
+  const allTime = monthParam === "all";
   const clientId = request.nextUrl.searchParams.get("clientId")?.trim() || null;
   const athleteId = request.nextUrl.searchParams.get("athleteId")?.trim() || null;
-  const analytics = await buildAnalytics(monthFromQuery(request), { clientId, athleteId });
+  const analytics = await buildAnalytics(allTime ? new Date() : monthFromQuery(request), {
+    clientId,
+    athleteId,
+    allTime,
+  });
   return NextResponse.json(analytics);
 }

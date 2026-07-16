@@ -50,11 +50,12 @@ function resolveBeatenMinutes(
   return beat.minutes;
 }
 
-/** Projects completed before due datetime in the selected month. */
+/** Projects completed before due datetime in the selected month (or all time). */
 export async function buildBeatenDeadlines(
   reference: Date,
   clientId?: string | null,
-  athleteId?: string | null
+  athleteId?: string | null,
+  allTime = false
 ): Promise<BeatenDeadlinesByAthlete[]> {
   const from = monthStartUtc(reference);
   const to = monthEndUtc(reference);
@@ -95,7 +96,7 @@ export async function buildBeatenDeadlines(
         : p.handoverDate
           ? dateOnlyUtc(p.handoverDate)
           : dateOnlyUtc(p.updatedAt);
-    if (dateOnlyUtc(completed) < from || dateOnlyUtc(completed) > to) continue;
+    if (!allTime && (dateOnlyUtc(completed) < from || dateOnlyUtc(completed) > to)) continue;
 
     const minutesBeaten = resolveBeatenMinutes(
       {

@@ -106,7 +106,9 @@ function currentMonth(): string {
 }
 
 export function AnalyticsClient() {
+  const [period, setPeriod] = useState<"month" | "all">("month");
   const [month, setMonth] = useState(currentMonth());
+  const [calendarMonth, setCalendarMonth] = useState(currentMonth());
   const [clientId, setClientId] = useState("");
   const [athleteId, setAthleteId] = useState("");
   const [clients, setClients] = useState<ClientOption[]>([]);
@@ -144,9 +146,13 @@ export function AnalyticsClient() {
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    if (period === "month") setCalendarMonth(month);
+  }, [period, month]);
+
   const load = useCallback(async () => {
     setLoading(true);
-    const q = new URLSearchParams({ month });
+    const q = new URLSearchParams({ month: period === "all" ? "all" : month });
     if (clientId) q.set("clientId", clientId);
     if (athleteId) q.set("athleteId", athleteId);
     const r = await fetch(`/api/ops/analytics?${q}`);
@@ -159,7 +165,7 @@ export function AnalyticsClient() {
     setData(j);
     setError("");
     setLoading(false);
-  }, [month, clientId, athleteId]);
+  }, [period, month, clientId, athleteId]);
 
   useEffect(() => {
     void load();
@@ -245,18 +251,39 @@ export function AnalyticsClient() {
   if (error) return <p className="text-sm text-red-400">{error}</p>;
   if (!data) return null;
 
+  const isAllTime = data.month === "all" || period === "all";
+  const periodLabel = isAllTime ? "all time" : "this month";
+
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-end gap-4">
         <label className="text-xs text-slate-400">
-          Month
-          <input
-            type="month"
-            value={month}
-            onChange={(e) => setMonth(e.target.value)}
-            className="mt-1 block rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
-          />
+          Period
+          <select
+            value={period}
+            onChange={(e) => setPeriod(e.target.value === "all" ? "all" : "month")}
+            className="select-console mt-1 block min-w-[10rem] rounded-md px-3 py-2 text-sm"
+          >
+            <option value="month">Month</option>
+            <option value="all">All time</option>
+          </select>
         </label>
+        {period === "month" ? (
+          <label className="text-xs text-slate-400">
+            Month
+            <input
+              type="month"
+              value={month}
+              onChange={(e) => setMonth(e.target.value)}
+              className="mt-1 block rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+            />
+          </label>
+        ) : (
+          <p className="pb-2 text-xs text-slate-500">
+            Lifetime totals since the first Blocharch daily log
+            {selectedClient ? ` for ${selectedClient.name}` : ""}.
+          </p>
+        )}
         <label className="text-xs text-slate-400">
           Client / firm
           <select
@@ -312,8 +339,8 @@ export function AnalyticsClient() {
           <h2 className="text-sm font-semibold text-white">Hours by phase</h2>
           <p className="mt-1 text-xs text-slate-500">
             {clientId || athleteId
-              ? "Hours logged for the selected filters this month."
-              : "All firms — cumulative phase hours this month."}
+              ? `Hours logged for the selected filters (${periodLabel}).`
+              : `All firms — cumulative phase hours ${periodLabel}.`}
           </p>
           <div className="mt-4">
             <SimpleBarChart items={phaseBars} valueSuffix="h" />
@@ -321,7 +348,7 @@ export function AnalyticsClient() {
         </div>
         <div className="card-tool rounded-xl p-5">
           <h2 className="text-sm font-semibold text-white">
-            {clientId || athleteId ? "Hours this month" : "Hours by client"}
+            {clientId || athleteId ? `Hours ${periodLabel}` : "Hours by client"}
           </h2>
           <div className="mt-4">
             {clientBars.length === 0 ? (
@@ -360,7 +387,7 @@ export function AnalyticsClient() {
       <div className="card-tool rounded-xl p-5">
         <h2 className="text-sm font-semibold text-white">Beaten deadlines</h2>
         <p className="mt-1 text-xs text-slate-500">
-          Projects completed before their due date in the selected month — useful for performance
+          Projects completed before their due date in the selected period — useful for performance
           recognition and future bonus calculations.
         </p>
         {beatenBars.length === 0 ? (
@@ -416,10 +443,23 @@ export function AnalyticsClient() {
       <div className="card-tool rounded-xl p-5 md:p-6">
         <h2 className="text-base font-semibold text-white">Due date calendar</h2>
         <p className="mt-1.5 text-sm text-slate-500">
-          Active projects due in the selected month — progress bars show completion.
+          {isAllTime
+            ? "Active projects with due dates — use the calendar to browse by month."
+            : "Active projects due in the selected month — progress bars show completion."}
         </p>
         <div className="mt-5">
-          <DueDateCalendar month={month} projects={data.dueDateCalendar ?? []} />
+          {isAllTime ? (
+            <label className="mb-4 block text-xs text-slate-400">
+              Calendar month
+              <input
+                type="month"
+                value={calendarMonth}
+                onChange={(e) => setCalendarMonth(e.target.value)}
+                className="mt-1 block rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+              />
+            </label>
+          ) : null}
+          <DueDateCalendar month={calendarMonth} projects={data.dueDateCalendar ?? []} />
         </div>
       </div>
 

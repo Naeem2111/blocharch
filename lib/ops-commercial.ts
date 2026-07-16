@@ -476,6 +476,119 @@ export async function buildCommercialLedger(reference: Date): Promise<Commercial
   };
 }
 
+function mergeCommercialSummaries(base: CommercialSummary, add: CommercialSummary): CommercialSummary {
+  const rowMap = new Map(
+    base.rows.map((row) => [`${row.athleteId}:${row.clientId}`, { ...row }])
+  );
+  for (const row of add.rows) {
+    const key = `${row.athleteId}:${row.clientId}`;
+    const existing = rowMap.get(key);
+    if (existing) {
+      existing.hoursWorked = round2(existing.hoursWorked + row.hoursWorked);
+      existing.revenueGbp = round2(existing.revenueGbp + row.revenueGbp);
+      existing.athleteCostZar = round2(existing.athleteCostZar + row.athleteCostZar);
+      existing.athleteCostGbp = round2(existing.athleteCostGbp + row.athleteCostGbp);
+      existing.marginGbp = round2(existing.revenueGbp - existing.athleteCostGbp);
+      existing.marginPercent =
+        existing.revenueGbp > 0 ? round2((existing.marginGbp / existing.revenueGbp) * 100) : 0;
+    } else {
+      rowMap.set(key, { ...row });
+    }
+  }
+
+  const laneMap = new Map(base.clientLanes.map((lane) => [lane.clientId, { ...lane }]));
+  for (const lane of add.clientLanes) {
+    const existing = laneMap.get(lane.clientId);
+    if (existing) {
+      existing.hoursUsed = round2(existing.hoursUsed + lane.hoursUsed);
+      existing.overtimeHours = round2(existing.overtimeHours + lane.overtimeHours);
+      existing.overtimeRevenueGbp = round2(existing.overtimeRevenueGbp + lane.overtimeRevenueGbp);
+      existing.monthlyLaneRevenueGbp = round2(existing.monthlyLaneRevenueGbp + lane.monthlyLaneRevenueGbp);
+      existing.totalClientRevenueGbp = round2(existing.totalClientRevenueGbp + lane.totalClientRevenueGbp);
+      existing.utilizationPercent =
+        existing.includedHours > 0
+          ? round2(Math.min(100, (existing.hoursUsed / existing.includedHours) * 100))
+          : 0;
+    } else {
+      laneMap.set(lane.clientId, { ...lane });
+    }
+  }
+
+  const athleteMap = new Map(base.athleteTotals.map((a) => [a.athleteId, { ...a }]));
+  for (const athlete of add.athleteTotals) {
+    const existing = athleteMap.get(athlete.athleteId);
+    if (existing) {
+      existing.hoursWorked = round2(existing.hoursWorked + athlete.hoursWorked);
+      existing.overtimeHours = round2(existing.overtimeHours + athlete.overtimeHours);
+      existing.revenueGbp = round2(existing.revenueGbp + athlete.revenueGbp);
+      existing.basePayGbp = round2(existing.basePayGbp + athlete.basePayGbp);
+      existing.overtimePayGbp = round2(existing.overtimePayGbp + athlete.overtimePayGbp);
+      existing.costZar = round2(existing.costZar + athlete.costZar);
+      existing.costGbp = round2(existing.costGbp + athlete.costGbp);
+      existing.marginGbp = round2(existing.revenueGbp - existing.costGbp);
+    } else {
+      athleteMap.set(athlete.athleteId, { ...athlete });
+    }
+  }
+
+  return {
+    month: "all",
+    reportingRate: add.reportingRate,
+    appliedRate: add.appliedRate,
+    costConversionMode: add.costConversionMode,
+    liveRate: add.liveRate,
+    totalRevenueGbp: round2(base.totalRevenueGbp + add.totalRevenueGbp),
+    totalLaneRevenueGbp: round2(base.totalLaneRevenueGbp + add.totalLaneRevenueGbp),
+    totalOvertimeRevenueGbp: round2(base.totalOvertimeRevenueGbp + add.totalOvertimeRevenueGbp),
+    totalCostZar: round2(base.totalCostZar + add.totalCostZar),
+    totalCostGbp: round2(base.totalCostGbp + add.totalCostGbp),
+    totalLaneCostGbp: round2(base.totalLaneCostGbp + add.totalLaneCostGbp),
+    totalOvertimeCostGbp: round2(base.totalOvertimeCostGbp + add.totalOvertimeCostGbp),
+    grossMarginGbp: round2(base.grossMarginGbp + add.grossMarginGbp),
+    grossMarginPercent:
+      base.totalRevenueGbp + add.totalRevenueGbp > 0
+        ? round2(
+            ((base.grossMarginGbp + add.grossMarginGbp) /
+              (base.totalRevenueGbp + add.totalRevenueGbp)) *
+              100
+          )
+        : 0,
+    clientLanes: Array.from(laneMap.values()).sort((a, b) => a.clientName.localeCompare(b.clientName)),
+    rows: Array.from(rowMap.values()).sort(
+      (a, b) => a.athleteName.localeCompare(b.athleteName) || a.clientName.localeCompare(b.clientName)
+    ),
+    athleteTotals: Array.from(athleteMap.values()).sort((a, b) =>
+      a.athleteName.localeCompare(b.athleteName)
+    ),
+  };
+}
+
+async function analyticsEarliestMonth(): Promise<Date | null> {
+  const first = await prisma.opsDailySubmission.findFirst({
+    orderBy: { submissionDate: "asc" },
+    select: { submissionDate: true },
+  });
+  return first ? monthStartUtc(first.submissionDate) : null;
+}
+
+/** Cumulative commercial ledger from first logged work through today. */
+export async function buildCommercialLedgerAllTime(): Promise<CommercialSummary> {
+  const start = await analyticsEarliestMonth();
+  if (!start) return buildCommercialLedger(new Date());
+
+  let cursor = start;
+  const end = monthEndUtc(new Date());
+  let merged: CommercialSummary | null = null;
+
+  while (cursor.getTime() <= end.getTime()) {
+    const ledger = await buildCommercialLedger(cursor);
+    merged = merged ? mergeCommercialSummaries(merged, ledger) : { ...ledger, month: "all" };
+    cursor = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 1));
+  }
+
+  return merged ?? buildCommercialLedger(new Date());
+}
+
 export type AnalyticsPayload = {
   month: string;
   hoursByPhase: Array<{ phase: string; hours: number }>;
@@ -532,6 +645,7 @@ export type AnalyticsPayload = {
 export type BuildAnalyticsOptions = {
   clientId?: string | null;
   athleteId?: string | null;
+  allTime?: boolean;
 };
 
 export async function buildAnalytics(
@@ -540,13 +654,14 @@ export async function buildAnalytics(
 ): Promise<AnalyticsPayload> {
   const clientId = options.clientId?.trim() || null;
   const athleteId = options.athleteId?.trim() || null;
+  const allTime = options.allTime === true;
   const from = monthStartUtc(reference);
   const to = monthEndUtc(reference);
-  const ledger = await buildCommercialLedger(reference);
+  const ledger = allTime ? await buildCommercialLedgerAllTime() : await buildCommercialLedger(reference);
 
   const lineItemWhere: Prisma.OpsSubmissionLineItemWhereInput = {
     submission: {
-      submissionDate: { gte: from, lte: to },
+      ...(allTime ? {} : { submissionDate: { gte: from, lte: to } }),
       ...(athleteId ? { athleteId } : {}),
     },
     ...(clientId ? { clientId } : {}),
@@ -596,7 +711,9 @@ export async function buildAnalytics(
 
   const [reportingAthletes, monthHoursByAthlete] = await Promise.all([
     listReportingAthletes({ status: "active" }),
-    monthSubmissionHoursByAthlete(from, to),
+    allTime
+      ? monthSubmissionHoursByAthlete(new Date(0), new Date())
+      : monthSubmissionHoursByAthlete(from, to),
   ]);
 
   for (const athlete of reportingAthletes) {
@@ -637,7 +754,7 @@ export async function buildAnalytics(
 
   const calendarProjects = await prisma.opsProject.findMany({
     where: {
-      dueDate: { gte: from, lte: to },
+      dueDate: allTime ? { not: null } : { gte: from, lte: to },
       currentStatus: { notIn: ["completed", "handed_over"] },
       ...projectFilter,
     },
@@ -724,10 +841,10 @@ export async function buildAnalytics(
       .sort((a, b) => b.marginGbp - a.marginGbp);
   }
 
-  const beatenDeadlinesByAthlete = await buildBeatenDeadlines(reference, clientId, athleteId);
+  const beatenDeadlinesByAthlete = await buildBeatenDeadlines(reference, clientId, athleteId, allTime);
 
   return {
-    month: from.toISOString().slice(0, 7),
+    month: allTime ? "all" : from.toISOString().slice(0, 7),
     hoursByPhase: Array.from(phaseMap.entries())
       .map(([phase, hours]) => ({ phase, hours: round2(hours) }))
       .sort((a, b) => b.hours - a.hours),

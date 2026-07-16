@@ -18,6 +18,14 @@ import { clientMetaFromNestedClient, groupProjectsByClient } from "@/lib/ops-pro
 import { daysUntilDueFromIso, projectDueColor } from "@/lib/project-color-scale";
 import { computeProjectTimeline } from "@/lib/project-timeline";
 
+const DUE_DATE_LEGEND = [
+  { label: "Overdue", color: "#ef4444" },
+  { label: "1–3 days", color: "#f97316" },
+  { label: "4–7 days", color: "#eab308" },
+  { label: "8–14 days", color: "#3b82f6" },
+  { label: "14+ days", color: "#22c55e" },
+] as const;
+
 type ProjectClient = {
   id: string;
   name: string;
@@ -137,35 +145,25 @@ export function AthleteProjectsClient() {
   return (
     <div className="space-y-6">
       <div className="card-tool rounded-xl p-5">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <h2 className="text-sm font-semibold text-white">Project due dates</h2>
-          <label className="text-xs text-slate-400">
-            Month
-            <input
-              type="month"
-              value={calendarMonth}
-              onChange={(e) => setCalendarMonth(e.target.value)}
-              className="mt-1 block rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
-            />
-          </label>
-        </div>
-        <MiniMonthCalendar className="mt-4" month={calendarMonth} marks={dueMarks} />
-        <div className="mt-3 flex flex-wrap gap-3 text-[10px] text-slate-500">
-          <span className="flex items-center gap-1">
-            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "#22c55e" }} /> 14+ days
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "#3b82f6" }} /> 8–14 days
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "#eab308" }} /> 4–7 days
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "#f97316" }} /> 1–3 days
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "#ef4444" }} /> Overdue
-          </span>
+        <h2 className="text-sm font-semibold text-white">Project due dates</h2>
+        <MiniMonthCalendar
+          className="mt-4"
+          size="lg"
+          markStyle="fill"
+          month={calendarMonth}
+          marks={dueMarks}
+          onSelectDate={(date) => setCalendarMonth(date.slice(0, 7))}
+        />
+        <div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500">
+          {DUE_DATE_LEGEND.map((item) => (
+            <span key={item.label} className="inline-flex items-center gap-2">
+              <span
+                className="h-2.5 w-2.5 rounded-sm shadow-[inset_0_0_0_1px_rgba(15,23,42,0.14)]"
+                style={{ backgroundColor: item.color }}
+              />
+              {item.label}
+            </span>
+          ))}
         </div>
       </div>
 
