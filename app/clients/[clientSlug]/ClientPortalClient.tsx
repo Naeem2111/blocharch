@@ -174,7 +174,7 @@ function ProjectCard({ project }: { project: PublicClientPortalProject }) {
 	);
 }
 
-function CompletedRow({ project }: { project: PublicClientPortalProject }) {
+function CompletedTableRow({ project }: { project: PublicClientPortalProject }) {
 	const outcome =
 		project.deadlineBeatenMinutes != null && project.deadlineBeatenMinutes > 0
 			? {
@@ -182,31 +182,28 @@ function CompletedRow({ project }: { project: PublicClientPortalProject }) {
 					early: true,
 				}
 			: project.deadlineBeatenDays != null && project.deadlineBeatenDays > 0
-			? {
-					label: `${project.deadlineBeatenDays} day${project.deadlineBeatenDays === 1 ? "" : "s"} early`,
-					early: true,
-				}
-			: project.handoverDate
-				? { label: "On time", early: false }
-				: null;
+				? {
+						label: `${project.deadlineBeatenDays} day${project.deadlineBeatenDays === 1 ? "" : "s"} early`,
+						early: true,
+					}
+				: project.handoverDate
+					? { label: "On time", early: false }
+					: null;
 
 	return (
-		<article className="client-portal-card client-portal-completed-row relative grid gap-4 rounded-xl border border-white/[0.08] bg-white/[0.03] p-4 sm:grid-cols-[minmax(0,2fr)_minmax(0,1.2fr)_auto_auto_auto_auto] sm:items-center sm:gap-3">
-			<div className="min-w-0">
+		<tr className="client-portal-completed-row border-b border-white/[0.06] bg-white/[0.02] last:border-b-0">
+			<td className="px-4 py-4 align-top">
 				<p className="font-semibold text-white">{project.name}</p>
 				{project.address ? (
-					<p className="mt-0.5 truncate text-xs text-slate-500">
-						{project.address}
-					</p>
+					<p className="mt-0.5 truncate text-xs text-slate-500">{project.address}</p>
 				) : null}
 				<div className="mt-2.5 max-w-[220px]">
 					<ProjectProgressBar percent={100} />
 				</div>
-			</div>
-
-			<div className="flex items-center gap-2.5">
+			</td>
+			<td className="px-4 py-4 align-middle">
 				{project.leadName ? (
-					<>
+					<div className="flex items-center gap-2.5">
 						<span className="client-portal-lead-avatar inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.08] text-[11px] font-semibold text-slate-300">
 							{leadInitials(project.leadName)}
 						</span>
@@ -216,41 +213,38 @@ function CompletedRow({ project }: { project: PublicClientPortalProject }) {
 								Lane lead
 							</p>
 						</div>
-					</>
+					</div>
 				) : (
 					<span className="text-xs text-slate-600">—</span>
 				)}
-			</div>
-
-			<span className="client-portal-lane-pill w-fit rounded-md border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">
-				Lane {project.laneNumber}
-			</span>
-
-			<DueDateHighlight project={project} />
-
-			<div className="text-sm font-medium text-emerald-400 client-portal-accent-emerald">
-				{project.handoverDate ? formatShortDate(project.handoverDate) : "—"}
-			</div>
-
-			{outcome ? (
-				<span
-					className={`client-portal-outcome-badge inline-flex w-fit items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase ${
-						outcome.early
-							? "bg-emerald-500/15 text-emerald-300"
-							: "border border-sky-500/30 bg-sky-500/10 text-sky-300"
-					}`}
-				>
-					{outcome.early ? `▲ ${outcome.label}` : outcome.label}
+			</td>
+			<td className="px-4 py-4 align-middle whitespace-nowrap">
+				<span className="client-portal-lane-pill inline-flex rounded-md border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+					Lane {project.laneNumber}
 				</span>
-			) : (
-				<span className="text-xs text-slate-600">—</span>
-			)}
-
-			<span
-				className="pointer-events-none absolute bottom-0 left-0 top-0 w-[3px] rounded-l-xl bg-emerald-500"
-				aria-hidden
-			/>
-		</article>
+			</td>
+			<td className="px-4 py-4 align-middle whitespace-nowrap">
+				<DueDateHighlight project={project} className="min-w-[8rem]" />
+			</td>
+			<td className="px-4 py-4 align-middle whitespace-nowrap text-sm font-medium text-emerald-400 client-portal-accent-emerald">
+				{project.handoverDate ? formatShortDate(project.handoverDate) : "—"}
+			</td>
+			<td className="px-4 py-4 align-middle whitespace-nowrap">
+				{outcome ? (
+					<span
+						className={`client-portal-outcome-badge inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase ${
+							outcome.early
+								? "bg-emerald-500/15 text-emerald-300"
+								: "border border-sky-500/30 bg-sky-500/10 text-sky-300"
+						}`}
+					>
+						{outcome.early ? `▲ ${outcome.label}` : outcome.label}
+					</span>
+				) : (
+					<span className="text-xs text-slate-600">—</span>
+				)}
+			</td>
+		</tr>
 	);
 }
 
@@ -588,19 +582,24 @@ export function ClientPortalClient({
 										})}
 									</div>
 
-									<div className="client-portal-completed-table hidden gap-3 px-4 text-[10px] font-semibold uppercase tracking-wider text-slate-500 sm:grid sm:grid-cols-[minmax(0,2fr)_minmax(0,1.2fr)_auto_auto_auto_auto]">
-										<span>Project</span>
-										<span>Lead</span>
-										<span>Lane</span>
-										<span>Due</span>
-										<span>Handover</span>
-										<span>Outcome</span>
-									</div>
-
-									<div className="space-y-3">
-										{completedFiltered.map((project) => (
-											<CompletedRow key={project.id} project={project} />
-										))}
+									<div className="client-portal-card overflow-x-auto rounded-xl ring-1 ring-white/[0.06]">
+										<table className="client-portal-completed-table min-w-[56rem] w-full text-left text-sm">
+											<thead className="bg-white/[0.03] text-xs uppercase tracking-wider text-slate-500">
+												<tr>
+													<th className="px-4 py-3 text-left font-semibold">Project</th>
+													<th className="px-4 py-3 text-left font-semibold">Lead</th>
+													<th className="px-4 py-3 text-left font-semibold">Lane</th>
+													<th className="px-4 py-3 text-left font-semibold">Due</th>
+													<th className="px-4 py-3 text-left font-semibold">Handover</th>
+													<th className="px-4 py-3 text-left font-semibold">Outcome</th>
+												</tr>
+											</thead>
+											<tbody>
+												{completedFiltered.map((project) => (
+													<CompletedTableRow key={project.id} project={project} />
+												))}
+											</tbody>
+										</table>
 									</div>
 								</>
 							) : null}
