@@ -392,6 +392,10 @@
   color: #0f172a !important;
 }
 
+[data-theme="light"] .mini-month-calendar-lg .mini-calendar-day-filled {
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.18) !important;
+}
+
 [data-theme="light"] .mini-month-calendar-lg .mini-calendar-day[style*="box-shadow"] {
   font-weight: 600;
 }
@@ -719,6 +723,20 @@ input.progress-slider::-moz-range-thumb {
 [data-theme="light"] .client-portal-completed-row .bg-sky-500\/10 {
   background-color: rgb(224 242 254 / 1) !important;
   color: #0369a1 !important;
+}
+
+.client-portal-completed-table {
+  border-collapse: collapse;
+}
+
+.client-portal-completed-table th,
+.client-portal-completed-table td {
+  overflow: hidden;
+  vertical-align: middle;
+}
+
+.client-portal-completed-table tbody td:first-child {
+  vertical-align: top;
 }
 
 .planner-done-toggle {

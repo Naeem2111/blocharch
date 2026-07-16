@@ -11,7 +11,13 @@ type AthleteOption = {
   athleteCode: string;
   profilePhotoUrl: string | null;
 };
-type ProjectOption = { id: string; name: string; clientName: string; assignedAthleteId: string | null };
+type ProjectOption = {
+  id: string;
+  name: string;
+  clientName: string;
+  assignedAthleteId: string | null;
+  assignedAthleteIds: string[];
+};
 type OutboxRow = {
   id: string;
   athleteName: string;
@@ -75,11 +81,13 @@ export function BlocharchOutboxPanel() {
                 name: string;
                 clientName: string;
                 assignedAthleteId: string | null;
+                assignedAthleteIds?: string[];
               }) => ({
                 id: x.id,
                 name: x.name,
                 clientName: x.clientName,
                 assignedAthleteId: x.assignedAthleteId,
+                assignedAthleteIds: x.assignedAthleteIds ?? (x.assignedAthleteId ? [x.assignedAthleteId] : []),
               })
             )
           );
@@ -89,7 +97,7 @@ export function BlocharchOutboxPanel() {
   }, [loadHistory]);
 
   const projectOptions = form.athleteId
-    ? projects.filter((p) => p.assignedAthleteId === form.athleteId)
+    ? projects.filter((p) => p.assignedAthleteIds.includes(form.athleteId))
     : projects;
 
   const selectedAthlete = athletes.find((a) => a.id === form.athleteId) ?? null;

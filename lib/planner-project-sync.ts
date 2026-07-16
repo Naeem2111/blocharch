@@ -15,16 +15,27 @@ export async function syncProjectBoardOnAssign(projectId: string) {
     where: { id: projectId },
     include: {
       assignedAthlete: { select: { id: true, userId: true } },
+      athleteAssignments: {
+        where: { removedAt: null },
+        include: { athlete: { select: { id: true, userId: true } } },
+      },
     },
   });
-  if (!project?.assignedAthleteId || !project.assignedAthlete) return;
+  if (!project || !isActiveProjectStatus(project.currentStatus)) return;
 
-  const { assignedAthlete: athlete } = project;
-  await ensureAthleteSystemBoards(athlete.id, athlete.userId);
+  const athletes = new Map<string, { id: string; userId: string }>();
+  if (project.assignedAthlete) {
+    athletes.set(project.assignedAthlete.id, project.assignedAthlete);
+  }
+  for (const row of project.athleteAssignments) {
+    athletes.set(row.athlete.id, row.athlete);
+  }
+  if (athletes.size === 0) return;
 
-  if (!isActiveProjectStatus(project.currentStatus)) return;
-
-  await ensureProjectBoard(athlete.id, athlete.userId, project.id, project.name);
+  for (const athlete of Array.from(athletes.values())) {
+    await ensureAthleteSystemBoards(athlete.id, athlete.userId);
+    await ensureProjectBoard(athlete.id, athlete.userId, project.id, project.name);
+  }
 }
 
 /** Update project board title when project is renamed. */

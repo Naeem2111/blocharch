@@ -43,9 +43,12 @@ function formatDateRange(start: string | null): string | null {
 function DueDateHighlight({
 	project,
 	className = "",
+	block = false,
 }: {
 	project: PublicClientPortalProject;
 	className?: string;
+	/** Fill table cell width; default is compact inline for cards */
+	block?: boolean;
 }) {
 	const dueIso = project.dueAt ?? (project.dueDate ? `${project.dueDate}T17:00:00` : null);
 	if (!dueIso) {
@@ -57,7 +60,9 @@ function DueDateHighlight({
 
 	return (
 		<div
-			className={`client-portal-due-block inline-flex min-w-[7.5rem] flex-col items-center justify-center rounded-lg px-3 py-2.5 text-center ${className}`}
+			className={`client-portal-due-block flex flex-col items-center justify-center rounded-lg px-2.5 py-2 text-center ${
+				block ? "w-full" : "inline-flex min-w-[7.5rem]"
+			} ${className}`}
 			style={{
 				backgroundColor: `${accent}24`,
 				boxShadow: `inset 0 0 0 1.5px ${accent}55`,
@@ -224,7 +229,7 @@ function CompletedTableRow({ project }: { project: PublicClientPortalProject }) 
 				</span>
 			</td>
 			<td className="px-4 py-4 align-middle whitespace-nowrap">
-				<DueDateHighlight project={project} className="min-w-[8rem]" />
+				<DueDateHighlight project={project} block />
 			</td>
 			<td className="px-4 py-4 align-middle whitespace-nowrap text-sm font-medium text-emerald-400 client-portal-accent-emerald">
 				{project.handoverDate ? formatShortDate(project.handoverDate) : "—"}
@@ -479,23 +484,23 @@ export function ClientPortalClient({
 									/>
 									<div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500">
 										<span className="inline-flex items-center gap-2">
-											<span className="h-2.5 w-2.5 rounded-sm border border-red-500/40 bg-red-500/30" />
+											<span className="h-2.5 w-2.5 rounded-sm bg-[#ef4444] shadow-[inset_0_0_0_1px_rgba(15,23,42,0.14)]" />
 											Overdue
 										</span>
 										<span className="inline-flex items-center gap-2">
-											<span className="h-2.5 w-2.5 rounded-sm border border-orange-500/40 bg-orange-500/30" />
+											<span className="h-2.5 w-2.5 rounded-sm bg-[#f97316] shadow-[inset_0_0_0_1px_rgba(15,23,42,0.14)]" />
 											1–3 days
 										</span>
 										<span className="inline-flex items-center gap-2">
-											<span className="h-2.5 w-2.5 rounded-sm border border-yellow-400/40 bg-yellow-400/30" />
+											<span className="h-2.5 w-2.5 rounded-sm bg-[#eab308] shadow-[inset_0_0_0_1px_rgba(15,23,42,0.14)]" />
 											4–7 days
 										</span>
 										<span className="inline-flex items-center gap-2">
-											<span className="h-2.5 w-2.5 rounded-sm border border-sky-500/40 bg-sky-500/30" />
+											<span className="h-2.5 w-2.5 rounded-sm bg-[#3b82f6] shadow-[inset_0_0_0_1px_rgba(15,23,42,0.14)]" />
 											8–14 days
 										</span>
 										<span className="inline-flex items-center gap-2">
-											<span className="h-2.5 w-2.5 rounded-sm border border-emerald-500/40 bg-emerald-500/30" />
+											<span className="h-2.5 w-2.5 rounded-sm bg-[#22c55e] shadow-[inset_0_0_0_1px_rgba(15,23,42,0.14)]" />
 											14+ days
 										</span>
 									</div>
@@ -583,8 +588,16 @@ export function ClientPortalClient({
 									</div>
 
 									<div className="client-portal-card overflow-x-auto rounded-xl ring-1 ring-white/[0.06]">
-										<table className="client-portal-completed-table min-w-[56rem] w-full text-left text-sm">
-											<thead className="bg-white/[0.03] text-xs uppercase tracking-wider text-slate-500">
+										<table className="client-portal-completed-table w-full min-w-[52rem] table-fixed text-left text-sm">
+											<colgroup>
+												<col style={{ width: "32%" }} />
+												<col style={{ width: "14%" }} />
+												<col style={{ width: "9%" }} />
+												<col style={{ width: "17%" }} />
+												<col style={{ width: "13%" }} />
+												<col style={{ width: "15%" }} />
+											</colgroup>
+											<thead className="bg-white/[0.03] text-[10px] uppercase tracking-wider text-slate-500">
 												<tr>
 													<th className="px-4 py-3 text-left font-semibold">Project</th>
 													<th className="px-4 py-3 text-left font-semibold">Lead</th>

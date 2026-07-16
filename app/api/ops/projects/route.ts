@@ -14,6 +14,12 @@ import { syncProjectBoardOnAssign } from "@/lib/planner-project-sync";
 import { normalizeAthleteProjectCode } from "@/lib/ops-project-code";
 import { projectDisplayFields } from "@/lib/project-display";
 import { validateProjectLeadContactDb } from "@/lib/ops-project-lead";
+import {
+  activeAthleteAssignmentsInclude,
+  applyProjectAthleteAssignments,
+  parseProjectAssignmentInput,
+  serializeProjectAssignments,
+} from "@/lib/ops-project-assignments";
 
 const ACTIVE_STATUSES = ["completed", "handed_over"] as const;
 
@@ -35,6 +41,7 @@ export async function GET(request: NextRequest) {
     include: {
       client: { select: { id: true, name: true, logoUrl: true, logoBgColor: true, logoTextTone: true } },
       assignedAthlete: { select: { id: true, fullName: true, athleteCode: true } },
+      athleteAssignments: activeAthleteAssignmentsInclude,
       projectLeadContact: { select: { id: true, name: true, email: true } },
     },
   });
@@ -50,6 +57,7 @@ export async function GET(request: NextRequest) {
         projectLeadContactName: p.projectLeadContact?.name ?? null,
         projectLeadContactEmail: p.projectLeadContact?.email ?? null,
         athleteCode: p.assignedAthlete?.athleteCode ?? null,
+        assignedAthletes: serializeProjectAssignments(p.athleteAssignments),
         updatedAt: p.updatedAt.toISOString(),
       })
     ),
@@ -64,7 +72,25 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const clientId = String(body.clientId || "").trim();
     let name = String(body.name || "").trim();
-    const assignedAthleteId = body.assignedAthleteId ? String(body.assignedAthleteId).trim() : null;
+
+    const hasMulti =
+      body.assignedAthleteIds !== undefined || body.primaryAthleteId !== undefined;
+    let athleteIds: string[] = [];
+    let assignedAthleteId: string | null = null;
+
+    if (hasMulti) {
+      const parsed = parseProjectAssignmentInput(body);
+      if ("error" in parsed) {
+        return NextResponse.json({ error: parsed.error }, { status: 400 });
+      }
+      athleteIds = parsed.athleteIds;
+      assignedAthleteId = parsed.primaryAthleteId;
+    } else {
+      assignedAthleteId = body.assignedAthleteId
+        ? String(body.assignedAthleteId).trim()
+        : null;
+      athleteIds = assignedAthleteId ? [assignedAthleteId] : [];
+    }
 
     const projectLeadContactId = body.projectLeadContactId
       ? String(body.projectLeadContactId).trim()
@@ -132,8 +158,12 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    if (assignedAthleteId) {
-      await syncProjectBoardOnAssign(project.id).catch(() => {});
+    const idsToAssign = athleteIds.length > 0 ? athleteIds : [];
+    if (idsToAssign.length > 0) {
+      await applyProjectAthleteAssignments(project.id, {
+        athleteIds: idsToAssign,
+        primaryAthleteId: assignedAthleteId,
+      }).catch(() => {});
     }
 
     const { displayTitle } = projectDisplayFields(project);

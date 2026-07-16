@@ -6,6 +6,7 @@ import {
   serializeProjectForAthlete,
 } from "@/lib/ops-access";
 import { prisma } from "@/lib/prisma";
+import { whereAthleteActiveProjects } from "@/lib/ops-project-assignments";
 
 export async function GET(request: NextRequest) {
   const gate = await requireAthletePortalSession(request);
@@ -14,7 +15,7 @@ export async function GET(request: NextRequest) {
 
   const projects = await prisma.opsProject.findMany({
     where: {
-      assignedAthleteId: athlete.id,
+      ...whereAthleteActiveProjects(athlete.id),
       currentStatus: { notIn: ["completed", "handed_over"] },
     },
     orderBy: [{ dueDate: "asc" }, { name: "asc" }],
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
   });
 
   const clients = await prisma.opsClient.findMany({
-    where: { projects: { some: { assignedAthleteId: athlete.id } } },
+    where: { projects: { some: whereAthleteActiveProjects(athlete.id) } },
     select: { id: true, name: true },
     orderBy: { name: "asc" },
   });

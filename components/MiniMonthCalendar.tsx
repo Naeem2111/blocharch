@@ -13,6 +13,14 @@ function parseMonth(month: string): { year: number; monthIndex: number } {
   return { year: y ?? new Date().getFullYear(), monthIndex: (m ?? 1) - 1 };
 }
 
+/** Contrasting label color on solid urgency fills. */
+function calendarFillTextColor(bg: string): string {
+  const c = bg.toLowerCase();
+  if (c === "#eab308") return "#422006";
+  if (c === "#64748b") return "#f8fafc";
+  return "#ffffff";
+}
+
 export function MiniMonthCalendar({
   month,
   marks = [],
@@ -102,9 +110,9 @@ export function MiniMonthCalendar({
               style={
                 hasFillMark && !isSelected
                   ? {
-                      backgroundColor: `${markColor}30`,
-                      boxShadow: `inset 0 0 0 1.5px ${markColor}66`,
-                      color: markColor,
+                      backgroundColor: markColor,
+                      color: calendarFillTextColor(markColor),
+                      boxShadow: "inset 0 0 0 1px rgba(15, 23, 42, 0.14)",
                     }
                   : undefined
               }
@@ -114,7 +122,7 @@ export function MiniMonthCalendar({
                 isSelected
                   ? "mini-calendar-day-selected bg-brand-500/25 font-semibold text-brand-100 ring-1 ring-brand-500/40"
                   : hasFillMark
-                    ? "font-semibold"
+                    ? "mini-calendar-day-filled font-semibold"
                     : clickable
                       ? "text-slate-300 hover:bg-white/[0.06]"
                       : "text-slate-400"

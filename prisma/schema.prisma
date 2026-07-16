@@ -439,6 +439,7 @@ model OpsAthlete {
   user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   projects     OpsProject[]         @relation("AssignedAthleteProjects")
   leadProjects OpsProject[]         @relation("ProjectLeadAthlete")
+  projectAssignments OpsProjectAthleteAssignment[]
   submissions  OpsDailySubmission[]
   plannerBoards PlannerBoard[]
   outboxTasks  OpsOutboxTask[]      @relation("OutboxTargetAthlete")
@@ -509,6 +510,7 @@ model OpsProject {
 
   client            OpsClient               @relation(fields: [clientId], references: [id], onDelete: Cascade)
   assignedAthlete   OpsAthlete?             @relation("AssignedAthleteProjects", fields: [assignedAthleteId], references: [id], onDelete: SetNull)
+  athleteAssignments OpsProjectAthleteAssignment[]
   projectLeadContact OpsClientContact?        @relation(fields: [projectLeadContactId], references: [id], onDelete: SetNull)
   projectLeadAthlete OpsAthlete?            @relation("ProjectLeadAthlete", fields: [projectLeadAthleteId], references: [id], onDelete: SetNull)
   lineItems       OpsSubmissionLineItem[]
@@ -521,6 +523,24 @@ model OpsProject {
   @@index([projectLeadContactId])
   @@index([projectLeadAthleteId])
   @@map("ops_projects")
+}
+
+/** Active and historical athlete assignments on a project. Primary athlete is mirrored on OpsProject.assignedAthleteId. */
+model OpsProjectAthleteAssignment {
+  id         String    @id @default(uuid())
+  projectId  String    @map("project_id")
+  athleteId  String    @map("athlete_id")
+  isPrimary  Boolean   @default(false) @map("is_primary")
+  assignedAt DateTime  @default(now()) @map("assigned_at")
+  removedAt  DateTime? @map("removed_at")
+
+  project OpsProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  athlete OpsAthlete @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, athleteId])
+  @@index([projectId, removedAt])
+  @@index([athleteId, removedAt])
+  @@map("ops_project_athlete_assignments")
 }
 
 enum OpsCheckInStatus {

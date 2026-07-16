@@ -1,6 +1,10 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import {
+  whereAthleteActiveProjects,
+  whereAthleteProjectAccess,
+} from "@/lib/ops-project-assignments";
 import type { OpsUrgencyStatus } from "@prisma/client";
 import {
   athleteMonthlySummary,
@@ -137,7 +141,7 @@ export async function POST(request: NextRequest) {
     for (const li of lineItems) {
       if (li.isHousekeeping) {
         const link = await prisma.opsProject.findFirst({
-          where: { assignedAthleteId: athlete.id, clientId: li.clientId },
+          where: { ...whereAthleteActiveProjects(athlete.id), clientId: li.clientId },
         });
         if (!link) {
           return NextResponse.json({ error: "Invalid client for housekeeping entry" }, { status: 400 });
@@ -145,7 +149,10 @@ export async function POST(request: NextRequest) {
         continue;
       }
       const project = await prisma.opsProject.findFirst({
-        where: { id: li.projectId!, assignedAthleteId: athlete.id, clientId: li.clientId },
+        where: {
+          ...whereAthleteProjectAccess(athlete.id, li.projectId!),
+          clientId: li.clientId,
+        },
       });
       if (!project) {
         return NextResponse.json({ error: "Invalid project selection" }, { status: 400 });

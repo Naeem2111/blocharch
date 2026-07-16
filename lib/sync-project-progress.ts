@@ -103,7 +103,7 @@ export async function reactivateProjectOnAthleteReassign(
   };
 }
 
-/** Recalculate project progress from all daily log line items and sync completion state. */
+/** Recalculate project progress from the primary assignee's daily log entries. */
 export async function syncProjectProgressForProjects(projectIds: string[]) {
   const uniqueIds = Array.from(new Set(projectIds.filter(Boolean)));
   for (const projectId of uniqueIds) {
@@ -119,9 +119,11 @@ export async function syncProjectProgressForProjects(projectIds: string[]) {
     });
     if (!before) continue;
 
-    const latestLog = await latestCompletionLogForProject(projectId);
-    const progressPercent =
-      latestLog?.progressPercent ?? before.progressPercent ?? 0;
+    const latestLog = await latestCompletionLogForProject(
+      projectId,
+      before.assignedAthleteId
+    );
+    const progressPercent = latestLog?.progressPercent ?? 0;
 
     const wasCompleted =
       before.currentStatus === "completed" || before.currentStatus === "handed_over";

@@ -15,7 +15,13 @@ import { validateProjectLeadContactDb } from "@/lib/ops-project-lead";
 import { deleteProjectAndSyncSubmissions } from "@/lib/sync-submission-totals";
 import { parseProjectDueInput } from "@/lib/project-deadline";
 import { serializeOpsProjectRow } from "@/lib/ops-project-serialize";
-import type { OpsProjectStatus } from "@prisma/client";
+import {
+  activeAthleteAssignmentsInclude,
+  applyProjectAthleteAssignments,
+  ensureProjectAssignmentRows,
+  parseProjectAssignmentInput,
+  serializeProjectAssignments,
+} from "@/lib/ops-project-assignments";
 
 type RouteContext = { params: Promise<{ projectId: string }> };
 
@@ -23,6 +29,13 @@ function serializeOpsProject(
   project: Parameters<typeof serializeOpsProjectRow>[0] & {
     client: { id: string; name: string };
     assignedAthlete: { id: string; fullName: string; athleteCode: string } | null;
+    athleteAssignments?: Array<{
+      athleteId: string;
+      isPrimary: boolean;
+      assignedAt: Date;
+      removedAt: Date | null;
+      athlete: { id: string; fullName: string; athleteCode: string };
+    }>;
     projectLeadContact: { id: string; name: string; email: string | null } | null;
   },
   hoursLogged: number
@@ -31,6 +44,9 @@ function serializeOpsProject(
     clientName: project.client.name,
     assignedAthleteName: project.assignedAthlete?.fullName ?? null,
     assignedAthleteCode: project.assignedAthlete?.athleteCode ?? null,
+    assignedAthletes: project.athleteAssignments
+      ? serializeProjectAssignments(project.athleteAssignments)
+      : [],
     projectLeadContactName: project.projectLeadContact?.name ?? null,
     projectLeadContactEmail: project.projectLeadContact?.email ?? null,
     hoursLogged,
@@ -42,11 +58,13 @@ export async function GET(_request: NextRequest, context: RouteContext) {
   if (gate instanceof NextResponse) return gate;
 
   const { projectId } = await context.params;
+  await ensureProjectAssignmentRows(projectId).catch(() => {});
   const project = await prisma.opsProject.findUnique({
     where: { id: projectId },
     include: {
       client: { select: { id: true, name: true } },
       assignedAthlete: { select: { id: true, fullName: true, athleteCode: true } },
+      athleteAssignments: activeAthleteAssignmentsInclude,
       projectLeadContact: { select: { id: true, name: true, email: true } },
     },
   });
@@ -107,33 +125,25 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
     const body = await request.json();
     const data: Record<string, unknown> = {};
+    let assignmentUpdate: { athleteIds: string[]; primaryAthleteId: string | null } | null = null;
+
+    const hasAssignmentFields =
+      body.assignedAthleteId !== undefined ||
+      body.assignedAthleteIds !== undefined ||
+      body.primaryAthleteId !== undefined;
+
+    if (hasAssignmentFields) {
+      const parsed = parseProjectAssignmentInput(body);
+      if ("error" in parsed) {
+        return NextResponse.json({ error: parsed.error }, { status: 400 });
+      }
+      assignmentUpdate = parsed;
+    }
 
     if (body.name != null) {
       const name = String(body.name).trim();
       if (!name) return NextResponse.json({ error: "Project name required" }, { status: 400 });
       data.name = name;
-    }
-    if (body.assignedAthleteId !== undefined) {
-      const aid = body.assignedAthleteId ? String(body.assignedAthleteId).trim() : null;
-      if (aid) {
-        const athlete = await prisma.opsAthlete.findUnique({ where: { id: aid } });
-        if (!athlete) return NextResponse.json({ error: "Athlete not found" }, { status: 404 });
-      }
-      data.assignedAthleteId = aid;
-
-      const reopen = await reactivateProjectOnAthleteReassign(
-        projectId,
-        existing.assignedAthleteId,
-        aid,
-        existing.currentStatus
-      );
-      if (reopen) {
-        data.currentStatus = reopen.currentStatus;
-        data.progressPercent = reopen.progressPercent;
-        data.completedAt = reopen.completedAt;
-        data.deadlineBeatenDays = reopen.deadlineBeatenDays;
-        data.deadlineBeatenMinutes = reopen.deadlineBeatenMinutes;
-      }
     }
     if (body.projectNumber != null) {
       const projectNumber = normalizeAthleteProjectCode(String(body.projectNumber));
@@ -185,19 +195,57 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (body.blockerFlag !== undefined) data.blockerFlag = Boolean(body.blockerFlag);
     if (body.checkInRequested !== undefined) data.checkInRequested = Boolean(body.checkInRequested);
 
-    if (Object.keys(data).length === 0) {
+    if (Object.keys(data).length === 0 && !assignmentUpdate) {
       return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
     }
 
-    const project = await prisma.opsProject.update({
-      where: { id: projectId },
-      include: {
-        client: { select: { id: true, name: true } },
-        assignedAthlete: { select: { id: true, fullName: true, athleteCode: true } },
-        projectLeadContact: { select: { id: true, name: true, email: true } },
-      },
-      data,
-    });
+    let nextPrimaryAthleteId = existing.assignedAthleteId;
+
+    if (assignmentUpdate) {
+      if (assignmentUpdate.primaryAthleteId !== existing.assignedAthleteId) {
+        const reopen = await reactivateProjectOnAthleteReassign(
+          projectId,
+          existing.assignedAthleteId,
+          assignmentUpdate.primaryAthleteId,
+          existing.currentStatus
+        );
+        if (reopen) {
+          data.currentStatus = reopen.currentStatus;
+          data.progressPercent = reopen.progressPercent;
+          data.completedAt = reopen.completedAt;
+          data.deadlineBeatenDays = reopen.deadlineBeatenDays;
+          data.deadlineBeatenMinutes = reopen.deadlineBeatenMinutes;
+        }
+      }
+
+      try {
+        const applied = await applyProjectAthleteAssignments(projectId, assignmentUpdate);
+        nextPrimaryAthleteId = applied.primaryAthleteId;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Invalid assignment";
+        return NextResponse.json({ error: msg }, { status: 400 });
+      }
+    }
+
+    const projectInclude = {
+      client: { select: { id: true, name: true } },
+      assignedAthlete: { select: { id: true, fullName: true, athleteCode: true } },
+      athleteAssignments: activeAthleteAssignmentsInclude,
+      projectLeadContact: { select: { id: true, name: true, email: true } },
+    } as const;
+
+    const project =
+      Object.keys(data).length > 0
+        ? await prisma.opsProject.update({
+            where: { id: projectId },
+            include: projectInclude,
+            data,
+          })
+        : await prisma.opsProject.findUnique({
+            where: { id: projectId },
+            include: projectInclude,
+          });
+    if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
 
     await syncProjectAfterOpsUpdate(
       projectId,
@@ -207,8 +255,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         name: existing.name,
       },
       {
-        assignedAthleteId: project.assignedAthleteId,
-        currentStatus: project.currentStatus as OpsProjectStatus,
+        assignedAthleteId: nextPrimaryAthleteId,
+        currentStatus: project.currentStatus as import("@prisma/client").OpsProjectStatus,
         name: project.name,
       }
     ).catch(() => {});

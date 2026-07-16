@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { whereAthleteProjectAccess, whereProjectHoursByAthlete } from "@/lib/ops-project-assignments";
 import {
   isOpsProjectPhase,
   isOpsProjectStatus,
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
   const { projectId } = await context.params;
   const project = await prisma.opsProject.findFirst({
-    where: { id: projectId, assignedAthleteId: athlete.id },
+    where: whereAthleteProjectAccess(athlete.id, projectId),
     select: {
       ...athleteProjectSelect,
       completedAt: true,
@@ -32,7 +33,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
   if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
 
   const hoursAgg = await prisma.opsSubmissionLineItem.aggregate({
-    where: { projectId },
+    where: whereProjectHoursByAthlete(athlete.id, projectId),
     _sum: { hoursWorked: true },
   });
 
@@ -88,7 +89,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
   const { projectId } = await context.params;
   const project = await prisma.opsProject.findFirst({
-    where: { id: projectId, assignedAthleteId: athlete.id },
+    where: whereAthleteProjectAccess(athlete.id, projectId),
   });
   if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
 
@@ -155,7 +156,11 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     if (data.currentStatus === "in_progress" && (project.currentStatus === "completed" || project.currentStatus === "handed_over")) {
       const latestLine = await prisma.opsSubmissionLineItem.findFirst({
-        where: { projectId, completionPercent: { not: null } },
+        where: {
+          projectId,
+          completionPercent: { not: null },
+          submission: { athleteId: athlete.id },
+        },
         orderBy: [{ submission: { submissionDate: "desc" } }, { submission: { updatedAt: "desc" } }],
         select: { id: true },
       });

@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { whereAthleteActiveProjects } from "@/lib/ops-project-assignments";
 
 type Db = Prisma.TransactionClient | typeof prisma;
 
@@ -36,7 +37,15 @@ export async function deleteProjectAndSyncSubmissions(projectId: string): Promis
   return prisma.$transaction(async (tx) => {
     const project = await tx.opsProject.findUnique({
       where: { id: projectId },
-      select: { id: true, clientId: true, assignedAthleteId: true },
+      select: {
+        id: true,
+        clientId: true,
+        assignedAthleteId: true,
+        athleteAssignments: {
+          where: { removedAt: null },
+          select: { athleteId: true },
+        },
+      },
     });
     if (!project) return false;
 
@@ -48,12 +57,16 @@ export async function deleteProjectAndSyncSubmissions(projectId: string): Promis
     });
     for (const li of projectLineItems) submissionIds.add(li.submissionId);
 
-    if (project.assignedAthleteId) {
+    const athleteIds = new Set<string>();
+    if (project.assignedAthleteId) athleteIds.add(project.assignedAthleteId);
+    for (const row of project.athleteAssignments) athleteIds.add(row.athleteId);
+
+    for (const athleteId of Array.from(athleteIds)) {
       const otherProjects = await tx.opsProject.count({
         where: {
           clientId: project.clientId,
-          assignedAthleteId: project.assignedAthleteId,
           id: { not: project.id },
+          ...whereAthleteActiveProjects(athleteId),
         },
       });
 
@@ -62,7 +75,7 @@ export async function deleteProjectAndSyncSubmissions(projectId: string): Promis
           where: {
             isHousekeeping: true,
             clientId: project.clientId,
-            submission: { athleteId: project.assignedAthleteId },
+            submission: { athleteId },
           },
           select: { id: true, submissionId: true },
         });

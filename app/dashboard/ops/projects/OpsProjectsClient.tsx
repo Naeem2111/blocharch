@@ -33,6 +33,12 @@ type ClientOption = {
   contacts: ClientContactOption[];
 };
 type AthleteOption = { id: string; fullName: string; athleteCode: string };
+type AssignedAthleteRow = {
+  athleteId: string;
+  fullName: string;
+  athleteCode: string;
+  isPrimary: boolean;
+};
 type ProjectRow = {
   id: string;
   clientId: string;
@@ -42,6 +48,7 @@ type ProjectRow = {
   clientLogoTextTone: string | null;
   assignedAthleteId: string | null;
   assignedAthleteName: string | null;
+  assignedAthletes?: AssignedAthleteRow[];
   projectLeadContactId: string | null;
   projectLeadContactName: string | null;
   projectLeadContactEmail: string | null;
@@ -64,7 +71,8 @@ type ProjectRow = {
 
 const emptyCreate = {
   clientId: "",
-  assignedAthleteId: "",
+  assignedAthleteIds: [] as string[],
+  primaryAthleteId: "",
   name: "",
   projectNumber: "",
   address: "",
@@ -76,6 +84,92 @@ const emptyCreate = {
 
 const inputClass =
   "mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white";
+
+function assignmentPayload(athleteIds: string[], primaryAthleteId: string) {
+  const ids = Array.from(new Set(athleteIds.filter(Boolean)));
+  const primary = primaryAthleteId && ids.includes(primaryAthleteId) ? primaryAthleteId : ids[0] ?? null;
+  return { assignedAthleteIds: ids, primaryAthleteId: primary };
+}
+
+function formatAssignedAthletes(p: ProjectRow) {
+  const rows =
+    p.assignedAthletes && p.assignedAthletes.length > 0
+      ? p.assignedAthletes
+      : p.assignedAthleteName
+        ? [{ fullName: p.assignedAthleteName, isPrimary: true }]
+        : [];
+  if (rows.length === 0) return "Unassigned";
+  return rows
+    .map((a) => (a.isPrimary ? `${a.fullName} (primary)` : a.fullName))
+    .join(", ");
+}
+
+function AthleteAssignmentsEditor({
+  athleteIds,
+  primaryAthleteId,
+  athletes,
+  onChange,
+  className = "",
+}: {
+  athleteIds: string[];
+  primaryAthleteId: string;
+  athletes: AthleteOption[];
+  onChange: (next: { assignedAthleteIds: string[]; primaryAthleteId: string }) => void;
+  className?: string;
+}) {
+  function toggleAthlete(athleteId: string, checked: boolean) {
+    const nextIds = checked
+      ? Array.from(new Set([...athleteIds, athleteId]))
+      : athleteIds.filter((id) => id !== athleteId);
+    let nextPrimary = primaryAthleteId;
+    if (!checked && primaryAthleteId === athleteId) {
+      nextPrimary = nextIds[0] ?? "";
+    }
+    if (checked && nextIds.length === 1) {
+      nextPrimary = athleteId;
+    }
+    onChange({ assignedAthleteIds: nextIds, primaryAthleteId: nextPrimary });
+  }
+
+  return (
+    <div className={className}>
+      <p className="text-xs text-slate-400">Assigned athletes</p>
+      <div className="mt-2 max-h-40 space-y-1 overflow-y-auto rounded-md border border-white/[0.08] bg-white/[0.02] p-2">
+        {athletes.map((a) => {
+          const checked = athleteIds.includes(a.id);
+          return (
+            <label
+              key={a.id}
+              className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-sm text-slate-200 hover:bg-white/[0.04]"
+            >
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={(e) => toggleAthlete(a.id, e.target.checked)}
+                className="rounded border-white/20"
+              />
+              <span className="min-w-0 flex-1 truncate">{a.fullName}</span>
+              {checked ? (
+                <span className="flex items-center gap-1 text-[10px] text-slate-500">
+                  <input
+                    type="radio"
+                    name="project-primary-athlete"
+                    checked={primaryAthleteId === a.id}
+                    onChange={() => onChange({ assignedAthleteIds: athleteIds, primaryAthleteId: a.id })}
+                  />
+                  Primary
+                </span>
+              ) : null}
+            </label>
+          );
+        })}
+      </div>
+      <span className="mt-1 block text-[10px] text-slate-500">
+        Select one or more athletes. Primary athlete owns the project on reports and client portal.
+      </span>
+    </div>
+  );
+}
 
 export function OpsProjectsClient() {
   const [projects, setProjects] = useState<ProjectRow[]>([]);
@@ -91,7 +185,8 @@ export function OpsProjectsClient() {
   const [clientFilterId, setClientFilterId] = useState("");
   const [scope, setScope] = useState<"active" | "all">("active");
   const [editForm, setEditForm] = useState({
-    assignedAthleteId: "",
+    assignedAthleteIds: [] as string[],
+    primaryAthleteId: "",
     projectLeadContactId: "",
     name: "",
     projectNumber: "",
@@ -157,12 +252,17 @@ export function OpsProjectsClient() {
   async function createProject(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    const assignment = assignmentPayload(form.assignedAthleteIds, form.primaryAthleteId);
+    if (assignment.assignedAthleteIds.length === 0) {
+      setError("Select at least one assigned athlete");
+      return;
+    }
     const r = await fetch("/api/ops/projects", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...form,
-        assignedAthleteId: form.assignedAthleteId || null,
+        ...assignment,
         projectLeadContactId: form.projectLeadContactId || null,
         dueDate: form.dueDate || null,
         dueTime: form.dueTime || null,
@@ -180,12 +280,23 @@ export function OpsProjectsClient() {
   }
 
   function startEdit(p: ProjectRow) {
-    const athleteId = p.assignedAthleteId ?? "";
+    const assignedAthleteIds =
+      p.assignedAthletes && p.assignedAthletes.length > 0
+        ? p.assignedAthletes.map((a) => a.athleteId)
+        : p.assignedAthleteId
+          ? [p.assignedAthleteId]
+          : [];
+    const primaryAthleteId =
+      p.assignedAthletes?.find((a) => a.isPrimary)?.athleteId ??
+      p.assignedAthleteId ??
+      assignedAthleteIds[0] ??
+      "";
     const due = splitDueAtIso(p.dueAt ?? (p.dueDate ? `${p.dueDate}T17:00:00` : null));
     setEditingId(p.id);
     setEditClientId(p.clientId);
     setEditForm({
-      assignedAthleteId: athleteId,
+      assignedAthleteIds,
+      primaryAthleteId,
       projectLeadContactId: p.projectLeadContactId ?? "",
       name: p.name,
       projectNumber: p.projectNumber,
@@ -206,11 +317,12 @@ export function OpsProjectsClient() {
 
   async function saveEdit(id: string) {
     setError("");
+    const assignment = assignmentPayload(editForm.assignedAthleteIds, editForm.primaryAthleteId);
     const r = await fetch(`/api/ops/projects/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        assignedAthleteId: editForm.assignedAthleteId || null,
+        ...assignment,
         projectLeadContactId: editForm.projectLeadContactId || null,
         name: editForm.name,
         projectNumber: editForm.projectNumber,
@@ -298,21 +410,6 @@ export function OpsProjectsClient() {
     return athletes.find((a) => a.id === athleteId)?.athleteCode ?? "";
   }
 
-  function handleCreateAthleteChange(athleteId: string) {
-    setForm((f) => ({
-      ...f,
-      assignedAthleteId: athleteId,
-      projectNumber: f.projectNumber || (athleteId ? athleteCodeById(athleteId) : ""),
-    }));
-  }
-
-  function handleEditAthleteChange(athleteId: string) {
-    setEditForm((f) => ({
-      ...f,
-      assignedAthleteId: athleteId,
-    }));
-  }
-
   function renderProjectCard(p: ProjectRow) {
     const timeline = computeProjectTimeline({
       startDate: p.startDate,
@@ -332,21 +429,13 @@ export function OpsProjectsClient() {
         {editingId === p.id ? (
           <div className="grid gap-3 md:grid-cols-2">
             <label className="text-xs text-slate-400">Name<input value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
-            <label className="text-xs text-slate-400">
-              Assigned athlete
-              <select
-                value={editForm.assignedAthleteId}
-                onChange={(e) => handleEditAthleteChange(e.target.value)}
-                className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
-              >
-                <option value="">Unassigned</option>
-                {athletes.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.fullName}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <AthleteAssignmentsEditor
+              className="md:col-span-2"
+              athleteIds={editForm.assignedAthleteIds}
+              primaryAthleteId={editForm.primaryAthleteId}
+              athletes={athletes}
+              onChange={(next) => setEditForm((f) => ({ ...f, ...next }))}
+            />
             <label className="text-xs text-slate-400">
               Office lead
               <select
@@ -435,7 +524,7 @@ export function OpsProjectsClient() {
               <p className="text-xs text-slate-500">
                 ID {p.id.slice(0, 8)} · {p.projectNumber}
                 {p.address ? ` · ${p.address}` : ""}
-                {p.assignedAthleteName ? ` · ${p.assignedAthleteName}` : " · Unassigned"}
+                {` · ${formatAssignedAthletes(p)}`}
               </p>
               {p.projectLeadContactName ? (
                 <p className="text-xs text-slate-400">
@@ -562,22 +651,21 @@ export function OpsProjectsClient() {
               </select>
             </div>
           </label>
-          <label className="text-xs text-slate-400">
-            Assigned athlete
-            <select
-              required
-              value={form.assignedAthleteId}
-              onChange={(e) => handleCreateAthleteChange(e.target.value)}
-              className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
-            >
-              <option value="">Select…</option>
-              {athletes.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.fullName}
-                </option>
-              ))}
-            </select>
-          </label>
+          <AthleteAssignmentsEditor
+            className="md:col-span-2"
+            athleteIds={form.assignedAthleteIds}
+            primaryAthleteId={form.primaryAthleteId}
+            athletes={athletes}
+            onChange={(next) =>
+              setForm((f) => ({
+                ...f,
+                ...next,
+                projectNumber:
+                  f.projectNumber ||
+                  (next.primaryAthleteId ? athleteCodeById(next.primaryAthleteId) : ""),
+              }))
+            }
+          />
           <label className="text-xs text-slate-400">
             Office lead
             <select

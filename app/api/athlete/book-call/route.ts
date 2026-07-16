@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAthletePortalSession } from "@/lib/ops-access";
+import { whereAthleteProjectAccess } from "@/lib/ops-project-assignments";
 import { notifyOpsCheckInRequest } from "@/lib/check-in-admin";
 import { serializeCheckInRequest } from "@/lib/check-in-requests";
 
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest) {
     }
 
     const project = await prisma.opsProject.findFirst({
-      where: { id: projectId, assignedAthleteId: athlete.id },
+      where: whereAthleteProjectAccess(athlete.id, projectId),
     });
     if (!project) {
       return NextResponse.json({ error: "Project not found on your account" }, { status: 400 });

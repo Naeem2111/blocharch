@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { athleteMonthlySummary, requireAthletePortalSession } from "@/lib/ops-access";
 import { prisma } from "@/lib/prisma";
+import { whereAthleteActiveProjects } from "@/lib/ops-project-assignments";
 import {
   buildBlockerAlert,
   buildCheckInAlert,
@@ -17,9 +18,10 @@ export async function GET(request: NextRequest) {
   const { athlete } = gate;
 
   const summary = await athleteMonthlySummary(athlete);
+  const athleteProjectsWhere = whereAthleteActiveProjects(athlete.id);
   const activeProjects = await prisma.opsProject.count({
     where: {
-      assignedAthleteId: athlete.id,
+      ...athleteProjectsWhere,
       currentStatus: { notIn: ["completed", "handed_over"] },
     },
   });
@@ -30,7 +32,7 @@ export async function GET(request: NextRequest) {
     },
   });
   const openBlockers = await prisma.opsProject.count({
-    where: { assignedAthleteId: athlete.id, blockerFlag: true },
+    where: { ...athleteProjectsWhere, blockerFlag: true },
   });
   const checkInRequests = await prisma.opsCheckInRequest.count({
     where: { athleteId: athlete.id, status: { in: ["pending", "counter_proposed"] } },
