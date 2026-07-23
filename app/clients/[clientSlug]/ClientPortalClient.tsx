@@ -23,6 +23,7 @@ import { formatDeadlineBeat, formatProjectDueAt, dueAtFallbackForDateOnly } from
 import { PublicThemeToggle } from "@/components/client-portal/PublicThemeToggle";
 import type {
 	PublicClientPortalData,
+	PublicClientPortalPipelineProject,
 	PublicClientPortalProject,
 } from "@/lib/public-client-portal";
 
@@ -224,6 +225,34 @@ function ProjectCard({ project }: { project: PublicClientPortalProject }) {
 	);
 }
 
+function PipelineCard({ project }: { project: PublicClientPortalPipelineProject }) {
+	return (
+		<article className="client-portal-card relative overflow-hidden rounded-xl border border-violet-500/25 bg-violet-500/[0.06] p-4">
+			<p className="text-[10px] font-bold uppercase tracking-wider text-violet-300">
+				Upcoming · Pipeline
+			</p>
+			<h3 className="mt-1 font-semibold text-white">{project.name}</h3>
+			{project.address ? (
+				<p className="mt-0.5 text-xs text-slate-500">{project.address}</p>
+			) : null}
+			{project.description ? (
+				<p className="mt-2 text-sm leading-snug text-slate-400">{project.description}</p>
+			) : null}
+			<p className="mt-2 text-xs text-slate-500">
+				{project.expectedStageLabel ? `${project.expectedStageLabel} · ` : ""}
+				{project.targetStartDate ? `From ${formatShortDate(project.targetStartDate)} · ` : ""}
+				{project.targetDueDate
+					? `Target ${formatShortDate(project.targetDueDate)}`
+					: "Dates to be confirmed"}
+			</p>
+			<span
+				className="pointer-events-none absolute bottom-0 left-0 top-0 w-[3px] rounded-l-xl bg-violet-500/70"
+				aria-hidden
+			/>
+		</article>
+	);
+}
+
 function CompletedTableRow({ project }: { project: PublicClientPortalProject }) {
 	const outcome =
 		project.deadlineBeatenMinutes != null && project.deadlineBeatenMinutes > 0
@@ -374,15 +403,25 @@ export function ClientPortalClient({
 		tab === "tracker" ? data.activeProjects : data.completedProjects;
 
 	const dueMarks = useMemo(
-		() =>
-			calendarProjects
+		() => [
+			...calendarProjects
 				.filter((p) => p.dueDate)
 				.map((p) => ({
 					date: p.dueDate!,
 					label: `${p.name} due`,
 					color: projectDueColor(daysUntilDueFromIso(p.dueDate)),
 				})),
-		[calendarProjects],
+			...(tab === "tracker"
+				? data.pipelineProjects
+						.filter((p) => p.targetDueDate)
+						.map((p) => ({
+							date: p.targetDueDate!,
+							label: `${p.name} (pipeline)`,
+							color: "#a855f7",
+						}))
+				: []),
+		],
+		[calendarProjects, data.pipelineProjects, tab],
 	);
 
 	const beatenSummary = useMemo(() => {
@@ -542,6 +581,23 @@ export function ClientPortalClient({
 							</section>
 
 							<section>
+								{data.pipelineProjects.length > 0 ? (
+									<>
+										<div className="mb-6 flex items-center justify-between gap-3">
+											<h2 className="text-xs font-semibold uppercase tracking-wider text-violet-300">
+												Upcoming pipeline
+											</h2>
+											<span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+												{data.pipelineProjects.length} scheduled
+											</span>
+										</div>
+										<div className="mb-6 space-y-3">
+											{data.pipelineProjects.map((project) => (
+												<PipelineCard key={project.id} project={project} />
+											))}
+										</div>
+									</>
+								) : null}
 								<div className="flex items-center justify-between gap-3">
 									<h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
 										Active projects

@@ -39,14 +39,21 @@ export function canAccessOpsOverview(role: UserRole): boolean {
 
 export function canAccessOpsDashboardPath(role: UserRole, path: string): boolean {
   if (role === "admin" && canAccessModule(role, "ops")) return true;
-  if (role === "manager") return path === "/dashboard/ops";
+  if (role === "manager") {
+    return path === "/dashboard/ops" || path.startsWith("/dashboard/ops/pipeline");
+  }
   return false;
 }
 
 export function canAccessOpsApiPath(role: UserRole, path: string): boolean {
   const normalized = path.split("?")[0] ?? path;
   if (role === "admin" && canAccessModule(role, "ops")) return true;
-  if (role === "manager") return normalized === "/api/ops/overview";
+  if (role === "manager") {
+    if (normalized === "/api/ops/overview") return true;
+    if (normalized.startsWith("/api/ops/pipeline")) return true;
+    if (normalized === "/api/ops/clients" || normalized === "/api/ops/athletes") return true;
+    return false;
+  }
   return false;
 }
 

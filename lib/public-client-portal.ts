@@ -8,6 +8,7 @@ import {
   isHousekeepingClientProject,
 } from "@/lib/client-portal-projects";
 import { parseClientDeliverables, type ClientPortalDeliverable } from "@/lib/client-portal-deliverables";
+import { serializePublicPipelineRow } from "@/lib/ops-pipeline-serialize";
 import { PROJECT_STATUS_LABELS, displayProjectStageLabel } from "@/lib/ops-constants";
 
 export type PublicClientPortalTask = {
@@ -48,6 +49,16 @@ export type PublicClientPortalProject = {
   clientDeliverables: ClientPortalDeliverable[];
 };
 
+export type PublicClientPortalPipelineProject = {
+  id: string;
+  name: string;
+  address: string | null;
+  description: string | null;
+  expectedStageLabel: string | null;
+  targetStartDate: string | null;
+  targetDueDate: string | null;
+};
+
 export type PublicClientPortalData = {
   client: {
     name: string;
@@ -57,6 +68,7 @@ export type PublicClientPortalData = {
     logoTextTone: string | null;
     activeLaneCount: number;
   };
+  pipelineProjects: PublicClientPortalPipelineProject[];
   activeProjects: PublicClientPortalProject[];
   completedProjects: PublicClientPortalProject[];
 };
@@ -189,6 +201,15 @@ export async function getPublicClientPortal(clientSlug: string): Promise<PublicC
     },
   });
 
+  const pipelineRows = await prisma.opsPipelineProject.findMany({
+    where: {
+      clientId: client.id,
+      convertedAt: null,
+      visibleToClient: true,
+    },
+    orderBy: [{ targetDueDate: "asc" }, { sortOrder: "asc" }, { name: "asc" }],
+  });
+
   const clientProjects = projects.filter((p) => !isHousekeepingClientProject(p));
   const activeLaneCount = client.commercial?.activeLaneCount ?? 1;
 
@@ -254,6 +275,7 @@ export async function getPublicClientPortal(clientSlug: string): Promise<PublicC
       logoTextTone: client.logoTextTone,
       activeLaneCount,
     },
+    pipelineProjects: pipelineRows.map(serializePublicPipelineRow),
     activeProjects: mapped.filter(isClientPortalActiveProject),
     completedProjects: mapped.filter(isClientPortalCompletedProject),
   };

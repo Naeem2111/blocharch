@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { OpsProjectPhase } from "@prisma/client";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
+import { DueDateCalendar } from "@/components/ops/DueDateCalendar";
 import { ProjectProgressBar } from "@/components/ProjectProgressBar";
 import { asAvatarTextTone } from "@/lib/avatar-text-tone";
 import {
@@ -183,6 +184,7 @@ export function OpsProjectsClient() {
   const [form, setForm] = useState(emptyCreate);
   const [clientFilterId, setClientFilterId] = useState("");
   const [scope, setScope] = useState<"active" | "all">("active");
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [editForm, setEditForm] = useState({
     assignedAthleteIds: [] as string[],
     primaryAthleteId: "",
@@ -366,6 +368,30 @@ export function OpsProjectsClient() {
     if (!clientFilterId) return projects;
     return projects.filter((p) => p.clientId === clientFilterId);
   }, [projects, clientFilterId]);
+
+  const calendarProjects = useMemo(
+    () =>
+      filteredProjects
+        .filter(
+          (p) =>
+            p.dueDate &&
+            p.currentStatus !== "completed" &&
+            p.currentStatus !== "handed_over"
+        )
+        .map((p) => ({
+          id: p.id,
+          name: p.displayTitle ?? p.name,
+          clientName: p.clientName,
+          clientLogoUrl: p.clientLogoUrl,
+          clientLogoBgColor: p.clientLogoBgColor,
+          clientLogoTextTone: p.clientLogoTextTone,
+          dueDate: p.dueDate!,
+          dueAt: p.dueAt,
+          progressPercent: p.progressPercent ?? 0,
+          assignedAthleteName: p.assignedAthleteName,
+        })),
+    [filteredProjects]
+  );
 
   const projectsByClient = useMemo(() => {
     const groups = new Map<
@@ -561,7 +587,27 @@ export function OpsProjectsClient() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      <div className="card-tool rounded-xl p-5 md:p-6">
+        <h2 className="text-base font-semibold text-white">Due date calendar</h2>
+        <p className="mt-1.5 text-sm text-slate-500">
+          Active projects with due dates — browse by month. Respects the client filter below.
+        </p>
+        <div className="mt-5">
+          <label className="mb-4 block text-xs text-slate-400">
+            Calendar month
+            <input
+              type="month"
+              value={calendarMonth}
+              onChange={(e) => setCalendarMonth(e.target.value)}
+              className="mt-1 block rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+            />
+          </label>
+          <DueDateCalendar month={calendarMonth} projects={calendarProjects} />
+        </div>
+      </div>
+
+      <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-wrap items-end gap-4">
           <p className="pb-2 text-sm text-slate-400">
@@ -776,6 +822,7 @@ export function OpsProjectsClient() {
         ) : null}
       </div>
       {error && !open ? <p className="text-sm text-red-400">{error}</p> : null}
+      </div>
     </div>
   );
 }

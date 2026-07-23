@@ -40,6 +40,13 @@ export async function requireOpsOverviewSession(
   return { user: session.user };
 }
 
+/** Pipeline CRUD + promote to project — admin or manager. */
+export async function requireOpsPipelineSession(
+  request: NextRequest
+): Promise<{ user: SessionUser } | NextResponse> {
+  return requireOpsOverviewSession(request);
+}
+
 export async function requireAthletePortalSession(
   request: NextRequest
 ): Promise<{ user: SessionUser; athlete: OpsAthlete } | NextResponse> {

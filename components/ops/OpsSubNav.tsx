@@ -12,6 +12,7 @@ export type OpsNavItem = {
 export const OPS_NAV: OpsNavItem[] = [
   { href: "/dashboard/ops", label: "Overview" },
   { href: "/dashboard/ops/submissions", label: "Daily submissions", badgeKey: "submissionCheckIns" },
+  { href: "/dashboard/ops/pipeline", label: "Pipeline" },
   { href: "/dashboard/ops/projects", label: "Projects" },
   { href: "/dashboard/ops/archives", label: "Project archives" },
   { href: "/dashboard/ops/commercial", label: "Commercial" },

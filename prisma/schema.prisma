@@ -380,6 +380,7 @@ model OpsClient {
   commercial OpsClientCommercialProfile?
   contacts   OpsClientContact[]
   projects   OpsProject[]
+  pipelineProjects OpsPipelineProject[]
   lineItems  OpsSubmissionLineItem[]
 
   @@map("ops_clients")
@@ -523,12 +524,39 @@ model OpsProject {
   plannerBoards   PlannerBoard[]
   outboxTasks     OpsOutboxTask[]
   checkInRequests OpsCheckInRequest[]
+  pipelineSource  OpsPipelineProject?
 
   @@index([clientId, projectNumber])
   @@index([assignedAthleteId])
   @@index([projectLeadContactId])
   @@index([projectLeadAthleteId])
   @@map("ops_projects")
+}
+
+/** Upcoming work discussed in client meetings — visible on client portal until promoted to OpsProject. */
+model OpsPipelineProject {
+  id                 String           @id @default(uuid())
+  clientId           String           @map("client_id")
+  name               String
+  address            String?          @db.Text
+  /** Client-visible scope / meeting summary. */
+  description        String?          @db.Text
+  expectedStage      OpsProjectPhase? @map("expected_stage")
+  targetStartDate    DateTime?        @map("target_start_date") @db.Date
+  targetDueDate      DateTime?        @map("target_due_date")
+  notes              String?          @db.Text
+  sortOrder          Int              @default(0) @map("sort_order")
+  visibleToClient    Boolean          @default(true) @map("visible_to_client")
+  convertedProjectId String?          @unique @map("converted_project_id")
+  convertedAt        DateTime?        @map("converted_at")
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+
+  client            OpsClient   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  convertedProject  OpsProject? @relation(fields: [convertedProjectId], references: [id], onDelete: SetNull)
+
+  @@index([clientId, convertedAt])
+  @@map("ops_pipeline_projects")
 }
 
 /** Active and historical athlete assignments on a project. Primary athlete is mirrored on OpsProject.assignedAthleteId. */
