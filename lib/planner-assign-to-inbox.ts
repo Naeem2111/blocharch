@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { createAthleteNotification } from "@/lib/ops-athlete-notifications";
 import { ensureDefaultLabelsOnBoard } from "@/lib/planner-labels-seed";
-import { ensureAthleteSystemBoards } from "@/lib/planner-system-boards";
+import { ensureAthleteSystemBoards, findAthleteMyTasksBoard } from "@/lib/planner-system-boards";
 
 type DeliverResult = {
   taskId?: string;
@@ -9,7 +9,7 @@ type DeliverResult = {
   reason?: string;
 };
 
-/** Copy an assigned planner task onto the athlete's Blocharch Inbox (idempotent). */
+/** Copy an assigned planner task onto the athlete's My Tasks board (idempotent). */
 export async function deliverAssignedTaskToAthleteInbox(
   sourceTaskId: string
 ): Promise<DeliverResult> {
@@ -36,13 +36,13 @@ export async function deliverAssignedTaskToAthleteInbox(
   if (!athlete) return { skipped: true, reason: "not_athlete" };
 
   const sourceBoard = source.column.board;
-  if (sourceBoard.kind === "blocharch_inbox" && sourceBoard.athleteId === athlete.id) {
-    return { skipped: true, reason: "already_in_inbox" };
+  if (sourceBoard.kind === "my_tasks" && sourceBoard.athleteId === athlete.id) {
+    return { skipped: true, reason: "already_on_my_tasks" };
   }
 
   const existing = await prisma.plannerTask.findFirst({
     where: {
-      column: { board: { athleteId: athlete.id, kind: "blocharch_inbox" } },
+      column: { board: { athleteId: athlete.id, kind: "my_tasks" } },
       customFields: {
         path: ["sourceTaskId"],
         equals: sourceTaskId,
@@ -56,18 +56,15 @@ export async function deliverAssignedTaskToAthleteInbox(
 
   await ensureAthleteSystemBoards(athlete.id, athlete.userId);
 
-  const inboxBoard = await prisma.plannerBoard.findFirst({
-    where: { athleteId: athlete.id, kind: "blocharch_inbox" },
-    select: { id: true },
-  });
-  if (!inboxBoard) return { skipped: true, reason: "no_inbox_board" };
+  const myTasksBoard = await findAthleteMyTasksBoard(athlete.id);
+  if (!myTasksBoard) return { skipped: true, reason: "no_my_tasks_board" };
 
   const backlog = await prisma.plannerColumn.findFirst({
-    where: { boardId: inboxBoard.id },
+    where: { boardId: myTasksBoard.id },
     orderBy: { sortOrder: "asc" },
     select: { id: true },
   });
-  if (!backlog) return { skipped: true, reason: "no_inbox_column" };
+  if (!backlog) return { skipped: true, reason: "no_my_tasks_column" };
 
   const maxOrder = await prisma.plannerTask.aggregate({
     where: { columnId: backlog.id },
@@ -92,16 +89,16 @@ export async function deliverAssignedTaskToAthleteInbox(
   });
 
   if (source.labels.length > 0) {
-    await ensureDefaultLabelsOnBoard(inboxBoard.id);
+    await ensureDefaultLabelsOnBoard(myTasksBoard.id);
     for (const row of source.labels) {
-      const inboxLabel = await prisma.plannerLabel.findFirst({
-        where: { boardId: inboxBoard.id, name: row.label.name },
+      const boardLabel = await prisma.plannerLabel.findFirst({
+        where: { boardId: myTasksBoard.id, name: row.label.name },
         select: { id: true },
       });
-      if (!inboxLabel) continue;
+      if (!boardLabel) continue;
       await prisma.plannerTaskLabel
         .create({
-          data: { taskId: task.id, labelId: inboxLabel.id },
+          data: { taskId: task.id, labelId: boardLabel.id },
         })
         .catch(() => {});
     }
@@ -111,10 +108,8 @@ export async function deliverAssignedTaskToAthleteInbox(
     athleteId: athlete.id,
     type: "task_assigned",
     title: source.title,
-    message: sourceBoard.title
-      ? `From: ${sourceBoard.title}`
-      : "New work in your Blocharch Inbox",
-    linkPath: `/dashboard/planner?area=team&athlete=me&group=blocharch&board=${inboxBoard.id}&task=${task.id}`,
+    message: sourceBoard.title ? `From: ${sourceBoard.title}` : "New task on My Tasks",
+    linkPath: `/dashboard/planner?area=team&athlete=me&group=blocharch&board=${myTasksBoard.id}&task=${task.id}`,
   }).catch(() => {});
 
   return { taskId: task.id, skipped: false };

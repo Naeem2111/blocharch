@@ -1,6 +1,7 @@
 import type { PlannerBoardKind, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { createDefaultColumnsOnBoard } from "@/lib/planner-columns-seed";
+import { resolveGeneralColumnId } from "@/lib/planner-default-columns";
 import { ensureDefaultLabelsOnBoard } from "@/lib/planner-labels-seed";
 
 export const SYSTEM_BOARD_TITLES = {
@@ -66,22 +67,74 @@ export async function ensureAdminOutboxBoard(adminUserId: string) {
   });
 }
 
-/** Fixed athlete workspace boards: Inbox, My Tasks, Completed. */
+async function firstColumnId(boardId: string, tx: Tx): Promise<string | null> {
+  const cols = await tx.plannerColumn.findMany({
+    where: { boardId },
+    orderBy: { sortOrder: "asc" },
+    select: { id: true, title: true },
+  });
+  return resolveGeneralColumnId(cols);
+}
+
+/** Move legacy inbox / misplaced “Blocharch” personal boards onto My Tasks. */
+async function consolidateAthleteTasksOntoMyTasks(
+  athleteId: string,
+  athleteUserId: string,
+  myTasksBoardId: string,
+  tx: Tx
+) {
+  const destColumnId = await firstColumnId(myTasksBoardId, tx);
+  if (!destColumnId) return;
+
+  const sourceBoards = await tx.plannerBoard.findMany({
+    where: {
+      athleteId,
+      ownerId: athleteUserId,
+      OR: [
+        { kind: "blocharch_inbox" },
+        {
+          kind: "custom",
+          title: { equals: "Blocharch", mode: "insensitive" },
+        },
+        {
+          kind: "custom",
+          title: { equals: "My Tasks", mode: "insensitive" },
+        },
+      ],
+    },
+    select: { id: true },
+  });
+
+  for (const board of sourceBoards) {
+    if (board.id === myTasksBoardId) continue;
+    const tasks = await tx.plannerTask.findMany({
+      where: { column: { boardId: board.id } },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      select: { id: true },
+    });
+    if (tasks.length === 0) continue;
+
+    const maxOrder = await tx.plannerTask.aggregate({
+      where: { columnId: destColumnId },
+      _max: { sortOrder: true },
+    });
+    let nextOrder = (maxOrder._max.sortOrder ?? -1) + 1;
+    for (const task of tasks) {
+      await tx.plannerTask.update({
+        where: { id: task.id },
+        data: { columnId: destColumnId, sortOrder: nextOrder++ },
+      });
+    }
+  }
+}
+
+/** Fixed athlete workspace boards: My Tasks + Completed (inbox retired). */
 export async function ensureAthleteSystemBoards(
   athleteId: string,
   athleteUserId: string,
   tx: Tx = prisma
 ) {
-  await createBoardWithColumns(tx, {
-    title: SYSTEM_BOARD_TITLES.blocharch_inbox,
-    scope: "personal",
-    kind: "blocharch_inbox",
-    ownerId: athleteUserId,
-    athleteId,
-    isSystem: true,
-    color: "#0ea5e9",
-  });
-  await createBoardWithColumns(tx, {
+  const myTasks = await createBoardWithColumns(tx, {
     title: SYSTEM_BOARD_TITLES.my_tasks,
     scope: "personal",
     kind: "my_tasks",
@@ -98,6 +151,15 @@ export async function ensureAthleteSystemBoards(
     athleteId,
     isSystem: true,
     color: "#22c55e",
+  });
+
+  await consolidateAthleteTasksOntoMyTasks(athleteId, athleteUserId, myTasks.id, tx);
+}
+
+export async function findAthleteMyTasksBoard(athleteId: string, tx: Tx = prisma) {
+  return tx.plannerBoard.findFirst({
+    where: { athleteId, kind: "my_tasks" },
+    select: { id: true },
   });
 }
 

@@ -34,10 +34,10 @@ import {
   PLANNER_BOARD_GROUP_LABELS,
   type PlannerBoardGroup,
 } from "@/lib/planner-board-groups";
+import { filterVisiblePlannerBoards } from "@/lib/planner-board-visibility";
 
 const FIXED_BOARD_KINDS = new Set([
   "blocharch_outbox",
-  "blocharch_inbox",
   "my_tasks",
   "completed",
 ]);
@@ -47,6 +47,7 @@ type BoardSummary = {
   title: string;
   scope: "personal" | "team";
   kind?: string;
+  athleteId?: string | null;
   isSystem?: boolean;
   color: string;
   sortOrder: number;
@@ -55,6 +56,15 @@ type BoardSummary = {
   owner: { username: string };
   _count: { columns: number };
 };
+
+function isAthleteWorkspaceBoard(b: BoardSummary): boolean {
+  return (
+    !!b.athleteId ||
+    b.kind === "my_tasks" ||
+    b.kind === "blocharch_inbox" ||
+    b.kind === "project"
+  );
+}
 
 type TeamAthleteRow = {
   id: string;
@@ -283,9 +293,6 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
   const [teamAthletes, setTeamAthletes] = useState<TeamAthleteRow[]>([]);
   const [teamAthletesLoading, setTeamAthletesLoading] = useState(false);
   const [selectedAthleteName, setSelectedAthleteName] = useState<string | null>(null);
-  const [moveModal, setMoveModal] = useState<{ taskId: string; title: string } | null>(null);
-  const [moveBoardId, setMoveBoardId] = useState<string | null>(null);
-  const [moveSaving, setMoveSaving] = useState(false);
   const [inboxUnreadCount, setInboxUnreadCount] = useState(0);
   const [allBoardsView, setAllBoardsView] = useState(false);
   const [boardDetailsById, setBoardDetailsById] = useState<Record<string, BoardDetail>>({});
@@ -506,18 +513,19 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
 
   const areaBoards = useMemo(() => {
     const hideCompleted = (b: BoardSummary) => b.kind !== "completed";
+    let list: BoardSummary[] = [];
     if (area === "personal" && currentUserId) {
-      return boards.filter(
+      list = boards.filter(
         (b) =>
           hideCompleted(b) &&
           b.ownerId === currentUserId &&
+          !isAthleteWorkspaceBoard(b) &&
           (b.scope === "personal" || b.kind === "blocharch_outbox")
       );
+    } else if (area === "team" && athleteUserId) {
+      list = boards.filter((b) => hideCompleted(b) && b.ownerId === athleteUserId);
     }
-    if (area === "team" && athleteUserId) {
-      return boards.filter((b) => hideCompleted(b) && b.ownerId === athleteUserId);
-    }
-    return [];
+    return filterVisiblePlannerBoards(list);
   }, [boards, area, currentUserId, athleteUserId]);
 
   const availableGroups = useMemo(() => groupsWithBoards(areaBoards), [areaBoards]);
@@ -533,12 +541,6 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
     () => filterBoardsByGroup(areaBoards, boardGroup),
     [areaBoards, boardGroup]
   );
-
-  const inboxMoveTargets = useMemo(() => {
-    return areaBoards.filter(
-      (b) => b.kind !== "blocharch_inbox" && b.kind !== "blocharch_outbox"
-    );
-  }, [areaBoards]);
 
   const loadAllBoardDetails = useCallback(async () => {
     const ids = filteredBoards
@@ -633,7 +635,9 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
     }
     const inGroup = filteredBoards.some((b) => b.id === boardId);
     if ((!boardId || !inGroup) && filteredBoards.length > 0) {
-      setBoardId(filteredBoards[0]!.id);
+      const preferred =
+        filteredBoards.find((b) => b.kind === "my_tasks") ?? filteredBoards[0]!;
+      setBoardId(preferred.id);
     } else if (filteredBoards.length === 0) {
       setBoardId(null);
       setDetail(null);
@@ -656,46 +660,13 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
         break;
       }
     }
-    if (athleteParam === "me" && bd.kind === "blocharch_inbox") {
+    if (athleteParam === "me" && bd.kind === "my_tasks") {
       await fetch("/api/athlete/notifications/mark-task-read", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ taskId }),
       }).catch(() => {});
       setInboxUnreadCount(0);
-    }
-  }
-
-  function openInboxMoveModal(taskId: string, taskTitle: string) {
-    const firstBoard = inboxMoveTargets[0]?.id ?? null;
-    setMoveModal({ taskId, title: taskTitle });
-    setMoveBoardId(firstBoard);
-  }
-
-  async function confirmMoveToBoard() {
-    if (!moveModal?.taskId || !moveBoardId) return;
-    setMoveSaving(true);
-    try {
-      const r = await fetch("/api/planner/tasks/move-to-board", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sourceTaskId: moveModal.taskId,
-          targetBoardId: moveBoardId,
-        }),
-      });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) {
-        window.alert((j as { error?: string }).error || "Could not move to board");
-        return;
-      }
-      const targetBid = typeof j.targetBoardId === "string" ? j.targetBoardId : moveBoardId;
-      setMoveModal(null);
-      setBoardId(targetBid);
-      await refreshBoards();
-      await loadDetail(targetBid);
-    } finally {
-      setMoveSaving(false);
     }
   }
 
@@ -1363,7 +1334,7 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {filteredBoards.map((b, boardIdx) => {
-            const inboxUnread = b.kind === "blocharch_inbox" && inboxUnreadCount > 0;
+            const myTasksUnread = b.kind === "my_tasks" && inboxUnreadCount > 0;
             return (
             <div key={b.id} className="flex items-center gap-0.5">
               {!FIXED_BOARD_KINDS.has(b.kind ?? "custom") && filteredBoards.length > 1 ? (
@@ -1409,21 +1380,19 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
                   ? "planner-tab-selected border-brand-500/40 bg-brand-500/10 text-brand-100"
                   : dropTargetBoardId === b.id
                     ? "planner-tab-selected border-brand-500/50 bg-brand-500/15 text-brand-100 ring-2 ring-brand-500/30"
-                    : inboxUnread
+                    : myTasksUnread
                       ? "planner-tab-alert animate-pulse border-red-500/40 bg-red-500/10 text-red-100 ring-1 ring-red-500/35"
                       : "border-white/[0.08] bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]"
               }`}
               style={{ borderLeftWidth: 4, borderLeftColor: b.color }}
             >
               <span className="font-medium">{b.title}</span>
-              {inboxUnread ? (
+              {myTasksUnread ? (
                 <span className="ml-2 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
                   {inboxUnreadCount > 99 ? "99+" : inboxUnreadCount}
                 </span>
               ) : null}
-              {b.isSystem && !isAthleteSelfView ? (
-                <span className="ml-2 text-[10px] uppercase text-amber-500/80">fixed</span>
-              ) : !b.isSystem ? (
+              {!b.isSystem ? (
                 <span className="ml-2 text-[10px] uppercase text-slate-500">{b.scope}</span>
               ) : null}
             </button>
@@ -1459,7 +1428,7 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
                 setEditTask({ ...task, columnId });
               }}
               onToggleComplete={(taskId, completed) => void toggleTaskCompleted(taskId, completed)}
-              hideFixedBadge={isAthleteSelfView}
+              hideFixedBadge={isAthleteSelfView || boardGroup === "blocharch"}
             />
           ) : (
             <p className="text-sm text-slate-500">No boards to show.</p>
@@ -1654,8 +1623,6 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
                     const nudge = detail.editable
                       ? taskNudgeAvailability(detail.columns, t.id)
                       : null;
-                    const showInboxMove =
-                      detail.kind === "blocharch_inbox" && detail.editable && inboxMoveTargets.length > 0;
                     const showInsertLine =
                       detail.editable &&
                       dragTaskId &&
@@ -1860,21 +1827,6 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
                                 ))}
                               </div>
                             ) : null}
-                            {showInboxMove ? (
-                              <div
-                                className="mt-2"
-                                onClick={(e) => e.stopPropagation()}
-                                onPointerDown={(e) => e.stopPropagation()}
-                              >
-                                <button
-                                  type="button"
-                                  onClick={() => openInboxMoveModal(t.id, t.title)}
-                                  className="rounded-md border border-brand-500/30 bg-brand-500/10 px-2 py-1 text-[10px] font-medium text-brand-200 hover:bg-brand-500/20"
-                                >
-                                  Move to board…
-                                </button>
-                              </div>
-                            ) : null}
                           </div>
                           {nudge ? (
                             <KanbanTaskMovePad
@@ -2044,57 +1996,6 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
       </>
       ) : null}
 
-      {moveModal ? (
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4"
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className="modal-panel w-full max-w-md rounded-2xl border border-white/[0.1] bg-slate-900 p-6 shadow-xl">
-            <h3 className="text-lg font-semibold text-white">Move to board</h3>
-            <p className="mt-1 text-xs text-slate-500">
-              Route this inbox task to a working board. It will land in the column linked to its
-              label, or the default column if none matches.
-            </p>
-            <p className="mt-2 text-sm text-slate-300">{moveModal.title}</p>
-            {inboxMoveTargets.length === 0 ? (
-              <p className="mt-4 text-sm text-amber-400/90">No destination boards available.</p>
-            ) : (
-              <label className="mt-4 block text-xs text-slate-400">
-                Destination board
-                <select
-                  value={moveBoardId ?? ""}
-                  onChange={(e) => setMoveBoardId(e.target.value || null)}
-                  className="select-console mt-1 block w-full rounded-lg px-3 py-2 text-sm"
-                >
-                  {inboxMoveTargets.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.title}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-            <div className="mt-6 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setMoveModal(null)}
-                className="rounded-lg px-4 py-2 text-sm text-slate-400 hover:text-white"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={moveSaving || !moveBoardId || inboxMoveTargets.length === 0}
-                onClick={() => void confirmMoveToBoard()}
-                className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-40"
-              >
-                {moveSaving ? "Moving…" : "Move"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
   });
   const sortOrder = (maxOrder._max.sortOrder ?? -1) + 1;
 
-  if (sourceBoard.kind === "blocharch_inbox") {
+  if (sourceBoard.kind === "blocharch_inbox" || sourceBoard.kind === "my_tasks") {
     const moved = await prisma.plannerTask.update({
       where: { id: source.id },
       data: { columnId: targetColumnId, sortOrder },

@@ -8,6 +8,7 @@ import {
   requirePlannerSession,
 } from "@/lib/planner-access";
 import { DEFAULT_BOARD_LABELS } from "@/lib/planner-default-labels";
+import { ensureAthleteSystemBoards } from "@/lib/planner-system-boards";
 
 export async function GET(request: NextRequest) {
   const gate = await requirePlannerSession(request);
@@ -45,12 +46,30 @@ export async function GET(request: NextRequest) {
 
   let boards;
   if (user.role === "admin" && ownerUserId) {
+    const athlete = await prisma.opsAthlete.findFirst({
+      where: { userId: ownerUserId },
+      select: { id: true, userId: true },
+    });
+    if (athlete) {
+      await ensureAthleteSystemBoards(athlete.id, athlete.userId);
+    }
+
     boards = await prisma.plannerBoard.findMany({
       where: { ownerId: ownerUserId, ...projectVisibilityFilter },
       orderBy: [{ sortOrder: "asc" }, { updatedAt: "desc" }],
       select: boardSelect,
     });
   } else {
+    if (user.role === "user") {
+      const athlete = await prisma.opsAthlete.findFirst({
+        where: { userId: user.id },
+        select: { id: true, userId: true },
+      });
+      if (athlete) {
+        await ensureAthleteSystemBoards(athlete.id, athlete.userId);
+      }
+    }
+
     const ids = await planBoardIdsForUser(user);
     if (ids.length === 0) {
       return NextResponse.json({ boards: [] });

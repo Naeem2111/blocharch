@@ -12,7 +12,7 @@ export const PLANNER_BOARD_GROUP_LABELS: Record<PlannerBoardGroup, string> = {
   personal: "Personal",
 };
 
-const BLOCHARCH_KINDS = new Set(["blocharch_inbox", "blocharch_outbox", "my_tasks"]);
+const BLOCHARCH_KINDS = new Set(["blocharch_outbox", "my_tasks"]);
 
 export function plannerBoardGroup(kind?: string | null): PlannerBoardGroup {
   if (kind === "project") return "projects";
