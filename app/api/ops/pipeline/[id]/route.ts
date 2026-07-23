@@ -5,6 +5,7 @@ import { isOpsProjectPhase } from "@/lib/ops-constants";
 import { requireOpsPipelineSession } from "@/lib/ops-access";
 import { parseDateOnly } from "@/lib/ops-hours";
 import { serializePipelineRow } from "@/lib/ops-pipeline-serialize";
+import { revalidateClientPortalByClientId } from "@/lib/revalidate-client-portal";
 
 const clientSelect = {
   name: true,
@@ -63,6 +64,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       include: { client: { select: clientSelect } },
     });
 
+    await revalidateClientPortalByClientId(row.clientId);
+
     return NextResponse.json({ pipeline: serializePipelineRow(row) });
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
@@ -77,6 +80,8 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
   const existing = await prisma.opsPipelineProject.findUnique({ where: { id } });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  const clientId = existing.clientId;
   await prisma.opsPipelineProject.delete({ where: { id } });
+  await revalidateClientPortalByClientId(clientId);
   return NextResponse.json({ ok: true });
 }

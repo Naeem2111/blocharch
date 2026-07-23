@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { canAccessOpsOverview } from "@/lib/permissions";
+import type { UserRole } from "@/lib/users-store";
 
 export type OpsNavItem = {
   href: string;
@@ -33,6 +35,16 @@ function navActive(pathname: string, href: string): boolean {
 
 export function OpsSubNav({ pathname }: { pathname: string }) {
   const [badges, setBadges] = useState<OpsBadges>({});
+  const [role, setRole] = useState<UserRole | null>(null);
+
+  useEffect(() => {
+    fetch("/api/me")
+      .then(async (r) => {
+        const j = await r.json().catch(() => ({}));
+        if (r.ok && j?.user?.role) setRole(j.user.role as UserRole);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -54,12 +66,17 @@ export function OpsSubNav({ pathname }: { pathname: string }) {
     };
   }, []);
 
+  const navItems =
+    role && canAccessOpsOverview(role) && role !== "admin"
+      ? OPS_NAV.filter((item) => item.href === "/dashboard/ops/pipeline")
+      : OPS_NAV;
+
   return (
     <nav
       className="mb-6 flex gap-2 overflow-x-auto border-b border-white/[0.06] pb-4 [-ms-overflow-style:none] [scrollbar-width:none] md:mb-8 md:flex-wrap md:overflow-visible [&::-webkit-scrollbar]:hidden"
       aria-label="Athlete operations"
     >
-      {OPS_NAV.map((item) => {
+      {navItems.map((item) => {
         const active = navActive(pathname, item.href);
         const badge = item.badgeKey ? badges[item.badgeKey] ?? 0 : 0;
         const urgent = !active && badge > 0;

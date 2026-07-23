@@ -5,6 +5,7 @@ import { isOpsProjectPhase } from "@/lib/ops-constants";
 import { requireOpsPipelineSession } from "@/lib/ops-access";
 import { parseDateOnly } from "@/lib/ops-hours";
 import { serializePipelineRow } from "@/lib/ops-pipeline-serialize";
+import { revalidateClientPortalByClientId } from "@/lib/revalidate-client-portal";
 
 const clientSelect = {
   name: true,
@@ -72,6 +73,8 @@ export async function POST(request: NextRequest) {
       },
       include: { client: { select: clientSelect } },
     });
+
+    await revalidateClientPortalByClientId(clientId);
 
     return NextResponse.json({ pipeline: serializePipelineRow(row) }, { status: 201 });
   } catch {

@@ -17,6 +17,7 @@ import {
   applyProjectAthleteAssignments,
   parseProjectAssignmentInput,
 } from "@/lib/ops-project-assignments";
+import { revalidateClientPortalByClientId } from "@/lib/revalidate-client-portal";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -111,6 +112,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
 
     await syncProjectBoardOnAssign(project.id).catch(() => {});
+
+    await revalidateClientPortalByClientId(pipeline.clientId);
 
     const full = await prisma.opsProject.findUnique({
       where: { id: project.id },

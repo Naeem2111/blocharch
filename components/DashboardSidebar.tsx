@@ -265,6 +265,25 @@ const OPS_NAV: NavItem[] = [
 		),
 	},
 	{
+		href: "/dashboard/ops/pipeline",
+		label: "Pipeline",
+		icon: (
+			<svg
+				className="h-5 w-5 shrink-0"
+				fill="none"
+				viewBox="0 0 24 24"
+				strokeWidth={1.5}
+				stroke="currentColor"
+			>
+				<path
+					strokeLinecap="round"
+					strokeLinejoin="round"
+					d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z"
+				/>
+			</svg>
+		),
+	},
+	{
 		href: "/dashboard/ops/projects",
 		label: "Projects",
 		icon: (
@@ -1036,7 +1055,10 @@ export function DashboardSidebar({
 		return ordered.map((section) => {
 			const items =
 				section.id === "ops" && managerOpsNav
-					? section.items.filter((item) => item.href === "/dashboard/ops")
+					? section.items.filter(
+							(item) =>
+								item.href === "/dashboard/ops" || item.href === "/dashboard/ops/pipeline",
+						)
 					: section.items;
 			return {
 				...section,
