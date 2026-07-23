@@ -52,7 +52,12 @@ type AnalyticsData = {
   month: string;
   clientFilter: string | null;
   athleteFilter: string | null;
-  hoursByPhase: Array<{ phase: string; hours: number }>;
+  hoursByPhase: Array<{
+    phase: string;
+    averageHours: number;
+    completionCount: number;
+    totalHours: number;
+  }>;
   hoursByClient: Array<{ clientId: string; clientName: string; clientLogoUrl: string | null; clientLogoBgColor: string | null; clientLogoTextTone: string | null; hours: number }>;
   hoursByAthlete: Array<{
     athleteId: string;
@@ -187,8 +192,8 @@ export function AnalyticsClient() {
     () =>
       (data?.hoursByPhase ?? []).map((p) => ({
         label: displayProjectStageLabel(p.phase as OpsProjectPhase) ?? p.phase,
-        value: p.hours,
-        sublabel: `${p.hours}h`,
+        value: p.averageHours,
+        sublabel: `${p.averageHours}h avg · ${p.completionCount} completion${p.completionCount === 1 ? "" : "s"}`,
       })),
     [data]
   );
@@ -338,15 +343,22 @@ export function AnalyticsClient() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="card-tool rounded-xl p-5">
-          <h2 className="text-sm font-semibold text-white">Hours by phase</h2>
+          <h2 className="text-sm font-semibold text-white">Average hours by phase</h2>
           <p className="mt-1 text-xs text-slate-500">
             {clientId || athleteId
-              ? `Hours logged for the selected filters (${periodLabel}).`
-              : `All firms — cumulative phase hours ${periodLabel}.`}
+              ? `Mean hours to complete each phase (100% logged) for the selected filters (${periodLabel}).`
+              : `Mean hours per completed phase submission across all firms ${periodLabel}.`}
           </p>
-          <div className="mt-4">
-            <SimpleBarChart items={phaseBars} valueSuffix="h" />
-          </div>
+          {(data?.hoursByPhase ?? []).length === 0 ? (
+            <p className="mt-4 text-sm text-slate-500">
+              No completed phase submissions in this period yet. Averages appear when athletes log
+              100% completion on a project phase.
+            </p>
+          ) : (
+            <div className="mt-4">
+              <SimpleBarChart items={phaseBars} valueSuffix="h avg" />
+            </div>
+          )}
         </div>
         <div className="card-tool rounded-xl p-5">
           <h2 className="text-sm font-semibold text-white">

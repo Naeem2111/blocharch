@@ -4,11 +4,7 @@ import { useMemo } from "react";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
 import { ProjectProgressBar } from "@/components/ProjectProgressBar";
 import { asAvatarTextTone } from "@/lib/avatar-text-tone";
-import {
-  daysUntilDueFromIso,
-  projectDueColor,
-  projectDueFillTextColor,
-} from "@/lib/project-color-scale";
+import { daysUntilDueFromIso, projectDueColor } from "@/lib/project-color-scale";
 
 export const DUE_DATE_LEGEND = [
   { label: "Overdue", color: "#ef4444" },
@@ -109,23 +105,18 @@ export function DueDateCalendar({
                     <ul className="mt-1.5 space-y-1.5">
                       {items.map((p) => {
                         const accent = urgencyColor(p);
-                        const textColor = projectDueFillTextColor(accent);
 
                         return (
                           <li
                             key={p.id}
-                            className="due-date-calendar-event due-date-calendar-event-urgency rounded-md px-1.5 py-1"
-                            style={{
-                              backgroundColor: accent,
-                              color: textColor,
-                              boxShadow: "inset 0 0 0 1px rgba(15, 23, 42, 0.14)",
-                            }}
+                            className="due-date-calendar-event due-date-calendar-event-urgency rounded-md border border-white/[0.08] border-l-[3px] bg-white/[0.06] px-1.5 py-1 text-slate-200"
+                            style={{ borderLeftColor: accent }}
                             title={`${p.name} · ${p.clientName}`}
                           >
-                            <p className="due-date-calendar-event-title text-xs font-semibold leading-snug">
+                            <p className="due-date-calendar-event-title text-xs font-semibold leading-snug text-white">
                               <span className="line-clamp-2">{p.name}</span>
                             </p>
-                            <p className="mt-0.5 flex items-center gap-1 text-[10px] font-medium leading-snug opacity-95">
+                            <p className="mt-0.5 flex items-center gap-1 text-[10px] font-medium leading-snug text-slate-400">
                               {p.clientLogoUrl || p.clientLogoBgColor ? (
                                 <ClientAvatar
                                   name={p.clientName}
@@ -137,7 +128,7 @@ export function DueDateCalendar({
                               ) : null}
                               <span className="line-clamp-1 min-w-0">{p.clientName}</span>
                             </p>
-                            <div className="mt-1 [&_.progress-track]:h-2 [&_.progress-track]:bg-black/20 [&_.progress-fill]:opacity-95">
+                            <div className="mt-1 [&_.progress-track]:h-2">
                               <ProjectProgressBar percent={p.progressPercent} showLabel={false} />
                             </div>
                           </li>
@@ -156,8 +147,8 @@ export function DueDateCalendar({
           {DUE_DATE_LEGEND.map((item) => (
             <span key={item.label} className="inline-flex items-center gap-2">
               <span
-                className="h-2.5 w-2.5 rounded-sm shadow-[inset_0_0_0_1px_rgba(15,23,42,0.14)]"
-                style={{ backgroundColor: item.color }}
+                className="h-2.5 w-2.5 rounded-sm border-2 bg-white/[0.06]"
+                style={{ borderColor: item.color }}
               />
               {item.label}
             </span>

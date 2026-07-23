@@ -11,6 +11,7 @@ import { getCostConversionSnapshot } from "@/lib/ops-exchange";
 import { OPS_ALERT_THRESHOLDS } from "@/lib/ops-alerts";
 import { countPendingCheckInRequests } from "@/lib/check-in-admin";
 import { buildBeatenDeadlines, type BeatenDeadlinesByAthlete } from "@/lib/analytics-deadlines";
+import { buildAverageHoursByPhase } from "@/lib/phase-average-hours";
 import { formatProjectDueAt } from "@/lib/project-deadline";
 import { listReportingAthletes, monthSubmissionHoursByAthlete } from "@/lib/reporting-athletes";
 
@@ -591,7 +592,12 @@ export async function buildCommercialLedgerAllTime(): Promise<CommercialSummary>
 
 export type AnalyticsPayload = {
   month: string;
-  hoursByPhase: Array<{ phase: string; hours: number }>;
+  hoursByPhase: Array<{
+    phase: string;
+    averageHours: number;
+    completionCount: number;
+    totalHours: number;
+  }>;
   hoursByClient: Array<{ clientId: string; clientName: string; clientLogoUrl: string | null; clientLogoBgColor: string | null; clientLogoTextTone: string | null; hours: number }>;
   hoursByAthlete: Array<{
     athleteId: string;
@@ -675,7 +681,6 @@ export async function buildAnalytics(
     },
   });
 
-  const phaseMap = new Map<string, number>();
   const clientHoursMap = new Map<string, { name: string; logoUrl: string | null; logoBgColor: string | null; logoTextTone: string | null; hours: number }>();
   const athleteHoursMap = new Map<
     string,
@@ -690,7 +695,6 @@ export async function buildAnalytics(
 
   for (const li of lineItems) {
     const hours = Number(li.hoursWorked);
-    phaseMap.set(li.projectPhase, (phaseMap.get(li.projectPhase) ?? 0) + hours);
 
     const ch = clientHoursMap.get(li.clientId);
     if (ch) ch.hours += hours;
@@ -843,11 +847,21 @@ export async function buildAnalytics(
 
   const beatenDeadlinesByAthlete = await buildBeatenDeadlines(reference, clientId, athleteId, allTime);
 
+  const hoursByPhaseRaw = await buildAverageHoursByPhase({
+    clientId,
+    athleteId,
+    from: allTime ? null : from,
+    to: allTime ? null : to,
+  });
+
   return {
     month: allTime ? "all" : from.toISOString().slice(0, 7),
-    hoursByPhase: Array.from(phaseMap.entries())
-      .map(([phase, hours]) => ({ phase, hours: round2(hours) }))
-      .sort((a, b) => b.hours - a.hours),
+    hoursByPhase: hoursByPhaseRaw.map((p) => ({
+      phase: p.phase,
+      averageHours: round2(p.averageHours),
+      completionCount: p.completionCount,
+      totalHours: round2(p.totalHours),
+    })),
     hoursByClient: Array.from(clientHoursMap.entries())
       .map(([clientId, v]) => ({
         clientId,
