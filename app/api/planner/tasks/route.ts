@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { canEditBoard, requirePlannerSession } from "@/lib/planner-access";
+import { deliverAssignedTaskToAthleteInbox } from "@/lib/planner-assign-to-inbox";
 
 const TASK_SUMMARY_MAX = 2_000;
 const TASK_DESCRIPTION_MAX = 50_000;
@@ -54,10 +55,6 @@ export async function POST(request: NextRequest) {
         assigneeId:
           typeof body.assigneeId === "string" && body.assigneeId ? body.assigneeId : null,
         dueAt: body.dueAt ? new Date(String(body.dueAt)) : null,
-        architectUrl:
-          typeof body.architectUrl === "string" && body.architectUrl.trim()
-            ? body.architectUrl.trim()
-            : null,
         customFields: body.customFields && typeof body.customFields === "object" ? body.customFields : undefined,
       },
       include: {
@@ -81,6 +78,10 @@ export async function POST(request: NextRequest) {
         labels: { include: { label: true } },
       },
     });
+
+    if (full?.assigneeId) {
+      await deliverAssignedTaskToAthleteInbox(full.id).catch(() => {});
+    }
 
     return NextResponse.json({ task: full }, { status: 201 });
   } catch (e) {

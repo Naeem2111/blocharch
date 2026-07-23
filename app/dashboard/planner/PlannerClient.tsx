@@ -25,6 +25,15 @@ import {
 } from "@/lib/planner-task-nudge";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
 import { asAvatarTextTone } from "@/lib/avatar-text-tone";
+import {
+  defaultPlannerBoardGroup,
+  filterBoardsByGroup,
+  groupsWithBoards,
+  isPlannerBoardGroup,
+  plannerBoardGroup,
+  PLANNER_BOARD_GROUP_LABELS,
+  type PlannerBoardGroup,
+} from "@/lib/planner-board-groups";
 
 const FIXED_BOARD_KINDS = new Set([
   "blocharch_outbox",
@@ -71,12 +80,10 @@ type TaskRow = {
   sortOrder: number;
   assigneeId: string | null;
   dueAt: string | null;
-  architectUrl: string | null;
   customFields: Record<string, unknown> | null;
   linkedFromTaskId?: string | null;
   assignee: Assignee | null;
   labels: TaskLbl[];
-  leadStage?: string | null;
 };
 
 type ColumnRow = {
@@ -131,9 +138,9 @@ function googleEventUrl(title: string, due: Date) {
   return `https://calendar.google.com/calendar/render?${p.toString()}`;
 }
 
-/** Snippet from task description for board cards */
-function taskCardDescriptionPreview(description: string | null): string | null {
-  const body = (description ?? "").trim();
+/** Snippet from task summary or description for board cards */
+function taskCardDescriptionPreview(summary: string | null, description: string | null): string | null {
+  const body = (summary ?? description ?? "").trim();
   if (!body) return null;
   const line = body
     .split(/\r?\n/)
@@ -231,11 +238,14 @@ function insertAnchorBeforeId(
   return nextRow ? nextRow.id : null;
 }
 
-export function PlannerClient() {
+type PlannerInitialUser = { id: string; role: "admin" | "manager" | "user" };
+
+export function PlannerClient({ initialUser = null }: { initialUser?: PlannerInitialUser | null }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const area = searchParams.get("area");
   const athleteParam = searchParams.get("athlete");
+  const groupParam = searchParams.get("group");
   const focusBoardId = searchParams.get("board");
   const focusTaskId = searchParams.get("task");
 
@@ -243,7 +253,7 @@ export function PlannerClient() {
   const [boardId, setBoardId] = useState<string | null>(null);
   const [detail, setDetail] = useState<BoardDetail | null>(null);
   const [assignees, setAssignees] = useState<AssigneeOption[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [boardsLoading, setBoardsLoading] = useState(false);
   const [newBoardOpen, setNewBoardOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newScope, setNewScope] = useState<"personal" | "team">("personal");
@@ -264,8 +274,10 @@ export function PlannerClient() {
   const [newColLinkedLabel, setNewColLinkedLabel] = useState("");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [currentRole, setCurrentRole] = useState<"admin" | "manager" | "user" | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(initialUser?.id ?? null);
+  const [currentRole, setCurrentRole] = useState<"admin" | "manager" | "user" | null>(
+    initialUser?.role ?? null
+  );
   /** Resolves athlete portal sidebar link `athlete=me` to the signed-in user id. */
   const athleteUserId = athleteParam === "me" ? currentUserId : athleteParam;
   const [teamAthletes, setTeamAthletes] = useState<TeamAthleteRow[]>([]);
@@ -278,7 +290,6 @@ export function PlannerClient() {
   const [allBoardsView, setAllBoardsView] = useState(false);
   const [boardDetailsById, setBoardDetailsById] = useState<Record<string, BoardDetail>>({});
   const [dropTargetBoardId, setDropTargetBoardId] = useState<string | null>(null);
-  const [boardsLoading, setBoardsLoading] = useState(false);
 
   const suppressNextCardClickRef = useRef(false);
   /** Mirrors dragTaskId for drop handlers (state can lag in edge timings). */
@@ -402,7 +413,15 @@ export function PlannerClient() {
     return typed;
   }, []);
 
+  const loadAssignees = useCallback(async () => {
+    if (assignees.length > 0) return;
+    const r = await fetch("/api/planner/assignees");
+    const j = await r.json();
+    if (r.ok) setAssignees(j.users || []);
+  }, [assignees.length]);
+
   useEffect(() => {
+    if (initialUser) return;
     fetch("/api/me")
       .then(async (r) => {
         const j = await r.json().catch(() => ({}));
@@ -415,7 +434,18 @@ export function PlannerClient() {
         }
       })
       .catch(() => {});
-  }, []);
+  }, [initialUser]);
+
+  useEffect(() => {
+    if (!showBoardPicker) return;
+    setBoardsLoading(true);
+    refreshBoards().finally(() => setBoardsLoading(false));
+  }, [showBoardPicker, refreshBoards]);
+
+  useEffect(() => {
+    if (!showBoardPicker || !detail) return;
+    void loadAssignees();
+  }, [showBoardPicker, detail, loadAssignees]);
 
   useEffect(() => {
     if (athleteParam !== "me" && area !== "team") return;
@@ -470,11 +500,11 @@ export function PlannerClient() {
 
   useEffect(() => {
     if (currentRole === "user" && !area) {
-      router.replace("/dashboard/planner?area=team&athlete=me");
+      router.replace("/dashboard/planner?area=team&athlete=me&group=blocharch");
     }
   }, [currentRole, area, router]);
 
-  const filteredBoards = useMemo(() => {
+  const areaBoards = useMemo(() => {
     const hideCompleted = (b: BoardSummary) => b.kind !== "completed";
     if (area === "personal" && currentUserId) {
       return boards.filter(
@@ -490,11 +520,25 @@ export function PlannerClient() {
     return [];
   }, [boards, area, currentUserId, athleteUserId]);
 
+  const availableGroups = useMemo(() => groupsWithBoards(areaBoards), [areaBoards]);
+
+  const boardGroup: PlannerBoardGroup = useMemo(() => {
+    if (isPlannerBoardGroup(groupParam) && availableGroups.includes(groupParam)) {
+      return groupParam;
+    }
+    return defaultPlannerBoardGroup(areaBoards);
+  }, [groupParam, availableGroups, areaBoards]);
+
+  const filteredBoards = useMemo(
+    () => filterBoardsByGroup(areaBoards, boardGroup),
+    [areaBoards, boardGroup]
+  );
+
   const inboxMoveTargets = useMemo(() => {
-    return filteredBoards.filter(
+    return areaBoards.filter(
       (b) => b.kind !== "blocharch_inbox" && b.kind !== "blocharch_outbox"
     );
-  }, [filteredBoards]);
+  }, [areaBoards]);
 
   const loadAllBoardDetails = useCallback(async () => {
     const ids = filteredBoards
@@ -530,30 +574,51 @@ export function PlannerClient() {
   const multiBoardList = useMemo(
     () =>
       Object.values(boardDetailsById)
-        .filter((b) => b.kind !== "blocharch_outbox")
+        .filter(
+          (b) =>
+            b.kind !== "blocharch_outbox" &&
+            filteredBoards.some((summary) => summary.id === b.id)
+        )
         .sort((a, b) => a.title.localeCompare(b.title)),
-    [boardDetailsById]
+    [boardDetailsById, filteredBoards]
   );
 
-  function goPlanner(params: { area?: string; athlete?: string }) {
+  function goPlanner(params: {
+    area?: string;
+    athlete?: string;
+    group?: PlannerBoardGroup;
+  }) {
     const p = new URLSearchParams();
     if (params.area) p.set("area", params.area);
     if (params.athlete) p.set("athlete", params.athlete);
+    if (params.group) p.set("group", params.group);
     const q = p.toString();
     router.push(q ? `/dashboard/planner?${q}` : "/dashboard/planner");
     setBoardId(null);
     setDetail(null);
+    setAllBoardsView(false);
+  }
+
+  function setBoardGroup(next: PlannerBoardGroup) {
+    const p = new URLSearchParams(searchParams.toString());
+    p.set("group", next);
+    router.push(`/dashboard/planner?${p.toString()}`);
+    setBoardId(null);
+    setDetail(null);
+    setAllBoardsView(false);
   }
 
   useEffect(() => {
-    setLoading(true);
-    Promise.all([
-      refreshBoards(),
-      fetch("/api/planner/assignees")
-        .then((r) => r.json())
-        .then((j) => setAssignees(j.users || [])),
-    ]).finally(() => setLoading(false));
-  }, [refreshBoards]);
+    if (!focusBoardId || areaBoards.length === 0) return;
+    const hit = areaBoards.find((b) => b.id === focusBoardId);
+    if (!hit) return;
+    const neededGroup = plannerBoardGroup(hit.kind);
+    if (groupParam !== neededGroup) {
+      const p = new URLSearchParams(searchParams.toString());
+      p.set("group", neededGroup);
+      router.replace(`/dashboard/planner?${p.toString()}`);
+    }
+  }, [focusBoardId, areaBoards, groupParam, searchParams, router]);
 
   useEffect(() => {
     if (!focusTaskId || !focusBoardId || boards.length === 0) return;
@@ -566,8 +631,12 @@ export function PlannerClient() {
       setDetail(null);
       return;
     }
-    if (!boardId && filteredBoards.length > 0) {
+    const inGroup = filteredBoards.some((b) => b.id === boardId);
+    if ((!boardId || !inGroup) && filteredBoards.length > 0) {
       setBoardId(filteredBoards[0]!.id);
+    } else if (filteredBoards.length === 0) {
+      setBoardId(null);
+      setDetail(null);
     }
   }, [boards, boardId, showBoardPicker, filteredBoards]);
 
@@ -695,7 +764,6 @@ export function PlannerClient() {
       description?: string | null;
       assigneeId?: string | null;
       dueAt?: string | null;
-      architectUrl?: string | null;
       labelIds?: string[];
     }
   ) {
@@ -1080,8 +1148,15 @@ export function PlannerClient() {
       ? `${window.location.origin}/api/planner/boards/${encodeURIComponent(boardId)}/calendar`
       : "";
 
-  if (loading) {
+  const bootLoading = !currentUserId;
+  const boardPickerLoading = showBoardPicker && boardsLoading && boards.length === 0;
+
+  if (bootLoading) {
     return <p className="text-slate-500 text-sm">Loading planner…</p>;
+  }
+
+  if (boardPickerLoading) {
+    return <p className="text-slate-500 text-sm">Loading boards…</p>;
   }
 
   return (
@@ -1135,7 +1210,7 @@ export function PlannerClient() {
                 <li key={a.id}>
                   <button
                     type="button"
-                    onClick={() => goPlanner({ area: "team", athlete: a.userId })}
+                    onClick={() => goPlanner({ area: "team", athlete: a.userId, group: "blocharch" })}
                     className="flex w-full items-center gap-3 rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-left transition-colors hover:bg-white/[0.06]"
                   >
                     <ClientAvatar name={a.fullName} logoUrl={a.profilePhotoUrl} backgroundColor={a.profilePhotoBgColor} textTone={asAvatarTextTone(a.profilePhotoTextTone)} size={36} objectFit="cover" />
@@ -1184,17 +1259,19 @@ export function PlannerClient() {
             </>
           ) : null}
         </div>
-        <button
-          type="button"
-          onClick={() => setNewBoardOpen(true)}
-          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-brand-500"
-        >
-          New board
-        </button>
+        {boardGroup === "personal" ? (
+          <button
+            type="button"
+            onClick={() => setNewBoardOpen(true)}
+            className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-brand-500"
+          >
+            New board
+          </button>
+        ) : null}
       </div>
       ) : null}
 
-      {showBoardPicker && newBoardOpen && (
+      {showBoardPicker && newBoardOpen && boardGroup === "personal" ? (
         <form
           onSubmit={createBoard}
           className="card-tool flex flex-wrap items-end gap-3 rounded-xl p-4"
@@ -1240,10 +1317,28 @@ export function PlannerClient() {
             Cancel
           </button>
         </form>
-      )}
+      ) : null}
 
       {showBoardPicker ? (
       <div className="flex flex-col gap-3">
+        {availableGroups.length > 1 ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {availableGroups.map((group) => (
+              <button
+                key={group}
+                type="button"
+                onClick={() => setBoardGroup(group)}
+                className={`planner-tab rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                  boardGroup === group
+                    ? "planner-tab-selected border-brand-500/40 bg-brand-500/10 text-brand-100"
+                    : "border-white/[0.08] bg-white/[0.03] text-slate-400 hover:bg-white/[0.06] hover:text-slate-200"
+                }`}
+              >
+                {PLANNER_BOARD_GROUP_LABELS[group]}
+              </button>
+            ))}
+          </div>
+        ) : null}
         <div className="flex flex-wrap items-center gap-2">
           {filteredBoards.length > 1 ? (
             <button
@@ -1336,7 +1431,11 @@ export function PlannerClient() {
             );
           })}
           {filteredBoards.length === 0 ? (
-            <p className="text-sm text-slate-500">No boards yet — create one to get started.</p>
+            <p className="text-sm text-slate-500">
+              {boardGroup === "personal"
+                ? "No personal boards yet — create one to get started."
+                : `No ${PLANNER_BOARD_GROUP_LABELS[boardGroup].toLowerCase()} boards in this workspace.`}
+            </p>
           ) : null}
         </div>
       </div>
@@ -1545,7 +1644,7 @@ export function PlannerClient() {
                   }}
                 >
                   {col.tasks.map((t) => {
-                    const descPreview = taskCardDescriptionPreview(t.description);
+                    const descPreview = taskCardDescriptionPreview(t.summary, t.description);
                     const showDoneTick =
                       detail.editable &&
                       completedColumnId !== null &&
@@ -2388,7 +2487,6 @@ function TaskFormModal({
     description?: string | null;
     assigneeId?: string | null;
     dueAt?: string | null;
-    architectUrl?: string | null;
     labelIds?: string[];
   }) => Promise<void>;
 }) {
@@ -2399,7 +2497,6 @@ function TaskFormModal({
   const [dueDate, setDueDate] = useState("");
   const [dueTime, setDueTime] = useState("");
   const [dueAmPm, setDueAmPm] = useState<"AM" | "PM">("AM");
-  const [architectUrl, setArchitectUrl] = useState("");
   const [labelIds, setLabelIds] = useState<string[]>([]);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="dialog">
@@ -2489,15 +2586,6 @@ function TaskFormModal({
               </select>
             </label>
           </div>
-          <label className="block text-slate-400">
-            Architect / lead URL (integrates with lead nurturing)
-            <input
-              className="select-console mt-1 w-full rounded-lg px-3 py-2 text-sm"
-              value={architectUrl}
-              onChange={(e) => setArchitectUrl(e.target.value)}
-              placeholder="https://architectdirectory.co.uk/practice/..."
-            />
-          </label>
           <div>
             <p className="text-slate-400">Labels</p>
             <div className="mt-1 flex flex-wrap gap-2">
@@ -2533,7 +2621,6 @@ function TaskFormModal({
                 description: description.trim() ? description : null,
                 assigneeId: showAssignee ? assigneeId || null : null,
                 dueAt: dueIso ? new Date(dueIso).toISOString() : null,
-                architectUrl: architectUrl.trim() || null,
                 labelIds,
               });
             }}
@@ -2568,6 +2655,7 @@ function EditTaskModal({
   onSave: (taskId: string, body: Record<string, unknown>) => Promise<void>;
   onDelete: (taskId: string) => Promise<void>;
 }) {
+  const [taskLoading, setTaskLoading] = useState(true);
   const initialDue = splitDueAtIso(task.dueAt);
   const [title, setTitle] = useState(task.title);
   const [summary, setSummary] = useState(task.summary || "");
@@ -2576,8 +2664,33 @@ function EditTaskModal({
   const [dueDate, setDueDate] = useState(initialDue.date);
   const [dueTime, setDueTime] = useState(initialDue.time);
   const [dueAmPm, setDueAmPm] = useState<"AM" | "PM">(initialDue.ampm);
-  const [architectUrl, setArchitectUrl] = useState(task.architectUrl || "");
   const [labelIds, setLabelIds] = useState(task.labels.map((x) => x.label.id));
+
+  useEffect(() => {
+    let cancelled = false;
+    setTaskLoading(true);
+    fetch(`/api/planner/tasks/${encodeURIComponent(task.id)}`)
+      .then(async (r) => {
+        const j = await r.json().catch(() => ({}));
+        if (cancelled || !r.ok || !j.task) return;
+        const full = j.task as TaskRow;
+        setTitle(full.title);
+        setSummary(full.summary || "");
+        setDescription(full.description || "");
+        setAssigneeId(full.assigneeId || "");
+        setLabelIds(full.labels.map((x) => x.label.id));
+        const due = splitDueAtIso(full.dueAt);
+        setDueDate(due.date);
+        setDueTime(due.time);
+        setDueAmPm(due.ampm);
+      })
+      .finally(() => {
+        if (!cancelled) setTaskLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [task.id]);
 
   const dueAtDate = task.dueAt ? new Date(task.dueAt) : null;
 
@@ -2585,10 +2698,13 @@ function EditTaskModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="dialog">
       <div className="modal-panel max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-white/[0.1] bg-slate-900 p-6 shadow-xl">
         <h3 className="text-lg font-semibold text-white">{readOnly ? "View task" : "Edit task"}</h3>
+        {taskLoading ? (
+          <p className="mt-3 text-sm text-slate-500">Loading task…</p>
+        ) : null}
         {readOnly ? (
           <p className="mt-1 text-xs text-slate-500">This board is read-only. You cannot change fields here.</p>
         ) : null}
-        <div className="mt-4 space-y-3 text-sm">
+        <div className={`mt-4 space-y-3 text-sm ${taskLoading ? "pointer-events-none opacity-60" : ""}`}>
           <label className="block text-slate-400">
             Title
             <input
@@ -2677,15 +2793,6 @@ function EditTaskModal({
               </select>
             </label>
           </div>
-          <label className="block text-slate-400">
-            Architect / lead URL
-            <input
-              className="select-console mt-1 w-full rounded-lg px-3 py-2 text-sm disabled:opacity-60"
-              value={architectUrl}
-              disabled={readOnly}
-              onChange={(e) => setArchitectUrl(e.target.value)}
-            />
-          </label>
           <div>
             <p className="text-slate-400">Labels</p>
             <div className="mt-1 flex flex-wrap gap-2">
@@ -2748,7 +2855,6 @@ function EditTaskModal({
                     description: description.trim() ? description : null,
                     assigneeId: showAssignee ? assigneeId || null : undefined,
                     dueAt: dueIso ? new Date(dueIso).toISOString() : null,
-                    architectUrl: architectUrl.trim() || null,
                     labelIds,
                   });
                 }}

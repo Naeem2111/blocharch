@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { OpsProjectStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   DEFAULT_PLANNER_COLUMNS,
@@ -15,41 +16,60 @@ export async function GET(request: NextRequest) {
 
   const ownerUserId = request.nextUrl.searchParams.get("ownerUserId")?.trim() || null;
 
-  const ids = await planBoardIdsForUser(user);
-  if (ids.length === 0) {
-    return NextResponse.json({ boards: [] });
+  const projectVisibilityFilter = {
+    OR: [
+      { kind: { not: "project" as const } },
+      { opsProjectId: null },
+      {
+        opsProject: {
+          currentStatus: { notIn: [OpsProjectStatus.completed, OpsProjectStatus.handed_over] },
+        },
+      },
+    ],
+  };
+
+  const boardSelect = {
+    id: true,
+    title: true,
+    scope: true,
+    kind: true,
+    isSystem: true,
+    color: true,
+    sortOrder: true,
+    ownerId: true,
+    athleteId: true,
+    updatedAt: true,
+    owner: { select: { username: true } },
+    _count: { select: { columns: true } },
+  } as const;
+
+  let boards;
+  if (user.role === "admin" && ownerUserId) {
+    boards = await prisma.plannerBoard.findMany({
+      where: { ownerId: ownerUserId, ...projectVisibilityFilter },
+      orderBy: [{ sortOrder: "asc" }, { updatedAt: "desc" }],
+      select: boardSelect,
+    });
+  } else {
+    const ids = await planBoardIdsForUser(user);
+    if (ids.length === 0) {
+      return NextResponse.json({ boards: [] });
+    }
+
+    boards = await prisma.plannerBoard.findMany({
+      where: {
+        id: { in: ids },
+        ...(ownerUserId ? { ownerId: ownerUserId } : {}),
+        ...projectVisibilityFilter,
+      },
+      orderBy: [{ sortOrder: "asc" }, { updatedAt: "desc" }],
+      select: boardSelect,
+    });
   }
 
-  const boards = await prisma.plannerBoard.findMany({
-    where: {
-      id: { in: ids },
-      ...(ownerUserId ? { ownerId: ownerUserId } : {}),
-      OR: [
-        { kind: { not: "project" } },
-        { opsProjectId: null },
-        {
-          opsProject: {
-            currentStatus: { notIn: ["completed", "handed_over"] },
-          },
-        },
-      ],
-    },
-    orderBy: [{ sortOrder: "asc" }, { updatedAt: "desc" }],
-    select: {
-      id: true,
-      title: true,
-      scope: true,
-      kind: true,
-      isSystem: true,
-      color: true,
-      sortOrder: true,
-      ownerId: true,
-      athleteId: true,
-      updatedAt: true,
-      owner: { select: { username: true } },
-      _count: { select: { columns: true } },
-    },
-  });
+  if (boards.length === 0) {
+    return NextResponse.json({ boards: [] });
+  }
 
   const ownerKey = ownerUserId ?? user.id;
   const ownerBoards = boards.filter((b) => b.ownerId === ownerKey);

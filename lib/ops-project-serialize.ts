@@ -22,6 +22,9 @@ type ProjectLike = {
   deadlineBeatenDays: number | null;
   deadlineBeatenMinutes: number | null;
   notes: string | null;
+  portalDisplayLocked: boolean;
+  clientDescription: string | null;
+  clientDeliverables: unknown;
   blockerFlag: boolean;
   checkInRequested: boolean;
 };
@@ -55,6 +58,9 @@ export function serializeOpsProjectRow<T extends ProjectLike>(
     deadlineBeatenDays: project.deadlineBeatenDays,
     deadlineBeatenMinutes: project.deadlineBeatenMinutes,
     notes: project.notes,
+    portalDisplayLocked: project.portalDisplayLocked ?? false,
+    clientDescription: project.clientDescription ?? null,
+    clientDeliverables: project.clientDeliverables ?? null,
     blockerFlag: project.blockerFlag,
     checkInRequested: project.checkInRequested,
     ...extras,

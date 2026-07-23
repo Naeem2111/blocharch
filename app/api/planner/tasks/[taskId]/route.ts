@@ -2,7 +2,8 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { canEditBoard, requirePlannerSession } from "@/lib/planner-access";
+import { canEditBoard, canViewBoard, requirePlannerSession } from "@/lib/planner-access";
+import { deliverAssignedTaskToAthleteInbox } from "@/lib/planner-assign-to-inbox";
 import { relocateTaskToLabelLinkedColumn } from "@/lib/planner-label-column";
 
 const TASK_SUMMARY_MAX = 2_000;
@@ -26,6 +27,31 @@ async function taskBoardId(taskId: string): Promise<string | null> {
   return t?.column.boardId ?? null;
 }
 
+export async function GET(request: NextRequest, context: Ctx) {
+  const gate = await requirePlannerSession(request);
+  if (gate instanceof NextResponse) return gate;
+  const { user } = gate;
+  const { taskId } = await context.params;
+
+  const boardId = await taskBoardId(taskId);
+  if (!boardId) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!(await canViewBoard(user, boardId))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const task = await prisma.plannerTask.findUnique({
+    where: { id: taskId },
+    include: {
+      assignee: { select: { id: true, username: true } },
+      labels: { include: { label: true } },
+      column: { select: { id: true, boardId: true } },
+    },
+  });
+
+  if (!task) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  return NextResponse.json({ task });
+}
+
 export async function PATCH(request: NextRequest, context: Ctx) {
   const gate = await requirePlannerSession(request);
   if (gate instanceof NextResponse) return gate;
@@ -41,6 +67,11 @@ export async function PATCH(request: NextRequest, context: Ctx) {
   try {
     const body = await request.json();
     const data: Prisma.PlannerTaskUncheckedUpdateInput = {};
+
+    const before = await prisma.plannerTask.findUnique({
+      where: { id: taskId },
+      select: { assigneeId: true },
+    });
 
     if (typeof body.title === "string") data.title = body.title.trim().slice(0, 200);
     const nextSummary = normalizeNullableLongText(body.summary, TASK_SUMMARY_MAX);
@@ -70,11 +101,6 @@ export async function PATCH(request: NextRequest, context: Ctx) {
 
     if (body.dueAt === null) data.dueAt = null;
     else if (body.dueAt) data.dueAt = new Date(String(body.dueAt));
-
-    if (body.architectUrl === null) data.architectUrl = null;
-    else if (typeof body.architectUrl === "string") {
-      data.architectUrl = body.architectUrl.trim() || null;
-    }
 
     if (body.customFields !== undefined) {
       data.customFields =
@@ -106,6 +132,14 @@ export async function PATCH(request: NextRequest, context: Ctx) {
         column: { select: { id: true, boardId: true } },
       },
     });
+
+    if (
+      body.assigneeId !== undefined &&
+      task?.assigneeId &&
+      task.assigneeId !== before?.assigneeId
+    ) {
+      await deliverAssignedTaskToAthleteInbox(taskId).catch(() => {});
+    }
 
     return NextResponse.json({ task });
   } catch (e) {

@@ -3,20 +3,24 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import {
   canEditBoard,
-  canManageBoardMembers,
-  canViewBoard,
   requirePlannerSession,
+  resolveBoardAccess,
 } from "@/lib/planner-access";
 import { isProtectedSystemBoard } from "@/lib/planner-system-boards";
-import {
-  ensureDefaultColumnsOnBoard,
-} from "@/lib/planner-columns-seed";
-import {
-  ensureDefaultLabelsOnBoard,
-  purgeUnapprovedBoardLabels,
-} from "@/lib/planner-labels-seed";
 
 type Ctx = { params: Promise<{ boardId: string }> };
+
+const boardTaskListSelect = {
+  id: true,
+  title: true,
+  summary: true,
+  sortOrder: true,
+  assigneeId: true,
+  dueAt: true,
+  linkedFromTaskId: true,
+  assignee: { select: { id: true, username: true } },
+  labels: { include: { label: true } },
+} as const;
 
 export async function GET(request: NextRequest, context: Ctx) {
   const gate = await requirePlannerSession(request);
@@ -24,13 +28,10 @@ export async function GET(request: NextRequest, context: Ctx) {
   const { user } = gate;
   const { boardId } = await context.params;
 
-  if (!(await canViewBoard(user, boardId))) {
+  const resolved = await resolveBoardAccess(user, boardId);
+  if (!resolved?.access.canView) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-
-  await purgeUnapprovedBoardLabels(boardId);
-  await ensureDefaultLabelsOnBoard(boardId);
-  await ensureDefaultColumnsOnBoard(boardId);
 
   const board = await prisma.plannerBoard.findUnique({
     where: { id: boardId },
@@ -41,10 +42,7 @@ export async function GET(request: NextRequest, context: Ctx) {
         include: {
           tasks: {
             orderBy: { sortOrder: "asc" },
-            include: {
-              assignee: { select: { id: true, username: true } },
-              labels: { include: { label: true } },
-            },
+            select: boardTaskListSelect,
           },
         },
       },
@@ -57,20 +55,6 @@ export async function GET(request: NextRequest, context: Ctx) {
 
   if (!board) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const urls = Array.from(
-    new Set(
-      board.columns.flatMap((c) => c.tasks.map((t) => t.architectUrl).filter(Boolean) as string[])
-    )
-  );
-  const leads =
-    urls.length > 0
-      ? await prisma.lead.findMany({
-          where: { architectUrl: { in: urls } },
-          select: { architectUrl: true, stage: true },
-        })
-      : [];
-  const leadMap = Object.fromEntries(leads.map((l) => [l.architectUrl, l.stage]));
-
   const payload = {
     ...board,
     kind: board.kind,
@@ -81,11 +65,12 @@ export async function GET(request: NextRequest, context: Ctx) {
       ...col,
       tasks: col.tasks.map((t) => ({
         ...t,
-        leadStage: t.architectUrl ? leadMap[t.architectUrl] ?? null : null,
+        description: null,
+        customFields: null,
       })),
     })),
-    editable: await canEditBoard(user, boardId),
-    canManageMembers: await canManageBoardMembers(user, boardId),
+    editable: resolved.access.canEdit,
+    canManageMembers: resolved.access.canManageMembers,
   };
 
   return NextResponse.json(payload);

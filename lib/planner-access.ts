@@ -21,34 +21,52 @@ export async function findBoard(boardId: string) {
   });
 }
 
+export function deriveBoardAccess(
+  user: SessionUser,
+  board: NonNullable<Awaited<ReturnType<typeof findBoard>>>
+): { canView: boolean; canEdit: boolean; canManageMembers: boolean } {
+  if (user.role === "admin") {
+    return { canView: true, canEdit: true, canManageMembers: true };
+  }
+
+  const isOwner = board.ownerId === user.id;
+  if (isOwner) {
+    return { canView: true, canEdit: true, canManageMembers: true };
+  }
+
+  if (board.scope === "team") {
+    if (user.role === "manager") {
+      return { canView: true, canEdit: true, canManageMembers: true };
+    }
+    const member = board.members.find((m) => m.userId === user.id);
+    if (member) {
+      return {
+        canView: true,
+        canEdit: member.role === "editor",
+        canManageMembers: false,
+      };
+    }
+  }
+
+  return { canView: false, canEdit: false, canManageMembers: false };
+}
+
+export async function resolveBoardAccess(user: SessionUser, boardId: string) {
+  const board = await findBoard(boardId);
+  if (!board) return null;
+  return { board, access: deriveBoardAccess(user, board) };
+}
+
 export async function canViewBoard(user: SessionUser, boardId: string): Promise<boolean> {
   const board = await findBoard(boardId);
   if (!board) return false;
-  if (user.role === "admin") return true;
-  if (board.ownerId === user.id) return true;
-  if (board.scope === "team") {
-    if (user.role === "manager") return true;
-    const m = await prisma.plannerBoardMember.findUnique({
-      where: { boardId_userId: { boardId, userId: user.id } },
-    });
-    return !!m;
-  }
-  return false;
+  return deriveBoardAccess(user, board).canView;
 }
 
 export async function canEditBoard(user: SessionUser, boardId: string): Promise<boolean> {
   const board = await findBoard(boardId);
   if (!board) return false;
-  if (user.role === "admin") return true;
-  if (board.ownerId === user.id) return true;
-  if (board.scope === "team") {
-    if (user.role === "manager") return true;
-    const m = await prisma.plannerBoardMember.findUnique({
-      where: { boardId_userId: { boardId, userId: user.id } },
-    });
-    return !!m && m.role === "editor";
-  }
-  return board.ownerId === user.id;
+  return deriveBoardAccess(user, board).canEdit;
 }
 
 export async function planBoardIdsForUser(user: SessionUser): Promise<string[]> {
@@ -83,8 +101,5 @@ export { DEFAULT_PLANNER_COLUMNS, resolveGeneralColumnId } from "@/lib/planner-d
 export async function canManageBoardMembers(user: SessionUser, boardId: string): Promise<boolean> {
   const board = await findBoard(boardId);
   if (!board) return false;
-  if (user.role === "admin") return true;
-  if (board.ownerId === user.id) return true;
-  if (board.scope === "team" && user.role === "manager") return true;
-  return false;
+  return deriveBoardAccess(user, board).canManageMembers;
 }

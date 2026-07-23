@@ -2,14 +2,10 @@ import { Suspense } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { getSession } from "@/lib/auth";
-import { provisionMissingPlannerBoards } from "@/lib/planner-provision";
 import { PlannerClient } from "./PlannerClient";
 
 export default async function PlannerPage() {
   const session = await getSession();
-  if (session?.user.role === "admin") {
-    await provisionMissingPlannerBoards().catch(() => {});
-  }
 
   return (
     <div className="mx-auto w-full max-w-[90rem]">
@@ -21,7 +17,13 @@ export default async function PlannerPage() {
         <ThemeToggle compact />
       </div>
       <Suspense fallback={<p className="text-slate-500 text-sm">Loading planner…</p>}>
-        <PlannerClient />
+        <PlannerClient
+          initialUser={
+            session
+              ? { id: session.user.id, role: session.user.role as "admin" | "manager" | "user" }
+              : null
+          }
+        />
       </Suspense>
     </div>
   );

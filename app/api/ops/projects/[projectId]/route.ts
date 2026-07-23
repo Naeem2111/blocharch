@@ -1,5 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import {
   isOpsProjectComplexity,
@@ -15,6 +17,8 @@ import { validateProjectLeadContactDb } from "@/lib/ops-project-lead";
 import { deleteProjectAndSyncSubmissions } from "@/lib/sync-submission-totals";
 import { parseProjectDueInput } from "@/lib/project-deadline";
 import { serializeOpsProjectRow } from "@/lib/ops-project-serialize";
+import { normalizeClientDeliverablesForSave } from "@/lib/client-portal-deliverables";
+import { clientPortalPath } from "@/lib/client-slug";
 import {
   activeAthleteAssignmentsInclude,
   applyProjectAthleteAssignments,
@@ -62,7 +66,15 @@ export async function GET(_request: NextRequest, context: RouteContext) {
   const project = await prisma.opsProject.findUnique({
     where: { id: projectId },
     include: {
-      client: { select: { id: true, name: true } },
+      client: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          publicPortalEnabled: true,
+          contacts: { orderBy: { sortOrder: "asc" }, select: { id: true, name: true, email: true } },
+        },
+      },
       assignedAthlete: { select: { id: true, fullName: true, athleteCode: true } },
       athleteAssignments: activeAthleteAssignmentsInclude,
       projectLeadContact: { select: { id: true, name: true, email: true } },
@@ -91,7 +103,12 @@ export async function GET(_request: NextRequest, context: RouteContext) {
   });
 
   return NextResponse.json({
-    project: serializeOpsProject(project, Number(hoursAgg._sum.hoursWorked ?? 0)),
+    project: {
+      ...serializeOpsProject(project, Number(hoursAgg._sum.hoursWorked ?? 0)),
+      clientSlug: project.client.slug,
+      clientPortalEnabled: project.client.publicPortalEnabled,
+      clientContacts: project.client.contacts,
+    },
     submissions: submissions.map((s) => ({
       id: s.id,
       submissionDate: s.submissionDate.toISOString().slice(0, 10),
@@ -192,6 +209,43 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
     if (body.handoverDate !== undefined) data.handoverDate = body.handoverDate ? parseDateOnly(String(body.handoverDate)) : null;
 
+    if (body.completedAt !== undefined) {
+      if (body.completedAt === null || body.completedAt === "") {
+        data.completedAt = null;
+      } else {
+        const d = new Date(String(body.completedAt));
+        if (Number.isNaN(d.getTime())) {
+          return NextResponse.json({ error: "Invalid completion date/time" }, { status: 400 });
+        }
+        data.completedAt = d;
+      }
+    }
+    if (body.deadlineBeatenDays !== undefined) {
+      data.deadlineBeatenDays =
+        body.deadlineBeatenDays == null || body.deadlineBeatenDays === ""
+          ? null
+          : Math.max(0, Math.round(Number(body.deadlineBeatenDays)));
+    }
+    if (body.deadlineBeatenMinutes !== undefined) {
+      data.deadlineBeatenMinutes =
+        body.deadlineBeatenMinutes == null || body.deadlineBeatenMinutes === ""
+          ? null
+          : Math.max(0, Math.round(Number(body.deadlineBeatenMinutes)));
+    }
+    if (body.portalDisplayLocked !== undefined) {
+      data.portalDisplayLocked = Boolean(body.portalDisplayLocked);
+    }
+    if (body.clientDescription !== undefined) {
+      data.clientDescription = body.clientDescription
+        ? String(body.clientDescription).trim().slice(0, 10_000)
+        : null;
+    }
+    if (body.clientDeliverables !== undefined) {
+      const deliverables = normalizeClientDeliverablesForSave(body.clientDeliverables);
+      data.clientDeliverables =
+        deliverables === null ? Prisma.JsonNull : (deliverables as Prisma.InputJsonValue);
+    }
+
     if (body.blockerFlag !== undefined) data.blockerFlag = Boolean(body.blockerFlag);
     if (body.checkInRequested !== undefined) data.checkInRequested = Boolean(body.checkInRequested);
 
@@ -228,7 +282,15 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
 
     const projectInclude = {
-      client: { select: { id: true, name: true } },
+      client: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          publicPortalEnabled: true,
+          contacts: { orderBy: { sortOrder: "asc" }, select: { id: true, name: true, email: true } },
+        },
+      },
       assignedAthlete: { select: { id: true, fullName: true, athleteCode: true } },
       athleteAssignments: activeAthleteAssignmentsInclude,
       projectLeadContact: { select: { id: true, name: true, email: true } },
@@ -261,7 +323,18 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       }
     ).catch(() => {});
 
-    await syncProjectProgressForProjects([projectId]).catch(() => {});
+    const shouldSyncProgress =
+      !project.portalDisplayLocked &&
+      !existing.portalDisplayLocked &&
+      body.portalDisplayLocked !== true;
+
+    if (shouldSyncProgress) {
+      await syncProjectProgressForProjects([projectId]).catch(() => {});
+    }
+
+    if (project.client.slug && project.client.publicPortalEnabled) {
+      revalidatePath(clientPortalPath(project.client.slug));
+    }
 
     const hoursAgg = await prisma.opsSubmissionLineItem.aggregate({
       where: { projectId },
@@ -269,7 +342,12 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     });
 
     return NextResponse.json({
-      project: serializeOpsProject(project, Number(hoursAgg._sum.hoursWorked ?? 0)),
+      project: {
+        ...serializeOpsProject(project, Number(hoursAgg._sum.hoursWorked ?? 0)),
+        clientSlug: project.client.slug,
+        clientPortalEnabled: project.client.publicPortalEnabled,
+        clientContacts: project.client.contacts,
+      },
     });
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });

@@ -28,6 +28,47 @@ import type {
 
 type Tab = "tracker" | "completed" | "notifications";
 
+function formatDateTime(iso: string | null): string {
+	if (!iso) return "";
+	const d = new Date(iso);
+	if (Number.isNaN(d.getTime())) return iso;
+	return d.toLocaleString("en-GB", {
+		day: "numeric",
+		month: "short",
+		year: "numeric",
+		hour: "2-digit",
+		minute: "2-digit",
+	});
+}
+
+function ProjectDeliverables({
+	deliverables,
+}: {
+	deliverables: PublicClientPortalProject["clientDeliverables"];
+}) {
+	if (!deliverables.length) return null;
+	return (
+		<ul className="mt-2 space-y-1">
+			{deliverables.map((d, i) => (
+				<li key={`${d.label}-${i}`} className="text-xs">
+					{d.url ? (
+						<a
+							href={d.url}
+							target="_blank"
+							rel="noopener noreferrer"
+							className="text-brand-400 hover:underline"
+						>
+							{d.label}
+						</a>
+					) : (
+						<span className="text-slate-400">{d.label}</span>
+					)}
+				</li>
+			))}
+		</ul>
+	);
+}
+
 function formatShortDate(iso: string | null): string {
 	if (!iso) return "";
 	const d = new Date(`${iso}T12:00:00`);
@@ -114,6 +155,10 @@ function ProjectCard({ project }: { project: PublicClientPortalProject }) {
 					{project.address ? (
 						<p className="mt-0.5 text-xs text-slate-500">{project.address}</p>
 					) : null}
+					{project.clientDescription ? (
+						<p className="mt-2 text-sm leading-snug text-slate-400">{project.clientDescription}</p>
+					) : null}
+					<ProjectDeliverables deliverables={project.clientDeliverables} />
 				</div>
 				<span
 					className="client-portal-status-badge inline-flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide"
@@ -202,6 +247,10 @@ function CompletedTableRow({ project }: { project: PublicClientPortalProject }) 
 				{project.address ? (
 					<p className="mt-0.5 truncate text-xs text-slate-500">{project.address}</p>
 				) : null}
+				{project.clientDescription ? (
+					<p className="mt-2 text-xs leading-snug text-slate-400">{project.clientDescription}</p>
+				) : null}
+				<ProjectDeliverables deliverables={project.clientDeliverables} />
 				<div className="mt-2.5 max-w-[220px]">
 					<ProjectProgressBar percent={100} />
 				</div>
@@ -230,6 +279,9 @@ function CompletedTableRow({ project }: { project: PublicClientPortalProject }) 
 			</td>
 			<td className="px-4 py-4 align-middle whitespace-nowrap">
 				<DueDateHighlight project={project} block />
+			</td>
+			<td className="px-4 py-4 align-middle whitespace-nowrap text-sm text-slate-300">
+				{project.completedAt ? formatDateTime(project.completedAt) : "—"}
 			</td>
 			<td className="px-4 py-4 align-middle whitespace-nowrap text-sm font-medium text-emerald-400 client-portal-accent-emerald">
 				{project.handoverDate ? formatShortDate(project.handoverDate) : "—"}
@@ -301,9 +353,6 @@ export function ClientPortalClient({
 	const [calendarMonth, setCalendarMonth] = useState(() =>
 		new Date().toISOString().slice(0, 7),
 	);
-	const [completedLaneFilter, setCompletedLaneFilter] = useState<number | "all">(
-		"all",
-	);
 	const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(
 		() => new Set(),
 	);
@@ -335,21 +384,6 @@ export function ClientPortalClient({
 				})),
 		[calendarProjects],
 	);
-
-	const completedFiltered = useMemo(() => {
-		if (completedLaneFilter === "all") return data.completedProjects;
-		return data.completedProjects.filter(
-			(p) => p.laneNumber === completedLaneFilter,
-		);
-	}, [data.completedProjects, completedLaneFilter]);
-
-	const laneCounts = useMemo(() => {
-		const counts = new Map<number, number>();
-		for (const p of data.completedProjects) {
-			counts.set(p.laneNumber, (counts.get(p.laneNumber) ?? 0) + 1);
-		}
-		return counts;
-	}, [data.completedProjects]);
 
 	const beatenSummary = useMemo(() => {
 		const total = data.completedProjects.length;
@@ -551,70 +585,35 @@ export function ClientPortalClient({
 							</div>
 
 							{data.completedProjects.length > 0 ? (
-								<>
-									<div className="flex flex-wrap gap-2">
-										<button
-											type="button"
-											onClick={() => setCompletedLaneFilter("all")}
-											className={`client-portal-lane-tab rounded-full border px-3 py-1.5 text-xs font-medium ${
-												completedLaneFilter === "all"
-													? "client-portal-lane-tab-active border-white/[0.2] bg-white/[0.06] text-white"
-													: "border-transparent text-slate-500 hover:text-slate-300"
-											}`}
-										>
-											All lanes {data.completedProjects.length}
-										</button>
-										{Array.from(
-											{ length: data.client.activeLaneCount },
-											(_, i) => i + 1,
-										).map((lane) => {
-											const count = laneCounts.get(lane) ?? 0;
-											if (count === 0) return null;
-											return (
-												<button
-													key={lane}
-													type="button"
-													onClick={() => setCompletedLaneFilter(lane)}
-													className={`client-portal-lane-tab rounded-full border px-3 py-1.5 text-xs font-medium ${
-														completedLaneFilter === lane
-															? "client-portal-lane-tab-active border-white/[0.2] bg-white/[0.06] text-white"
-															: "border-transparent text-slate-500 hover:text-slate-300"
-													}`}
-												>
-													Lane {lane} {count}
-												</button>
-											);
-										})}
-									</div>
-
-									<div className="client-portal-card overflow-x-auto rounded-xl ring-1 ring-white/[0.06]">
-										<table className="client-portal-completed-table w-full min-w-[52rem] table-fixed text-left text-sm">
-											<colgroup>
-												<col style={{ width: "32%" }} />
-												<col style={{ width: "14%" }} />
-												<col style={{ width: "9%" }} />
-												<col style={{ width: "17%" }} />
-												<col style={{ width: "13%" }} />
-												<col style={{ width: "15%" }} />
-											</colgroup>
-											<thead className="bg-white/[0.03] text-[10px] uppercase tracking-wider text-slate-500">
-												<tr>
-													<th className="px-4 py-3 text-left font-semibold">Project</th>
-													<th className="px-4 py-3 text-left font-semibold">Lead</th>
-													<th className="px-4 py-3 text-left font-semibold">Lane</th>
-													<th className="px-4 py-3 text-left font-semibold">Due</th>
-													<th className="px-4 py-3 text-left font-semibold">Handover</th>
-													<th className="px-4 py-3 text-left font-semibold">Outcome</th>
-												</tr>
-											</thead>
-											<tbody>
-												{completedFiltered.map((project) => (
-													<CompletedTableRow key={project.id} project={project} />
-												))}
-											</tbody>
-										</table>
-									</div>
-								</>
+								<div className="client-portal-card overflow-x-auto rounded-xl ring-1 ring-white/[0.06]">
+									<table className="client-portal-completed-table w-full min-w-[52rem] table-fixed text-left text-sm">
+										<colgroup>
+											<col style={{ width: "28%" }} />
+											<col style={{ width: "12%" }} />
+											<col style={{ width: "8%" }} />
+											<col style={{ width: "14%" }} />
+											<col style={{ width: "14%" }} />
+											<col style={{ width: "11%" }} />
+											<col style={{ width: "13%" }} />
+										</colgroup>
+										<thead className="bg-white/[0.03] text-[10px] uppercase tracking-wider text-slate-500">
+											<tr>
+												<th className="px-4 py-3 text-left font-semibold">Project</th>
+												<th className="px-4 py-3 text-left font-semibold">Lead</th>
+												<th className="px-4 py-3 text-left font-semibold">Lane</th>
+												<th className="px-4 py-3 text-left font-semibold">Due</th>
+												<th className="px-4 py-3 text-left font-semibold">Completed</th>
+												<th className="px-4 py-3 text-left font-semibold">Handover</th>
+												<th className="px-4 py-3 text-left font-semibold">Outcome</th>
+											</tr>
+										</thead>
+										<tbody>
+											{data.completedProjects.map((project) => (
+												<CompletedTableRow key={project.id} project={project} />
+											))}
+										</tbody>
+									</table>
+								</div>
 							) : null}
 						</section>
 					) : null}

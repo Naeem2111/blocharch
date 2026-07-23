@@ -115,9 +115,11 @@ export async function syncProjectProgressForProjects(projectIds: string[]) {
         name: true,
         progressPercent: true,
         dueDate: true,
+        portalDisplayLocked: true,
       },
     });
     if (!before) continue;
+    if (before.portalDisplayLocked) continue;
 
     const latestLog = await latestCompletionLogForProject(
       projectId,

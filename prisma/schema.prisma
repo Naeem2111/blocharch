@@ -503,6 +503,12 @@ model OpsProject {
   /** Minutes finished before due datetime; null if not early. */
   deadlineBeatenMinutes Int?            @map("deadline_beaten_minutes")
   notes             String?             @db.Text
+  /** When true, daily-log sync will not overwrite portal-visible completion fields. */
+  portalDisplayLocked Boolean             @default(false) @map("portal_display_locked")
+  /** Client-facing project summary shown on the public portal. */
+  clientDescription String?             @map("client_description") @db.Text
+  /** Client-facing deliverable links: [{ label, url? }]. */
+  clientDeliverables Json?              @map("client_deliverables")
   blockerFlag       Boolean             @default(false) @map("blocker_flag")
   checkInRequested  Boolean             @default(false) @map("check_in_requested")
   createdAt         DateTime            @default(now()) @map("created_at")

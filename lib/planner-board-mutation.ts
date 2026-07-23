@@ -8,12 +8,10 @@ export type KanbanTaskRow = {
   sortOrder: number;
   assigneeId: string | null;
   dueAt: string | null;
-  architectUrl: string | null;
   customFields: Record<string, unknown> | null;
   linkedFromTaskId?: string | null;
   assignee: { id: string; username: string } | null;
   labels: Array<{ label: { id: string; name: string; color: string } }>;
-  leadStage?: string | null;
 };
 
 export type KanbanColumnRow = {

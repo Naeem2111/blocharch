@@ -7,6 +7,7 @@ import {
   isClientPortalCompletedProject,
   isHousekeepingClientProject,
 } from "@/lib/client-portal-projects";
+import { parseClientDeliverables, type ClientPortalDeliverable } from "@/lib/client-portal-deliverables";
 import { PROJECT_STATUS_LABELS, displayProjectStageLabel } from "@/lib/ops-constants";
 
 export type PublicClientPortalTask = {
@@ -42,6 +43,9 @@ export type PublicClientPortalProject = {
   deadlineBeatenMinutes: number | null;
   laneNumber: number;
   assignedAthleteName: string | null;
+  completedAt: string | null;
+  clientDescription: string | null;
+  clientDeliverables: ClientPortalDeliverable[];
 };
 
 export type PublicClientPortalData = {
@@ -103,6 +107,9 @@ function mapProject(
     progressPercent: number | null;
     deadlineBeatenDays: number | null;
     deadlineBeatenMinutes: number | null;
+    completedAt: Date | null;
+    clientDescription: string | null;
+    clientDeliverables: unknown;
     projectLeadContact: {
       name: string;
       email: string | null;
@@ -145,6 +152,9 @@ function mapProject(
     deadlineBeatenMinutes: p.deadlineBeatenMinutes,
     laneNumber,
     assignedAthleteName: p.assignedAthlete?.fullName ?? null,
+    completedAt: p.completedAt?.toISOString() ?? null,
+    clientDescription: p.clientDescription?.trim() || null,
+    clientDeliverables: parseClientDeliverables(p.clientDeliverables),
   };
 }
 
