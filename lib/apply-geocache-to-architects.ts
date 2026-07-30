@@ -23,7 +23,10 @@ export async function applyGeocacheToArchitects(): Promise<number> {
   if (Object.keys(geocache).length === 0) return 0;
 
   const rows = await prisma.architect.findMany({
-    where: { OR: [{ latitude: null }, { longitude: null }] },
+    where: {
+      deletedAt: null,
+      OR: [{ latitude: null }, { longitude: null }],
+    },
     select: { id: true, address: true, description: true },
   });
 

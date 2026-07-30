@@ -12,7 +12,10 @@ async function buildAddressContextMap(): Promise<
 > {
   const map = new Map<string, { id: string; name: string }>();
   const rows = await prisma.architect.findMany({
-    where: { OR: [{ latitude: null }, { longitude: null }] },
+    where: {
+      deletedAt: null,
+      OR: [{ latitude: null }, { longitude: null }],
+    },
     select: { id: true, name: true, address: true, description: true },
   });
   for (const row of rows) {

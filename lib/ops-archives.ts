@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { athleteProfileVisual } from "@/lib/athlete-profile-visual";
 import { findDoneColumnId } from "@/lib/planner-completed";
 import { projectDisplayFields } from "@/lib/project-display";
+import { ensureOpsProjectDueDates } from "@/lib/project-due-sources";
 import { listReportingAthletes } from "@/lib/reporting-athletes";
 
 export type OpsArchivesFilters = {
@@ -32,7 +33,7 @@ export async function buildOpsArchives(filters: OpsArchivesFilters = {}) {
   const [projects, boards, clients, athletes] = await Promise.all([
     prisma.opsProject.findMany({
       where: projectWhere,
-      orderBy: [{ completedAt: "desc" }, { handoverDate: "desc" }, { updatedAt: "desc" }],
+      orderBy: [{ completedAt: "desc" }, { updatedAt: "desc" }],
       include: {
         client: {
           select: {
@@ -259,34 +260,40 @@ export async function buildOpsArchives(filters: OpsArchivesFilters = {}) {
       clients,
       athletes,
     },
-    projects: projects.map((p) => {
-      const { displayTitle, stageLabel } = projectDisplayFields(p);
-      return {
-      id: p.id,
-      name: p.name,
-      displayTitle,
-      stageLabel,
-      address: p.address,
-      projectNumber: p.projectNumber,
-      clientId: p.clientId,
-      clientName: p.client.name,
-      clientLogoUrl: p.client.logoUrl,
-      clientLogoBgColor: p.client.logoBgColor,
-      clientLogoTextTone: p.client.logoTextTone,
-      assignedAthleteId: p.assignedAthleteId,
-      assignedAthleteName: p.assignedAthlete?.fullName ?? null,
-      assignedAthleteCode: p.assignedAthlete?.athleteCode ?? null,
-      ...athleteProfileVisual(p.assignedAthlete),
-      currentStatus: p.currentStatus,
-      currentStage: p.currentStage,
-      complexity: p.complexity,
-      progressPercent: p.progressPercent,
-      dueDate: p.dueDate?.toISOString().slice(0, 10) ?? null,
-      dueAt: p.dueDate?.toISOString() ?? null,
-      completedAt: p.completedAt?.toISOString() ?? null,
-      updatedAt: p.updatedAt.toISOString(),
-    };
-    }),
+    projects: await (async () => {
+      const dueById = await ensureOpsProjectDueDates(
+        projects.map((p) => ({ id: p.id, dueDate: p.dueDate }))
+      );
+      return projects.map((p) => {
+        const { displayTitle, stageLabel } = projectDisplayFields(p);
+        const dueDate = dueById.get(p.id) ?? p.dueDate;
+        return {
+          id: p.id,
+          name: p.name,
+          displayTitle,
+          stageLabel,
+          address: p.address,
+          projectNumber: p.projectNumber,
+          clientId: p.clientId,
+          clientName: p.client.name,
+          clientLogoUrl: p.client.logoUrl,
+          clientLogoBgColor: p.client.logoBgColor,
+          clientLogoTextTone: p.client.logoTextTone,
+          assignedAthleteId: p.assignedAthleteId,
+          assignedAthleteName: p.assignedAthlete?.fullName ?? null,
+          assignedAthleteCode: p.assignedAthlete?.athleteCode ?? null,
+          ...athleteProfileVisual(p.assignedAthlete),
+          currentStatus: p.currentStatus,
+          currentStage: p.currentStage,
+          complexity: p.complexity,
+          progressPercent: p.progressPercent,
+          dueDate: dueDate?.toISOString().slice(0, 10) ?? null,
+          dueAt: dueDate?.toISOString() ?? null,
+          completedAt: p.completedAt?.toISOString() ?? null,
+          updatedAt: p.updatedAt.toISOString(),
+        };
+      });
+    })(),
     tasks,
     loggedCompletions: lineItems.map((li) => ({
       id: li.id,

@@ -9,7 +9,6 @@ export type ProjectTimeline = {
 export function computeProjectTimeline(input: {
   startDate: string | null;
   dueDate: string | null;
-  handoverDate?: string | null;
 }): ProjectTimeline {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -21,7 +20,7 @@ export function computeProjectTimeline(input: {
   };
 
   const start = parse(input.startDate);
-  const due = parse(input.dueDate ?? input.handoverDate);
+  const due = parse(input.dueDate);
 
   let daysActive: number | null = null;
   if (start) {

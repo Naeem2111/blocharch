@@ -1,5 +1,10 @@
 import { NextRequest } from "next/server";
-import { findArchitectBySlugOrUrl, loadArchitects, updateArchitect } from "@/lib/architects";
+import {
+  deleteArchitect,
+  findArchitectBySlugOrUrl,
+  loadArchitects,
+  updateArchitect,
+} from "@/lib/architects";
 import { slugFromPracticeUrl } from "@/lib/practice-url";
 
 function slugFromUrl(url: string): string {
@@ -56,6 +61,22 @@ export async function PATCH(
     return Response.json(practice);
   } catch (e) {
     const message = e instanceof Error ? e.message : "Failed to update practice";
+    const status = message === "Practice not found" ? 404 : 400;
+    return Response.json({ error: message }, { status });
+  }
+}
+
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+
+  try {
+    const result = await deleteArchitect(id);
+    return Response.json(result);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Failed to delete practice";
     const status = message === "Practice not found" ? 404 : 400;
     return Response.json({ error: message }, { status });
   }

@@ -33,7 +33,6 @@ function resolveBeatenMinutes(
   project: {
     dueDate: Date;
     completedAt: Date | null;
-    handoverDate: Date | null;
     updatedAt: Date;
     deadlineBeatenMinutes: number | null;
     deadlineBeatenDays: number | null;
@@ -91,18 +90,13 @@ export async function buildBeatenDeadlines(
     if (!dueDate || !p.assignedAthlete) continue;
 
     const completed =
-      p.completedAt != null
-        ? p.completedAt
-        : p.handoverDate
-          ? dateOnlyUtc(p.handoverDate)
-          : dateOnlyUtc(p.updatedAt);
+      p.completedAt != null ? p.completedAt : dateOnlyUtc(p.updatedAt);
     if (!allTime && (dateOnlyUtc(completed) < from || dateOnlyUtc(completed) > to)) continue;
 
     const minutesBeaten = resolveBeatenMinutes(
       {
         dueDate,
         completedAt: p.completedAt,
-        handoverDate: p.handoverDate,
         updatedAt: p.updatedAt,
         deadlineBeatenMinutes: p.deadlineBeatenMinutes,
         deadlineBeatenDays: p.deadlineBeatenDays,

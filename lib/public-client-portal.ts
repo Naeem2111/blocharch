@@ -8,6 +8,7 @@ import {
   isHousekeepingClientProject,
 } from "@/lib/client-portal-projects";
 import { parseClientDeliverables, type ClientPortalDeliverable } from "@/lib/client-portal-deliverables";
+import { ensureOpsProjectDueDates } from "@/lib/project-due-sources";
 import { serializePublicPipelineRow } from "@/lib/ops-pipeline-serialize";
 import { PROJECT_STATUS_LABELS, displayProjectStageLabel } from "@/lib/ops-constants";
 
@@ -33,7 +34,6 @@ export type PublicClientPortalProject = {
   startDate: string | null;
   dueDate: string | null;
   dueAt: string | null;
-  handoverDate: string | null;
   progressPercent: number;
   leadName: string | null;
   leadPhotoUrl: string | null;
@@ -115,7 +115,6 @@ function mapProject(
     currentStatus: OpsProjectStatus;
     startDate: Date | null;
     dueDate: Date | null;
-    handoverDate: Date | null;
     progressPercent: number | null;
     deadlineBeatenDays: number | null;
     deadlineBeatenMinutes: number | null;
@@ -153,7 +152,6 @@ function mapProject(
     startDate: isoDate(p.startDate),
     dueDate: isoDate(p.dueDate),
     dueAt: p.dueDate?.toISOString() ?? null,
-    handoverDate: isoDate(p.handoverDate),
     progressPercent,
     leadName: contact?.name ?? legacyAthlete?.fullName ?? p.projectLead ?? null,
     leadPhotoUrl: contact ? null : legacyAthlete?.profilePhotoUrl ?? null,
@@ -258,13 +256,19 @@ export async function getPublicClientPortal(clientSlug: string): Promise<PublicC
     );
   }
 
-  const mapped = clientProjects.map((p) =>
-    mapProject(
-      p,
-      tasksByProjectId.get(p.id) ?? [],
-      deriveClientPortalLaneNumber(p.projectNumber, activeLaneCount)
-    )
-  );
+  const mapped = await (async () => {
+    const dueById = await ensureOpsProjectDueDates(
+      clientProjects.map((p) => ({ id: p.id, dueDate: p.dueDate }))
+    );
+    return clientProjects.map((p) => {
+      const dueDate = dueById.get(p.id) ?? p.dueDate;
+      return mapProject(
+        { ...p, dueDate },
+        tasksByProjectId.get(p.id) ?? [],
+        deriveClientPortalLaneNumber(p.projectNumber, activeLaneCount)
+      );
+    });
+  })();
 
   return {
     client: {

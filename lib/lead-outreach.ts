@@ -488,6 +488,7 @@ export async function listMarketingNotifications(): Promise<MarketingNotificatio
   await syncAllFollowUpDueStages();
 
   const architects = await prisma.architect.findMany({
+    where: { deletedAt: null },
     select: {
       url: true,
       name: true,
@@ -554,6 +555,7 @@ export async function listMarketingFollowUpDates(): Promise<MarketingDueDateItem
 
   const architects = await prisma.architect.findMany({
     where: {
+      deletedAt: null,
       lead: { followUpDueAt: { not: null } },
     },
     select: {

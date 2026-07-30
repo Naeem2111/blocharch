@@ -64,7 +64,6 @@ type ProjectRow = {
   startDate: string | null;
   dueDate: string | null;
   dueAt: string | null;
-  handoverDate: string | null;
   notes: string | null;
   progressPercent: number | null;
 };
@@ -197,7 +196,6 @@ export function OpsProjectsClient() {
     currentStatus: "not_started",
     startDate: "",
     ...emptyProjectDueFields(),
-    handoverDate: "",
     notes: "",
   });
 
@@ -309,7 +307,6 @@ export function OpsProjectsClient() {
       dueDate: due.date,
       dueTime: due.time || emptyProjectDueFields().dueTime,
       dueAmPm: due.ampm,
-      handoverDate: p.handoverDate ?? "",
       notes: p.notes ?? "",
     });
     setError("");
@@ -335,7 +332,6 @@ export function OpsProjectsClient() {
         dueDate: editForm.dueDate || null,
         dueTime: editForm.dueTime || null,
         dueAmPm: editForm.dueAmPm,
-        handoverDate: editForm.handoverDate || null,
         notes: editForm.notes || null,
       }),
     });
@@ -439,7 +435,6 @@ export function OpsProjectsClient() {
     const timeline = computeProjectTimeline({
       startDate: p.startDate,
       dueDate: p.dueDate,
-      handoverDate: p.handoverDate,
     });
     const daysUntil = daysUntilDueFromIso(p.dueAt ?? p.dueDate);
     const dueLabel = formatProjectDueAt(p.dueAt ?? (p.dueDate ? dueAtFallbackForDateOnly(p.dueDate) : null));
@@ -526,7 +521,6 @@ export function OpsProjectsClient() {
               }}
               onChange={(due) => setEditForm((f) => ({ ...f, ...due }))}
             />
-            <label className="text-xs text-slate-400">Handover<input type="date" value={editForm.handoverDate} onChange={(e) => setEditForm((f) => ({ ...f, handoverDate: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.04] px-3 py-2 text-sm text-white" /></label>
             <label className="text-xs text-slate-400 md:col-span-2">Notes<textarea value={editForm.notes} onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))} rows={2} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
             <div className="flex flex-wrap gap-2 md:col-span-2">
               <button

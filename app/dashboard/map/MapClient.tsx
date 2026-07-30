@@ -62,6 +62,8 @@ export function MapClient({
   const [pinFilter, setPinFilter] = useState("");
   const [stageBySlug, setStageBySlug] = useState<Record<string, MapPracticeStage>>({});
   const [stageError, setStageError] = useState<string | null>(null);
+  const [removedSlugs, setRemovedSlugs] = useState<Record<string, true>>({});
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   /** Increment to tell LeafletMap to fly back to the focal hub coordinates. */
   const [hubRecenterTick, setHubRecenterTick] = useState(0);
 
@@ -112,6 +114,37 @@ export function MapClient({
       }
     },
     [practices]
+  );
+
+  const deletePractice = useCallback(
+    async (slug: string) => {
+      if (slug === MAP_FOCAL_SYNTHETIC_ID || (focalAnchor.slug && slug === focalAnchor.slug)) {
+        return;
+      }
+      const practice = practices.find((p) => p.slug === slug);
+      const name = practice?.name ?? slug;
+      if (!window.confirm(`Delete practice "${name}"? You can restore it later from Practices → Deleted.`)) return;
+
+      setDeleteError(null);
+      setRemovedSlugs((prev) => ({ ...prev, [slug]: true }));
+      try {
+        const res = await fetch(`/api/practices/${encodeURIComponent(slug)}`, {
+          method: "DELETE",
+        });
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          throw new Error((j as { error?: string }).error || "Could not delete practice");
+        }
+      } catch (e) {
+        setRemovedSlugs((prev) => {
+          const next = { ...prev };
+          delete next[slug];
+          return next;
+        });
+        setDeleteError(e instanceof Error ? e.message : "Could not delete practice");
+      }
+    },
+    [practices, focalAnchor.slug]
   );
 
   useEffect(() => {
@@ -195,6 +228,7 @@ export function MapClient({
     }> = [];
     const hubSlug = focalAnchor.slug;
     for (const p of practices) {
+      if (removedSlugs[p.slug]) continue;
       const r = results[p.address];
       const isHub = Boolean(hubSlug && p.slug === hubSlug);
 
@@ -222,7 +256,7 @@ export function MapClient({
       });
     }
     return out;
-  }, [practices, results, focalAnchor, stageBySlug]);
+  }, [practices, results, focalAnchor, stageBySlug, removedSlugs]);
 
   const markers = useMemo(() => {
     const list = [...markersBase];
@@ -392,6 +426,11 @@ export function MapClient({
           {stageError}
         </p>
       )}
+      {deleteError && (
+        <p className="text-red-400/90 text-sm rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2">
+          {deleteError}
+        </p>
+      )}
       {hasActiveFilter && filteredMarkers.length === 0 ? (
         <div className="card-tool flex h-[520px] flex-col items-center justify-center rounded-2xl ring-1 ring-white/[0.06] px-6 text-center">
           <p className="text-slate-400 text-sm">
@@ -422,12 +461,13 @@ export function MapClient({
             zoom={initialZoom}
             hubRecenterTick={hubRecenterTick}
             onStageChange={updateStage}
+            onDelete={deletePractice}
           />
         </div>
       )}
       <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
         <p className="text-xs uppercase tracking-wide text-slate-500 mb-2">
-          Lead stage colours — click a pin to change stage
+          Lead stage colours — click a pin to change stage or delete
         </p>
         {hubUsesIconStudio(focalAnchor) ? (
           <p className="text-xs text-slate-500 mb-3">

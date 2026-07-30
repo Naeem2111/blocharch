@@ -154,11 +154,13 @@ model Architect {
   latitude    Float?
   longitude   Float?
   geocodedAt  DateTime? @map("geocoded_at")
+  deletedAt   DateTime? @map("deleted_at")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   lead Lead?
 
+  @@index([deletedAt])
   @@map("architects")
 }
 

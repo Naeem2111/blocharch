@@ -3,6 +3,7 @@ import {
   computeDeadlineBeatMetrics,
   projectCompletionFromLog,
 } from "@/lib/project-completion";
+import { ensureOpsProjectDueDate } from "@/lib/project-due-sources";
 import {
   isActiveProjectStatus,
   syncProjectAfterOpsUpdate,
@@ -131,8 +132,10 @@ export async function syncProjectProgressForProjects(projectIds: string[]) {
       before.currentStatus === "completed" || before.currentStatus === "handed_over";
 
     if (progressPercent >= 100 && isActiveProjectStatus(before.currentStatus) && before.assignedAthleteId) {
+      // Archives / beat metrics need a due date — carry from pipeline, planner, or outbox if unset.
+      const dueDate = await ensureOpsProjectDueDate(projectId);
       const { completedAt, deadlineBeatenDays, deadlineBeatenMinutes } = completionMetrics(
-        before.dueDate,
+        dueDate,
         latestLog
       );
 
@@ -169,8 +172,9 @@ export async function syncProjectProgressForProjects(projectIds: string[]) {
     }
 
     if (wasCompleted && progressPercent >= 100) {
+      const dueDate = await ensureOpsProjectDueDate(projectId);
       const { completedAt, deadlineBeatenDays, deadlineBeatenMinutes } = completionMetrics(
-        before.dueDate,
+        dueDate,
         latestLog
       );
       await prisma.opsProject.update({

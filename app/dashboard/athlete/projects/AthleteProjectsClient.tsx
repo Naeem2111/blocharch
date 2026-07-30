@@ -46,7 +46,6 @@ type ProjectRow = {
   currentStatus: keyof typeof PROJECT_STATUS_LABELS;
   startDate: string | null;
   dueDate: string | null;
-  handoverDate: string | null;
   progressPercent: number | null;
   notes: string | null;
   client: ProjectClient;
@@ -231,7 +230,6 @@ export function AthleteProjectsClient() {
         const timeline = computeProjectTimeline({
           startDate: p.startDate,
           dueDate: p.dueDate,
-          handoverDate: p.handoverDate,
         });
         const daysUntil = daysUntilDueFromIso(p.dueDate);
         const accent = projectDueColor(daysUntil);
@@ -351,10 +349,6 @@ export function AthleteProjectsClient() {
                 <div>
                   <dt className="text-slate-500">Due</dt>
                   <dd className="text-slate-200">{p.dueDate ?? "—"}</dd>
-                </div>
-                <div>
-                  <dt className="text-slate-500">Handover</dt>
-                  <dd className="text-slate-200">{p.handoverDate ?? "—"}</dd>
                 </div>
               </dl>
               {p.notes ? (

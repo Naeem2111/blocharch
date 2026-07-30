@@ -1,13 +1,18 @@
 import { NextRequest } from "next/server";
-import { createManualPractice, searchArchitects } from "@/lib/architects";
+import { createManualPractice, searchArchitects, searchDeletedArchitects } from "@/lib/architects";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const q = searchParams.get("q") || undefined;
   const page = parseInt(searchParams.get("page") || "1", 10);
   const perPage = parseInt(searchParams.get("perPage") || "25", 10);
+  const deleted =
+    searchParams.get("deleted") === "1" ||
+    searchParams.get("deleted") === "true";
 
-  const result = await searchArchitects({ q, page, perPage });
+  const result = deleted
+    ? await searchDeletedArchitects({ q, page, perPage })
+    : await searchArchitects({ q, page, perPage });
   return Response.json(result);
 }
 

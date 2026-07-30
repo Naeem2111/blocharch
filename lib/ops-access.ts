@@ -115,7 +115,6 @@ export const athleteProjectSelect = {
   complexity: true,
   startDate: true,
   dueDate: true,
-  handoverDate: true,
   currentStage: true,
   currentStatus: true,
   progressPercent: true,
@@ -144,7 +143,6 @@ export function serializeProjectForAthlete(project: Prisma.OpsProjectGetPayload<
     startDate: project.startDate?.toISOString().slice(0, 10) ?? null,
     dueDate: due.dueDate,
     dueAt: due.dueAt,
-    handoverDate: project.handoverDate?.toISOString().slice(0, 10) ?? null,
     updatedAt: project.updatedAt.toISOString(),
   };
 }

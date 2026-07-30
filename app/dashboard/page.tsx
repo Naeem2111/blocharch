@@ -13,6 +13,7 @@ export default async function DashboardPage() {
   const withWebsite = architects.filter((a) => a.website?.trim()).length;
   const mapReady = await prisma.architect.count({
     where: {
+      deletedAt: null,
       latitude: { not: null },
       longitude: { not: null },
     },

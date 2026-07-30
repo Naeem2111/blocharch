@@ -40,7 +40,7 @@ export function AthletePrivateProjectsClient({ scope }: { scope: "active" | "com
               </>
             ) : (
               <>
-                <th className="px-4 py-3 font-semibold">Handover</th>
+                <th className="px-4 py-3 font-semibold">Completed</th>
                 <th className="px-4 py-3 font-semibold">Outcome</th>
               </>
             )}

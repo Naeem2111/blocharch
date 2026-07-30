@@ -26,7 +26,12 @@ type MarkerItem = {
 
 import { LEAD_STAGE_COLORS } from "@/lib/lead-stage-ui";
 import type { LeadStage } from "@/lib/leads";
-import { buildMapPinStageSelectHtml, initMapPinStageDropdown } from "@/lib/map-pin-popup";
+import {
+  buildMapPinDeleteHtml,
+  buildMapPinStageSelectHtml,
+  initMapPinDelete,
+  initMapPinStageDropdown,
+} from "@/lib/map-pin-popup";
 
 const STAGE_COLORS: Record<Stage, string> = LEAD_STAGE_COLORS;
 
@@ -119,14 +124,18 @@ function HubRecenterController({
 function MapClusterLayer({
   markers,
   onStageChange,
+  onDelete,
 }: {
   markers: MarkerItem[];
   onStageChange?: (slug: string, stage: Stage) => void;
+  onDelete?: (slug: string) => void;
 }) {
   const map = useMap();
   const sig = useMemo(() => markerSignature(markers), [markers]);
   const onStageChangeRef = useRef(onStageChange);
   onStageChangeRef.current = onStageChange;
+  const onDeleteRef = useRef(onDelete);
+  onDeleteRef.current = onDelete;
 
   useEffect(() => {
     if (!markers.length) return;
@@ -142,6 +151,7 @@ function MapClusterLayer({
 
     for (const m of markers) {
       const marker = L.marker([m.lat, m.lng], { icon: markerIcon(m.stage, Boolean(m.hub)) });
+      const canEdit = !m.hub && Boolean(onStageChangeRef.current || onDeleteRef.current);
       const lines = [
         `<div class="font-semibold">${escapeHtml(m.name)}</div>`,
         m.hub && m.hubDetail
@@ -158,22 +168,38 @@ function MapClusterLayer({
         !m.hub && onStageChangeRef.current
           ? buildMapPinStageSelectHtml(m.id, m.stage)
           : "",
+        !m.hub && onDeleteRef.current ? buildMapPinDeleteHtml(m.id) : "",
       ].filter(Boolean);
       marker.bindPopup(lines.join(""));
-      if (!m.hub && onStageChangeRef.current) {
-        let cleanupPicker: (() => void) | null = null;
+      if (canEdit) {
+        let cleanupPopup: (() => void) | null = null;
         marker.on("popupopen", () => {
-          cleanupPicker?.();
+          cleanupPopup?.();
           const popupEl = marker.getPopup()?.getElement();
-          const picker = popupEl?.querySelector(".map-pin-stage-picker") as HTMLElement | null;
-          if (!picker) return;
-          cleanupPicker = initMapPinStageDropdown(picker, (stage) => {
-            onStageChangeRef.current?.(m.id, stage);
-          });
+          if (!popupEl) return;
+          const cleanups: Array<() => void> = [];
+          const picker = popupEl.querySelector(".map-pin-stage-picker") as HTMLElement | null;
+          if (picker && onStageChangeRef.current) {
+            cleanups.push(
+              initMapPinStageDropdown(picker, (stage) => {
+                onStageChangeRef.current?.(m.id, stage);
+              })
+            );
+          }
+          if (onDeleteRef.current) {
+            cleanups.push(
+              initMapPinDelete(popupEl, (slug) => {
+                onDeleteRef.current?.(slug);
+              })
+            );
+          }
+          cleanupPopup = () => {
+            for (const fn of cleanups) fn();
+          };
         });
         marker.on("popupclose", () => {
-          cleanupPicker?.();
-          cleanupPicker = null;
+          cleanupPopup?.();
+          cleanupPopup = null;
         });
       }
       mcg.addLayer(marker);
@@ -196,6 +222,7 @@ export function LeafletMap({
   heightClassName = "h-[min(420px,55vh)] sm:h-[520px]",
   hubRecenterTick = 0,
   onStageChange,
+  onDelete,
 }: {
   markers: MarkerItem[];
   center: { lat: number; lng: number };
@@ -205,6 +232,8 @@ export function LeafletMap({
   hubRecenterTick?: number;
   /** Called when a pin popup stage dropdown changes (slug = practice slug). */
   onStageChange?: (slug: string, stage: Stage) => void;
+  /** Called when a pin popup delete control is used (slug = practice slug). */
+  onDelete?: (slug: string) => void;
 }) {
   const mapCenter = useMemo(() => [center.lat, center.lng] as [number, number], [center.lat, center.lng]);
 
@@ -221,7 +250,7 @@ export function LeafletMap({
         <HubRecenterController tick={hubRecenterTick} mapCenter={mapCenter} zoom={zoom} />
         {markers.some((m) => m.hub && m.hubDetail) ? <HubRadiusLayer markers={markers} /> : null}
         {markers.length > 0 ? (
-          <MapClusterLayer markers={markers} onStageChange={onStageChange} />
+          <MapClusterLayer markers={markers} onStageChange={onStageChange} onDelete={onDelete} />
         ) : null}
       </MapContainer>
       <style jsx>{`
@@ -338,6 +367,26 @@ export function LeafletMap({
         :global(.map-pin-stage-option-label) {
           flex: 1;
           min-width: 0;
+        }
+        :global(.map-pin-actions) {
+          margin-top: 10px;
+          padding-top: 8px;
+          border-top: 1px solid #e2e8f0;
+        }
+        :global(.map-pin-delete) {
+          display: inline-flex;
+          align-items: center;
+          border: none;
+          background: transparent;
+          padding: 0;
+          font-size: 12px;
+          font-weight: 600;
+          color: #dc2626;
+          cursor: pointer;
+        }
+        :global(.map-pin-delete:hover) {
+          color: #b91c1c;
+          text-decoration: underline;
         }
       `}</style>
     </div>

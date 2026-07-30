@@ -14,7 +14,6 @@ type ProjectLike = {
   complexity: string;
   startDate: Date | null;
   dueDate: Date | null;
-  handoverDate: Date | null;
   currentStage: OpsProjectPhase;
   currentStatus: OpsProjectStatus | string;
   progressPercent: number | null;
@@ -50,7 +49,6 @@ export function serializeOpsProjectRow<T extends ProjectLike>(
     startDate: project.startDate?.toISOString().slice(0, 10) ?? null,
     dueDate: due.dueDate,
     dueAt: due.dueAt,
-    handoverDate: project.handoverDate?.toISOString().slice(0, 10) ?? null,
     currentStage: project.currentStage,
     currentStatus: project.currentStatus,
     progressPercent: project.progressPercent,

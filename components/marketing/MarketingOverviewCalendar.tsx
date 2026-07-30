@@ -151,7 +151,7 @@ export function MarketingOverviewCalendar({ items }: { items: MarketingDueDateIt
           item.followUpStatus !== "due_today" &&
           new Date(toDateOnly(item.followUpDueAt)) > today
       )
-      .slice(0, 8);
+      .sort((a, b) => new Date(a.followUpDueAt).getTime() - new Date(b.followUpDueAt).getTime());
   }, [items]);
 
   return (
@@ -178,7 +178,7 @@ export function MarketingOverviewCalendar({ items }: { items: MarketingDueDateIt
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,22rem)_1fr] xl:grid-cols-[minmax(0,26rem)_1fr]">
-        <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-5">
+        <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-5 lg:sticky lg:top-4 lg:self-start">
           <div className="mb-3 flex items-center justify-between gap-2">
             <button
               type="button"
@@ -238,15 +238,20 @@ export function MarketingOverviewCalendar({ items }: { items: MarketingDueDateIt
           </p>
         </div>
 
-        <div className="space-y-6">
+        <div className="max-h-[min(70vh,40rem)] space-y-6 overflow-y-auto overscroll-y-contain pr-1">
           <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-300/90">
+            <h3 className="sticky top-0 z-10 -mx-1 bg-[var(--bg-main)]/90 px-1 pb-2 text-xs font-semibold uppercase tracking-wider text-amber-300/90 backdrop-blur-sm">
               Due today / overdue
+              {attentionItems.length > 0 ? (
+                <span className="ml-2 font-normal normal-case tracking-normal text-slate-500">
+                  ({attentionItems.length})
+                </span>
+              ) : null}
             </h3>
             {attentionItems.length === 0 ? (
               <p className="mt-2 text-sm text-slate-400">No follow-ups need attention right now.</p>
             ) : (
-              <ul className="mt-3 space-y-2">
+              <ul className="mt-1 space-y-2">
                 {attentionItems.map((item) => (
                   <FollowUpRow
                     key={`attention-${item.practiceUrl}`}
@@ -260,13 +265,13 @@ export function MarketingOverviewCalendar({ items }: { items: MarketingDueDateIt
           </div>
 
           <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-300">
+            <h3 className="sticky top-0 z-10 -mx-1 bg-[var(--bg-main)]/90 px-1 pb-2 text-xs font-semibold uppercase tracking-wider text-slate-300 backdrop-blur-sm">
               {formatShortDate(selectedDate)}
             </h3>
             {selectedItems.length === 0 ? (
               <p className="mt-2 text-sm text-slate-400">No follow-ups due on this date.</p>
             ) : (
-              <ul className="mt-3 space-y-2">
+              <ul className="mt-1 space-y-2">
                 {selectedItems.map((item) => (
                   <FollowUpRow
                     key={`${item.practiceUrl}-${item.followUpDueAt}`}
@@ -279,11 +284,18 @@ export function MarketingOverviewCalendar({ items }: { items: MarketingDueDateIt
           </div>
 
           <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-300">Upcoming</h3>
+            <h3 className="sticky top-0 z-10 -mx-1 bg-[var(--bg-main)]/90 px-1 pb-2 text-xs font-semibold uppercase tracking-wider text-slate-300 backdrop-blur-sm">
+              Upcoming
+              {upcomingItems.length > 0 ? (
+                <span className="ml-2 font-normal normal-case tracking-normal text-slate-500">
+                  ({upcomingItems.length})
+                </span>
+              ) : null}
+            </h3>
             {upcomingItems.length === 0 ? (
               <p className="mt-2 text-sm text-slate-400">No scheduled follow-ups ahead.</p>
             ) : (
-              <ul className="mt-3 space-y-2">
+              <ul className="mt-1 space-y-2">
                 {upcomingItems.map((item) => (
                   <FollowUpRow key={`upcoming-${item.practiceUrl}`} item={item} showDate />
                 ))}

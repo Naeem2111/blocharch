@@ -123,6 +123,35 @@ export function initMapPinStageDropdown(
   };
 }
 
+/** Delete control for Leaflet marker popups. */
+export function buildMapPinDeleteHtml(slug: string): string {
+  return `<div class="map-pin-actions">
+    <button type="button" class="map-pin-delete" data-slug="${escapeHtml(slug)}">
+      Delete practice
+    </button>
+  </div>`;
+}
+
+/** Wire delete button inside a Leaflet popup. Returns cleanup. */
+export function initMapPinDelete(
+  root: HTMLElement,
+  onDelete: (slug: string) => void
+): () => void {
+  const btn = root.querySelector(".map-pin-delete") as HTMLButtonElement | null;
+  if (!btn) return () => {};
+
+  const onClick = (e: MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const slug = btn.dataset.slug;
+    if (!slug) return;
+    onDelete(slug);
+  };
+
+  btn.addEventListener("click", onClick);
+  return () => btn.removeEventListener("click", onClick);
+}
+
 /** Custom stage dropdown for Leaflet marker popups (dots on every option). */
 export function buildMapPinStageSelectHtml(slug: string, stage: LeadStage): string {
   const safeStage = LEAD_STAGES.includes(stage) ? stage : "cold";

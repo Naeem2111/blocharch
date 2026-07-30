@@ -283,6 +283,11 @@ function CompletedTableRow({ project }: { project: PublicClientPortalProject }) 
 		<tr className="client-portal-completed-row border-b border-white/[0.06] bg-white/[0.02] last:border-b-0">
 			<td className="px-4 py-4 align-top">
 				<p className="font-semibold text-white">{project.name}</p>
+				{project.currentStageLabel ? (
+					<p className="mt-0.5 text-xs font-medium text-slate-400">
+						{project.currentStageLabel}
+					</p>
+				) : null}
 				{project.address ? (
 					<p className="mt-0.5 truncate text-xs text-slate-500">{project.address}</p>
 				) : null}

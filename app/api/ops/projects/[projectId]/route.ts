@@ -16,6 +16,7 @@ import { normalizeAthleteProjectCode } from "@/lib/ops-project-code";
 import { validateProjectLeadContactDb } from "@/lib/ops-project-lead";
 import { deleteProjectAndSyncSubmissions } from "@/lib/sync-submission-totals";
 import { parseProjectDueInput } from "@/lib/project-deadline";
+import { ensureOpsProjectDueDate } from "@/lib/project-due-sources";
 import { serializeOpsProjectRow } from "@/lib/ops-project-serialize";
 import { normalizeClientDeliverablesForSave } from "@/lib/client-portal-deliverables";
 import { clientPortalPath } from "@/lib/client-slug";
@@ -208,6 +209,17 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       });
     }
     if (body.handoverDate !== undefined) data.handoverDate = body.handoverDate ? parseDateOnly(String(body.handoverDate)) : null;
+
+    // Entering archives without a project due — carry from pipeline / planner / outbox.
+    const nextStatus = (data.currentStatus as string | undefined) ?? existing.currentStatus;
+    const enteringArchive =
+      (nextStatus === "completed" || nextStatus === "handed_over") &&
+      existing.currentStatus !== "completed" &&
+      existing.currentStatus !== "handed_over";
+    if (enteringArchive && data.dueDate === undefined && !existing.dueDate) {
+      const carried = await ensureOpsProjectDueDate(projectId);
+      if (carried) data.dueDate = carried;
+    }
 
     if (body.completedAt !== undefined) {
       if (body.completedAt === null || body.completedAt === "") {

@@ -89,6 +89,7 @@ export async function loadPracticesForMap(): Promise<{
   focalAnchor: MapHubAnchor;
 }> {
   const rows = await prisma.architect.findMany({
+    where: { deletedAt: null },
     select: {
       url: true,
       name: true,

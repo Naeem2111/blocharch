@@ -95,6 +95,7 @@ function truncate(s: string, max: number): string {
 }
 
 export function PracticesClient() {
+	const [tab, setTab] = useState<"active" | "deleted">("active");
 	const [q, setQ] = useState("");
 	const [query, setQuery] = useState("");
 	const [page, setPage] = useState(1);
@@ -107,6 +108,8 @@ export function PracticesClient() {
 	const [loading, setLoading] = useState(true);
 	const [refreshKey, setRefreshKey] = useState(0);
 	const [editing, setEditing] = useState<Architect | null>(null);
+	const [restoringUrl, setRestoringUrl] = useState<string | null>(null);
+	const [restoreError, setRestoreError] = useState<string | null>(null);
 	const [columnsOpen, setColumnsOpen] = useState(false);
 	const [visible, setVisible] =
 		useState<Record<ColumnId, boolean>>(DEFAULT_VISIBLE);
@@ -127,15 +130,50 @@ export function PracticesClient() {
 
 	useEffect(() => {
 		setLoading(true);
+		setRestoreError(null);
 		const params = new URLSearchParams();
 		if (query) params.set("q", query);
 		params.set("page", String(page));
 		params.set("perPage", "25");
+		if (tab === "deleted") params.set("deleted", "1");
 		fetch(`/api/practices?${params}`)
 			.then((r) => r.json())
 			.then(setData)
 			.finally(() => setLoading(false));
-	}, [query, page, refreshKey]);
+	}, [query, page, refreshKey, tab]);
+
+	const switchTab = (next: "active" | "deleted") => {
+		setTab(next);
+		setPage(1);
+		setQ("");
+		setQuery("");
+		setData(null);
+	};
+
+	const restorePractice = async (p: Architect) => {
+		const slug = slugFromUrl(p.url);
+		setRestoreError(null);
+		setRestoringUrl(p.url);
+		try {
+			const res = await fetch(
+				`/api/practices/${encodeURIComponent(slug)}/restore`,
+				{ method: "POST" },
+			);
+			if (!res.ok) {
+				const j = await res.json().catch(() => ({}));
+				throw new Error(
+					(j as { error?: string }).error || "Could not restore practice",
+				);
+			}
+			setRefreshKey((k) => k + 1);
+		} catch (e) {
+			setRestoreError(
+				e instanceof Error ? e.message : "Could not restore practice",
+			);
+		} finally {
+			setRestoringUrl(null);
+		}
+	};
 
 	const toggleColumn = (id: ColumnId) => {
 		setVisible((v) => ({ ...v, [id]: !v[id] }));
@@ -182,14 +220,51 @@ export function PracticesClient() {
 					}}
 				/>
 			) : null}
-			<div className="mb-6">
-				<AddPracticeForm
-					onCreated={() => {
-						setPage(1);
-						setRefreshKey((k) => k + 1);
-					}}
-				/>
+			{tab === "active" ? (
+				<div className="mb-6">
+					<AddPracticeForm
+						onCreated={() => {
+							setPage(1);
+							setRefreshKey((k) => k + 1);
+						}}
+					/>
+				</div>
+			) : null}
+			<div className="mb-4 flex gap-1 border-b border-white/[0.08]">
+				<button
+					type="button"
+					onClick={() => switchTab("active")}
+					className={`px-4 py-2.5 text-sm font-medium transition-colors ${
+						tab === "active"
+							? "border-b-2 border-brand-400 text-white"
+							: "text-slate-400 hover:text-slate-200"
+					}`}
+				>
+					All practices
+				</button>
+				<button
+					type="button"
+					onClick={() => switchTab("deleted")}
+					className={`px-4 py-2.5 text-sm font-medium transition-colors ${
+						tab === "deleted"
+							? "border-b-2 border-brand-400 text-white"
+							: "text-slate-400 hover:text-slate-200"
+					}`}
+				>
+					Deleted
+				</button>
 			</div>
+			{tab === "deleted" ? (
+				<p className="mb-4 text-sm text-slate-500">
+					Practices removed from the map or directory appear here. Restore to put
+					them back on the map and in All practices.
+				</p>
+			) : null}
+			{restoreError ? (
+				<p className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400/90">
+					{restoreError}
+				</p>
+			) : null}
 			<div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-start sm:gap-3">
 				<input
 					type="search"
@@ -210,6 +285,7 @@ export function PracticesClient() {
 					>
 						Search
 					</button>
+					{tab === "active" ? (
 					<div className="relative">
 						<button
 							type="button"
@@ -270,6 +346,7 @@ export function PracticesClient() {
 							</>
 						)}
 					</div>
+					) : null}
 				</div>
 			</div>
 
@@ -277,8 +354,17 @@ export function PracticesClient() {
 			{!loading && data && (
 				<>
 					<p className="text-slate-500 text-sm mb-4">
-						{data.total} practice{data.total !== 1 ? "s" : ""} found
+						{data.total}{" "}
+						{tab === "deleted" ? "deleted " : ""}
+						practice{data.total !== 1 ? "s" : ""} found
 					</p>
+					{data.items.length === 0 ? (
+						<p className="rounded-2xl border border-white/[0.08] bg-white/[0.02] px-6 py-10 text-center text-sm text-slate-400 ring-1 ring-white/[0.04]">
+							{tab === "deleted"
+								? "No deleted practices."
+								: "No practices match your search."}
+						</p>
+					) : (
 					<div className="overflow-x-auto rounded-2xl border border-white/[0.08] bg-white/[0.02] ring-1 ring-white/[0.04]">
 						<table className="w-full min-w-[720px]">
 							<thead>
@@ -320,6 +406,7 @@ export function PracticesClient() {
 															<span className="break-all text-slate-300">
 																{p.email}
 															</span>
+															{tab === "active" ? (
 															<a
 																href={gmailComposeUrl(p.email)}
 																target="_blank"
@@ -328,6 +415,7 @@ export function PracticesClient() {
 															>
 																Gmail
 															</a>
+															) : null}
 														</div>
 													) : (
 														"—"
@@ -444,6 +532,18 @@ export function PracticesClient() {
 											)}
 											{visible.actions && (
 												<td className="px-4 py-3 whitespace-nowrap">
+													{tab === "deleted" ? (
+														<button
+															type="button"
+															onClick={() => void restorePractice(p)}
+															disabled={restoringUrl === p.url}
+															className="text-sm font-medium text-brand-400 hover:text-brand-300 disabled:cursor-not-allowed disabled:opacity-50"
+														>
+															{restoringUrl === p.url
+																? "Restoring…"
+																: "Restore"}
+														</button>
+													) : (
 													<div className="flex items-center gap-3">
 														<button
 															type="button"
@@ -459,6 +559,7 @@ export function PracticesClient() {
 															View
 														</Link>
 													</div>
+													)}
 												</td>
 											)}
 										</tr>
@@ -467,7 +568,8 @@ export function PracticesClient() {
 							</tbody>
 						</table>
 					</div>
-					{data.totalPages > 1 && (
+					)}
+					{data.totalPages > 1 && data.items.length > 0 && (
 						<div className="flex items-center gap-2 mt-4">
 							<button
 								type="button"
