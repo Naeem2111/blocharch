@@ -106,6 +106,26 @@ export function formatDeadlineBeat(minutes: number | null | undefined): string |
   return `${mins} min${mins === 1 ? "" : "s"} early`;
 }
 
+/** Early label from due vs completed — no stored days/minutes fields needed. */
+export function formatEarlyFromDueAndCompleted(opts: {
+  dueAt?: string | null;
+  dueDate?: string | null;
+  completedAt?: string | null;
+}): string | null {
+  if (!opts.completedAt) return null;
+  const dueIso =
+    opts.dueAt && String(opts.dueAt).trim()
+      ? String(opts.dueAt)
+      : opts.dueDate
+        ? dueAtFallbackForDateOnly(opts.dueDate)
+        : null;
+  if (!dueIso) return null;
+  const due = new Date(dueIso);
+  const completed = new Date(opts.completedAt);
+  if (Number.isNaN(due.getTime()) || Number.isNaN(completed.getTime())) return null;
+  return formatDeadlineBeat(computeDeadlineBeat(due, completed).minutes);
+}
+
 export function formatProjectDueAt(dueAt: Date | string | null | undefined): string | null {
   if (!dueAt) return null;
   const d = typeof dueAt === "string" ? new Date(dueAt) : dueAt;

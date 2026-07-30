@@ -14,6 +14,7 @@ import {
   type ClientPortalDeliverable,
 } from "@/lib/client-portal-deliverables";
 import { composeDueAtIso, splitDueAtIso } from "@/lib/planner-due-datetime";
+import { formatEarlyFromDueAndCompleted } from "@/lib/project-deadline";
 import type { OpsProjectPhase } from "@prisma/client";
 
 type ClientContact = { id: string; name: string; email: string | null };
@@ -42,8 +43,6 @@ type ProjectDetail = {
   dueAt: string | null;
   handoverDate: string | null;
   completedAt: string | null;
-  deadlineBeatenDays: number | null;
-  deadlineBeatenMinutes: number | null;
   portalDisplayLocked: boolean;
   clientDescription: string | null;
   clientDeliverables: unknown;
@@ -111,8 +110,6 @@ export function ArchiveProjectDetailPanel({
     dueAmPm: "AM" as "AM" | "PM",
     handoverDate: "",
     completedAtLocal: "",
-    deadlineBeatenDays: "",
-    deadlineBeatenMinutes: "",
     portalDisplayLocked: true,
     clientDescription: "",
     deliverables: [] as ClientPortalDeliverable[],
@@ -134,8 +131,6 @@ export function ArchiveProjectDetailPanel({
       dueAmPm: due.ampm,
       handoverDate: p.handoverDate ?? "",
       completedAtLocal: toDatetimeLocalValue(p.completedAt),
-      deadlineBeatenDays: p.deadlineBeatenDays != null ? String(p.deadlineBeatenDays) : "",
-      deadlineBeatenMinutes: p.deadlineBeatenMinutes != null ? String(p.deadlineBeatenMinutes) : "",
       portalDisplayLocked: p.portalDisplayLocked ?? true,
       clientDescription: p.clientDescription ?? "",
       deliverables: parseClientDeliverables(p.clientDeliverables),
@@ -183,9 +178,6 @@ export function ArchiveProjectDetailPanel({
           dueAt: dueIso,
           handoverDate: form.handoverDate || null,
           completedAt: fromDatetimeLocalValue(form.completedAtLocal),
-          deadlineBeatenDays: form.deadlineBeatenDays === "" ? null : Number(form.deadlineBeatenDays),
-          deadlineBeatenMinutes:
-            form.deadlineBeatenMinutes === "" ? null : Number(form.deadlineBeatenMinutes),
           portalDisplayLocked: form.portalDisplayLocked,
           clientDescription: form.clientDescription.trim() || null,
           clientDeliverables: form.deliverables.filter((d) => d.label.trim()),
@@ -229,7 +221,8 @@ export function ArchiveProjectDetailPanel({
           <div className="mt-4 space-y-6">
             <div className="rounded-lg border border-brand-500/25 bg-brand-500/5 px-4 py-3 text-xs text-slate-300">
               Changes here update what the client sees on their portal immediately. Lock display to
-              stop daily logs from overwriting completion dates and outcome metrics.
+              stop daily logs from overwriting completion and due dates. Outcome (days/minutes early)
+              is calculated from due vs completed.
               {portalHref ? (
                 <>
                   {" "}
@@ -369,26 +362,18 @@ export function ArchiveProjectDetailPanel({
                     className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
                   />
                 </label>
-                <label className="text-xs text-slate-400">
-                  Days early (outcome)
-                  <input
-                    type="number"
-                    min={0}
-                    value={form.deadlineBeatenDays}
-                    onChange={(e) => setForm((f) => ({ ...f, deadlineBeatenDays: e.target.value }))}
-                    className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
-                  />
-                </label>
-                <label className="text-xs text-slate-400">
-                  Minutes early (outcome)
-                  <input
-                    type="number"
-                    min={0}
-                    value={form.deadlineBeatenMinutes}
-                    onChange={(e) => setForm((f) => ({ ...f, deadlineBeatenMinutes: e.target.value }))}
-                    className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
-                  />
-                </label>
+                <div className="text-xs text-slate-400 sm:col-span-2">
+                  Outcome (calculated)
+                  <p className="mt-1 rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-slate-200">
+                    {formatEarlyFromDueAndCompleted({
+                      dueAt: composeDueAtIso(form.dueDate, form.dueTime, form.dueAmPm),
+                      dueDate: form.dueDate || null,
+                      completedAt:
+                        fromDatetimeLocalValue(form.completedAtLocal) ??
+                        (form.handoverDate ? `${form.handoverDate}T12:00:00` : null),
+                    }) ?? "On time / not early — set due and completion to calculate"}
+                  </p>
+                </div>
               </div>
 
               <label className="flex items-start gap-2 text-xs text-slate-400">
@@ -399,8 +384,8 @@ export function ArchiveProjectDetailPanel({
                   className="mt-0.5"
                 />
                 <span>
-                  Lock client display — daily log sync will not overwrite completion dates, progress,
-                  or outcome metrics for this project.
+                  Lock client display — daily log sync will not overwrite completion dates, due dates,
+                  or progress for this project.
                 </span>
               </label>
 

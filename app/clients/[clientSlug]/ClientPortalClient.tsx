@@ -18,7 +18,10 @@ import {
 	daysUntilDueFromIso,
 	projectDueColor,
 } from "@/lib/project-color-scale";
-import { clientPortalProjectBeatDeadline } from "@/lib/client-portal-projects";
+import {
+	clientPortalProjectBeatDeadline,
+	daysEarlyHandoverVsCompleted,
+} from "@/lib/client-portal-projects";
 import { formatDeadlineBeat, formatProjectDueAt, dueAtFallbackForDateOnly } from "@/lib/project-deadline";
 import { PublicThemeToggle } from "@/components/client-portal/PublicThemeToggle";
 import type {
@@ -254,10 +257,14 @@ function PipelineCard({ project }: { project: PublicClientPortalPipelineProject 
 }
 
 function CompletedTableRow({ project }: { project: PublicClientPortalProject }) {
+	const handoverEarlyDays = daysEarlyHandoverVsCompleted(
+		project.handoverDate,
+		project.completedAt,
+	);
 	const outcome =
 		project.deadlineBeatenMinutes != null && project.deadlineBeatenMinutes > 0
 			? {
-					label: formatDeadlineBeat(project.deadlineBeatenMinutes) ?? "Early",
+					label: formatDeadlineBeat(project.deadlineBeatenMinutes) ?? "Deadline beaten",
 					early: true,
 				}
 			: project.deadlineBeatenDays != null && project.deadlineBeatenDays > 0
@@ -265,9 +272,17 @@ function CompletedTableRow({ project }: { project: PublicClientPortalProject }) 
 						label: `${project.deadlineBeatenDays} day${project.deadlineBeatenDays === 1 ? "" : "s"} early`,
 						early: true,
 					}
-				: project.handoverDate
-					? { label: "On time", early: false }
-					: null;
+				: handoverEarlyDays != null
+					? {
+							label:
+								handoverEarlyDays === 1
+									? "1 day early"
+									: `${handoverEarlyDays} days early`,
+							early: true,
+						}
+					: project.handoverDate
+						? { label: "On time", early: false }
+						: null;
 
 	return (
 		<tr className="client-portal-completed-row border-b border-white/[0.06] bg-white/[0.02] last:border-b-0">
@@ -305,9 +320,6 @@ function CompletedTableRow({ project }: { project: PublicClientPortalProject }) 
 				<span className="client-portal-lane-pill inline-flex rounded-md border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">
 					Lane {project.laneNumber}
 				</span>
-			</td>
-			<td className="px-4 py-4 align-middle whitespace-nowrap">
-				<DueDateHighlight project={project} block />
 			</td>
 			<td className="px-4 py-4 align-middle whitespace-nowrap text-sm text-slate-300">
 				{project.completedAt ? formatDateTime(project.completedAt) : "—"}
@@ -642,22 +654,20 @@ export function ClientPortalClient({
 
 							{data.completedProjects.length > 0 ? (
 								<div className="client-portal-card overflow-x-auto rounded-xl ring-1 ring-white/[0.06]">
-									<table className="client-portal-completed-table w-full min-w-[52rem] table-fixed text-left text-sm">
+									<table className="client-portal-completed-table w-full min-w-[44rem] table-fixed text-left text-sm">
 										<colgroup>
-											<col style={{ width: "28%" }} />
-											<col style={{ width: "12%" }} />
-											<col style={{ width: "8%" }} />
+											<col style={{ width: "32%" }} />
+											<col style={{ width: "14%" }} />
+											<col style={{ width: "10%" }} />
+											<col style={{ width: "16%" }} />
 											<col style={{ width: "14%" }} />
 											<col style={{ width: "14%" }} />
-											<col style={{ width: "11%" }} />
-											<col style={{ width: "13%" }} />
 										</colgroup>
 										<thead className="bg-white/[0.03] text-[10px] uppercase tracking-wider text-slate-500">
 											<tr>
 												<th className="px-4 py-3 text-left font-semibold">Project</th>
 												<th className="px-4 py-3 text-left font-semibold">Lead</th>
 												<th className="px-4 py-3 text-left font-semibold">Lane</th>
-												<th className="px-4 py-3 text-left font-semibold">Due</th>
 												<th className="px-4 py-3 text-left font-semibold">Completed</th>
 												<th className="px-4 py-3 text-left font-semibold">Handover</th>
 												<th className="px-4 py-3 text-left font-semibold">Outcome</th>

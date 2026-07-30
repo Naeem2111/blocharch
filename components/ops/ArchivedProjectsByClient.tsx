@@ -5,10 +5,10 @@ import { ClientAvatar } from "@/components/ops/ClientAvatar";
 import { asAvatarTextTone } from "@/lib/avatar-text-tone";
 import {
   COMPLEXITY_LABELS,
-  PROJECT_PHASE_LABELS,
   PROJECT_STATUS_LABELS,
 } from "@/lib/ops-constants";
 import { groupProjectsByClient } from "@/lib/ops-project-groups";
+import { formatEarlyFromDueAndCompleted } from "@/lib/project-deadline";
 
 export type ArchivedProjectRow = {
   id: string;
@@ -29,9 +29,10 @@ export type ArchivedProjectRow = {
   currentStatus: keyof typeof PROJECT_STATUS_LABELS;
   complexity: keyof typeof COMPLEXITY_LABELS;
   progressPercent: number | null;
+  dueDate: string | null;
+  dueAt?: string | null;
   handoverDate: string | null;
   completedAt: string | null;
-  deadlineBeatenDays: number | null;
 };
 
 function formatDate(iso: string | null): string {
@@ -104,80 +105,87 @@ export function ArchivedProjectsByClient({
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/[0.06]">
-                {group.projects.map((p) => (
-                  <tr key={p.id} className="bg-white/[0.02]">
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-white">{p.displayTitle ?? p.name}</p>
-                      <p className="text-xs text-slate-500">
-                        {p.projectNumber}
-                        {p.address ? ` · ${p.address}` : ""} · {COMPLEXITY_LABELS[p.complexity]}
-                      </p>
-                    </td>
-                    {showAssignedAthlete ? (
-                      <td className="px-4 py-3 text-slate-300">
-                        {p.assignedAthleteName ? (
-                          <span className="inline-flex items-center gap-2">
-                            <AthleteAvatar
-                              name={p.assignedAthleteName}
-                              photoUrl={p.profilePhotoUrl}
-                              backgroundColor={p.profilePhotoBgColor}
-                              textTone={asAvatarTextTone(p.profilePhotoTextTone)}
-                              size={24}
-                            />
-                            <span>
-                              {p.assignedAthleteName}
-                              {p.assignedAthleteCode ? (
-                                <span className="block text-xs text-slate-500">{p.assignedAthleteCode}</span>
-                              ) : null}
-                            </span>
-                          </span>
-                        ) : (
-                          "Unassigned"
-                        )}
+                {group.projects.map((p) => {
+                  const earlyLabel = formatEarlyFromDueAndCompleted({
+                    dueAt: p.dueAt,
+                    dueDate: p.dueDate,
+                    completedAt: p.completedAt ?? p.handoverDate,
+                  });
+                  return (
+                    <tr key={p.id} className="bg-white/[0.02]">
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-white">{p.displayTitle ?? p.name}</p>
+                        <p className="text-xs text-slate-500">
+                          {p.projectNumber}
+                          {p.address ? ` · ${p.address}` : ""} · {COMPLEXITY_LABELS[p.complexity]}
+                        </p>
                       </td>
-                    ) : null}
-                    <td className="px-4 py-3 text-slate-300">
-                      {PROJECT_STATUS_LABELS[p.currentStatus]}
-                    </td>
-                    <td className="px-4 py-3 text-slate-300">
-                      {formatDate(p.completedAt ?? p.handoverDate)}
-                      {p.deadlineBeatenDays != null && p.deadlineBeatenDays > 0 ? (
-                        <span className="block text-xs text-brand-300">
-                          {p.deadlineBeatenDays} day{p.deadlineBeatenDays === 1 ? "" : "s"} early
-                        </span>
+                      {showAssignedAthlete ? (
+                        <td className="px-4 py-3 text-slate-300">
+                          {p.assignedAthleteName ? (
+                            <span className="inline-flex items-center gap-2">
+                              <AthleteAvatar
+                                name={p.assignedAthleteName}
+                                photoUrl={p.profilePhotoUrl}
+                                backgroundColor={p.profilePhotoBgColor}
+                                textTone={asAvatarTextTone(p.profilePhotoTextTone)}
+                                size={24}
+                              />
+                              <span>
+                                {p.assignedAthleteName}
+                                {p.assignedAthleteCode ? (
+                                  <span className="block text-xs text-slate-500">
+                                    {p.assignedAthleteCode}
+                                  </span>
+                                ) : null}
+                              </span>
+                            </span>
+                          ) : (
+                            "Unassigned"
+                          )}
+                        </td>
                       ) : null}
-                    </td>
-                    <td className="px-4 py-3 text-slate-300">{formatDate(p.handoverDate)}</td>
-                    <td className="px-4 py-3 text-slate-300">{p.progressPercent ?? "—"}%</td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-col items-start gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => onOpen(p.id)}
-                          className="text-xs text-brand-300 hover:text-brand-200"
-                        >
-                          Open
-                        </button>
-                        {onReactivate ? (
+                      <td className="px-4 py-3 text-slate-300">
+                        {PROJECT_STATUS_LABELS[p.currentStatus]}
+                      </td>
+                      <td className="px-4 py-3 text-slate-300">
+                        {formatDate(p.completedAt ?? p.handoverDate)}
+                        {earlyLabel ? (
+                          <span className="block text-xs text-brand-300">{earlyLabel}</span>
+                        ) : null}
+                      </td>
+                      <td className="px-4 py-3 text-slate-300">{formatDate(p.handoverDate)}</td>
+                      <td className="px-4 py-3 text-slate-300">{p.progressPercent ?? "—"}%</td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col items-start gap-1.5">
                           <button
                             type="button"
-                            disabled={reactivatingId === p.id}
-                            onClick={() =>
-                              onReactivate({
-                                id: p.id,
-                                name: p.name,
-                                displayTitle: p.displayTitle,
-                              })
-                            }
-                            className="text-xs text-slate-500 hover:text-slate-300 disabled:opacity-40"
+                            onClick={() => onOpen(p.id)}
+                            className="text-xs text-brand-300 hover:text-brand-200"
                           >
-                            {reactivatingId === p.id ? "Moving…" : "Still in progress"}
+                            Open
                           </button>
-                        ) : null}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          {onReactivate ? (
+                            <button
+                              type="button"
+                              disabled={reactivatingId === p.id}
+                              onClick={() =>
+                                onReactivate({
+                                  id: p.id,
+                                  name: p.name,
+                                  displayTitle: p.displayTitle,
+                                })
+                              }
+                              className="text-xs text-slate-500 hover:text-slate-300 disabled:opacity-40"
+                            >
+                              {reactivatingId === p.id ? "Moving…" : "Still in progress"}
+                            </button>
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

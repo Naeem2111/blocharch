@@ -52,17 +52,37 @@ function handoverBeatsDue(
   return handoverEnd.getTime() <= due.getTime();
 }
 
-/** Delivered on or before the due datetime (early or on time). */
+/** Days early when completed before the handover date (date-only). */
+export function daysEarlyHandoverVsCompleted(
+  handoverDate: string | null | undefined,
+  completedAt: string | null | undefined,
+): number | null {
+  if (!handoverDate || !completedAt) return null;
+  const handover = dateOnlyUtc(new Date(`${handoverDate}T12:00:00`));
+  const completed = dateOnlyUtc(new Date(completedAt));
+  if (Number.isNaN(handover.getTime()) || Number.isNaN(completed.getTime())) return null;
+  const diffDays = Math.floor((handover.getTime() - completed.getTime()) / 86_400_000);
+  return diffDays > 0 ? diffDays : null;
+}
+
+/**
+ * Delivered early or on time: stored beat metrics, handover on/before due,
+ * or completed before the handover date.
+ */
 export function clientPortalProjectBeatDeadline(project: {
   deadlineBeatenMinutes?: number | null;
   deadlineBeatenDays: number | null;
   handoverDate: string | null;
   dueDate: string | null;
   dueAt?: string | null;
+  completedAt?: string | null;
 }): boolean {
   if (projectBeatDeadline(project)) return true;
   if (project.handoverDate && (project.dueAt || project.dueDate)) {
     return handoverBeatsDue(project.handoverDate, project.dueAt ?? dueAtFallbackForDateOnly(project.dueDate!));
+  }
+  if (daysEarlyHandoverVsCompleted(project.handoverDate, project.completedAt) != null) {
+    return true;
   }
   return false;
 }
@@ -74,6 +94,7 @@ export function clientPortalDeadlineBeatDescription(project: {
   handoverDate: string | null;
   dueDate: string | null;
   dueAt?: string | null;
+  completedAt?: string | null;
 }): { title: string; description: string } {
   if (project.deadlineBeatenMinutes != null && project.deadlineBeatenMinutes > 0) {
     const label = formatDeadlineBeat(project.deadlineBeatenMinutes);
@@ -88,6 +109,13 @@ export function clientPortalDeadlineBeatDescription(project: {
     return {
       title: `Deadline beaten — ${project.name}`,
       description: `Delivered ${project.deadlineBeatenDays} day${project.deadlineBeatenDays === 1 ? "" : "s"} ahead of schedule.`,
+    };
+  }
+  const vsHandover = daysEarlyHandoverVsCompleted(project.handoverDate, project.completedAt);
+  if (vsHandover != null) {
+    return {
+      title: `Deadline beaten — ${project.name}`,
+      description: `Delivered ${vsHandover} day${vsHandover === 1 ? "" : "s"} ahead of schedule.`,
     };
   }
   return {
