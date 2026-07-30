@@ -22,6 +22,9 @@ export async function GET(request: NextRequest) {
   const page = parseInt(searchParams.get("page") || "1", 10);
   const perPage = Math.min(50, Math.max(10, parseInt(searchParams.get("perPage") || "25", 10)));
   const withEmailOnly = searchParams.get("withEmail") === "true";
+  const excludeCold =
+    searchParams.get("excludeCold") === "true" ||
+    searchParams.get("loggedOutreach") === "true";
 
   await syncAllFollowUpDueStages();
 
@@ -77,6 +80,9 @@ export async function GET(request: NextRequest) {
 
   if (filter) {
     items = items.filter((x) => matchesLeadFilter(filter, x._filterMeta));
+  }
+  if (excludeCold) {
+    items = items.filter((x) => x.lead.effectiveStage !== "cold");
   }
   if (withEmailOnly) {
     items = items.filter((a) => a.email?.trim());

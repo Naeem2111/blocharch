@@ -78,6 +78,7 @@ function StarRating({
 }
 
 export function AutomationClient() {
+  const [tab, setTab] = useState<"all" | "logged">("all");
   const [stage, setStage] = useState<string>("");
   const [q, setQ] = useState("");
   const [query, setQuery] = useState("");
@@ -93,16 +94,29 @@ export function AutomationClient() {
     params.set("perPage", "25");
     if (stage) params.set("stage", stage);
     if (query) params.set("q", query);
-    params.set("withEmail", "true");
+    if (tab === "logged") {
+      params.set("loggedOutreach", "true");
+    } else {
+      params.set("withEmail", "true");
+    }
     return fetch(`/api/leads?${params}`)
       .then((r) => r.json())
       .then(setData)
       .finally(() => setLoading(false));
-  }, [stage, page, query]);
+  }, [stage, page, query, tab]);
 
   useEffect(() => {
     void loadData();
   }, [loadData, refreshKey]);
+
+  const switchTab = (next: "all" | "logged") => {
+    setTab(next);
+    setPage(1);
+    setStage("");
+    setQ("");
+    setQuery("");
+    setData(null);
+  };
 
   async function updateLead(practiceUrl: string, updates: { stage?: string; rating?: number }) {
     const slug = slugFromUrl(practiceUrl);
@@ -114,6 +128,17 @@ export function AutomationClient() {
     if (!res.ok) return;
     const d = await res.json().catch(() => null);
     if (data && d) {
+      const nextEffective =
+        d.outreach?.effectiveStage ?? d.stage ?? undefined;
+      // Drop from Logged outreach if stage returned to cold
+      if (tab === "logged" && nextEffective === "cold") {
+        setData({
+          ...data,
+          total: Math.max(0, data.total - 1),
+          items: data.items.filter((item) => item.url !== practiceUrl),
+        });
+        return;
+      }
       setData({
         ...data,
         items: data.items.map((item) =>
@@ -135,6 +160,11 @@ export function AutomationClient() {
     }
   }
 
+  const stageFilterOptions =
+    tab === "logged"
+      ? LEAD_FILTER_OPTIONS.filter((opt) => opt.value !== "cold")
+      : LEAD_FILTER_OPTIONS;
+
   return (
     <div className="space-y-8">
       <AddPracticeForm
@@ -143,6 +173,31 @@ export function AutomationClient() {
           setRefreshKey((k) => k + 1);
         }}
       />
+
+      <div className="flex gap-1 border-b border-white/[0.08]">
+        <button
+          type="button"
+          onClick={() => switchTab("all")}
+          className={`px-4 py-2.5 text-sm font-medium transition-colors ${
+            tab === "all"
+              ? "border-b-2 border-brand-400 text-white"
+              : "text-slate-400 hover:text-slate-200"
+          }`}
+        >
+          All with email
+        </button>
+        <button
+          type="button"
+          onClick={() => switchTab("logged")}
+          className={`px-4 py-2.5 text-sm font-medium transition-colors ${
+            tab === "logged"
+              ? "border-b-2 border-brand-400 text-white"
+              : "text-slate-400 hover:text-slate-200"
+          }`}
+        >
+          Logged outreach
+        </button>
+      </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-3">
         <input
@@ -181,7 +236,7 @@ export function AutomationClient() {
             }}
             className="select-console rounded-lg px-3 py-2 text-sm"
           >
-            {LEAD_FILTER_OPTIONS.map((opt) => (
+            {stageFilterOptions.map((opt) => (
               <option key={opt.value || "all"} value={opt.value}>
                 {opt.label}
               </option>
@@ -197,7 +252,9 @@ export function AutomationClient() {
       </div>
 
       <p className="text-sm text-slate-500">
-        Track outreach stages, follow-up dates, and contact history. Open a practice to log emails, replies, and next actions.
+        {tab === "logged"
+          ? "Practices that are no longer cold — anyone with logged or progressed outreach (deleted practices are excluded)."
+          : "Track outreach stages, follow-up dates, and contact history. Open a practice to log emails, replies, and next actions."}
       </p>
 
       {loading ? (
@@ -205,9 +262,17 @@ export function AutomationClient() {
       ) : data ? (
         <>
           <p className="text-sm text-slate-500">
-            {data.total} practice{data.total !== 1 ? "s" : ""} with email
+            {data.total} practice{data.total !== 1 ? "s" : ""}
+            {tab === "logged" ? " with logged outreach" : " with email"}
             {query ? ` matching “${query}”` : ""}
           </p>
+          {data.items.length === 0 ? (
+            <p className="rounded-2xl border border-white/[0.08] bg-white/[0.02] px-6 py-10 text-center text-sm text-slate-400 ring-1 ring-white/[0.04]">
+              {tab === "logged"
+                ? "No practices outside cold status yet."
+                : "No practices match your search."}
+            </p>
+          ) : (
           <div className="overflow-x-auto rounded-2xl border border-white/[0.08] bg-white/[0.02] ring-1 ring-white/[0.04]">
             <table className="w-full min-w-[1100px]">
               <thead>
@@ -301,7 +366,8 @@ export function AutomationClient() {
               </tbody>
             </table>
           </div>
-          {data.totalPages > 1 && (
+          )}
+          {data.totalPages > 1 && data.items.length > 0 && (
             <div className="mt-4 flex items-center gap-2">
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
