@@ -13,6 +13,7 @@
     "db:migrate": "prisma migrate deploy",
     "db:push": "prisma db push",
     "db:seed": "node prisma/seed.mjs",
+    "db:seed:private": "node prisma/seed-private.mjs",
     "geocode:architects": "node scripts/geocode-architects.mjs",
     "geocode:architects:all": "node scripts/apply-geocache-to-db.mjs && node scripts/geocode-architects.mjs --all",
     "geocode:architects:fast": "node scripts/geocode-architects-bulk.mjs",

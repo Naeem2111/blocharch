@@ -14,6 +14,8 @@ import {
   isMarketingDashboardPath,
   isOpsApiPath,
   isOpsDashboardPath,
+  isPrivateApiPath,
+  isPrivateDashboardPath,
 } from "@/lib/permissions";
 
 const AUTH_COOKIE = "blocarch_session";
@@ -84,6 +86,15 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  if ((isPrivateDashboardPath(path) || isPrivateApiPath(path)) && !n8nAuthorized) {
+    if (!role || !canAccessModule(role, "private_work", username)) {
+      if (isApi) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+      return NextResponse.redirect(new URL(defaultDashboardPath(role ?? "user", username), request.url));
+    }
+  }
+
   const isProtected = path.startsWith("/dashboard") || path.startsWith("/api/") || path === "/";
   if (isProtected && !isAuthenticated && !n8nAuthorized) {
     if (isApi) {
@@ -119,5 +130,6 @@ export const config = {
     "/api/planner/:path*",
     "/api/ops/:path*",
     "/api/athlete/:path*",
+    "/api/private/:path*",
   ],
 };

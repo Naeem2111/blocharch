@@ -440,6 +440,25 @@ const ATHLETE_PORTAL_NAV: NavItem[] = [
 		),
 	},
 	{
+		href: "/dashboard/athlete/private",
+		label: "Private work",
+		icon: (
+			<svg
+				className="h-5 w-5 shrink-0"
+				fill="none"
+				viewBox="0 0 24 24"
+				strokeWidth={1.5}
+				stroke="currentColor"
+			>
+				<path
+					strokeLinecap="round"
+					strokeLinejoin="round"
+					d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21"
+				/>
+			</svg>
+		),
+	},
+	{
 		href: "/dashboard/athlete/notifications",
 		label: "My notifications",
 		badgeKey: "notifications",
@@ -500,6 +519,85 @@ const ATHLETE_PORTAL_NAV: NavItem[] = [
 	},
 ];
 
+const PRIVATE_WORK_NAV: NavItem[] = [
+	{
+		href: "/dashboard/private",
+		label: "Overview",
+		icon: (
+			<svg
+				className="h-5 w-5 shrink-0"
+				fill="none"
+				viewBox="0 0 24 24"
+				strokeWidth={1.5}
+				stroke="currentColor"
+			>
+				<path
+					strokeLinecap="round"
+					strokeLinejoin="round"
+					d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5M9 11.25v1.5M12 9v3.75m3-6.75v6.75"
+				/>
+			</svg>
+		),
+	},
+	{
+		href: "/dashboard/private/commercial",
+		label: "Commercial & analytics",
+		icon: (
+			<svg
+				className="h-5 w-5 shrink-0"
+				fill="none"
+				viewBox="0 0 24 24"
+				strokeWidth={1.5}
+				stroke="currentColor"
+			>
+				<path
+					strokeLinecap="round"
+					strokeLinejoin="round"
+					d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+				/>
+			</svg>
+		),
+	},
+	{
+		href: "/dashboard/private/projects",
+		label: "Projects",
+		icon: (
+			<svg
+				className="h-5 w-5 shrink-0"
+				fill="none"
+				viewBox="0 0 24 24"
+				strokeWidth={1.5}
+				stroke="currentColor"
+			>
+				<path
+					strokeLinecap="round"
+					strokeLinejoin="round"
+					d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z"
+				/>
+			</svg>
+		),
+	},
+	{
+		href: "/dashboard/private/onboarding",
+		label: "Onboarding",
+		icon: (
+			<svg
+				className="h-5 w-5 shrink-0"
+				fill="none"
+				viewBox="0 0 24 24"
+				strokeWidth={1.5}
+				stroke="currentColor"
+			>
+				<path
+					strokeLinecap="round"
+					strokeLinejoin="round"
+					d="M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z"
+				/>
+			</svg>
+		),
+	},
+];
+
 const ADMIN_NAV: NavItem[] = [
 	{
 		href: "/dashboard/admin",
@@ -537,6 +635,12 @@ const NAV_SECTIONS: NavSection[] = [
 	},
 	{ id: "ops", label: "Athlete operations", module: "ops", items: OPS_NAV },
 	{
+		id: "private_work",
+		label: "Private projects",
+		module: "private_work",
+		items: PRIVATE_WORK_NAV,
+	},
+	{
 		id: "athlete_portal",
 		label: "My workspace",
 		module: "athlete_portal",
@@ -554,7 +658,10 @@ const NAV_SECTIONS: NavSection[] = [
 function navActive(pathname: string, href: string): boolean {
 	if (href === "/dashboard") return pathname === "/dashboard";
 	if (href === "/dashboard/ops") return pathname === "/dashboard/ops";
+	if (href === "/dashboard/private") return pathname === "/dashboard/private";
 	if (href === "/dashboard/athlete") return pathname === "/dashboard/athlete";
+	if (href === "/dashboard/athlete/private")
+		return pathname === "/dashboard/athlete/private" || pathname.startsWith("/dashboard/athlete/private/");
 	if (href.startsWith("/dashboard/planner"))
 		return pathname.startsWith("/dashboard/planner");
 	return pathname === href || pathname.startsWith(`${href}/`);

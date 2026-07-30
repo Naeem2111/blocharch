@@ -427,6 +427,8 @@ model OpsAthlete {
   dateOfBirth      DateTime?        @map("date_of_birth") @db.Date
   baseMonthlyPayZar Decimal         @default(20000) @map("base_monthly_pay_zar") @db.Decimal(12, 2)
   monthlyHourCap   Int              @default(160) @map("monthly_hour_cap")
+  /** Soft weekly cap for private-project hours (capacity guardrail on private overview). */
+  privateWeeklyCapHours Int          @default(8) @map("private_weekly_cap_hours")
   overtimeRateZar  Decimal          @default(200) @map("overtime_rate_zar") @db.Decimal(10, 2)
   blocharchStartDate DateTime       @map("blocharch_start_date") @db.Date
   status           OpsAthleteStatus @default(active)
@@ -447,6 +449,8 @@ model OpsAthlete {
   notifications OpsNotification[]
   athleteNotifications OpsAthleteNotification[]
   checkInRequests OpsCheckInRequest[]
+  privateProjects PrivateProject[]
+  privateHourLogs PrivateHourLog[]
 
   @@map("ops_athletes")
 }
@@ -750,4 +754,134 @@ model OpsAppSetting {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("ops_app_settings")
+}
+
+// ─── Private work (Cape Town private projects — separate from UK Production Lane) ───
+
+enum PrivateDesignStage {
+  site_measure_up
+  existing_drawings
+  concept_design
+  design_review
+  design_development
+  council_submission_docs
+  council_review
+  council_approved
+}
+
+enum PrivateProjectStatus {
+  active
+  completed
+  on_hold
+}
+
+enum PrivateProjectType {
+  residential_extension
+  commercial
+  other
+}
+
+/** End client for a private (non–Production Lane) project. */
+model PrivateClient {
+  id           String   @id @default(uuid())
+  name         String
+  contactEmail String?  @map("contact_email")
+  contactPhone String?  @map("contact_phone")
+  /** Public portal slug: /private/{slug} */
+  slug         String?  @unique
+  portalEnabled Boolean @default(true) @map("portal_enabled")
+  notes        String?  @db.Text
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  projects PrivateProject[]
+
+  @@map("private_clients")
+}
+
+model PrivateProject {
+  id              String               @id @default(uuid())
+  clientId        String               @map("client_id")
+  assignedAthleteId String?            @map("assigned_athlete_id")
+  name            String
+  address         String?              @db.Text
+  projectType     PrivateProjectType   @default(residential_extension) @map("project_type")
+  designStage     PrivateDesignStage   @default(site_measure_up) @map("design_stage")
+  status          PrivateProjectStatus @default(active)
+  /** Fixed fee excl. VAT (ZAR). */
+  feeZar          Decimal              @default(0) @map("fee_zar") @db.Decimal(12, 2)
+  /** Athlete cost allocated to date (ZAR). */
+  costZar         Decimal              @default(0) @map("cost_zar") @db.Decimal(12, 2)
+  /** Out-of-scope hourly billed this month / life (tracked separately). */
+  outOfScopeBilledZar Decimal          @default(0) @map("out_of_scope_billed_zar") @db.Decimal(12, 2)
+  outOfScopeFlag  Boolean              @default(false) @map("out_of_scope_flag")
+  stageNotes      String?              @map("stage_notes") @db.Text
+  briefReceivedAt DateTime?            @map("brief_received_at") @db.Date
+  councilSubmittedAt DateTime?         @map("council_submitted_at") @db.Date
+  /** When the current design stage started — drives duration-weighted progress. */
+  stageStartedAt  DateTime             @default(now()) @map("stage_started_at") @db.Date
+  completedAt     DateTime?            @map("completed_at") @db.Date
+  handoverOutcome String?              @map("handover_outcome")
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+
+  client          PrivateClient        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  assignedAthlete OpsAthlete?          @relation(fields: [assignedAthleteId], references: [id], onDelete: SetNull)
+  updates         PrivateProjectUpdate[]
+  actionItems     PrivateActionItem[]
+  hourLogs        PrivateHourLog[]
+
+  @@index([clientId])
+  @@index([assignedAthleteId])
+  @@index([status, designStage])
+  @@map("private_projects")
+}
+
+model PrivateProjectUpdate {
+  id        String   @id @default(uuid())
+  projectId String   @map("project_id")
+  title     String
+  body      String?  @db.Text
+  /** Shown on the client portal feed. */
+  clientVisible Boolean @default(true) @map("client_visible")
+  occurredAt DateTime @default(now()) @map("occurred_at") @db.Date
+  createdAt DateTime @default(now()) @map("created_at")
+
+  project PrivateProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, occurredAt])
+  @@map("private_project_updates")
+}
+
+model PrivateActionItem {
+  id          String    @id @default(uuid())
+  projectId   String    @map("project_id")
+  title       String
+  /** Client must act — shown as "Action needed from you". */
+  clientFacing Boolean  @default(true) @map("client_facing")
+  completedAt DateTime? @map("completed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  project PrivateProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, completedAt])
+  @@map("private_action_items")
+}
+
+/** Athlete hours on private projects — never mixes with Production Lane billing. */
+model PrivateHourLog {
+  id         String   @id @default(uuid())
+  projectId  String   @map("project_id")
+  athleteId  String   @map("athlete_id")
+  workDate   DateTime @map("work_date") @db.Date
+  hours      Decimal  @map("hours") @db.Decimal(5, 2)
+  notes      String?  @db.Text
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  project PrivateProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  athlete OpsAthlete     @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@index([athleteId, workDate])
+  @@index([projectId, workDate])
+  @@map("private_hour_logs")
 }

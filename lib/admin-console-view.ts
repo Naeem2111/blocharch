@@ -3,6 +3,7 @@ import {
 	isAthleteDashboardPath,
 	isMarketingDashboardPath,
 	isOpsDashboardPath,
+	isPrivateDashboardPath,
 } from "@/lib/permissions";
 import { isAdminOnlyAccount } from "@/lib/admin-only-accounts";
 
@@ -22,6 +23,7 @@ export const ADMIN_CONSOLE_VIEWS: {
 			"marketing",
 			"onboarding",
 			"ops",
+			"private_work",
 			"athlete_portal",
 			"planner",
 			"admin",
@@ -31,7 +33,7 @@ export const ADMIN_CONSOLE_VIEWS: {
 	{
 		id: "admin",
 		label: "Admin",
-		sections: ["onboarding", "ops", "planner", "admin"],
+		sections: ["onboarding", "ops", "private_work", "planner", "admin"],
 		home: "/dashboard/ops",
 	},
 	{
@@ -87,6 +89,7 @@ export function adminViewFromPath(pathname: string): AdminConsoleView {
 	if (isAthleteDashboardPath(pathname)) return "athlete";
 	if (pathname.startsWith("/dashboard/planner")) return "admin";
 	if (isOpsDashboardPath(pathname)) return "admin";
+	if (isPrivateDashboardPath(pathname)) return "admin";
 	if (isMarketingDashboardPath(pathname)) return "manager";
 	return "manager";
 }

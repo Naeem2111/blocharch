@@ -2,7 +2,13 @@ import type { UserRole } from "@/lib/users-store";
 import { isAdminOnlyAccount } from "@/lib/admin-only-accounts";
 
 /** Feature areas within the single Blocharch console domain. */
-export type AppModule = "marketing" | "planner" | "admin" | "ops" | "athlete_portal";
+export type AppModule =
+  | "marketing"
+  | "planner"
+  | "admin"
+  | "ops"
+  | "athlete_portal"
+  | "private_work";
 
 const MODULE_ROLES: Record<AppModule, readonly UserRole[]> = {
   /** Lead directory, map, outreach — internal Blocharch staff only. */
@@ -15,6 +21,8 @@ const MODULE_ROLES: Record<AppModule, readonly UserRole[]> = {
   ops: ["admin"],
   /** Athlete-facing workspace — dashboard, submissions, my projects (/dashboard/athlete). */
   athlete_portal: ["admin", "user"],
+  /** Private Cape Town projects — ops overview (/dashboard/private). */
+  private_work: ["admin"],
 };
 
 export function canAccessModule(
@@ -109,4 +117,12 @@ export function isAthleteDashboardPath(path: string): boolean {
 
 export function isAthleteApiPath(path: string): boolean {
   return path.startsWith("/api/athlete/");
+}
+
+export function isPrivateDashboardPath(path: string): boolean {
+  return path === "/dashboard/private" || path.startsWith("/dashboard/private/");
+}
+
+export function isPrivateApiPath(path: string): boolean {
+  return path.startsWith("/api/private/");
 }
