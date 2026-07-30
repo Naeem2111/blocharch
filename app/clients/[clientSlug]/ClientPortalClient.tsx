@@ -20,9 +20,13 @@ import {
 } from "@/lib/project-color-scale";
 import {
 	clientPortalProjectBeatDeadline,
-	daysEarlyHandoverVsCompleted,
 } from "@/lib/client-portal-projects";
-import { formatDeadlineBeat, formatProjectDueAt, dueAtFallbackForDateOnly } from "@/lib/project-deadline";
+import {
+	formatDeadlineBeat,
+	formatEarlyFromDueAndCompleted,
+	formatProjectDueAt,
+	dueAtFallbackForDateOnly,
+} from "@/lib/project-deadline";
 import { PublicThemeToggle } from "@/components/client-portal/PublicThemeToggle";
 import type {
 	PublicClientPortalData,
@@ -257,32 +261,23 @@ function PipelineCard({ project }: { project: PublicClientPortalPipelineProject 
 }
 
 function CompletedTableRow({ project }: { project: PublicClientPortalProject }) {
-	const handoverEarlyDays = daysEarlyHandoverVsCompleted(
-		project.handoverDate,
-		project.completedAt,
-	);
-	const outcome =
-		project.deadlineBeatenMinutes != null && project.deadlineBeatenMinutes > 0
-			? {
-					label: formatDeadlineBeat(project.deadlineBeatenMinutes) ?? "Deadline beaten",
-					early: true,
-				}
+	const earlyLabel =
+		formatEarlyFromDueAndCompleted({
+			dueAt: project.dueAt,
+			dueDate: project.dueDate,
+			completedAt: project.completedAt,
+		}) ??
+		(project.deadlineBeatenMinutes != null && project.deadlineBeatenMinutes > 0
+			? formatDeadlineBeat(project.deadlineBeatenMinutes)
 			: project.deadlineBeatenDays != null && project.deadlineBeatenDays > 0
-				? {
-						label: `${project.deadlineBeatenDays} day${project.deadlineBeatenDays === 1 ? "" : "s"} early`,
-						early: true,
-					}
-				: handoverEarlyDays != null
-					? {
-							label:
-								handoverEarlyDays === 1
-									? "1 day early"
-									: `${handoverEarlyDays} days early`,
-							early: true,
-						}
-					: project.handoverDate
-						? { label: "On time", early: false }
-						: null;
+				? `${project.deadlineBeatenDays} day${project.deadlineBeatenDays === 1 ? "" : "s"} early`
+				: null);
+
+	const outcome = earlyLabel
+		? { label: earlyLabel, early: true }
+		: project.completedAt && (project.dueAt || project.dueDate)
+			? { label: "On time", early: false }
+			: null;
 
 	return (
 		<tr className="client-portal-completed-row border-b border-white/[0.06] bg-white/[0.02] last:border-b-0">
@@ -321,11 +316,15 @@ function CompletedTableRow({ project }: { project: PublicClientPortalProject }) 
 					Lane {project.laneNumber}
 				</span>
 			</td>
+			<td className="px-4 py-4 align-middle whitespace-nowrap">
+				{project.dueDate || project.dueAt ? (
+					<DueDateHighlight project={project} block />
+				) : (
+					<span className="text-xs text-slate-600">—</span>
+				)}
+			</td>
 			<td className="px-4 py-4 align-middle whitespace-nowrap text-sm text-slate-300">
 				{project.completedAt ? formatDateTime(project.completedAt) : "—"}
-			</td>
-			<td className="px-4 py-4 align-middle whitespace-nowrap text-sm font-medium text-emerald-400 client-portal-accent-emerald">
-				{project.handoverDate ? formatShortDate(project.handoverDate) : "—"}
 			</td>
 			<td className="px-4 py-4 align-middle whitespace-nowrap">
 				{outcome ? (
@@ -668,8 +667,8 @@ export function ClientPortalClient({
 												<th className="px-4 py-3 text-left font-semibold">Project</th>
 												<th className="px-4 py-3 text-left font-semibold">Lead</th>
 												<th className="px-4 py-3 text-left font-semibold">Lane</th>
+												<th className="px-4 py-3 text-left font-semibold">Due</th>
 												<th className="px-4 py-3 text-left font-semibold">Completed</th>
-												<th className="px-4 py-3 text-left font-semibold">Handover</th>
 												<th className="px-4 py-3 text-left font-semibold">Outcome</th>
 											</tr>
 										</thead>

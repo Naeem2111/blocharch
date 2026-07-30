@@ -31,7 +31,6 @@ export type ArchivedProjectRow = {
   progressPercent: number | null;
   dueDate: string | null;
   dueAt?: string | null;
-  handoverDate: string | null;
   completedAt: string | null;
 };
 
@@ -98,8 +97,8 @@ export function ArchivedProjectsByClient({
                     <th className="px-4 py-3 font-medium">Completed by</th>
                   ) : null}
                   <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium">Due</th>
                   <th className="px-4 py-3 font-medium">Completed</th>
-                  <th className="px-4 py-3 font-medium">Handover</th>
                   <th className="px-4 py-3 font-medium">Progress</th>
                   <th className="px-4 py-3 font-medium" />
                 </tr>
@@ -109,7 +108,7 @@ export function ArchivedProjectsByClient({
                   const earlyLabel = formatEarlyFromDueAndCompleted({
                     dueAt: p.dueAt,
                     dueDate: p.dueDate,
-                    completedAt: p.completedAt ?? p.handoverDate,
+                    completedAt: p.completedAt,
                   });
                   return (
                     <tr key={p.id} className="bg-white/[0.02]">
@@ -148,13 +147,13 @@ export function ArchivedProjectsByClient({
                       <td className="px-4 py-3 text-slate-300">
                         {PROJECT_STATUS_LABELS[p.currentStatus]}
                       </td>
+                      <td className="px-4 py-3 text-slate-300">{formatDate(p.dueDate)}</td>
                       <td className="px-4 py-3 text-slate-300">
-                        {formatDate(p.completedAt ?? p.handoverDate)}
+                        {formatDate(p.completedAt)}
                         {earlyLabel ? (
                           <span className="block text-xs text-brand-300">{earlyLabel}</span>
                         ) : null}
                       </td>
-                      <td className="px-4 py-3 text-slate-300">{formatDate(p.handoverDate)}</td>
                       <td className="px-4 py-3 text-slate-300">{p.progressPercent ?? "—"}%</td>
                       <td className="px-4 py-3">
                         <div className="flex flex-col items-start gap-1.5">

@@ -38,23 +38,20 @@ export function buildClientPortalNotifications(
   const beaten = completedProjects
     .filter((p) => clientPortalProjectBeatDeadline(p))
     .sort((a, b) => {
-      const aTime = a.handoverDate
-        ? new Date(`${a.handoverDate}T12:00:00`).getTime()
-        : 0;
-      const bTime = b.handoverDate
-        ? new Date(`${b.handoverDate}T12:00:00`).getTime()
-        : 0;
+      const aTime = a.completedAt ? new Date(a.completedAt).getTime() : 0;
+      const bTime = b.completedAt ? new Date(b.completedAt).getTime() : 0;
       return bTime - aTime;
     });
 
   return beaten.map((p) => {
     const copy = clientPortalDeadlineBeatDescription(p);
+    const completedDay = p.completedAt ? p.completedAt.slice(0, 10) : null;
     return {
       id: `${p.id}-beaten`,
       kind: "deadline_beaten",
       title: copy.title,
       description: copy.description,
-      timeLabel: relativeLabelFromIso(p.handoverDate, "Recently"),
+      timeLabel: relativeLabelFromIso(completedDay, "Recently"),
       projectId: p.id,
     };
   });

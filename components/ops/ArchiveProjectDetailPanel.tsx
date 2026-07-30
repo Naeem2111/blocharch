@@ -41,7 +41,6 @@ type ProjectDetail = {
   startDate: string | null;
   dueDate: string | null;
   dueAt: string | null;
-  handoverDate: string | null;
   completedAt: string | null;
   portalDisplayLocked: boolean;
   clientDescription: string | null;
@@ -108,7 +107,6 @@ export function ArchiveProjectDetailPanel({
     dueDate: "",
     dueTime: "",
     dueAmPm: "AM" as "AM" | "PM",
-    handoverDate: "",
     completedAtLocal: "",
     portalDisplayLocked: true,
     clientDescription: "",
@@ -129,7 +127,6 @@ export function ArchiveProjectDetailPanel({
       dueDate: due.date,
       dueTime: due.time,
       dueAmPm: due.ampm,
-      handoverDate: p.handoverDate ?? "",
       completedAtLocal: toDatetimeLocalValue(p.completedAt),
       portalDisplayLocked: p.portalDisplayLocked ?? true,
       clientDescription: p.clientDescription ?? "",
@@ -176,7 +173,6 @@ export function ArchiveProjectDetailPanel({
           startDate: form.startDate || null,
           dueDate: form.dueDate || null,
           dueAt: dueIso,
-          handoverDate: form.handoverDate || null,
           completedAt: fromDatetimeLocalValue(form.completedAtLocal),
           portalDisplayLocked: form.portalDisplayLocked,
           clientDescription: form.clientDescription.trim() || null,
@@ -353,25 +349,17 @@ export function ArchiveProjectDetailPanel({
                     className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
                   />
                 </label>
-                <label className="text-xs text-slate-400">
-                  Handover date
-                  <input
-                    type="date"
-                    value={form.handoverDate}
-                    onChange={(e) => setForm((f) => ({ ...f, handoverDate: e.target.value }))}
-                    className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
-                  />
-                </label>
                 <div className="text-xs text-slate-400 sm:col-span-2">
                   Outcome (calculated)
                   <p className="mt-1 rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-slate-200">
                     {formatEarlyFromDueAndCompleted({
                       dueAt: composeDueAtIso(form.dueDate, form.dueTime, form.dueAmPm),
                       dueDate: form.dueDate || null,
-                      completedAt:
-                        fromDatetimeLocalValue(form.completedAtLocal) ??
-                        (form.handoverDate ? `${form.handoverDate}T12:00:00` : null),
-                    }) ?? "On time / not early — set due and completion to calculate"}
+                      completedAt: fromDatetimeLocalValue(form.completedAtLocal),
+                    }) ??
+                      (form.dueDate && form.completedAtLocal
+                        ? "On time"
+                        : "Set due and completion to calculate deadline beaten")}
                   </p>
                 </div>
               </div>

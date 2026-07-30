@@ -283,7 +283,6 @@ export async function buildOpsArchives(filters: OpsArchivesFilters = {}) {
       progressPercent: p.progressPercent,
       dueDate: p.dueDate?.toISOString().slice(0, 10) ?? null,
       dueAt: p.dueDate?.toISOString() ?? null,
-      handoverDate: p.handoverDate?.toISOString().slice(0, 10) ?? null,
       completedAt: p.completedAt?.toISOString() ?? null,
       updatedAt: p.updatedAt.toISOString(),
     };

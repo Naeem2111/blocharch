@@ -1,6 +1,9 @@
 import type { OpsProjectPhase, OpsProjectStatus } from "@prisma/client";
-import { formatDeadlineBeat, projectBeatDeadline, dueAtFallbackForDateOnly } from "@/lib/project-deadline";
-import { dateOnlyUtc } from "@/lib/ops-hours";
+import {
+  formatDeadlineBeat,
+  formatEarlyFromDueAndCompleted,
+  projectBeatDeadline,
+} from "@/lib/project-deadline";
 
 /** Internal / housekeeping work — hidden from client portal. */
 export function isHousekeepingClientProject(project: {
@@ -40,58 +43,28 @@ export function isClientPortalCompletedProject(project: {
   return !isClientPortalActiveProject(project);
 }
 
-function handoverBeatsDue(
-  handoverDate: string,
-  dueAt: string | null
-): boolean {
-  if (!dueAt) return false;
-  const due = new Date(dueAt);
-  if (Number.isNaN(due.getTime())) return false;
-  const handover = dateOnlyUtc(new Date(`${handoverDate}T12:00:00`));
-  const handoverEnd = new Date(handover.getTime() + 24 * 60 * 60 * 1000 - 1);
-  return handoverEnd.getTime() <= due.getTime();
-}
-
-/** Days early when completed before the handover date (date-only). */
-export function daysEarlyHandoverVsCompleted(
-  handoverDate: string | null | undefined,
-  completedAt: string | null | undefined,
-): number | null {
-  if (!handoverDate || !completedAt) return null;
-  const handover = dateOnlyUtc(new Date(`${handoverDate}T12:00:00`));
-  const completed = dateOnlyUtc(new Date(completedAt));
-  if (Number.isNaN(handover.getTime()) || Number.isNaN(completed.getTime())) return null;
-  const diffDays = Math.floor((handover.getTime() - completed.getTime()) / 86_400_000);
-  return diffDays > 0 ? diffDays : null;
-}
-
-/**
- * Delivered early or on time: stored beat metrics, handover on/before due,
- * or completed before the handover date.
- */
+/** Deadline beaten when completed before due (or stored beat metrics from sync). */
 export function clientPortalProjectBeatDeadline(project: {
   deadlineBeatenMinutes?: number | null;
   deadlineBeatenDays: number | null;
-  handoverDate: string | null;
   dueDate: string | null;
   dueAt?: string | null;
   completedAt?: string | null;
 }): boolean {
   if (projectBeatDeadline(project)) return true;
-  if (project.handoverDate && (project.dueAt || project.dueDate)) {
-    return handoverBeatsDue(project.handoverDate, project.dueAt ?? dueAtFallbackForDateOnly(project.dueDate!));
-  }
-  if (daysEarlyHandoverVsCompleted(project.handoverDate, project.completedAt) != null) {
-    return true;
-  }
-  return false;
+  return (
+    formatEarlyFromDueAndCompleted({
+      dueAt: project.dueAt,
+      dueDate: project.dueDate,
+      completedAt: project.completedAt,
+    }) != null
+  );
 }
 
 export function clientPortalDeadlineBeatDescription(project: {
   name: string;
   deadlineBeatenMinutes?: number | null;
   deadlineBeatenDays: number | null;
-  handoverDate: string | null;
   dueDate: string | null;
   dueAt?: string | null;
   completedAt?: string | null;
@@ -111,11 +84,15 @@ export function clientPortalDeadlineBeatDescription(project: {
       description: `Delivered ${project.deadlineBeatenDays} day${project.deadlineBeatenDays === 1 ? "" : "s"} ahead of schedule.`,
     };
   }
-  const vsHandover = daysEarlyHandoverVsCompleted(project.handoverDate, project.completedAt);
-  if (vsHandover != null) {
+  const early = formatEarlyFromDueAndCompleted({
+    dueAt: project.dueAt,
+    dueDate: project.dueDate,
+    completedAt: project.completedAt,
+  });
+  if (early) {
     return {
       title: `Deadline beaten — ${project.name}`,
-      description: `Delivered ${vsHandover} day${vsHandover === 1 ? "" : "s"} ahead of schedule.`,
+      description: `Delivered ${early.replace(" early", "")} ahead of schedule.`,
     };
   }
   return {
