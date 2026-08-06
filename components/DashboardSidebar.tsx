@@ -1262,6 +1262,10 @@ export function DashboardSidebar({
 								<span className="ml-1.5 rounded bg-amber-500/15 px-1 py-0.5 text-[9px] font-semibold uppercase text-amber-400">
 									manager
 								</span>
+							) : user.role === "sales" ? (
+								<span className="ml-1.5 rounded bg-teal-500/15 px-1 py-0.5 text-[9px] font-semibold uppercase text-teal-400">
+									sales
+								</span>
 							) : user.role === "user" ? (
 								<span className="ml-1.5 rounded bg-slate-500/15 px-1 py-0.5 text-[9px] font-semibold uppercase text-slate-400">
 									athlete

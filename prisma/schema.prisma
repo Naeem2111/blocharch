@@ -11,6 +11,7 @@ enum UserRole {
   admin
   manager
   user
+  sales
 }
 
 enum LeadStage {

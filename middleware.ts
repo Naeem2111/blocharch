@@ -14,6 +14,8 @@ import {
   isMarketingDashboardPath,
   isOpsApiPath,
   isOpsDashboardPath,
+  isPlannerApiPath,
+  isPlannerDashboardPath,
   isPrivateApiPath,
   isPrivateDashboardPath,
 } from "@/lib/permissions";
@@ -58,6 +60,15 @@ export async function middleware(request: NextRequest) {
 
   if ((isMarketingDashboardPath(path) || isMarketingApiPath(path)) && !n8nAuthorized) {
     if (!role || !canAccessModule(role, "marketing", username)) {
+      if (isApi) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+      return NextResponse.redirect(new URL(defaultDashboardPath(role ?? "user", username), request.url));
+    }
+  }
+
+  if ((isPlannerDashboardPath(path) || isPlannerApiPath(path)) && !n8nAuthorized) {
+    if (!role || !canAccessModule(role, "planner", username)) {
       if (isApi) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
@@ -124,6 +135,7 @@ export const config = {
     "/api/templates",
     "/api/n8n/:path*",
     "/api/geocode/:path*",
+    "/api/marketing/:path*",
     "/api/me",
     "/api/me/preferences",
     "/api/admin/:path*",

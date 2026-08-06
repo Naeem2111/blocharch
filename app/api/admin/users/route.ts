@@ -17,7 +17,10 @@ export async function POST(request: NextRequest) {
     const username = String(body.username || "");
     const password = String(body.password || "");
     const role =
-      body.role === "admin" || body.role === "manager" || body.role === "user"
+      body.role === "admin" ||
+      body.role === "manager" ||
+      body.role === "user" ||
+      body.role === "sales"
         ? (body.role as UserRole)
         : "user";
     const disabled = Boolean(body.disabled);
