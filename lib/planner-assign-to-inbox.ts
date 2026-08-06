@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { createAthleteNotification } from "@/lib/ops-athlete-notifications";
 import { ensureDefaultLabelsOnBoard } from "@/lib/planner-labels-seed";
-import { ensureAthleteSystemBoards, findAthleteMyTasksBoard } from "@/lib/planner-system-boards";
+import { resolveAthleteDeliveryBoard } from "@/lib/planner-system-boards";
 
 type DeliverResult = {
   taskId?: string;
@@ -9,7 +9,7 @@ type DeliverResult = {
   reason?: string;
 };
 
-/** Copy an assigned planner task onto the athlete's My Tasks board (idempotent). */
+/** Copy an assigned planner task onto the athlete's project or Personal board (idempotent). */
 export async function deliverAssignedTaskToAthleteInbox(
   sourceTaskId: string
 ): Promise<DeliverResult> {
@@ -20,7 +20,13 @@ export async function deliverAssignedTaskToAthleteInbox(
       column: {
         include: {
           board: {
-            select: { id: true, kind: true, athleteId: true, title: true },
+            select: {
+              id: true,
+              kind: true,
+              athleteId: true,
+              title: true,
+              opsProjectId: true,
+            },
           },
         },
       },
@@ -36,13 +42,18 @@ export async function deliverAssignedTaskToAthleteInbox(
   if (!athlete) return { skipped: true, reason: "not_athlete" };
 
   const sourceBoard = source.column.board;
-  if (sourceBoard.kind === "my_tasks" && sourceBoard.athleteId === athlete.id) {
-    return { skipped: true, reason: "already_on_my_tasks" };
+  if (
+    sourceBoard.athleteId === athlete.id &&
+    (sourceBoard.kind === "project" ||
+      sourceBoard.kind === "custom" ||
+      sourceBoard.kind === "my_tasks")
+  ) {
+    return { skipped: true, reason: "already_on_athlete_board" };
   }
 
   const existing = await prisma.plannerTask.findFirst({
     where: {
-      column: { board: { athleteId: athlete.id, kind: "my_tasks" } },
+      column: { board: { athleteId: athlete.id } },
       customFields: {
         path: ["sourceTaskId"],
         equals: sourceTaskId,
@@ -54,17 +65,18 @@ export async function deliverAssignedTaskToAthleteInbox(
     return { taskId: existing.id, skipped: true, reason: "already_delivered" };
   }
 
-  await ensureAthleteSystemBoards(athlete.id, athlete.userId);
-
-  const myTasksBoard = await findAthleteMyTasksBoard(athlete.id);
-  if (!myTasksBoard) return { skipped: true, reason: "no_my_tasks_board" };
+  const destBoard = await resolveAthleteDeliveryBoard(
+    athlete.id,
+    athlete.userId,
+    sourceBoard.opsProjectId
+  );
 
   const backlog = await prisma.plannerColumn.findFirst({
-    where: { boardId: myTasksBoard.id },
+    where: { boardId: destBoard.id },
     orderBy: { sortOrder: "asc" },
     select: { id: true },
   });
-  if (!backlog) return { skipped: true, reason: "no_my_tasks_column" };
+  if (!backlog) return { skipped: true, reason: "no_delivery_column" };
 
   const maxOrder = await prisma.plannerTask.aggregate({
     where: { columnId: backlog.id },
@@ -89,10 +101,10 @@ export async function deliverAssignedTaskToAthleteInbox(
   });
 
   if (source.labels.length > 0) {
-    await ensureDefaultLabelsOnBoard(myTasksBoard.id);
+    await ensureDefaultLabelsOnBoard(destBoard.id);
     for (const row of source.labels) {
       const boardLabel = await prisma.plannerLabel.findFirst({
-        where: { boardId: myTasksBoard.id, name: row.label.name },
+        where: { boardId: destBoard.id, name: row.label.name },
         select: { id: true },
       });
       if (!boardLabel) continue;
@@ -104,12 +116,15 @@ export async function deliverAssignedTaskToAthleteInbox(
     }
   }
 
+  const group = destBoard.kind === "project" ? "blocharch" : "personal";
   await createAthleteNotification({
     athleteId: athlete.id,
     type: "task_assigned",
     title: source.title,
-    message: sourceBoard.title ? `From: ${sourceBoard.title}` : "New task on My Tasks",
-    linkPath: `/dashboard/planner?area=team&athlete=me&group=blocharch&board=${myTasksBoard.id}&task=${task.id}`,
+    message: sourceBoard.title
+      ? `From: ${sourceBoard.title}`
+      : "New task assigned to you",
+    linkPath: `/dashboard/planner?area=team&athlete=me&group=${group}&board=${destBoard.id}&task=${task.id}`,
   }).catch(() => {});
 
   return { taskId: task.id, skipped: false };

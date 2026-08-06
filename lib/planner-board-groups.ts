@@ -1,27 +1,31 @@
-export type PlannerBoardGroup = "blocharch" | "projects" | "personal";
+export type PlannerBoardGroup = "blocharch" | "personal";
 
-export const PLANNER_BOARD_GROUPS: PlannerBoardGroup[] = [
-  "blocharch",
-  "projects",
-  "personal",
-];
+export const PLANNER_BOARD_GROUPS: PlannerBoardGroup[] = ["blocharch", "personal"];
 
 export const PLANNER_BOARD_GROUP_LABELS: Record<PlannerBoardGroup, string> = {
   blocharch: "Blocharch",
-  projects: "Projects",
   personal: "Personal",
 };
 
-const BLOCHARCH_KINDS = new Set(["blocharch_outbox", "my_tasks"]);
+/** Outbox + project kanbans live under Blocharch. */
+const BLOCHARCH_KINDS = new Set(["blocharch_outbox", "project"]);
 
 export function plannerBoardGroup(kind?: string | null): PlannerBoardGroup {
-  if (kind === "project") return "projects";
   if (kind && BLOCHARCH_KINDS.has(kind)) return "blocharch";
   return "personal";
 }
 
 export function isPlannerBoardGroup(value: string | null): value is PlannerBoardGroup {
-  return value === "blocharch" || value === "projects" || value === "personal";
+  return value === "blocharch" || value === "personal";
+}
+
+/** Accept legacy `group=projects` URLs as Blocharch. */
+export function normalizePlannerBoardGroup(
+  value: string | null
+): PlannerBoardGroup | null {
+  if (value === "projects") return "blocharch";
+  if (isPlannerBoardGroup(value)) return value;
+  return null;
 }
 
 export function defaultPlannerBoardGroup(

@@ -48,9 +48,14 @@ export async function POST(request: NextRequest) {
   if (!(await canViewBoard(user, sourceBoard.id))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  if (sourceBoard.kind !== "my_tasks" && sourceBoard.kind !== "blocharch_inbox") {
+  if (
+    sourceBoard.kind !== "my_tasks" &&
+    sourceBoard.kind !== "blocharch_inbox" &&
+    sourceBoard.kind !== "custom" &&
+    sourceBoard.kind !== "project"
+  ) {
     return NextResponse.json(
-      { error: "Only tasks on My Tasks can be routed to another board here" },
+      { error: "Only tasks on athlete boards can be routed here" },
       { status: 400 }
     );
   }

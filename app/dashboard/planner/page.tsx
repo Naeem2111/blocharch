@@ -12,7 +12,7 @@ export default async function PlannerPage() {
       <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
         <PageHeader
           title="Project planner"
-          description="Personal boards for your work, or Team to open an athlete workspace and Kanban. Athlete workspaces use My Tasks on the Blocharch tab for assigned work."
+          description="Personal boards for your work, or Team to open an athlete workspace and Kanban. Project boards live under Blocharch; Personal stays for your own boards."
         />
         <ThemeToggle compact />
       </div>

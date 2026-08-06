@@ -11,6 +11,8 @@ export const SYSTEM_BOARD_TITLES = {
   completed: "Completed",
 } as const satisfies Record<Exclude<PlannerBoardKind, "custom" | "project">, string>;
 
+export const ATHLETE_PERSONAL_BOARD_TITLE = "Personal";
+
 type Tx = Prisma.TransactionClient;
 
 async function createBoardWithColumns(
@@ -76,39 +78,18 @@ async function firstColumnId(boardId: string, tx: Tx): Promise<string | null> {
   return resolveGeneralColumnId(cols);
 }
 
-/** Move legacy inbox / misplaced “Blocharch” personal boards onto My Tasks. */
-async function consolidateAthleteTasksOntoMyTasks(
-  athleteId: string,
-  athleteUserId: string,
-  myTasksBoardId: string,
+async function moveTasksOntoBoard(
+  sourceBoardIds: string[],
+  destBoardId: string,
   tx: Tx
 ) {
-  const destColumnId = await firstColumnId(myTasksBoardId, tx);
+  const destColumnId = await firstColumnId(destBoardId, tx);
   if (!destColumnId) return;
 
-  const sourceBoards = await tx.plannerBoard.findMany({
-    where: {
-      athleteId,
-      ownerId: athleteUserId,
-      OR: [
-        { kind: "blocharch_inbox" },
-        {
-          kind: "custom",
-          title: { equals: "Blocharch", mode: "insensitive" },
-        },
-        {
-          kind: "custom",
-          title: { equals: "My Tasks", mode: "insensitive" },
-        },
-      ],
-    },
-    select: { id: true },
-  });
-
-  for (const board of sourceBoards) {
-    if (board.id === myTasksBoardId) continue;
+  for (const boardId of sourceBoardIds) {
+    if (boardId === destBoardId) continue;
     const tasks = await tx.plannerTask.findMany({
-      where: { column: { boardId: board.id } },
+      where: { column: { boardId } },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
       select: { id: true },
     });
@@ -128,21 +109,86 @@ async function consolidateAthleteTasksOntoMyTasks(
   }
 }
 
-/** Fixed athlete workspace boards: My Tasks + Completed (inbox retired). */
+/** Default Personal board for athlete workspace (custom kind, Personal group). */
+export async function ensureAthletePersonalBoard(
+  athleteId: string,
+  athleteUserId: string,
+  tx: Tx = prisma
+) {
+  const existing = await tx.plannerBoard.findFirst({
+    where: {
+      athleteId,
+      ownerId: athleteUserId,
+      kind: "custom",
+      title: { equals: ATHLETE_PERSONAL_BOARD_TITLE, mode: "insensitive" },
+    },
+  });
+  if (existing) return existing;
+
+  const anyCustom = await tx.plannerBoard.findFirst({
+    where: {
+      athleteId,
+      ownerId: athleteUserId,
+      kind: "custom",
+    },
+    orderBy: { createdAt: "asc" },
+  });
+  if (anyCustom) return anyCustom;
+
+  return createBoardWithColumns(tx, {
+    title: ATHLETE_PERSONAL_BOARD_TITLE,
+    scope: "personal",
+    kind: "custom",
+    ownerId: athleteUserId,
+    athleteId,
+    isSystem: false,
+    color: "#64748b",
+  });
+}
+
+/** Move legacy My Tasks / inbox cards onto the athlete Personal board. */
+async function consolidateLegacyOntoPersonal(
+  athleteId: string,
+  athleteUserId: string,
+  personalBoardId: string,
+  tx: Tx
+) {
+  const sourceBoards = await tx.plannerBoard.findMany({
+    where: {
+      athleteId,
+      ownerId: athleteUserId,
+      OR: [
+        { kind: "my_tasks" },
+        { kind: "blocharch_inbox" },
+        {
+          kind: "custom",
+          title: { equals: "Blocharch", mode: "insensitive" },
+        },
+        {
+          kind: "custom",
+          title: { equals: "My Tasks", mode: "insensitive" },
+        },
+      ],
+    },
+    select: { id: true },
+  });
+
+  await moveTasksOntoBoard(
+    sourceBoards.map((b) => b.id),
+    personalBoardId,
+    tx
+  );
+}
+
+/**
+ * Athlete workspace boards: Completed (hidden archive) + Personal.
+ * My Tasks is retired — existing cards are moved onto Personal.
+ */
 export async function ensureAthleteSystemBoards(
   athleteId: string,
   athleteUserId: string,
   tx: Tx = prisma
 ) {
-  const myTasks = await createBoardWithColumns(tx, {
-    title: SYSTEM_BOARD_TITLES.my_tasks,
-    scope: "personal",
-    kind: "my_tasks",
-    ownerId: athleteUserId,
-    athleteId,
-    isSystem: true,
-    color: "#6366f1",
-  });
   await createBoardWithColumns(tx, {
     title: SYSTEM_BOARD_TITLES.completed,
     scope: "personal",
@@ -153,14 +199,50 @@ export async function ensureAthleteSystemBoards(
     color: "#22c55e",
   });
 
-  await consolidateAthleteTasksOntoMyTasks(athleteId, athleteUserId, myTasks.id, tx);
+  const personal = await ensureAthletePersonalBoard(athleteId, athleteUserId, tx);
+  await consolidateLegacyOntoPersonal(athleteId, athleteUserId, personal.id, tx);
+  return personal;
 }
 
+/** @deprecated My Tasks retired — prefer resolveAthleteDeliveryBoard. */
 export async function findAthleteMyTasksBoard(athleteId: string, tx: Tx = prisma) {
   return tx.plannerBoard.findFirst({
     where: { athleteId, kind: "my_tasks" },
     select: { id: true },
   });
+}
+
+/**
+ * Destination for assigned / outbox work:
+ * project board when linked, otherwise athlete Personal board.
+ */
+export async function resolveAthleteDeliveryBoard(
+  athleteId: string,
+  athleteUserId: string,
+  opsProjectId: string | null | undefined,
+  tx: Tx = prisma
+): Promise<{ id: string; kind: PlannerBoardKind }> {
+  await ensureAthleteSystemBoards(athleteId, athleteUserId, tx);
+
+  if (opsProjectId) {
+    const project = await tx.opsProject.findUnique({
+      where: { id: opsProjectId },
+      select: { id: true, name: true },
+    });
+    if (project) {
+      const board = await ensureProjectBoard(
+        athleteId,
+        athleteUserId,
+        project.id,
+        project.name,
+        tx
+      );
+      return { id: board.id, kind: board.kind };
+    }
+  }
+
+  const personal = await ensureAthletePersonalBoard(athleteId, athleteUserId, tx);
+  return { id: personal.id, kind: personal.kind };
 }
 
 /** Active project board for an assigned athlete. */

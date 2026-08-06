@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { createAthleteNotification } from "@/lib/ops-athlete-notifications";
 import { isApprovedLabelName } from "@/lib/planner-approved-labels";
 import { ensureDefaultLabelsOnBoard } from "@/lib/planner-labels-seed";
-import { ensureAthleteSystemBoards, findAthleteMyTasksBoard } from "@/lib/planner-system-boards";
+import { resolveAthleteDeliveryBoard } from "@/lib/planner-system-boards";
 
 function buildInboxDescription(input: {
   description: string | null;
@@ -50,7 +50,7 @@ async function attachLabelToTask(boardId: string, taskId: string, labelName: str
   }
 }
 
-/** Creates a card on the athlete My Tasks board and marks the outbox row delivered. */
+/** Creates a card on the athlete project (or Personal) board and marks the outbox row delivered. */
 export async function deliverOutboxTaskToInbox(outboxTaskId: string) {
   const row = await prisma.opsOutboxTask.findUnique({
     where: { id: outboxTaskId },
@@ -78,25 +78,25 @@ export async function deliverOutboxTaskToInbox(outboxTaskId: string) {
   }
 
   const athlete = row.athlete;
-  await ensureAthleteSystemBoards(athlete.id, athlete.userId);
-
-  const myTasksBoard = await findAthleteMyTasksBoard(athlete.id);
-  if (!myTasksBoard) throw new Error("Athlete My Tasks board missing");
+  const destBoard = await resolveAthleteDeliveryBoard(
+    athlete.id,
+    athlete.userId,
+    row.projectId
+  );
 
   const backlog = await prisma.plannerColumn.findFirst({
-    where: { boardId: myTasksBoard.id },
+    where: { boardId: destBoard.id },
     orderBy: { sortOrder: "asc" },
     select: { id: true },
   });
-  if (!backlog) throw new Error("My Tasks board has no columns");
+  if (!backlog) throw new Error("Delivery board has no columns");
 
   const maxOrder = await prisma.plannerTask.aggregate({
     where: { columnId: backlog.id },
     _max: { sortOrder: true },
   });
 
-  const title =
-    (row.title?.trim() || "Assigned task").slice(0, 200);
+  const title = (row.title?.trim() || "Assigned task").slice(0, 200);
   const description = buildInboxDescription({
     description: row.description,
     notes: row.notes,
@@ -123,24 +123,27 @@ export async function deliverOutboxTaskToInbox(outboxTaskId: string) {
   });
 
   if (row.labelName) {
-    await attachLabelToTask(myTasksBoard.id, task.id, row.labelName);
+    await attachLabelToTask(destBoard.id, task.id, row.labelName);
   }
 
   await prisma.opsOutboxTask.update({
     where: { id: row.id },
     data: {
-      inboxBoardId: myTasksBoard.id,
+      inboxBoardId: destBoard.id,
       inboxTaskId: task.id,
       deliveredAt: new Date(),
     },
   });
 
+  const group = destBoard.kind === "project" ? "blocharch" : "personal";
   await createAthleteNotification({
     athleteId: athlete.id,
     type: "task_assigned",
     title: title,
-    message: row.project?.name ? `Project: ${row.project.name}` : "New task on My Tasks",
-    linkPath: `/dashboard/planner?area=team&athlete=me&group=blocharch&board=${myTasksBoard.id}&task=${task.id}`,
+    message: row.project?.name
+      ? `Project: ${row.project.name}`
+      : "New task on your Personal board",
+    linkPath: `/dashboard/planner?area=team&athlete=me&group=${group}&board=${destBoard.id}&task=${task.id}`,
   }).catch(() => {});
 
   return { taskId: task.id, alreadyDelivered: false };

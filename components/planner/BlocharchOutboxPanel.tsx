@@ -131,7 +131,9 @@ export function BlocharchOutboxPanel() {
         return;
       }
       const athleteName = athletes.find((a) => a.id === form.athleteId)?.fullName ?? "athlete";
-      setSuccess(`Assigned to ${athleteName} — card added to their My Tasks board.`);
+      setSuccess(
+        `Assigned to ${athleteName} — card added to their ${form.projectId ? "project board" : "Personal board"}.`
+      );
       setForm({ ...emptyForm, athleteId: form.athleteId });
       await loadHistory();
     } finally {
@@ -144,8 +146,9 @@ export function BlocharchOutboxPanel() {
       <div>
         <h2 className="text-lg font-semibold text-amber-100">Blocharch Outbox</h2>
         <p className="mt-1 text-sm text-slate-400">
-          Assign work to an athlete. Each assignment creates a card on their{" "}
-          <span className="text-slate-300">My Tasks</span> board automatically.
+          Assign work to an athlete. With a project selected, the card lands on that project’s
+          Blocharch board; otherwise it goes to their{" "}
+          <span className="text-slate-300">Personal</span> board.
         </p>
       </div>
 

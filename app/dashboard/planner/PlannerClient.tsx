@@ -29,7 +29,7 @@ import {
   defaultPlannerBoardGroup,
   filterBoardsByGroup,
   groupsWithBoards,
-  isPlannerBoardGroup,
+  normalizePlannerBoardGroup,
   plannerBoardGroup,
   PLANNER_BOARD_GROUP_LABELS,
   type PlannerBoardGroup,
@@ -38,7 +38,6 @@ import { filterVisiblePlannerBoards } from "@/lib/planner-board-visibility";
 
 const FIXED_BOARD_KINDS = new Set([
   "blocharch_outbox",
-  "my_tasks",
   "completed",
 ]);
 
@@ -530,9 +529,18 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
 
   const availableGroups = useMemo(() => groupsWithBoards(areaBoards), [areaBoards]);
 
+  useEffect(() => {
+    if (groupParam === "projects") {
+      const p = new URLSearchParams(searchParams.toString());
+      p.set("group", "blocharch");
+      router.replace(`/dashboard/planner?${p.toString()}`);
+    }
+  }, [groupParam, searchParams, router]);
+
   const boardGroup: PlannerBoardGroup = useMemo(() => {
-    if (isPlannerBoardGroup(groupParam) && availableGroups.includes(groupParam)) {
-      return groupParam;
+    const normalized = normalizePlannerBoardGroup(groupParam);
+    if (normalized && availableGroups.includes(normalized)) {
+      return normalized;
     }
     return defaultPlannerBoardGroup(areaBoards);
   }, [groupParam, availableGroups, areaBoards]);
@@ -636,7 +644,9 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
     const inGroup = filteredBoards.some((b) => b.id === boardId);
     if ((!boardId || !inGroup) && filteredBoards.length > 0) {
       const preferred =
-        filteredBoards.find((b) => b.kind === "my_tasks") ?? filteredBoards[0]!;
+        filteredBoards.find((b) => b.kind === "project") ??
+        filteredBoards.find((b) => b.kind === "blocharch_outbox") ??
+        filteredBoards[0]!;
       setBoardId(preferred.id);
     } else if (filteredBoards.length === 0) {
       setBoardId(null);
@@ -660,7 +670,7 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
         break;
       }
     }
-    if (athleteParam === "me" && bd.kind === "my_tasks") {
+    if (athleteParam === "me" && (bd.kind === "project" || bd.kind === "custom")) {
       await fetch("/api/athlete/notifications/mark-task-read", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1334,7 +1344,8 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {filteredBoards.map((b, boardIdx) => {
-            const myTasksUnread = b.kind === "my_tasks" && inboxUnreadCount > 0;
+            const showUnreadBadge =
+              isAthleteSelfView && inboxUnreadCount > 0 && boardIdx === 0;
             return (
             <div key={b.id} className="flex items-center gap-0.5">
               {!FIXED_BOARD_KINDS.has(b.kind ?? "custom") && filteredBoards.length > 1 ? (
@@ -1380,14 +1391,14 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
                   ? "planner-tab-selected border-brand-500/40 bg-brand-500/10 text-brand-100"
                   : dropTargetBoardId === b.id
                     ? "planner-tab-selected border-brand-500/50 bg-brand-500/15 text-brand-100 ring-2 ring-brand-500/30"
-                    : myTasksUnread
+                    : showUnreadBadge
                       ? "planner-tab-alert animate-pulse border-red-500/40 bg-red-500/10 text-red-100 ring-1 ring-red-500/35"
                       : "border-white/[0.08] bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]"
               }`}
               style={{ borderLeftWidth: 4, borderLeftColor: b.color }}
             >
               <span className="font-medium">{b.title}</span>
-              {myTasksUnread ? (
+              {showUnreadBadge ? (
                 <span className="ml-2 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
                   {inboxUnreadCount > 99 ? "99+" : inboxUnreadCount}
                 </span>
@@ -1403,7 +1414,7 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
             <p className="text-sm text-slate-500">
               {boardGroup === "personal"
                 ? "No personal boards yet — create one to get started."
-                : `No ${PLANNER_BOARD_GROUP_LABELS[boardGroup].toLowerCase()} boards in this workspace.`}
+                : "No project boards here yet — assign an ops project to open its kanban under Blocharch."}
             </p>
           ) : null}
         </div>
