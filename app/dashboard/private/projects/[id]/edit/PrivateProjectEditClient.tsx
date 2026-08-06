@@ -328,18 +328,18 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
       <section className="card-tool rounded-xl p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-sm font-semibold text-white">Phases & stage billing</h2>
+            <h2 className="text-sm font-semibold text-white">Stages & phase billing</h2>
             <p className="mt-1 text-xs text-slate-500">
-              Create phases, assign design stages to each phase, and set fee/cost splits per stage.
+              Create stages, assign design phases to each stage, and set fee/cost splits per phase.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => setPhaseStructure((s) => addPhase(s, "New phase"))}
+              onClick={() => setPhaseStructure((s) => addPhase(s))}
               className="rounded-lg bg-brand-500/20 px-3 py-1.5 text-xs font-medium text-brand-200 ring-1 ring-brand-500/30"
             >
-              Add phase
+              Add stage
             </button>
             <button
               type="button"
@@ -363,7 +363,7 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
                   className="min-w-[10rem] flex-1 rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-sm font-semibold text-white"
                 />
                 <span className="text-xs tabular-nums text-slate-500">
-                  {group.stages.length} stage{group.stages.length === 1 ? "" : "s"} · {zar(group.feeZar)} fee
+                  {group.stages.length} phase{group.stages.length === 1 ? "" : "s"} · {zar(group.feeZar)} fee
                 </span>
                 <button
                   type="button"
@@ -374,7 +374,7 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
                   }}
                   className="rounded px-2 py-0.5 text-[10px] font-medium text-red-300/80 ring-1 ring-red-500/20 hover:bg-red-500/10 disabled:opacity-40"
                 >
-                  Remove phase
+                  Remove stage
                 </button>
               </div>
 
@@ -382,8 +382,8 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
                 <table className="w-full min-w-[40rem] text-left text-sm">
                   <thead>
                     <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-wider text-slate-500">
-                      <th className="pb-2 pr-3 font-semibold">Stage</th>
-                      <th className="pb-2 pr-3 font-semibold">Move to phase</th>
+                      <th className="pb-2 pr-3 font-semibold">Phase</th>
+                      <th className="pb-2 pr-3 font-semibold">Move to stage</th>
                       <th className="pb-2 pr-3 font-semibold">Status</th>
                       <th className="pb-2 pr-3 font-semibold">Fee %</th>
                       <th className="pb-2 pr-3 font-semibold">Cost %</th>
@@ -395,7 +395,7 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
                     {group.stages.length === 0 ? (
                       <tr>
                         <td colSpan={7} className="py-3 text-slate-500">
-                          No stages assigned — move stages here from another phase.
+                          No phases assigned — move phases here from another stage.
                         </td>
                       </tr>
                     ) : (
@@ -470,7 +470,7 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
           {unassignedExpenseZar > 0 ? (
             <span className="text-amber-300">
               {" "}
-              ({zar(unassignedExpenseZar)} unassigned — set a stage on each expense)
+              ({zar(unassignedExpenseZar)} unassigned — set a phase on each expense)
             </span>
           ) : null}
           {" · "}
@@ -487,7 +487,7 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
         <h2 className="text-sm font-semibold text-white">Progress & assignment</h2>
         <div className="mt-4 space-y-3">
           <label className="block text-xs text-slate-400">
-            Current design stage
+            Current design phase
             <select
               className={field}
               value={form.designStage}
@@ -525,7 +525,7 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
               </div>
             ) : (
               <p className="mt-2 text-xs text-slate-500">
-                Progress is calculated from design stage and time in stage.
+                Progress is calculated from design phase and time in phase.
               </p>
             )}
           </div>
@@ -551,7 +551,7 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
         <h2 className="text-sm font-semibold text-white">Notes & dates</h2>
         <div className="mt-4 space-y-3">
           <label className="block text-xs text-slate-400">
-            Stage notes
+            Phase notes
             <textarea
               rows={3}
               className={field}

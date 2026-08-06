@@ -172,9 +172,9 @@ export function PrivateOnboardingClient() {
       </section>
 
       <section className="card-tool rounded-xl p-5">
-        <h2 className="text-sm font-semibold text-white">Starting stage</h2>
+        <h2 className="text-sm font-semibold text-white">Starting phase</h2>
         <label className="mt-4 block text-xs text-slate-400">
-          Design stage
+          Design phase
           <select
             className={field}
             value={form.designStage}

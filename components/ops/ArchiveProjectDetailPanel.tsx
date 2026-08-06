@@ -202,7 +202,7 @@ export function ArchiveProjectDetailPanel({
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-white">Edit client portal display</h2>
-            <p className="text-xs text-slate-500">{project?.displayTitle ?? "Project"} · {projectId}</p>
+            <p className="text-xs text-slate-500">{project?.displayTitle ?? "Project"}</p>
           </div>
           <button type="button" onClick={onClose} className="text-sm text-slate-400 hover:text-white">
             Close

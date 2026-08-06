@@ -4,9 +4,9 @@ export const BLOCHARCH_SITE = "https://www.blocharch.com/" as const;
 export const brandAssets = {
   /** Wordmark + cube mark (PNG) */
   logo: "/brand/blocharch-logo.png",
-  /** Client portal wordmark (light theme) */
+  /** Client portal — light theme (“Your Vision. Our Expertise.”, dark wordmark) */
   clientLogo: "/brand/blocharch-logo-client.png",
-  /** Client portal wordmark (dark theme) */
+  /** Client portal — dark theme (white wordmark + tagline) */
   clientLogoDark: "/brand/blocharch-logo-dark.png",
   /** Isometric cube favicon */
   favicon: "/brand/favicon-192.png",

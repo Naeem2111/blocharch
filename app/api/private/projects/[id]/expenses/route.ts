@@ -166,7 +166,7 @@ export async function PATCH(
     } else if (isPrivateDesignStage(String(body.designStage))) {
       updateData.designStage = String(body.designStage) as PrivateDesignStage;
     } else {
-      return NextResponse.json({ error: "Invalid design stage" }, { status: 400 });
+      return NextResponse.json({ error: "Invalid design phase" }, { status: 400 });
     }
   }
 

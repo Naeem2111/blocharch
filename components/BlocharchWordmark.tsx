@@ -64,7 +64,7 @@ export function BlocharchWordmark({
     >
       <Image
         src={logoSrc}
-        alt="Blocharch"
+        alt="Blocharch — Your Vision. Our Expertise."
         width={600}
         height={600}
         priority

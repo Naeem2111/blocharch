@@ -54,7 +54,7 @@ export function PrivateProjectsClient() {
     const j = await r.json();
     setSaving(false);
     if (!r.ok) {
-      setError(j.error || "Could not update stage");
+      setError(j.error || "Could not update phase");
       return;
     }
     setStageOpenId(null);
@@ -73,7 +73,7 @@ export function PrivateProjectsClient() {
               <th className="px-4 py-3 font-semibold">Project</th>
               <th className="px-4 py-3 font-semibold">Client</th>
               <th className="px-4 py-3 font-semibold">Athlete</th>
-              <th className="px-4 py-3 font-semibold">Stage</th>
+              <th className="px-4 py-3 font-semibold">Phase</th>
               <th className="px-4 py-3 font-semibold">Progress</th>
               <th className="px-4 py-3 font-semibold">Fee</th>
               <th className="px-4 py-3 font-semibold">Margin</th>

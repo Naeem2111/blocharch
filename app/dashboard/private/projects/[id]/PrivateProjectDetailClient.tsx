@@ -263,7 +263,7 @@ export function PrivateProjectDetailClient({ projectId }: { projectId: string })
             Overall progress
           </p>
           <p className="mt-1 text-sm text-slate-400">
-            Stage {p.stageMeta.stageNumber} of {p.stageMeta.stageCount} · {p.designStageLabel} ·{" "}
+            Phase {p.stageMeta.stageNumber} of {p.stageMeta.stageCount} · {p.designStageLabel} ·{" "}
             {p.stageMeta.daysIntoStage} days into a typical {p.stageMeta.typicalDays}
           </p>
           <div className="mt-3 flex items-end gap-3">
@@ -300,7 +300,7 @@ export function PrivateProjectDetailClient({ projectId }: { projectId: string })
         {p.phaseGroups?.length ? (
           <div className="mt-6 space-y-4">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-              Phases & stage billing
+              Stages & phase billing
             </p>
             {p.phaseGroups.map((group) => (
               <div key={group.id} className="rounded-lg bg-white/[0.03] p-3 ring-1 ring-white/[0.06]">
@@ -314,7 +314,7 @@ export function PrivateProjectDetailClient({ projectId }: { projectId: string })
                   <table className="w-full min-w-[32rem] text-left text-sm">
                     <thead>
                       <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-wider text-slate-500">
-                        <th className="pb-2 pr-3 font-semibold">Stage</th>
+                        <th className="pb-2 pr-3 font-semibold">Phase</th>
                         <th className="pb-2 pr-3 font-semibold">Status</th>
                         <th className="pb-2 pr-3 font-semibold">Fee</th>
                         <th className="pb-2 font-semibold">Expenses</th>
@@ -380,7 +380,7 @@ export function PrivateProjectDetailClient({ projectId }: { projectId: string })
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="card-tool rounded-xl p-5">
-          <h3 className="text-sm font-semibold text-white">Design stage</h3>
+          <h3 className="text-sm font-semibold text-white">Design phase</h3>
           <select
             className="mt-3 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
             value={p.designStage}
@@ -394,7 +394,7 @@ export function PrivateProjectDetailClient({ projectId }: { projectId: string })
             ))}
           </select>
           <label className="mt-4 block text-xs text-slate-400">
-            Stage notes
+            Phase notes
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}

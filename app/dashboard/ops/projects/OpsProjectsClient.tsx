@@ -715,7 +715,7 @@ export function OpsProjectsClient() {
                 {p.displayTitle ?? formatProjectFullTitle(p.name, p.currentStage)}
               </h2>
               <p className="text-xs text-slate-500">
-                ID {p.id.slice(0, 8)} · {p.projectNumber}
+                {p.projectNumber}
                 {p.address ? ` · ${p.address}` : ""}
                 {` · ${formatAssignedAthletes(p)}`}
               </p>

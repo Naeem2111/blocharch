@@ -11,7 +11,7 @@ export default function PrivateProjectEditPage({
       <PageHeader
         title="Edit project"
         badge="Private"
-        description="Update client, project, progress, athlete, and stage details."
+        description="Update client, project, progress, athlete, and phase details."
         className="mb-8"
       />
       <PrivateProjectEditClient projectId={params.id} />

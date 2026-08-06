@@ -119,7 +119,7 @@ export async function PATCH(
 
     if (body.designStage !== undefined) {
       if (!isPrivateDesignStage(String(body.designStage))) {
-        return NextResponse.json({ error: "Invalid design stage" }, { status: 400 });
+        return NextResponse.json({ error: "Invalid design phase" }, { status: 400 });
       }
       if (body.designStage !== existing.designStage) {
         data.designStage = body.designStage;
@@ -182,7 +182,7 @@ export async function PATCH(
     if (body.phaseFeePercents !== undefined) {
       const map = parsePhaseSplitMap(body.phaseFeePercents);
       if (!map) {
-        return NextResponse.json({ error: "Invalid fee phase splits" }, { status: 400 });
+        return NextResponse.json({ error: "Invalid fee splits" }, { status: 400 });
       }
       const check = validatePhaseSplitMap(map);
       if (!check.ok) {
@@ -196,7 +196,7 @@ export async function PATCH(
     if (body.phaseStructure !== undefined) {
       const structure = parsePhaseStructure(body.phaseStructure);
       if (!structure) {
-        return NextResponse.json({ error: "Invalid phase structure" }, { status: 400 });
+        return NextResponse.json({ error: "Invalid stage structure" }, { status: 400 });
       }
       const check = validatePhaseStructure(structure);
       if (!check.ok) {

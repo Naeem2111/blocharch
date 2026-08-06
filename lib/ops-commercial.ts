@@ -13,6 +13,7 @@ import { countPendingCheckInRequests } from "@/lib/check-in-admin";
 import { buildBeatenDeadlines, type BeatenDeadlinesByAthlete } from "@/lib/analytics-deadlines";
 import { buildAverageHoursByPhase } from "@/lib/phase-average-hours";
 import { formatProjectDueAt } from "@/lib/project-deadline";
+import { projectDisplayFields } from "@/lib/project-display";
 import { listReportingAthletes, monthSubmissionHoursByAthlete } from "@/lib/reporting-athletes";
 
 export { LANE_MONTHLY_HOURS };
@@ -885,9 +886,10 @@ export async function buildAnalytics(
     dueDateRisk: riskProjects.map((p) => {
       const due = p.dueDate!;
       const daysUntilDue = Math.ceil((due.getTime() - now.getTime()) / 86400000);
+      const { displayTitle } = projectDisplayFields(p);
       return {
         id: p.id,
-        name: p.name,
+        name: displayTitle,
         clientName: p.client.name,
         clientLogoUrl: p.client.logoUrl,
         clientLogoBgColor: p.client.logoBgColor,
@@ -901,9 +903,11 @@ export async function buildAnalytics(
         assignedAthleteName: p.assignedAthlete?.fullName ?? null,
       };
     }),
-    dueDateCalendar: calendarProjects.map((p) => ({
+    dueDateCalendar: calendarProjects.map((p) => {
+      const { displayTitle } = projectDisplayFields(p);
+      return {
       id: p.id,
-      name: p.name,
+      name: displayTitle,
       clientName: p.client.name,
       clientLogoUrl: p.client.logoUrl,
       clientLogoBgColor: p.client.logoBgColor,
@@ -914,7 +918,8 @@ export async function buildAnalytics(
       progressPercent: p.progressPercent ?? 0,
       currentStatus: p.currentStatus,
       assignedAthleteName: p.assignedAthlete?.fullName ?? null,
-    })),
+      };
+    }),
     profitabilityByClient,
     beatenDeadlinesByAthlete,
     clientFilter: clientId,

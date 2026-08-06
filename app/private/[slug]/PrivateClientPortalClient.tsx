@@ -1,6 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { ClientPortalBrandMark } from "@/components/client-portal/ClientPortalBrandMark";
+import { PublicThemeToggle } from "@/components/client-portal/PublicThemeToggle";
 import { PRIVATE_STAGE_DONE_COPY } from "@/lib/private-constants";
 import { PlannerDoneToggle } from "@/components/planner/PlannerDoneToggle";
 
@@ -30,7 +32,7 @@ export function PrivateClientPortalClient({
   slug: string;
   data: PortalData;
 }) {
-  const { project, stages, updates } = data;
+  const { project, stages, phaseGroups, updates } = data;
   const [actionItems, setActionItems] = useState<ActionItem[]>(data.actionItems);
   const [completedActionItems, setCompletedActionItems] = useState<CompletedActionItem[]>(
     data.completedActionItems,
@@ -79,10 +81,82 @@ export function PrivateClientPortalClient({
     }
   }
 
+  function phaseStateClass(state: "done" | "current" | "upcoming") {
+    if (state === "done") return "bg-emerald-500/20 text-emerald-300 ring-emerald-500/30";
+    if (state === "current") return "bg-brand-500/20 text-brand-200 ring-brand-500/40";
+    return "bg-white/[0.04] text-slate-500 ring-white/[0.08]";
+  }
+
   return (
     <div className="min-h-screen bg-[var(--bg-page)] text-slate-100">
+      <header className="client-portal-header border-b border-white/[0.06] px-4 py-5 sm:px-6 lg:px-10">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
+          <ClientPortalBrandMark />
+          <PublicThemeToggle />
+        </div>
+      </header>
+
       <div className="app-main min-h-screen px-4 py-8 sm:px-6 lg:px-10">
-        <div className="mx-auto max-w-3xl">
+        <div className="mx-auto flex max-w-6xl gap-8 lg:gap-10">
+          {/* Stage progress — left margin on desktop */}
+          <aside className="hidden w-44 shrink-0 lg:block">
+            <div className="sticky top-8">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                Project stages
+              </p>
+              <ol className="relative mt-4 space-y-0">
+                <div
+                  className="absolute bottom-3 left-[11px] top-3 w-px bg-white/[0.08]"
+                  aria-hidden
+                />
+                {phaseGroups.map((phase) => (
+                  <li key={phase.id} className="relative flex gap-3 pb-5 last:pb-0">
+                    <span
+                      className={`relative z-[1] flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ring-1 ${phaseStateClass(phase.state)}`}
+                    >
+                      {phase.state === "done" ? "✓" : phase.number}
+                    </span>
+                    <div className="min-w-0 pt-0.5">
+                      <p
+                        className={`text-xs font-semibold leading-tight ${
+                          phase.state === "current"
+                            ? "text-brand-100"
+                            : phase.state === "done"
+                              ? "text-slate-300"
+                              : "text-slate-500"
+                        }`}
+                      >
+                        {phase.name}
+                      </p>
+                      {phase.state === "current" ? (
+                        <p className="mt-1 text-[10px] font-medium text-brand-300">You are here</p>
+                      ) : null}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </aside>
+
+          <div className="min-w-0 flex-1 max-w-3xl">
+          {/* Mobile stage strip */}
+          <div className="mb-6 lg:hidden">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+              Project stages
+            </p>
+            <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+              {phaseGroups.map((phase) => (
+                <div
+                  key={phase.id}
+                  className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium ring-1 ${phaseStateClass(phase.state)}`}
+                >
+                  {phase.name}
+                  {phase.state === "current" ? " · here" : ""}
+                </div>
+              ))}
+            </div>
+          </div>
+
           <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-400">
             Your project
           </p>
@@ -98,7 +172,7 @@ export function PrivateClientPortalClient({
               {project.progressPercent}%
             </p>
             <p className="mt-2 text-sm text-slate-400">
-              Currently in {project.designStageLabel}
+              Currently in phase: {project.designStageLabel}
               {project.councilSubmittedAt
                 ? ` · submitted ${formatDate(project.councilSubmittedAt)}`
                 : ""}
@@ -228,81 +302,77 @@ export function PrivateClientPortalClient({
                 </p>
               </div>
             ) : null}
-
-            <dl className="mt-6 grid gap-3 sm:grid-cols-3">
-              <div>
-                <dt className="text-[10px] uppercase tracking-wider text-slate-500">Brief received</dt>
-                <dd className="mt-1 text-sm text-slate-200">{formatDate(project.briefReceivedAt)}</dd>
-              </div>
-              <div>
-                <dt className="text-[10px] uppercase tracking-wider text-slate-500">Council submitted</dt>
-                <dd className="mt-1 text-sm text-slate-200">
-                  {formatDate(project.councilSubmittedAt)}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-[10px] uppercase tracking-wider text-slate-500">
-                  Est. council decision
-                </dt>
-                <dd className="mt-1 text-sm text-slate-200">
-                  {project.estCouncilDecision ?? "—"}
-                </dd>
-              </div>
-            </dl>
           </section>
 
           <section className="mt-8">
             <h2 className="text-sm font-semibold text-white">Where you are in the process</h2>
-            <ol className="mt-4 space-y-2">
-              {stages.map((s) => (
-                <li
-                  key={s.key}
-                  className={`flex items-start gap-3 rounded-lg px-3 py-2 text-sm ${
-                    s.state === "current"
-                      ? "bg-brand-500/10 ring-1 ring-brand-500/25"
-                      : ""
-                  }`}
-                >
-                  <span
-                    className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
-                      s.state === "done"
-                        ? "bg-emerald-500/20 text-emerald-300"
-                        : s.state === "current"
-                          ? "bg-brand-500/30 text-brand-200"
-                          : "bg-white/[0.06] text-slate-500"
+            <div className="mt-4 space-y-5">
+              {phaseGroups.map((phase) => (
+                <div key={phase.id}>
+                  <p
+                    className={`text-[10px] font-semibold uppercase tracking-wider ${
+                      phase.state === "current"
+                        ? "text-brand-300"
+                        : phase.state === "done"
+                          ? "text-slate-400"
+                          : "text-slate-600"
                     }`}
                   >
-                    {s.state === "done" ? "✓" : s.number}
-                  </span>
-                  <div>
-                    <p
-                      className={
-                        s.state === "upcoming"
-                          ? "text-slate-500"
-                          : s.state === "current"
-                            ? "font-medium text-brand-100"
-                            : "text-slate-300"
-                      }
-                    >
-                      {s.label}
-                      {s.state === "current" ? (
-                        <span className="ml-2 text-xs font-normal text-brand-300">
-                          You are here
+                    {phase.name}
+                  </p>
+                  <ol className="mt-2 space-y-2">
+                    {phase.stages.map((s) => (
+                      <li
+                        key={s.key}
+                        className={`flex items-start gap-3 rounded-lg px-3 py-2 text-sm ${
+                          s.state === "current" ? "bg-brand-500/10 ring-1 ring-brand-500/25" : ""
+                        }`}
+                      >
+                        <span
+                          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                            s.state === "done"
+                              ? "bg-emerald-500/20 text-emerald-300"
+                              : s.state === "current"
+                                ? "bg-brand-500/30 text-brand-200"
+                                : "bg-white/[0.06] text-slate-500"
+                          }`}
+                        >
+                          {s.state === "done"
+                            ? "✓"
+                            : stages.find((x) => x.key === s.key)?.number ?? "·"}
                         </span>
-                      ) : null}
-                    </p>
-                    {s.state === "current" && s.key === "council_approved" ? (
-                      <p className="mt-1 text-xs text-slate-400">{PRIVATE_STAGE_DONE_COPY}</p>
-                    ) : null}
-                    {s.key === "council_approved" && current?.key === "council_review" ? (
-                      <p className="mt-1 text-xs text-slate-500">
-                        Design approved — construction is the next, separate phase
-                      </p>
-                    ) : null}
-                  </div>
-                </li>
+                        <div>
+                          <p
+                            className={
+                              s.state === "upcoming"
+                                ? "text-slate-500"
+                                : s.state === "current"
+                                  ? "font-medium text-brand-100"
+                                  : "text-slate-300"
+                            }
+                          >
+                            {s.label}
+                            {s.state === "current" ? (
+                              <span className="ml-2 text-xs font-normal text-brand-300">
+                                You are here
+                              </span>
+                            ) : null}
+                          </p>
+                          {s.state === "current" && s.key === "council_approved" ? (
+                            <p className="mt-1 text-xs text-slate-400">{PRIVATE_STAGE_DONE_COPY}</p>
+                          ) : null}
+                          {s.key === "council_approved" && current?.key === "council_review" ? (
+                            <p className="mt-1 text-xs text-slate-500">
+                              Design approved — construction is the next, separate phase
+                            </p>
+                          ) : null}
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
               ))}
-            </ol>
+            </div>
             {project.doneCopy ? (
               <p className="mt-3 text-sm text-slate-400">{project.doneCopy}</p>
             ) : project.designStage !== "council_approved" ? (
@@ -340,6 +410,7 @@ export function PrivateClientPortalClient({
               Last updated {formatDate(project.updatedAt)}
             </p>
           </section>
+          </div>
         </div>
       </div>
     </div>

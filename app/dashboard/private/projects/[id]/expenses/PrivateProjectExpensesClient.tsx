@@ -190,7 +190,7 @@ export function PrivateProjectExpensesClient({ projectId }: { projectId: string 
         <h2 className="text-lg font-semibold text-white">{projectName}</h2>
         <p className="mt-1 text-sm text-slate-400">Project expenses</p>
         <p className="mt-4 text-2xl font-semibold tabular-nums text-white">{zar(totalZar)}</p>
-        <p className="text-xs text-slate-500">{expenses.length} expense{expenses.length === 1 ? "" : "s"} recorded · assign each to a stage for cost breakdown</p>
+        <p className="text-xs text-slate-500">{expenses.length} expense{expenses.length === 1 ? "" : "s"} recorded · assign each to a phase for cost breakdown</p>
       </div>
 
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
@@ -254,7 +254,7 @@ export function PrivateProjectExpensesClient({ projectId }: { projectId: string 
                     />
                   </label>
                   <label className="block text-xs text-slate-400 sm:col-span-2 lg:col-span-4">
-                    Stage (for cost breakdown)
+                    Phase (for cost breakdown)
                     <select
                       disabled={busy}
                       value={draft.designStage}
@@ -350,7 +350,7 @@ export function PrivateProjectExpensesClient({ projectId }: { projectId: string 
             />
           </label>
           <label className="block text-xs text-slate-400 sm:col-span-2 lg:col-span-4">
-            Stage (for cost breakdown)
+            Phase (for cost breakdown)
             <select
               value={designStage}
               onChange={(e) => setDesignStage(e.target.value as PrivateDesignStage)}

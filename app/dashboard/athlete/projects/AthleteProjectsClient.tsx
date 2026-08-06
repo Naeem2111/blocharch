@@ -81,7 +81,7 @@ export function AthleteProjectsClient() {
           const days = daysUntilDueFromIso(p.dueDate);
           return {
             date: p.dueDate!,
-            label: `${p.name} due`,
+            label: `${p.displayTitle ?? formatProjectFullTitle(p.name, p.currentStage)} due`,
             color: projectDueColor(days),
           };
         }),

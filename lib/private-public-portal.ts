@@ -5,6 +5,10 @@ import {
   PRIVATE_STAGE_DONE_COPY,
 } from "@/lib/private-constants";
 import { resolvePrivateProgressPercent, privateStageMeta } from "@/lib/private-progress";
+import {
+  buildPortalPhaseGroups,
+  resolvePhaseStructure,
+} from "@/lib/private-phase-structure";
 
 export async function getPublicPrivateProjectBySlug(slug: string) {
   const client = await prisma.privateClient.findFirst({
@@ -42,6 +46,9 @@ export async function getPublicPrivateProjectBySlug(slug: string) {
     designStage: project.designStage,
     stageStartedAt: project.stageStartedAt,
   });
+
+  const phaseStructure = resolvePhaseStructure(project.phaseStructure);
+  const phaseGroups = buildPortalPhaseGroups(phaseStructure, project.designStage);
 
   const stages = PRIVATE_STAGE_ORDER.map((key, i) => {
     const currentIdx = PRIVATE_STAGE_ORDER.indexOf(project.designStage);
@@ -81,6 +88,7 @@ export async function getPublicPrivateProjectBySlug(slug: string) {
       outOfScopeFlag: project.outOfScopeFlag,
     },
     stages,
+    phaseGroups,
     actionItems: project.actionItems
       .filter((a) => !a.completedAt)
       .map((a) => ({ id: a.id, title: a.title })),

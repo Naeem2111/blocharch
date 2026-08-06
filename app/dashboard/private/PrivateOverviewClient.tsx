@@ -103,7 +103,7 @@ export function PrivateOverviewClient() {
           </ul>
         </section>
         <section className="card-tool rounded-xl p-5">
-          <h2 className="text-sm font-semibold text-white">Upcoming stage moves</h2>
+          <h2 className="text-sm font-semibold text-white">Upcoming phase moves</h2>
           <ul className="mt-4 space-y-3">
             {data.upcomingMoves.length === 0 ? (
               <li className="text-sm text-slate-500">No active projects.</li>

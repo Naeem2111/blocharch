@@ -1,5 +1,5 @@
 import type { PrivateDesignStage } from "@prisma/client";
-import { PRIVATE_STAGE_ORDER } from "@/lib/private-constants";
+import { PRIVATE_STAGE_LABELS, PRIVATE_STAGE_ORDER, stageIndex } from "@/lib/private-constants";
 
 export type ProjectPhaseGroup = {
   id: string;
@@ -11,27 +11,31 @@ export type PhaseStructure = {
   phases: ProjectPhaseGroup[];
 };
 
+export function defaultPhaseName(index: number): string {
+  return `Stage ${index + 1}`;
+}
+
 export function defaultPhaseStructure(): PhaseStructure {
   return {
     phases: [
       {
-        id: "phase-site",
-        name: "Site & existing",
+        id: "phase-1",
+        name: defaultPhaseName(0),
         stageKeys: ["site_measure_up", "existing_drawings"],
       },
       {
-        id: "phase-concept",
-        name: "Concept & review",
+        id: "phase-2",
+        name: defaultPhaseName(1),
         stageKeys: ["concept_design", "design_review"],
       },
       {
-        id: "phase-development",
-        name: "Design development",
+        id: "phase-3",
+        name: defaultPhaseName(2),
         stageKeys: ["design_development"],
       },
       {
-        id: "phase-council",
-        name: "Council submission",
+        id: "phase-4",
+        name: defaultPhaseName(3),
         stageKeys: ["council_submission_docs", "council_review", "council_approved"],
       },
     ],
@@ -64,17 +68,17 @@ export function resolvePhaseStructure(json: unknown): PhaseStructure {
 
 export function validatePhaseStructure(structure: PhaseStructure): { ok: boolean; error?: string } {
   if (structure.phases.length === 0) {
-    return { ok: false, error: "At least one phase is required." };
+    return { ok: false, error: "At least one stage is required." };
   }
 
   const seen = new Set<PrivateDesignStage>();
   for (const phase of structure.phases) {
     if (!phase.name.trim()) {
-      return { ok: false, error: "Every phase needs a name." };
+      return { ok: false, error: "Every stage needs a name." };
     }
     for (const stage of phase.stageKeys) {
       if (seen.has(stage)) {
-        return { ok: false, error: "Each stage can only belong to one phase." };
+        return { ok: false, error: "Each phase can only belong to one stage." };
       }
       seen.add(stage);
     }
@@ -82,7 +86,7 @@ export function validatePhaseStructure(structure: PhaseStructure): { ok: boolean
 
   for (const stage of PRIVATE_STAGE_ORDER) {
     if (!seen.has(stage)) {
-      return { ok: false, error: "Every design stage must be assigned to a phase." };
+      return { ok: false, error: "Every design phase must be assigned to a stage." };
     }
   }
 
@@ -109,13 +113,14 @@ export function assignStageToPhase(
   };
 }
 
-export function addPhase(structure: PhaseStructure, name: string): PhaseStructure {
+export function addPhase(structure: PhaseStructure, name?: string): PhaseStructure {
+  const nextIndex = structure.phases.length;
   return {
     phases: [
       ...structure.phases,
       {
         id: crypto.randomUUID(),
-        name: name.trim() || "New phase",
+        name: name?.trim() || defaultPhaseName(nextIndex),
         stageKeys: [],
       },
     ],
@@ -140,4 +145,49 @@ export function renamePhase(
       p.id === phaseId ? { ...p, name: name.trim() || p.name } : p,
     ),
   };
+}
+
+export type PortalPhaseGroup = {
+  id: string;
+  name: string;
+  number: number;
+  state: "done" | "current" | "upcoming";
+  stages: Array<{
+    key: PrivateDesignStage;
+    label: string;
+    state: "done" | "current" | "upcoming";
+  }>;
+};
+
+export function buildPortalPhaseGroups(
+  structure: PhaseStructure,
+  currentStage: PrivateDesignStage,
+): PortalPhaseGroup[] {
+  const currentIdx = stageIndex(currentStage);
+
+  return structure.phases.map((phase, phaseIndex) => {
+    const stageIndices = phase.stageKeys.map((key) => stageIndex(key));
+    const minIdx = Math.min(...stageIndices);
+    const maxIdx = Math.max(...stageIndices);
+
+    let state: PortalPhaseGroup["state"] = "upcoming";
+    if (maxIdx < currentIdx) state = "done";
+    else if (minIdx <= currentIdx && currentIdx <= maxIdx) state = "current";
+
+    return {
+      id: phase.id,
+      name: phase.name,
+      number: phaseIndex + 1,
+      state,
+      stages: phase.stageKeys.map((key) => {
+        const idx = stageIndex(key);
+        return {
+          key,
+          label: PRIVATE_STAGE_LABELS[key],
+          state:
+            idx < currentIdx ? "done" : idx === currentIdx ? "current" : "upcoming",
+        };
+      }),
+    };
+  });
 }
