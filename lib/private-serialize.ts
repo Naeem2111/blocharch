@@ -39,7 +39,7 @@ export function serializePrivateProject(
   });
 
   const phaseStructure = resolvePhaseStructure(p.phaseStructure);
-  const { feePercents } = resolvePhaseSplits(p.phaseFeePercents, p.phaseCostPercents);
+  const { feePercents } = resolvePhaseSplits(p.phaseFeePercents, p.phaseCostPercents, phaseStructure);
   const expenseRows = (p.expenses ?? []).map((e) => ({
     designStage: e.designStage,
     amountZar: Number(e.amountZar),

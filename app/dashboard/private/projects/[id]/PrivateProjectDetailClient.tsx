@@ -33,7 +33,8 @@ type Detail = {
       feeZar: number;
       costZar: number;
       stages: Array<{
-        stage: string;
+        phaseId: string;
+        stage?: string;
         label: string;
         status: "completed" | "current" | "upcoming";
         feePercent: number;
@@ -43,7 +44,8 @@ type Detail = {
       }>;
     }>;
     phases: Array<{
-      stage: string;
+      phaseId: string;
+      stage?: string;
       label: string;
       status: "completed" | "current" | "upcoming";
       feePercent: number;
@@ -322,7 +324,7 @@ export function PrivateProjectDetailClient({ projectId }: { projectId: string })
                     </thead>
                     <tbody>
                       {group.stages.map((row) => (
-                        <tr key={row.stage} className="border-b border-white/[0.04]">
+                        <tr key={row.phaseId} className="border-b border-white/[0.04]">
                           <td className="py-2 pr-3 text-slate-200">{row.label}</td>
                           <td className="py-2 pr-3 capitalize text-slate-400">{row.status}</td>
                           <td className="py-2 pr-3 tabular-nums text-slate-300">
@@ -358,7 +360,7 @@ export function PrivateProjectDetailClient({ projectId }: { projectId: string })
                 </thead>
                 <tbody>
                   {p.phases.map((row) => (
-                    <tr key={row.stage} className="border-b border-white/[0.04]">
+                    <tr key={row.phaseId} className="border-b border-white/[0.04]">
                       <td className="py-2 pr-3 text-slate-200">{row.label}</td>
                       <td className="py-2 pr-3 capitalize text-slate-400">{row.status}</td>
                       <td className="py-2 pr-3 tabular-nums text-slate-300">

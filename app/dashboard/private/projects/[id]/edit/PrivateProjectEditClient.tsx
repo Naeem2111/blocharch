@@ -8,19 +8,22 @@ import { PRIVATE_STAGE_LABELS, PRIVATE_STAGE_ORDER } from "@/lib/private-constan
 import {
   buildProjectPhaseBreakdown,
   defaultPhaseSplits,
-  distributeFeePercentAcrossStages,
+  distributeFeePercentAcrossDesignPhases,
   phaseSplitSum,
   syncPhaseFeePercentsFromStructure,
   type PhaseSplitMap,
 } from "@/lib/private-phase-splits";
 import {
+  addDesignPhase,
   addPhase,
-  assignStageToPhase,
+  allDesignPhases,
   clearPhaseGroupFeePercent,
   defaultPhaseStructure,
+  moveDesignPhaseToGroup,
   phaseGroupFeeTotal,
-  phasesAvailableForGroup,
+  removeDesignPhase,
   removePhase,
+  renameDesignPhase,
   renamePhase,
   setPhaseGroupFeePercent,
   type PhaseStructure,
@@ -34,7 +37,7 @@ import type { PrivateDesignStage } from "@prisma/client";
 type Athlete = { id: string; fullName: string; athleteCode: string };
 
 type PhaseRow = {
-  stage: PrivateDesignStage;
+  phaseId: string;
   label: string;
   status: "completed" | "current" | "upcoming";
   feePercent: number;
@@ -106,8 +109,11 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [useManualProgress, setUseManualProgress] = useState(false);
-  const [phaseFeePercents, setPhaseFeePercents] = useState<PhaseSplitMap>(defaultPhaseSplits());
+  const [phaseFeePercents, setPhaseFeePercents] = useState<PhaseSplitMap>(() =>
+    defaultPhaseSplits(defaultPhaseStructure()),
+  );
   const [phaseStructure, setPhaseStructure] = useState<PhaseStructure>(defaultPhaseStructure());
+  const [newPhaseNames, setNewPhaseNames] = useState<Record<string, string>>({});
   const [expenseRecords, setExpenseRecords] = useState<
     Array<{ designStage: string | null; amountZar: number }>
   >([]);
@@ -191,40 +197,78 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
     [phaseFeePercents, phaseStructure],
   );
 
-  const feeSplitSum = phaseSplitSum(effectiveFeePercents);
+  /** Progress tracking still uses built-in workflow keys — show custom phase names where linked. */
+  const progressPhaseOptions = useMemo(() => {
+    const linked = allDesignPhases(phaseStructure).filter(
+      (p): p is typeof p & { builtInKey: PrivateDesignStage } => p.builtInKey != null,
+    );
+    if (linked.length > 0) return linked;
+    return PRIVATE_STAGE_ORDER.map((key) => ({
+      id: key,
+      name: PRIVATE_STAGE_LABELS[key],
+      builtInKey: key,
+    }));
+  }, [phaseStructure]);
+
+  const feeSplitSum = phaseSplitSum(effectiveFeePercents, phaseStructure);
+  const feeSplitsValid = feeSplitSum === 100;
+  const feeSplitDelta = feeSplitSum - 100;
 
   function applyStageFeePercent(groupId: string, value: number) {
     const group = phaseStructure.phases.find((p) => p.id === groupId);
     if (!group) return;
     const feePercent = Math.max(0, Math.min(100, Math.round(value)));
     setPhaseStructure((s) => setPhaseGroupFeePercent(s, groupId, feePercent));
-    if (group.stageKeys.length > 0) {
+    if (group.designPhases.length > 0) {
       setPhaseFeePercents((prev) => ({
         ...prev,
-        ...distributeFeePercentAcrossStages(group.stageKeys, feePercent),
+        ...(distributeFeePercentAcrossDesignPhases(
+          group.designPhases,
+          feePercent,
+        ) as PhaseSplitMap),
       }));
     }
   }
 
-  function applyPhaseFeePercent(groupId: string, stage: PrivateDesignStage, value: number) {
+  function applyPhaseFeePercent(groupId: string, phaseId: string, value: number) {
     setPhaseStructure((s) => clearPhaseGroupFeePercent(s, groupId));
     setPhaseFeePercents((prev) => ({
       ...prev,
-      [stage]: Math.max(0, Math.min(100, Math.round(Number(value) || 0))),
+      [phaseId]: Math.max(0, Math.min(100, Math.round(Number(value) || 0))),
     }));
   }
 
-  function addPhaseToGroup(groupId: string, stage: PrivateDesignStage) {
-    const next = assignStageToPhase(phaseStructure, stage, groupId);
+  function createDesignPhase(groupId: string, name: string) {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const next = addDesignPhase(phaseStructure, groupId, trimmed);
     setPhaseStructure(next);
     const group = next.phases.find((p) => p.id === groupId);
-    if (group?.feePercent != null && group.stageKeys.length > 0) {
-      const feePercent = group.feePercent;
-      setPhaseFeePercents((prev) => ({
-        ...prev,
-        ...distributeFeePercentAcrossStages(group.stageKeys, feePercent),
-      }));
+    const created = group?.designPhases[group.designPhases.length - 1];
+    if (created) {
+      setPhaseFeePercents((prev) => ({ ...prev, [created.id]: 0 }));
+      if (group?.feePercent != null) {
+        setPhaseFeePercents((prev) => ({
+          ...prev,
+          ...(distributeFeePercentAcrossDesignPhases(
+            group.designPhases,
+            group.feePercent!,
+          ) as PhaseSplitMap),
+        }));
+      }
     }
+    setNewPhaseNames((prev) => ({ ...prev, [groupId]: "" }));
+  }
+
+  function deleteDesignPhase(phaseId: string) {
+    const next = removeDesignPhase(phaseStructure, phaseId);
+    if (!next) return;
+    setPhaseStructure(next);
+    setPhaseFeePercents((prev) => {
+      const copy = { ...prev };
+      delete copy[phaseId];
+      return copy;
+    });
   }
 
   async function submit(e: React.FormEvent) {
@@ -377,7 +421,7 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
           <div>
             <h2 className="text-sm font-semibold text-white">Stages & phase billing</h2>
             <p className="mt-1 text-xs text-slate-500">
-              Create stages, assign design phases to each stage, and set fee % per stage — or customize per phase.
+              Create stages, add custom phases to each stage, and set fee % per stage — or customize per phase.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -390,13 +434,29 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
             </button>
             <button
               type="button"
-              onClick={() => setPhaseFeePercents(defaultPhaseSplits())}
+              onClick={() => setPhaseFeePercents(defaultPhaseSplits(phaseStructure))}
               className="rounded-lg bg-white/[0.04] px-3 py-1.5 text-xs text-slate-300 ring-1 ring-white/[0.08] hover:bg-white/[0.07]"
             >
               Reset fee splits
             </button>
           </div>
         </div>
+
+        {!feeSplitsValid ? (
+          <div
+            className="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100"
+            role="alert"
+          >
+            Fee splits total{" "}
+            <span className="font-semibold tabular-nums text-amber-200">{feeSplitSum}%</span>
+            {feeSplitDelta > 0 ? (
+              <span className="text-amber-200/90"> ({feeSplitDelta}% over 100%)</span>
+            ) : (
+              <span className="text-amber-200/90"> ({Math.abs(feeSplitDelta)}% short of 100%)</span>
+            )}
+            . Adjust stage or phase fee % until the total equals 100% — saving is blocked until then.
+          </div>
+        ) : null}
 
         <div className="mt-4 space-y-5">
           {phaseGroups.map((group) => {
@@ -406,8 +466,7 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
               ? groupPhase!.feePercent!
               : groupPhase
                 ? phaseGroupFeeTotal(groupPhase, phaseFeePercents)
-                : group.stages.reduce((sum, row) => sum + phaseFeePercents[row.stage], 0);
-            const availablePhases = phasesAvailableForGroup(phaseStructure, group.id);
+                : group.stages.reduce((sum, row) => sum + (phaseFeePercents[row.phaseId] ?? 0), 0);
 
             return (
             <div key={group.id} className="rounded-lg bg-white/[0.03] p-4 ring-1 ring-white/[0.06]">
@@ -446,7 +505,7 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
                 </span>
                 <button
                   type="button"
-                  disabled={group.stages.length > 0 || phaseStructure.phases.length <= 1}
+                  disabled={(groupPhase?.designPhases.length ?? 0) > 0 || phaseStructure.phases.length <= 1}
                   onClick={() => {
                     const next = removePhase(phaseStructure, group.id);
                     if (next) setPhaseStructure(next);
@@ -467,46 +526,40 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
                       <th className="pb-2 pr-3 font-semibold">Fee %</th>
                       <th className="pb-2 pr-3 font-semibold">Cost %</th>
                       <th className="pb-2 pr-3 font-semibold text-right">Fee</th>
-                      <th className="pb-2 font-semibold text-right">Expenses</th>
+                      <th className="pb-2 pr-3 font-semibold text-right">Expenses</th>
+                      <th className="pb-2 font-semibold" />
                     </tr>
                   </thead>
                   <tbody>
                     {group.stages.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="py-3">
-                          <div className="flex flex-wrap items-center gap-2 text-slate-500">
-                            <span>No phases assigned.</span>
-                            {availablePhases.length > 0 ? (
-                              <select
-                                value=""
-                                onChange={(e) => {
-                                  const stage = e.target.value as PrivateDesignStage;
-                                  if (stage) addPhaseToGroup(group.id, stage);
-                                }}
-                                className="rounded border border-white/[0.08] bg-white/[0.04] px-2 py-1 text-xs text-white"
-                              >
-                                <option value="">Add phase…</option>
-                                {availablePhases.map((key) => (
-                                  <option key={key} value={key}>
-                                    {PRIVATE_STAGE_LABELS[key]}
-                                  </option>
-                                ))}
-                              </select>
-                            ) : null}
-                          </div>
+                        <td colSpan={8} className="py-3 text-slate-500">
+                          No phases yet — add one below.
                         </td>
                       </tr>
                     ) : (
-                      <>
-                      {group.stages.map((row) => (
-                        <tr key={row.stage} className="border-b border-white/[0.04]">
-                          <td className="py-3 pr-3 text-slate-200">{row.label}</td>
+                      group.stages.map((row) => (
+                        <tr key={row.phaseId} className="border-b border-white/[0.04]">
+                          <td className="py-3 pr-3">
+                            <input
+                              value={
+                                groupPhase?.designPhases.find((p) => p.id === row.phaseId)?.name ??
+                                row.label
+                              }
+                              onChange={(e) =>
+                                setPhaseStructure((s) =>
+                                  renameDesignPhase(s, row.phaseId, e.target.value),
+                                )
+                              }
+                              className="min-w-[10rem] w-full rounded border border-white/[0.08] bg-white/[0.04] px-2 py-1 text-sm text-white"
+                            />
+                          </td>
                           <td className="py-3 pr-3">
                             <select
                               value={group.id}
                               onChange={(e) =>
                                 setPhaseStructure((s) =>
-                                  assignStageToPhase(s, row.stage, e.target.value),
+                                  moveDesignPhaseToGroup(s, row.phaseId, e.target.value),
                                 )
                               }
                               className="rounded border border-white/[0.08] bg-white/[0.04] px-2 py-1 text-xs text-white"
@@ -533,13 +586,13 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
                               disabled={usesStageFee}
                               title={
                                 usesStageFee
-                                  ? "Split across phases by typical duration — use Customize per phase to edit individually"
+                                  ? "Split across phases — use Customize per phase to edit individually"
                                   : undefined
                               }
                               className="w-16 rounded border border-white/[0.08] bg-white/[0.04] px-2 py-1 text-sm tabular-nums text-white disabled:cursor-not-allowed disabled:opacity-50"
-                              value={effectiveFeePercents[row.stage]}
+                              value={effectiveFeePercents[row.phaseId] ?? 0}
                               onChange={(e) =>
-                                applyPhaseFeePercent(group.id, row.stage, Number(e.target.value))
+                                applyPhaseFeePercent(group.id, row.phaseId, Number(e.target.value))
                               }
                             />
                           </td>
@@ -549,34 +602,51 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
                           <td className="py-3 pr-3 text-right tabular-nums text-slate-400">
                             {zar(row.feeZar)}
                           </td>
-                          <td className="py-3 text-right tabular-nums text-slate-400">
+                          <td className="py-3 pr-3 text-right tabular-nums text-slate-400">
                             {zar(row.expenseZar)}
                           </td>
-                        </tr>
-                      ))}
-                      {availablePhases.length > 0 ? (
-                        <tr className="border-b border-white/[0.04]">
-                          <td colSpan={7} className="py-3">
-                            <select
-                              value=""
-                              onChange={(e) => {
-                                const stage = e.target.value as PrivateDesignStage;
-                                if (stage) addPhaseToGroup(group.id, stage);
-                              }}
-                              className="rounded border border-white/[0.08] bg-white/[0.04] px-2 py-1 text-xs text-white"
+                          <td className="py-3">
+                            <button
+                              type="button"
+                              onClick={() => deleteDesignPhase(row.phaseId)}
+                              className="rounded px-2 py-0.5 text-[10px] font-medium text-red-300/80 ring-1 ring-red-500/20 hover:bg-red-500/10"
                             >
-                              <option value="">Add phase…</option>
-                              {availablePhases.map((key) => (
-                                <option key={key} value={key}>
-                                  {PRIVATE_STAGE_LABELS[key]}
-                                </option>
-                              ))}
-                            </select>
+                              Remove
+                            </button>
                           </td>
                         </tr>
-                      ) : null}
-                      </>
+                      ))
                     )}
+                    <tr className="border-b border-white/[0.04]">
+                      <td colSpan={8} className="py-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <input
+                            placeholder="New phase name"
+                            value={newPhaseNames[group.id] ?? ""}
+                            onChange={(e) =>
+                              setNewPhaseNames((prev) => ({
+                                ...prev,
+                                [group.id]: e.target.value,
+                              }))
+                            }
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                createDesignPhase(group.id, newPhaseNames[group.id] ?? "");
+                              }
+                            }}
+                            className="min-w-[12rem] flex-1 rounded border border-white/[0.08] bg-white/[0.04] px-2 py-1 text-sm text-white"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => createDesignPhase(group.id, newPhaseNames[group.id] ?? "")}
+                            className="rounded-lg bg-brand-500/20 px-3 py-1 text-xs font-medium text-brand-200 ring-1 ring-brand-500/30"
+                          >
+                            Add phase
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
@@ -585,11 +655,11 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
           })}
         </div>
 
-        <p className="mt-3 text-xs text-slate-500">
+        <p
+          className={`mt-3 text-xs ${feeSplitsValid ? "text-emerald-400/90" : "font-medium text-amber-300"}`}
+        >
           Fee splits total {feeSplitSum}%
-          {feeSplitSum !== 100 ? (
-            <span className="text-amber-300"> — must total 100% before saving</span>
-          ) : null}
+          {feeSplitsValid ? " — aligned" : " — must total 100% before saving"}
           {" · "}
           Expenses total {zar(totalExpenseZar)}
           {unassignedExpenseZar > 0 ? (
@@ -620,9 +690,9 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
                 setForm({ ...form, designStage: e.target.value as PrivateDesignStage })
               }
             >
-              {PRIVATE_STAGE_ORDER.map((key) => (
-                <option key={key} value={key}>
-                  {PRIVATE_STAGE_LABELS[key]}
+              {progressPhaseOptions.map((phase) => (
+                <option key={phase.id} value={phase.builtInKey}>
+                  {phase.name}
                 </option>
               ))}
             </select>
@@ -708,8 +778,9 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
       <div className="flex flex-wrap gap-3">
         <button
           type="submit"
-          disabled={saving}
-          className="rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-slate-950 hover:bg-brand-400 disabled:opacity-60"
+          disabled={saving || !feeSplitsValid}
+          title={!feeSplitsValid ? "Fee splits must total 100% before saving" : undefined}
+          className="rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-slate-950 hover:bg-brand-400 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {saving ? "Saving…" : "Save changes"}
         </button>

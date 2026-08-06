@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { ClientPortalBrandMark } from "@/components/client-portal/ClientPortalBrandMark";
 import { PublicThemeToggle } from "@/components/client-portal/PublicThemeToggle";
+import { ProjectProgressBar } from "@/components/ProjectProgressBar";
 import { PRIVATE_STAGE_DONE_COPY } from "@/lib/private-constants";
 import { PlannerDoneToggle } from "@/components/planner/PlannerDoneToggle";
 
@@ -171,6 +172,11 @@ export function PrivateClientPortalClient({
             <p className="mt-3 text-5xl font-semibold tabular-nums text-white">
               {project.progressPercent}%
             </p>
+            <ProjectProgressBar
+              percent={project.progressPercent}
+              showLabel={false}
+              className="mt-4 max-w-md"
+            />
             <p className="mt-2 text-sm text-slate-400">
               Currently in phase: {project.designStageLabel}
               {project.councilSubmittedAt

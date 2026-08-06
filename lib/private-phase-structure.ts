@@ -1,11 +1,19 @@
 import type { PrivateDesignStage } from "@prisma/client";
 import { PRIVATE_STAGE_LABELS, PRIVATE_STAGE_ORDER, stageIndex } from "@/lib/private-constants";
 
+/** User-defined design phase within a stage group. */
+export type ProjectDesignPhase = {
+  id: string;
+  name: string;
+  /** Links to built-in workflow step for progress and expense attribution. */
+  builtInKey?: PrivateDesignStage;
+};
+
 export type ProjectPhaseGroup = {
   id: string;
   name: string;
-  stageKeys: PrivateDesignStage[];
-  /** When set, fee is allocated to child phases by typical duration — no per-phase entry needed. */
+  designPhases: ProjectDesignPhase[];
+  /** When set, fee is allocated to child phases — no per-phase entry needed. */
   feePercent?: number;
 };
 
@@ -17,31 +25,67 @@ export function defaultPhaseName(index: number): string {
   return `Stage ${index + 1}`;
 }
 
+export function defaultDesignPhaseName(index: number): string {
+  return `Phase ${index + 1}`;
+}
+
+function designPhasesFromStageKeys(stageKeys: PrivateDesignStage[]): ProjectDesignPhase[] {
+  return stageKeys.map((key) => ({
+    id: key,
+    name: PRIVATE_STAGE_LABELS[key],
+    builtInKey: key,
+  }));
+}
+
 export function defaultPhaseStructure(): PhaseStructure {
   return {
     phases: [
       {
         id: "phase-1",
         name: defaultPhaseName(0),
-        stageKeys: ["site_measure_up", "existing_drawings"],
+        designPhases: designPhasesFromStageKeys(["site_measure_up", "existing_drawings"]),
       },
       {
         id: "phase-2",
         name: defaultPhaseName(1),
-        stageKeys: ["concept_design", "design_review"],
+        designPhases: designPhasesFromStageKeys(["concept_design", "design_review"]),
       },
       {
         id: "phase-3",
         name: defaultPhaseName(2),
-        stageKeys: ["design_development"],
+        designPhases: designPhasesFromStageKeys(["design_development"]),
       },
       {
         id: "phase-4",
         name: defaultPhaseName(3),
-        stageKeys: ["council_submission_docs", "council_review", "council_approved"],
+        designPhases: designPhasesFromStageKeys([
+          "council_submission_docs",
+          "council_review",
+          "council_approved",
+        ]),
       },
     ],
   };
+}
+
+function parseDesignPhases(raw: unknown): ProjectDesignPhase[] | null {
+  if (!Array.isArray(raw)) return null;
+  const phases: ProjectDesignPhase[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") return null;
+    const id = String((item as { id?: unknown }).id || "").trim();
+    const name = String((item as { name?: unknown }).name || "").trim();
+    if (!id || !name) return null;
+    const builtInRaw = (item as { builtInKey?: unknown }).builtInKey;
+    let builtInKey: PrivateDesignStage | undefined;
+    if (builtInRaw != null && builtInRaw !== "") {
+      const key = String(builtInRaw) as PrivateDesignStage;
+      if (!PRIVATE_STAGE_ORDER.includes(key)) return null;
+      builtInKey = key;
+    }
+    phases.push(builtInKey ? { id, name, builtInKey } : { id, name });
+  }
+  return phases;
 }
 
 export function parsePhaseStructure(json: unknown): PhaseStructure | null {
@@ -54,10 +98,20 @@ export function parsePhaseStructure(json: unknown): PhaseStructure | null {
     if (!item || typeof item !== "object") return null;
     const id = String((item as { id?: unknown }).id || "").trim();
     const name = String((item as { name?: unknown }).name || "").trim();
+    if (!id || !name) return null;
+
+    const designPhasesRaw = (item as { designPhases?: unknown }).designPhases;
     const stageKeysRaw = (item as { stageKeys?: unknown }).stageKeys;
-    if (!id || !name || !Array.isArray(stageKeysRaw)) return null;
-    const stageKeys = stageKeysRaw.map((k) => String(k)) as PrivateDesignStage[];
-    if (stageKeys.some((k) => !PRIVATE_STAGE_ORDER.includes(k))) return null;
+    let designPhases: ProjectDesignPhase[] | null = null;
+    if (designPhasesRaw != null) {
+      designPhases = parseDesignPhases(designPhasesRaw);
+    } else if (Array.isArray(stageKeysRaw)) {
+      const stageKeys = stageKeysRaw.map((k) => String(k)) as PrivateDesignStage[];
+      if (stageKeys.some((k) => !PRIVATE_STAGE_ORDER.includes(k))) return null;
+      designPhases = designPhasesFromStageKeys(stageKeys);
+    }
+    if (!designPhases) return null;
+
     const feePercentRaw = (item as { feePercent?: unknown }).feePercent;
     let feePercent: number | undefined;
     if (feePercentRaw !== undefined && feePercentRaw !== null) {
@@ -65,7 +119,7 @@ export function parsePhaseStructure(json: unknown): PhaseStructure | null {
       if (!Number.isFinite(n) || n < 0 || n > 100) return null;
       feePercent = Math.round(n);
     }
-    phases.push({ id, name, stageKeys, ...(feePercent !== undefined ? { feePercent } : {}) });
+    phases.push({ id, name, designPhases, ...(feePercent !== undefined ? { feePercent } : {}) });
   }
 
   return { phases };
@@ -75,51 +129,47 @@ export function resolvePhaseStructure(json: unknown): PhaseStructure {
   return parsePhaseStructure(json) ?? defaultPhaseStructure();
 }
 
+export function allDesignPhases(structure: PhaseStructure): ProjectDesignPhase[] {
+  return structure.phases.flatMap((group) => group.designPhases);
+}
+
+export function findDesignPhase(
+  structure: PhaseStructure,
+  phaseId: string,
+): { group: ProjectPhaseGroup; phase: ProjectDesignPhase } | null {
+  for (const group of structure.phases) {
+    const phase = group.designPhases.find((p) => p.id === phaseId);
+    if (phase) return { group, phase };
+  }
+  return null;
+}
+
 export function validatePhaseStructure(structure: PhaseStructure): { ok: boolean; error?: string } {
   if (structure.phases.length === 0) {
     return { ok: false, error: "At least one stage is required." };
   }
 
-  const seen = new Set<PrivateDesignStage>();
-  for (const phase of structure.phases) {
-    if (!phase.name.trim()) {
+  const seenIds = new Set<string>();
+  for (const group of structure.phases) {
+    if (!group.name.trim()) {
       return { ok: false, error: "Every stage needs a name." };
     }
-    for (const stage of phase.stageKeys) {
-      if (seen.has(stage)) {
-        return { ok: false, error: "Each phase can only belong to one stage." };
+    for (const phase of group.designPhases) {
+      if (!phase.name.trim()) {
+        return { ok: false, error: "Every phase needs a name." };
       }
-      seen.add(stage);
+      if (seenIds.has(phase.id)) {
+        return { ok: false, error: "Phase IDs must be unique." };
+      }
+      seenIds.add(phase.id);
     }
   }
 
-  for (const stage of PRIVATE_STAGE_ORDER) {
-    if (!seen.has(stage)) {
-      return { ok: false, error: "Every design phase must be assigned to a stage." };
-    }
+  if (allDesignPhases(structure).length === 0) {
+    return { ok: false, error: "Add at least one design phase." };
   }
 
   return { ok: true };
-}
-
-export function assignStageToPhase(
-  structure: PhaseStructure,
-  stage: PrivateDesignStage,
-  targetPhaseId: string,
-): PhaseStructure {
-  return {
-    phases: structure.phases.map((phase) => {
-      const without = phase.stageKeys.filter((k) => k !== stage);
-      if (phase.id === targetPhaseId) {
-        const next = [...without, stage];
-        next.sort(
-          (a, b) => PRIVATE_STAGE_ORDER.indexOf(a) - PRIVATE_STAGE_ORDER.indexOf(b),
-        );
-        return { ...phase, stageKeys: next };
-      }
-      return { ...phase, stageKeys: without };
-    }),
-  };
 }
 
 export function addPhase(structure: PhaseStructure, name?: string): PhaseStructure {
@@ -130,7 +180,7 @@ export function addPhase(structure: PhaseStructure, name?: string): PhaseStructu
       {
         id: crypto.randomUUID(),
         name: name?.trim() || defaultPhaseName(nextIndex),
-        stageKeys: [],
+        designPhases: [],
       },
     ],
   };
@@ -139,7 +189,7 @@ export function addPhase(structure: PhaseStructure, name?: string): PhaseStructu
 export function removePhase(structure: PhaseStructure, phaseId: string): PhaseStructure | null {
   const target = structure.phases.find((p) => p.id === phaseId);
   if (!target) return null;
-  if (target.stageKeys.length > 0) return null;
+  if (target.designPhases.length > 0) return null;
   if (structure.phases.length <= 1) return null;
   return { phases: structure.phases.filter((p) => p.id !== phaseId) };
 }
@@ -152,6 +202,73 @@ export function renamePhase(
   return {
     phases: structure.phases.map((p) =>
       p.id === phaseId ? { ...p, name: name.trim() || p.name } : p,
+    ),
+  };
+}
+
+export function addDesignPhase(
+  structure: PhaseStructure,
+  groupId: string,
+  name?: string,
+): PhaseStructure {
+  const nextIndex = allDesignPhases(structure).length;
+  const phase: ProjectDesignPhase = {
+    id: crypto.randomUUID(),
+    name: name?.trim() || defaultDesignPhaseName(nextIndex),
+  };
+  return {
+    phases: structure.phases.map((group) =>
+      group.id === groupId
+        ? { ...group, designPhases: [...group.designPhases, phase], feePercent: undefined }
+        : group,
+    ),
+  };
+}
+
+export function renameDesignPhase(
+  structure: PhaseStructure,
+  phaseId: string,
+  name: string,
+): PhaseStructure {
+  return {
+    phases: structure.phases.map((group) => ({
+      ...group,
+      designPhases: group.designPhases.map((p) =>
+        p.id === phaseId ? { ...p, name: name.trim() || p.name } : p,
+      ),
+    })),
+  };
+}
+
+export function removeDesignPhase(
+  structure: PhaseStructure,
+  phaseId: string,
+): PhaseStructure | null {
+  if (allDesignPhases(structure).length <= 1) return null;
+  return {
+    phases: structure.phases.map((group) => ({
+      ...group,
+      designPhases: group.designPhases.filter((p) => p.id !== phaseId),
+    })),
+  };
+}
+
+export function moveDesignPhaseToGroup(
+  structure: PhaseStructure,
+  phaseId: string,
+  targetGroupId: string,
+): PhaseStructure {
+  const found = findDesignPhase(structure, phaseId);
+  if (!found) return structure;
+  const without = structure.phases.map((group) => ({
+    ...group,
+    designPhases: group.designPhases.filter((p) => p.id !== phaseId),
+  }));
+  return {
+    phases: without.map((group) =>
+      group.id === targetGroupId
+        ? { ...group, designPhases: [...group.designPhases, found.phase], feePercent: undefined }
+        : group,
     ),
   };
 }
@@ -182,20 +299,9 @@ export function clearPhaseGroupFeePercent(
 
 export function phaseGroupFeeTotal(
   group: ProjectPhaseGroup,
-  phaseFeePercents: Record<PrivateDesignStage, number>,
+  phaseFeePercents: Record<string, number>,
 ): number {
-  return group.stageKeys.reduce((sum, key) => sum + phaseFeePercents[key], 0);
-}
-
-/** Design phases not yet assigned to this stage — available to add or move here. */
-export function phasesAvailableForGroup(
-  structure: PhaseStructure,
-  groupId: string,
-): PrivateDesignStage[] {
-  const group = structure.phases.find((p) => p.id === groupId);
-  if (!group) return [];
-  const inGroup = new Set(group.stageKeys);
-  return PRIVATE_STAGE_ORDER.filter((key) => !inGroup.has(key));
+  return group.designPhases.reduce((sum, phase) => sum + (phaseFeePercents[phase.id] ?? 0), 0);
 }
 
 export type PortalPhaseGroup = {
@@ -204,7 +310,7 @@ export type PortalPhaseGroup = {
   number: number;
   state: "done" | "current" | "upcoming";
   stages: Array<{
-    key: PrivateDesignStage;
+    key: string;
     label: string;
     state: "done" | "current" | "upcoming";
   }>;
@@ -216,27 +322,37 @@ export function buildPortalPhaseGroups(
 ): PortalPhaseGroup[] {
   const currentIdx = stageIndex(currentStage);
 
-  return structure.phases.map((phase, phaseIndex) => {
-    const stageIndices = phase.stageKeys.map((key) => stageIndex(key));
-    const minIdx = Math.min(...stageIndices);
-    const maxIdx = Math.max(...stageIndices);
+  return structure.phases.map((group, groupIndex) => {
+    const builtInIndices = group.designPhases
+      .map((p) => (p.builtInKey ? stageIndex(p.builtInKey) : null))
+      .filter((idx): idx is number => idx != null);
 
     let state: PortalPhaseGroup["state"] = "upcoming";
-    if (maxIdx < currentIdx) state = "done";
-    else if (minIdx <= currentIdx && currentIdx <= maxIdx) state = "current";
+    if (builtInIndices.length > 0) {
+      const minIdx = Math.min(...builtInIndices);
+      const maxIdx = Math.max(...builtInIndices);
+      if (maxIdx < currentIdx) state = "done";
+      else if (minIdx <= currentIdx && currentIdx <= maxIdx) state = "current";
+    }
 
     return {
-      id: phase.id,
-      name: phase.name,
-      number: phaseIndex + 1,
+      id: group.id,
+      name: group.name,
+      number: groupIndex + 1,
       state,
-      stages: phase.stageKeys.map((key) => {
-        const idx = stageIndex(key);
+      stages: group.designPhases.map((phase) => {
+        const idx = phase.builtInKey ? stageIndex(phase.builtInKey) : null;
         return {
-          key,
-          label: PRIVATE_STAGE_LABELS[key],
+          key: phase.id,
+          label: phase.name,
           state:
-            idx < currentIdx ? "done" : idx === currentIdx ? "current" : "upcoming",
+            idx == null
+              ? state
+              : idx < currentIdx
+                ? "done"
+                : idx === currentIdx
+                  ? "current"
+                  : "upcoming",
         };
       }),
     };

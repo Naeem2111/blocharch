@@ -104,8 +104,8 @@ export async function POST(request: NextRequest) {
       ? parseDateOnly(String(body.briefReceivedAt))
       : new Date();
 
-    const defaultSplits = defaultPhaseSplits();
     const defaultStructure = defaultPhaseStructure();
+    const defaultSplits = defaultPhaseSplits(defaultStructure);
 
     const created = await prisma.$transaction(async (tx) => {
       const client = await tx.privateClient.create({

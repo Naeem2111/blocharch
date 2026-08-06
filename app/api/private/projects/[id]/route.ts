@@ -198,17 +198,18 @@ export async function PATCH(
       const { feePercents: existingFeePercents } = resolvePhaseSplits(
         existing.phaseFeePercents,
         existing.phaseCostPercents,
+        structure,
       );
       const feeMap =
         body.phaseFeePercents !== undefined
-          ? parsePhaseSplitMap(body.phaseFeePercents)
+          ? parsePhaseSplitMap(body.phaseFeePercents, structure)
           : existingFeePercents;
       if (!feeMap) {
         return NextResponse.json({ error: "Invalid fee splits" }, { status: 400 });
       }
 
       const syncedFeePercents = syncPhaseFeePercentsFromStructure(feeMap, structure);
-      const feeCheck = validatePhaseSplitMap(syncedFeePercents);
+      const feeCheck = validatePhaseSplitMap(syncedFeePercents, structure);
       if (!feeCheck.ok) {
         return NextResponse.json(
           { error: `Fee splits must total 100% (currently ${feeCheck.sum}%)` },
