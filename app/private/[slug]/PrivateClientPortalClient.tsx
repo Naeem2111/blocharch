@@ -1,10 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import { PRIVATE_STAGE_DONE_COPY } from "@/lib/private-constants";
 
 type PortalData = NonNullable<
   Awaited<ReturnType<typeof import("@/lib/private-public-portal").getPublicPrivateProjectBySlug>>
 >;
+
+type ActionItem = { id: string; title: string };
+type CompletedActionItem = { id: string; title: string; completedAt: string };
 
 function formatDate(iso: string | null) {
   if (!iso) return "—";
@@ -18,9 +22,46 @@ function formatDate(iso: string | null) {
   });
 }
 
-export function PrivateClientPortalClient({ data }: { data: PortalData }) {
-  const { project, stages, actionItems, updates } = data;
+export function PrivateClientPortalClient({
+  slug,
+  data,
+}: {
+  slug: string;
+  data: PortalData;
+}) {
+  const { project, stages, updates } = data;
+  const [actionItems, setActionItems] = useState<ActionItem[]>(data.actionItems);
+  const [completedActionItems, setCompletedActionItems] = useState<CompletedActionItem[]>(
+    data.completedActionItems,
+  );
+  const [completing, setCompleting] = useState<string | null>(null);
   const current = stages.find((s) => s.state === "current");
+
+  async function completeAction(actionItemId: string) {
+    setCompleting(actionItemId);
+    try {
+      const r = await fetch(`/api/private/portal/${slug}/actions`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ actionItemId }),
+      });
+      if (!r.ok) return;
+      const j = (await r.json()) as {
+        actionItem: { id: string; title: string; completedAt: string };
+      };
+      setActionItems((prev) => prev.filter((a) => a.id !== actionItemId));
+      setCompletedActionItems((prev) => [
+        {
+          id: j.actionItem.id,
+          title: j.actionItem.title,
+          completedAt: j.actionItem.completedAt.slice(0, 10),
+        },
+        ...prev,
+      ]);
+    } finally {
+      setCompleting(null);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-[var(--bg-page)] text-slate-100">
@@ -66,17 +107,71 @@ export function PrivateClientPortalClient({ data }: { data: PortalData }) {
 
             {actionItems.length > 0 ? (
               <div className="mt-5 rounded-xl bg-amber-500/10 p-4 ring-1 ring-amber-500/25">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-200/80">
-                  Action needed from you
-                </p>
-                <ul className="mt-2 space-y-1">
-                  {actionItems.map((title) => (
-                    <li key={title} className="text-sm text-amber-50">
-                      {title}
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-200/80">
+                    Action needed from you
+                  </p>
+                  <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-amber-100">
+                    {actionItems.length}
+                  </span>
+                </div>
+                <ul className="mt-3 space-y-2">
+                  {actionItems.map((item, index) => (
+                    <li
+                      key={item.id}
+                      className="flex items-start gap-3 rounded-lg bg-amber-500/5 px-3 py-2.5 ring-1 ring-amber-500/15"
+                    >
+                      <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={false}
+                          disabled={completing === item.id}
+                          onChange={() => void completeAction(item.id)}
+                          className="mt-0.5 h-4 w-4 shrink-0 rounded border-amber-400/40 bg-transparent accent-amber-400"
+                          aria-label={`Mark "${item.title}" as done`}
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-[10px] font-medium uppercase tracking-wider text-amber-200/60">
+                            Item {index + 1}
+                          </span>
+                          <span className="mt-0.5 block text-sm leading-snug text-amber-50">
+                            {item.title}
+                          </span>
+                        </span>
+                      </label>
                     </li>
                   ))}
                 </ul>
+                <p className="mt-3 text-xs text-amber-200/50">
+                  Tick each item when you&apos;ve completed it — it will disappear from this list.
+                </p>
               </div>
+            ) : null}
+
+            {completedActionItems.length > 0 ? (
+              <details className="mt-5 rounded-xl bg-white/[0.03] p-4 ring-1 ring-white/[0.06]">
+                <summary className="cursor-pointer text-[10px] font-semibold uppercase tracking-wider text-slate-400 hover:text-slate-200">
+                  Completed actions ({completedActionItems.length})
+                </summary>
+                <ul className="mt-3 space-y-2">
+                  {completedActionItems.map((item) => (
+                    <li
+                      key={item.id}
+                      className="flex items-start justify-between gap-3 rounded-lg bg-white/[0.02] px-3 py-2 text-sm"
+                    >
+                      <span className="flex min-w-0 items-start gap-2 text-slate-400">
+                        <span className="mt-0.5 text-emerald-400" aria-hidden>
+                          ✓
+                        </span>
+                        <span className="line-through decoration-slate-600">{item.title}</span>
+                      </span>
+                      <span className="shrink-0 text-xs text-slate-500">
+                        {formatDate(item.completedAt)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
             ) : null}
 
             {project.outOfScopeFlag ? (

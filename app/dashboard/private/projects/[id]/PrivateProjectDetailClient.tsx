@@ -42,6 +42,7 @@ export function PrivateProjectDetailClient({ projectId }: { projectId: string })
   const [notes, setNotes] = useState("");
   const [actionTitle, setActionTitle] = useState("");
   const [saving, setSaving] = useState(false);
+  const [completingAction, setCompletingAction] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const r = await fetch(`/api/private/projects/${projectId}`);
@@ -93,10 +94,23 @@ export function PrivateProjectDetailClient({ projectId }: { projectId: string })
     void load();
   }
 
+  async function completeAction(actionItemId: string) {
+    setCompletingAction(actionItemId);
+    await fetch(`/api/private/projects/${projectId}/actions`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ actionItemId, complete: true }),
+    });
+    setCompletingAction(null);
+    void load();
+  }
+
   if (error) return <p className="text-sm text-red-300">{error}</p>;
   if (!data) return <p className="text-sm text-slate-500">Loading…</p>;
 
   const p = data.project;
+  const openActions = data.actionItems.filter((a) => !a.completedAt && a.clientFacing);
+  const completedActions = data.actionItems.filter((a) => a.completedAt);
 
   return (
     <div className="space-y-6">
@@ -121,6 +135,49 @@ export function PrivateProjectDetailClient({ projectId }: { projectId: string })
           Expenses
         </Link>
       </div>
+
+      {openActions.length > 0 ? (
+        <div className="rounded-xl bg-amber-500/10 p-5 ring-1 ring-amber-500/25">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-200/80">
+              Action needed from client
+            </p>
+            <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-amber-100">
+              {openActions.length}
+            </span>
+          </div>
+          <ul className="mt-3 space-y-2">
+            {openActions.map((item, index) => (
+              <li
+                key={item.id}
+                className="flex items-start gap-3 rounded-lg bg-amber-500/5 px-3 py-2.5 ring-1 ring-amber-500/15"
+              >
+                <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={false}
+                    disabled={completingAction === item.id}
+                    onChange={() => void completeAction(item.id)}
+                    className="mt-0.5 h-4 w-4 shrink-0 rounded border-amber-400/40 bg-transparent accent-amber-400"
+                    aria-label={`Mark "${item.title}" as actioned`}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[10px] font-medium uppercase tracking-wider text-amber-200/60">
+                      Item {index + 1}
+                    </span>
+                    <span className="mt-0.5 block text-sm leading-snug text-amber-50">
+                      {item.title}
+                    </span>
+                  </span>
+                </label>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-3 text-xs text-amber-200/50">
+            Tick when the client has actioned an item — it clears from the portal and this list.
+          </p>
+        </div>
+      ) : null}
 
       <div className="card-tool rounded-xl p-6">
         <h2 className="text-lg font-semibold text-white">{p.name}</h2>
@@ -234,8 +291,23 @@ export function PrivateProjectDetailClient({ projectId }: { projectId: string })
         <h3 className="text-sm font-semibold text-white">Client action items</h3>
         <ul className="mt-3 space-y-2">
           {data.actionItems.filter((a) => !a.completedAt).map((a) => (
-            <li key={a.id} className="text-sm text-slate-300">
-              {a.title}
+            <li key={a.id} className="flex items-start gap-3 text-sm text-slate-300">
+              <input
+                type="checkbox"
+                checked={false}
+                disabled={completingAction === a.id}
+                onChange={() => void completeAction(a.id)}
+                className="mt-0.5 h-4 w-4 shrink-0 rounded border-white/20 bg-transparent accent-brand-400"
+                aria-label={`Mark "${a.title}" as done`}
+              />
+              <span className="min-w-0 flex-1">
+                {a.title}
+                {!a.clientFacing ? (
+                  <span className="ml-2 text-[10px] uppercase tracking-wider text-slate-500">
+                    Internal
+                  </span>
+                ) : null}
+              </span>
             </li>
           ))}
           {data.actionItems.filter((a) => !a.completedAt).length === 0 ? (
@@ -258,6 +330,37 @@ export function PrivateProjectDetailClient({ projectId }: { projectId: string })
             Add
           </button>
         </div>
+
+        {completedActions.length > 0 ? (
+          <details className="mt-4 border-t border-white/[0.06] pt-4">
+            <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wider text-slate-500 hover:text-slate-300">
+              Completed actions ({completedActions.length})
+            </summary>
+            <ul className="mt-3 space-y-2">
+              {completedActions.map((a) => (
+                <li
+                  key={a.id}
+                  className="flex items-start justify-between gap-3 rounded-lg bg-white/[0.02] px-3 py-2 text-sm"
+                >
+                  <span className="flex min-w-0 items-start gap-2 text-slate-400">
+                    <span className="mt-0.5 text-emerald-400" aria-hidden>
+                      ✓
+                    </span>
+                    <span>
+                      <span className="line-through decoration-slate-600">{a.title}</span>
+                      {!a.clientFacing ? (
+                        <span className="ml-2 text-[10px] uppercase tracking-wider text-slate-600">
+                          Internal
+                        </span>
+                      ) : null}
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-xs text-slate-500">{a.completedAt?.slice(0, 10)}</span>
+                </li>
+              ))}
+            </ul>
+          </details>
+        ) : null}
       </section>
 
       <section className="card-tool rounded-xl p-5">

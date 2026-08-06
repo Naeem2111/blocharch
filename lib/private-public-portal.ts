@@ -25,8 +25,9 @@ export async function getPublicPrivateProjectBySlug(slug: string) {
         take: 12,
       },
       actionItems: {
-        where: { clientFacing: true, completedAt: null },
-        orderBy: { createdAt: "desc" },
+        where: { clientFacing: true },
+        orderBy: [{ completedAt: "desc" }, { createdAt: "desc" }],
+        take: 40,
       },
     },
   });
@@ -79,7 +80,16 @@ export async function getPublicPrivateProjectBySlug(slug: string) {
       outOfScopeFlag: project.outOfScopeFlag,
     },
     stages,
-    actionItems: project.actionItems.map((a) => a.title),
+    actionItems: project.actionItems
+      .filter((a) => !a.completedAt)
+      .map((a) => ({ id: a.id, title: a.title })),
+    completedActionItems: project.actionItems
+      .filter((a) => a.completedAt)
+      .map((a) => ({
+        id: a.id,
+        title: a.title,
+        completedAt: a.completedAt!.toISOString().slice(0, 10),
+      })),
     updates: project.updates.map((u) => ({
       title: u.title,
       body: u.body,

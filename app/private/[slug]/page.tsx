@@ -11,5 +11,5 @@ export default async function PrivateClientPortalPage({
   const data = await getPublicPrivateProjectBySlug(resolved.slug);
   if (!data) notFound();
 
-  return <PrivateClientPortalClient data={data} />;
+  return <PrivateClientPortalClient slug={resolved.slug} data={data} />;
 }
