@@ -12,6 +12,7 @@ type AssignedProject = {
   displayTitle?: string;
   projectNumber: string;
   complexity: string;
+  progressPercent: number | null;
   client: { id: string; name: string };
 };
 
@@ -97,6 +98,11 @@ function emptyHousekeepingLine(): LineItemForm {
     completedSummary: "",
     housekeepingNote: "",
   };
+}
+
+function currentProjectProgress(projects: AssignedProject[], projectId: string): number {
+  const p = projects.find((x) => x.id === projectId);
+  return p?.progressPercent ?? 0;
 }
 
 function EntryTypeSegment({
@@ -769,6 +775,9 @@ export function AthleteSubmissionsClient() {
                     updateLine(li.key, {
                       projectId,
                       clientId: p?.client.id ?? "",
+                      completionPercent: projectId
+                        ? currentProjectProgress(projects, projectId)
+                        : 0,
                     });
                   }}
                   className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
@@ -862,6 +871,11 @@ export function AthleteSubmissionsClient() {
                   value={li.completionPercent}
                   onChange={(v) => updateLine(li.key, { completionPercent: v })}
                   disabled={formLocked}
+                  label={
+                    project?.progressPercent != null
+                      ? `Project progress (currently ${project.progressPercent}% on record)`
+                      : "Project progress"
+                  }
                 />
               </div>
               <label className="text-xs text-slate-400 md:col-span-2">
