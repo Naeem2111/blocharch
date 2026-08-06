@@ -34,7 +34,7 @@ import type {
 	PublicClientPortalProject,
 } from "@/lib/public-client-portal";
 
-type Tab = "tracker" | "completed" | "notifications";
+type Tab = "tracker" | "pipeline" | "completed" | "notifications";
 
 function formatDateTime(iso: string | null): string {
 	if (!iso) return "";
@@ -416,29 +416,30 @@ export function ClientPortalClient({
 	).length;
 
 	const calendarProjects =
-		tab === "tracker" ? data.activeProjects : data.completedProjects;
+		tab === "tracker"
+			? data.activeProjects
+			: tab === "completed"
+				? data.completedProjects
+				: [];
 
-	const dueMarks = useMemo(
-		() => [
-			...calendarProjects
-				.filter((p) => p.dueDate)
+	const dueMarks = useMemo(() => {
+		if (tab === "pipeline") {
+			return data.pipelineProjects
+				.filter((p) => p.targetDueDate)
 				.map((p) => ({
-					date: p.dueDate!,
-					label: `${p.name} due`,
-					color: projectDueColor(daysUntilDueFromIso(p.dueDate)),
-				})),
-			...(tab === "tracker"
-				? data.pipelineProjects
-						.filter((p) => p.targetDueDate)
-						.map((p) => ({
-							date: p.targetDueDate!,
-							label: `${p.name} (pipeline)`,
-							color: "#a855f7",
-						}))
-				: []),
-		],
-		[calendarProjects, data.pipelineProjects, tab],
-	);
+					date: p.targetDueDate!,
+					label: `${p.name} target`,
+					color: "#a855f7",
+				}));
+		}
+		return calendarProjects
+			.filter((p) => p.dueDate)
+			.map((p) => ({
+				date: p.dueDate!,
+				label: `${p.name} due`,
+				color: projectDueColor(daysUntilDueFromIso(p.dueDate)),
+			}));
+	}, [calendarProjects, data.pipelineProjects, tab]);
 
 	const beatenSummary = useMemo(() => {
 		const total = data.completedProjects.length;
@@ -452,6 +453,7 @@ export function ClientPortalClient({
 
 	const navItems: { id: Tab; label: string; badge?: number }[] = [
 		{ id: "tracker", label: "Project tracker" },
+		{ id: "pipeline", label: "Pipeline tracker" },
 		{ id: "completed", label: "Completed projects" },
 		{
 			id: "notifications",
@@ -463,9 +465,11 @@ export function ClientPortalClient({
 	const headerSubtitle =
 		tab === "tracker"
 			? "Live view of active project status and deadlines."
-			: tab === "completed"
-				? "Completed projects · full delivery record"
-				: "Beat deadline updates across your projects";
+			: tab === "pipeline"
+				? "Upcoming work scheduled before projects go live."
+				: tab === "completed"
+					? "Completed projects · full delivery record"
+					: "Beat deadline updates across your projects";
 
 	return (
 		<div className="flex min-h-screen">
@@ -597,23 +601,6 @@ export function ClientPortalClient({
 							</section>
 
 							<section>
-								{data.pipelineProjects.length > 0 ? (
-									<>
-										<div className="mb-6 flex items-center justify-between gap-3">
-											<h2 className="text-xs font-semibold uppercase tracking-wider text-violet-300">
-												Upcoming pipeline
-											</h2>
-											<span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-												{data.pipelineProjects.length} scheduled
-											</span>
-										</div>
-										<div className="mb-6 space-y-3">
-											{data.pipelineProjects.map((project) => (
-												<PipelineCard key={project.id} project={project} />
-											))}
-										</div>
-									</>
-								) : null}
 								<div className="flex items-center justify-between gap-3">
 									<h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
 										Active projects
@@ -630,6 +617,53 @@ export function ClientPortalClient({
 									<div className="mt-3 space-y-3">
 										{data.activeProjects.map((project) => (
 											<ProjectCard key={project.id} project={project} />
+										))}
+									</div>
+								)}
+							</section>
+						</div>
+					) : null}
+
+					{tab === "pipeline" ? (
+						<div className="grid gap-6 xl:grid-cols-[minmax(0,360px)_1fr]">
+							<section>
+								<h2 className="text-xs font-semibold uppercase tracking-wider text-violet-300">
+									Pipeline target dates
+								</h2>
+								<div className="client-portal-card mt-3 rounded-xl border border-violet-500/20 bg-violet-500/[0.04] p-5">
+									<MiniMonthCalendar
+										size="lg"
+										markStyle="fill"
+										month={calendarMonth}
+										marks={dueMarks}
+										onSelectDate={(date) => setCalendarMonth(date.slice(0, 7))}
+									/>
+									<div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500">
+										<span className="inline-flex items-center gap-2">
+											<span className="h-2.5 w-2.5 rounded-sm bg-[#a855f7] shadow-[inset_0_0_0_1px_rgba(15,23,42,0.14)]" />
+											Target due date
+										</span>
+									</div>
+								</div>
+							</section>
+
+							<section>
+								<div className="flex items-center justify-between gap-3">
+									<h2 className="text-xs font-semibold uppercase tracking-wider text-violet-300">
+										Upcoming pipeline
+									</h2>
+									<span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+										{data.pipelineProjects.length} scheduled
+									</span>
+								</div>
+								{data.pipelineProjects.length === 0 ? (
+									<p className="mt-3 text-sm text-slate-500">
+										No upcoming pipeline projects right now.
+									</p>
+								) : (
+									<div className="mt-3 space-y-3">
+										{data.pipelineProjects.map((project) => (
+											<PipelineCard key={project.id} project={project} />
 										))}
 									</div>
 								)}
