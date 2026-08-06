@@ -99,6 +99,50 @@ export function validatePhaseSplitMap(map: PhaseSplitMap): { ok: boolean; sum: n
   return { ok: sum === 100, sum };
 }
 
+/** Split a stage fee % across its phases, weighted by typical duration. */
+export function distributeFeePercentAcrossStages(
+  stageKeys: PrivateDesignStage[],
+  totalPercent: number,
+): Partial<PhaseSplitMap> {
+  if (stageKeys.length === 0) return {};
+  const totalDays = stageKeys.reduce((sum, stage) => sum + PRIVATE_STAGE_DURATIONS[stage], 0);
+  if (totalDays <= 0) {
+    const even = Math.round(totalPercent / stageKeys.length);
+    return Object.fromEntries(stageKeys.map((stage) => [stage, even])) as Partial<PhaseSplitMap>;
+  }
+  const raw = stageKeys.map((stage) => ({
+    stage,
+    pct: (PRIVATE_STAGE_DURATIONS[stage] / totalDays) * totalPercent,
+  }));
+  const rounded = raw.map((row) => ({ ...row, pct: Math.round(row.pct) }));
+  let sum = rounded.reduce((s, row) => s + row.pct, 0);
+  let i = 0;
+  while (sum !== Math.round(totalPercent) && i < 100) {
+    const idx = i % rounded.length;
+    rounded[idx].pct += sum < Math.round(totalPercent) ? 1 : -1;
+    sum = rounded.reduce((s, row) => s + row.pct, 0);
+    i++;
+  }
+  return Object.fromEntries(rounded.map((row) => [row.stage, row.pct])) as Partial<PhaseSplitMap>;
+}
+
+/** Apply stage-level fee overrides onto the per-phase split map before save or billing. */
+export function syncPhaseFeePercentsFromStructure(
+  phaseFeePercents: PhaseSplitMap,
+  phaseStructure: PhaseStructure,
+): PhaseSplitMap {
+  let next = { ...phaseFeePercents };
+  for (const group of phaseStructure.phases) {
+    if (group.feePercent != null && group.stageKeys.length > 0) {
+      next = {
+        ...next,
+        ...distributeFeePercentAcrossStages(group.stageKeys, group.feePercent),
+      };
+    }
+  }
+  return next;
+}
+
 export function phaseStatus(
   stage: PrivateDesignStage,
   currentStage: PrivateDesignStage,
@@ -175,13 +219,17 @@ export function buildProjectPhaseBreakdown(input: {
   const { totals, unassignedZar } = expenseTotalsByStage(input.expenses ?? []);
   const totalExpenseZar = PRIVATE_STAGE_ORDER.reduce((sum, stage) => sum + totals[stage], 0);
   const costPercents = computeCostPercentsFromExpenses(totals);
+  const effectiveFeePercents = syncPhaseFeePercentsFromStructure(
+    input.phaseFeePercents,
+    input.phaseStructure,
+  );
 
   const stages = PRIVATE_STAGE_ORDER.map((stage) =>
     buildStageRow({
       stage,
       designStage: input.designStage,
       feeZar: input.feeZar,
-      phaseFeePercents: input.phaseFeePercents,
+      phaseFeePercents: effectiveFeePercents,
       stageExpenseZar: totals[stage],
       totalExpenseZar,
     }),

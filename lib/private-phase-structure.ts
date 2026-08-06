@@ -5,6 +5,8 @@ export type ProjectPhaseGroup = {
   id: string;
   name: string;
   stageKeys: PrivateDesignStage[];
+  /** When set, fee is allocated to child phases by typical duration — no per-phase entry needed. */
+  feePercent?: number;
 };
 
 export type PhaseStructure = {
@@ -56,7 +58,14 @@ export function parsePhaseStructure(json: unknown): PhaseStructure | null {
     if (!id || !name || !Array.isArray(stageKeysRaw)) return null;
     const stageKeys = stageKeysRaw.map((k) => String(k)) as PrivateDesignStage[];
     if (stageKeys.some((k) => !PRIVATE_STAGE_ORDER.includes(k))) return null;
-    phases.push({ id, name, stageKeys });
+    const feePercentRaw = (item as { feePercent?: unknown }).feePercent;
+    let feePercent: number | undefined;
+    if (feePercentRaw !== undefined && feePercentRaw !== null) {
+      const n = Number(feePercentRaw);
+      if (!Number.isFinite(n) || n < 0 || n > 100) return null;
+      feePercent = Math.round(n);
+    }
+    phases.push({ id, name, stageKeys, ...(feePercent !== undefined ? { feePercent } : {}) });
   }
 
   return { phases };
@@ -145,6 +154,48 @@ export function renamePhase(
       p.id === phaseId ? { ...p, name: name.trim() || p.name } : p,
     ),
   };
+}
+
+export function setPhaseGroupFeePercent(
+  structure: PhaseStructure,
+  phaseId: string,
+  feePercent: number,
+): PhaseStructure {
+  const rounded = Math.max(0, Math.min(100, Math.round(feePercent)));
+  return {
+    phases: structure.phases.map((p) =>
+      p.id === phaseId ? { ...p, feePercent: rounded } : p,
+    ),
+  };
+}
+
+export function clearPhaseGroupFeePercent(
+  structure: PhaseStructure,
+  phaseId: string,
+): PhaseStructure {
+  return {
+    phases: structure.phases.map((p) =>
+      p.id === phaseId ? { ...p, feePercent: undefined } : p,
+    ),
+  };
+}
+
+export function phaseGroupFeeTotal(
+  group: ProjectPhaseGroup,
+  phaseFeePercents: Record<PrivateDesignStage, number>,
+): number {
+  return group.stageKeys.reduce((sum, key) => sum + phaseFeePercents[key], 0);
+}
+
+/** Design phases not yet assigned to this stage — available to add or move here. */
+export function phasesAvailableForGroup(
+  structure: PhaseStructure,
+  groupId: string,
+): PrivateDesignStage[] {
+  const group = structure.phases.find((p) => p.id === groupId);
+  if (!group) return [];
+  const inGroup = new Set(group.stageKeys);
+  return PRIVATE_STAGE_ORDER.filter((key) => !inGroup.has(key));
 }
 
 export type PortalPhaseGroup = {

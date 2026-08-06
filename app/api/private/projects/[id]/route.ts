@@ -11,11 +11,14 @@ import {
   parsePhaseSplitMap,
   validatePhaseSplitMap,
   defaultPhaseSplits,
+  resolvePhaseSplits,
+  syncPhaseFeePercentsFromStructure,
 } from "@/lib/private-phase-splits";
 import {
   parsePhaseStructure,
   validatePhaseStructure,
   defaultPhaseStructure,
+  resolvePhaseStructure,
 } from "@/lib/private-phase-structure";
 
 const projectInclude = {
@@ -179,30 +182,42 @@ export async function PATCH(
       data.projectType = typeResolved.projectType;
       data.customProjectTypeId = typeResolved.customProjectTypeId;
     }
-    if (body.phaseFeePercents !== undefined) {
-      const map = parsePhaseSplitMap(body.phaseFeePercents);
-      if (!map) {
-        return NextResponse.json({ error: "Invalid fee splits" }, { status: 400 });
-      }
-      const check = validatePhaseSplitMap(map);
-      if (!check.ok) {
-        return NextResponse.json(
-          { error: `Fee splits must total 100% (currently ${check.sum}%)` },
-          { status: 400 },
-        );
-      }
-      data.phaseFeePercents = map;
-    }
-    if (body.phaseStructure !== undefined) {
-      const structure = parsePhaseStructure(body.phaseStructure);
+    if (body.phaseFeePercents !== undefined || body.phaseStructure !== undefined) {
+      const structure =
+        body.phaseStructure !== undefined
+          ? parsePhaseStructure(body.phaseStructure)
+          : resolvePhaseStructure(existing.phaseStructure);
       if (!structure) {
         return NextResponse.json({ error: "Invalid stage structure" }, { status: 400 });
       }
-      const check = validatePhaseStructure(structure);
-      if (!check.ok) {
-        return NextResponse.json({ error: check.error }, { status: 400 });
+      const structureCheck = validatePhaseStructure(structure);
+      if (!structureCheck.ok) {
+        return NextResponse.json({ error: structureCheck.error }, { status: 400 });
       }
+
+      const { feePercents: existingFeePercents } = resolvePhaseSplits(
+        existing.phaseFeePercents,
+        existing.phaseCostPercents,
+      );
+      const feeMap =
+        body.phaseFeePercents !== undefined
+          ? parsePhaseSplitMap(body.phaseFeePercents)
+          : existingFeePercents;
+      if (!feeMap) {
+        return NextResponse.json({ error: "Invalid fee splits" }, { status: 400 });
+      }
+
+      const syncedFeePercents = syncPhaseFeePercentsFromStructure(feeMap, structure);
+      const feeCheck = validatePhaseSplitMap(syncedFeePercents);
+      if (!feeCheck.ok) {
+        return NextResponse.json(
+          { error: `Fee splits must total 100% (currently ${feeCheck.sum}%)` },
+          { status: 400 },
+        );
+      }
+
       data.phaseStructure = structure;
+      data.phaseFeePercents = syncedFeePercents;
     }
     if (body.status !== undefined) data.status = String(body.status);
     if (body.name !== undefined) {
