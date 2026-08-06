@@ -22,6 +22,18 @@ function daysBetween(from: Date, to: Date): number {
  * current stage counts min(elapsed, typical). Caps at 99 until council_approved
  * so 100% never overclaims "finished".
  */
+export function resolvePrivateProgressPercent(input: {
+  designStage: PrivateDesignStage;
+  stageStartedAt: Date;
+  manualProgressPercent?: number | null;
+  asOf?: Date;
+}): number {
+  if (input.manualProgressPercent != null) {
+    return Math.min(100, Math.max(0, Math.round(input.manualProgressPercent)));
+  }
+  return computePrivateProgressPercent(input);
+}
+
 export function computePrivateProgressPercent(input: {
   designStage: PrivateDesignStage;
   stageStartedAt: Date;

@@ -29,6 +29,20 @@ type DashboardData = {
     hoursRemaining: number;
     totalEarningsZar: number;
   };
+  earnings: {
+    productionSupportMonthZar: number;
+    productionSupportLifetimeZar: number;
+    privateWorkMonthZar: number;
+    privateWorkLifetimeZar: number;
+    combinedLifetimeZar: number;
+  };
+  privateWork: {
+    monthHours: number;
+    lifetimeHours: number;
+    monthEarningsZar: number;
+    lifetimeEarningsZar: number;
+    hourlyRateZar: number;
+  };
   activeProjects: number;
   completedProjects: number;
   openBlockers: number;
@@ -74,10 +88,47 @@ export function AthleteDashboardClient() {
   if (error) return <p className="text-sm text-red-400">{error}</p>;
   if (!data) return <p className="text-sm text-slate-500">Loading dashboard…</p>;
 
-  const { profile, summary } = data;
+  const { profile, summary, earnings } = data;
 
   return (
     <>
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="card-tool rounded-xl p-4 lg:col-span-1">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+            All-time earnings
+          </p>
+          <p className="mt-1 text-3xl font-semibold tabular-nums text-white">
+            R {earnings.combinedLifetimeZar.toLocaleString()}
+          </p>
+          <p className="mt-2 text-xs text-slate-500">
+            R {earnings.productionSupportLifetimeZar.toLocaleString()} production support · R{" "}
+            {earnings.privateWorkLifetimeZar.toLocaleString()} private work
+          </p>
+        </div>
+        <div className="card-tool rounded-xl p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+            Est. earnings
+          </p>
+          <p className="mt-0.5 text-[10px] font-medium text-brand-300/90">Production support</p>
+          <p className="mt-1 text-2xl font-semibold tabular-nums text-brand-400">
+            R {earnings.productionSupportMonthZar.toLocaleString()}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">This month · outsourcing</p>
+        </div>
+        <div className="card-tool rounded-xl p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+            Est. earnings
+          </p>
+          <p className="mt-0.5 text-[10px] font-medium text-violet-300/90">Private work</p>
+          <p className="mt-1 text-2xl font-semibold tabular-nums text-violet-300">
+            R {earnings.privateWorkMonthZar.toLocaleString()}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            {data.privateWork.monthHours.toFixed(1)}h logged this month
+          </p>
+        </div>
+      </div>
+
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="card-tool rounded-xl p-4">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">This month</p>
@@ -90,12 +141,6 @@ export function AthleteDashboardClient() {
           <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Overtime</p>
           <p className="mt-1 text-2xl font-semibold tabular-nums text-amber-400/90">
             {summary.monthOvertimeHours.toFixed(1)}h
-          </p>
-        </div>
-        <div className="card-tool rounded-xl p-4">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Est. earnings</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums text-brand-400">
-            R {summary.totalEarningsZar.toLocaleString()}
           </p>
         </div>
         <div className="card-tool rounded-xl p-4">
@@ -122,6 +167,12 @@ export function AthleteDashboardClient() {
           className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-brand-500"
         >
           Log today&apos;s work
+        </Link>
+        <Link
+          href="/dashboard/athlete/private/log"
+          className="rounded-lg bg-white/[0.08] px-4 py-2 text-sm text-slate-200 ring-1 ring-white/[0.08] hover:bg-white/[0.12]"
+        >
+          Private work log
         </Link>
         <Link
           href="/dashboard/athlete/projects"

@@ -2,7 +2,8 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requirePrivateOpsSession, slugifyPrivateClient } from "@/lib/private-access";
-import { isPrivateDesignStage, isPrivateProjectType } from "@/lib/private-constants";
+import { isPrivateDesignStage } from "@/lib/private-constants";
+import { resolveProjectTypeInput } from "@/lib/private-project-types";
 import { serializePrivateProject } from "@/lib/private-serialize";
 import { parseDateOnly } from "@/lib/ops-hours";
 
@@ -23,6 +24,9 @@ const projectInclude = {
       athleteCode: true,
       privateWeeklyCapHours: true,
     },
+  },
+  customProjectType: {
+    select: { id: true, label: true },
   },
 } as const;
 
@@ -68,9 +72,11 @@ export async function POST(request: NextRequest) {
     const designStage = isPrivateDesignStage(String(body.designStage || ""))
       ? body.designStage
       : "site_measure_up";
-    const projectType = isPrivateProjectType(String(body.projectType || ""))
-      ? body.projectType
-      : "residential_extension";
+    const projectTypeResolved = await resolveProjectTypeInput(body);
+    if (!projectTypeResolved.ok) {
+      return NextResponse.json({ error: projectTypeResolved.error }, { status: 400 });
+    }
+    const { projectType, customProjectTypeId } = projectTypeResolved;
 
     if (!clientName) {
       return NextResponse.json({ error: "Client name is required" }, { status: 400 });
@@ -114,6 +120,7 @@ export async function POST(request: NextRequest) {
           name,
           address: address || name,
           projectType,
+          customProjectTypeId,
           designStage,
           feeZar,
           briefReceivedAt,

@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { athleteMonthlySummary, requireAthletePortalSession } from "@/lib/ops-access";
+import { athleteMonthlySummary, requireAthletePortalSession, athleteProductionSupportLifetimeEarnings } from "@/lib/ops-access";
 import { prisma } from "@/lib/prisma";
 import { whereAthleteActiveProjects } from "@/lib/ops-project-assignments";
 import {
@@ -11,6 +11,7 @@ import {
   type OpsAlertSeverity,
 } from "@/lib/ops-alerts";
 import { dateOnlyUtc } from "@/lib/ops-hours";
+import { athletePrivateWorkEarnings } from "@/lib/private-athlete-earnings";
 
 export async function GET(request: NextRequest) {
   const gate = await requireAthletePortalSession(request);
@@ -18,6 +19,15 @@ export async function GET(request: NextRequest) {
   const { athlete } = gate;
 
   const summary = await athleteMonthlySummary(athlete);
+  const privateWork = await athletePrivateWorkEarnings(athlete.id, athlete);
+  const productionSupportLifetimeZar = await athleteProductionSupportLifetimeEarnings(athlete);
+  const earnings = {
+    productionSupportMonthZar: summary.totalEarningsZar,
+    productionSupportLifetimeZar,
+    privateWorkMonthZar: privateWork.monthEarningsZar,
+    privateWorkLifetimeZar: privateWork.lifetimeEarningsZar,
+    combinedLifetimeZar: productionSupportLifetimeZar + privateWork.lifetimeEarningsZar,
+  };
   const athleteProjectsWhere = whereAthleteActiveProjects(athlete.id);
   const activeProjects = await prisma.opsProject.count({
     where: {
@@ -143,6 +153,8 @@ export async function GET(request: NextRequest) {
       monthlyHourCap: athlete.monthlyHourCap,
     },
     summary,
+    earnings,
+    privateWork,
     activeProjects,
     completedProjects,
     openBlockers,

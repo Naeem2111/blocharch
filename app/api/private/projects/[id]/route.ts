@@ -6,6 +6,7 @@ import { isPrivateDesignStage } from "@/lib/private-constants";
 import { PRIVATE_STAGE_LABELS } from "@/lib/private-constants";
 import { serializePrivateProject } from "@/lib/private-serialize";
 import { parseDateOnly } from "@/lib/ops-hours";
+import { resolveProjectTypeInput } from "@/lib/private-project-types";
 
 const projectInclude = {
   client: {
@@ -24,6 +25,9 @@ const projectInclude = {
       athleteCode: true,
       privateWeeklyCapHours: true,
     },
+  },
+  customProjectType: {
+    select: { id: true, label: true },
   },
   updates: { orderBy: { occurredAt: "desc" as const }, take: 20 },
   actionItems: { orderBy: { createdAt: "desc" as const } },
@@ -117,9 +121,14 @@ export async function PATCH(
     }
     if (body.stageNotes !== undefined) data.stageNotes = String(body.stageNotes || "") || null;
     if (body.assignedAthleteId !== undefined) {
-      data.assignedAthleteId = body.assignedAthleteId
-        ? String(body.assignedAthleteId)
-        : null;
+      const athleteId = body.assignedAthleteId ? String(body.assignedAthleteId) : null;
+      if (athleteId) {
+        const athlete = await prisma.opsAthlete.findUnique({ where: { id: athleteId } });
+        if (!athlete) {
+          return NextResponse.json({ error: "Assigned athlete not found" }, { status: 400 });
+        }
+      }
+      data.assignedAthleteId = athleteId;
     }
     if (body.feeZar !== undefined) data.feeZar = Number(body.feeZar);
     if (body.costZar !== undefined) data.costZar = Number(body.costZar);
@@ -131,6 +140,30 @@ export async function PATCH(
       data.councilSubmittedAt = body.councilSubmittedAt
         ? parseDateOnly(String(body.councilSubmittedAt))
         : null;
+    }
+    if (body.briefReceivedAt !== undefined) {
+      data.briefReceivedAt = body.briefReceivedAt
+        ? parseDateOnly(String(body.briefReceivedAt))
+        : null;
+    }
+    if (body.manualProgressPercent !== undefined) {
+      if (body.manualProgressPercent === null || body.manualProgressPercent === "") {
+        data.manualProgressPercent = null;
+      } else {
+        const n = Number(body.manualProgressPercent);
+        if (!Number.isFinite(n) || n < 0 || n > 100) {
+          return NextResponse.json({ error: "Progress must be between 0 and 100" }, { status: 400 });
+        }
+        data.manualProgressPercent = Math.round(n);
+      }
+    }
+    if (body.projectType !== undefined) {
+      const typeResolved = await resolveProjectTypeInput(body);
+      if (!typeResolved.ok) {
+        return NextResponse.json({ error: typeResolved.error }, { status: 400 });
+      }
+      data.projectType = typeResolved.projectType;
+      data.customProjectTypeId = typeResolved.customProjectTypeId;
     }
     if (body.status !== undefined) data.status = String(body.status);
     if (body.name !== undefined) {
@@ -148,15 +181,31 @@ export async function PATCH(
 
     const clientName =
       body.clientName !== undefined ? String(body.clientName).trim() : undefined;
+    const clientContactEmail =
+      body.clientContactEmail !== undefined
+        ? String(body.clientContactEmail || "").trim() || null
+        : undefined;
+    const clientContactPhone =
+      body.clientContactPhone !== undefined
+        ? String(body.clientContactPhone || "").trim() || null
+        : undefined;
     if (clientName !== undefined && !clientName) {
       return NextResponse.json({ error: "Client name is required" }, { status: 400 });
     }
 
     const updated = await prisma.$transaction(async (tx) => {
-      if (clientName !== undefined) {
+      if (
+        clientName !== undefined ||
+        clientContactEmail !== undefined ||
+        clientContactPhone !== undefined
+      ) {
         await tx.privateClient.update({
           where: { id: existing.clientId },
-          data: { name: clientName },
+          data: {
+            ...(clientName !== undefined ? { name: clientName } : {}),
+            ...(clientContactEmail !== undefined ? { contactEmail: clientContactEmail } : {}),
+            ...(clientContactPhone !== undefined ? { contactPhone: clientContactPhone } : {}),
+          },
         });
       }
 
@@ -181,6 +230,7 @@ export async function PATCH(
               privateWeeklyCapHours: true,
             },
           },
+          customProjectType: { select: { id: true, label: true } },
         },
       });
 

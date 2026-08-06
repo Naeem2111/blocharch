@@ -786,6 +786,17 @@ enum PrivateProjectType {
   other
 }
 
+/** User-defined project type label when projectType is other — reused across projects. */
+model PrivateProjectCustomType {
+  id        String   @id @default(uuid())
+  label     String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  projects PrivateProject[]
+
+  @@map("private_project_custom_types")
+}
+
 /** End client for a private (non–Production Lane) project. */
 model PrivateClient {
   id           String   @id @default(uuid())
@@ -811,6 +822,7 @@ model PrivateProject {
   name            String
   address         String?              @db.Text
   projectType     PrivateProjectType   @default(residential_extension) @map("project_type")
+  customProjectTypeId String?            @map("custom_project_type_id")
   designStage     PrivateDesignStage   @default(site_measure_up) @map("design_stage")
   status          PrivateProjectStatus @default(active)
   /** Fixed fee excl. VAT (ZAR). */
@@ -824,6 +836,8 @@ model PrivateProject {
   briefReceivedAt DateTime?            @map("brief_received_at") @db.Date
   councilSubmittedAt DateTime?         @map("council_submitted_at") @db.Date
   /** When the current design stage started — drives duration-weighted progress. */
+  /** When set, overrides duration-weighted progress in UI (0–100). */
+  manualProgressPercent Int? @map("manual_progress_percent")
   stageStartedAt  DateTime             @default(now()) @map("stage_started_at") @db.Date
   completedAt     DateTime?            @map("completed_at") @db.Date
   handoverOutcome String?              @map("handover_outcome")
@@ -832,6 +846,7 @@ model PrivateProject {
 
   client          PrivateClient        @relation(fields: [clientId], references: [id], onDelete: Cascade)
   assignedAthlete OpsAthlete?          @relation(fields: [assignedAthleteId], references: [id], onDelete: SetNull)
+  customProjectType PrivateProjectCustomType? @relation(fields: [customProjectTypeId], references: [id], onDelete: SetNull)
   updates         PrivateProjectUpdate[]
   actionItems     PrivateActionItem[]
   hourLogs        PrivateHourLog[]

@@ -4,7 +4,7 @@ import {
   PRIVATE_STAGE_ORDER,
   PRIVATE_STAGE_DONE_COPY,
 } from "@/lib/private-constants";
-import { computePrivateProgressPercent, privateStageMeta } from "@/lib/private-progress";
+import { resolvePrivateProgressPercent, privateStageMeta } from "@/lib/private-progress";
 
 export async function getPublicPrivateProjectBySlug(slug: string) {
   const client = await prisma.privateClient.findFirst({
@@ -33,9 +33,10 @@ export async function getPublicPrivateProjectBySlug(slug: string) {
   });
   if (!project) return null;
 
-  const progressPercent = computePrivateProgressPercent({
+  const progressPercent = resolvePrivateProgressPercent({
     designStage: project.designStage,
     stageStartedAt: project.stageStartedAt,
+    manualProgressPercent: project.manualProgressPercent,
   });
   const meta = privateStageMeta({
     designStage: project.designStage,

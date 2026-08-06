@@ -2,18 +2,23 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  PRIVATE_PROJECT_TYPE_LABELS,
-  PRIVATE_STAGE_LABELS,
-  PRIVATE_STAGE_ORDER,
-} from "@/lib/private-constants";
-import type { PrivateProjectType, PrivateDesignStage } from "@prisma/client";
+import { PRIVATE_STAGE_LABELS, PRIVATE_STAGE_ORDER } from "@/lib/private-constants";
+import type { PrivateDesignStage } from "@prisma/client";
 
 type Athlete = { id: string; fullName: string; athleteCode: string };
+type CustomProjectType = { id: string; label: string };
+type ProjectTypeOptions = {
+  builtIn: Array<{ key: string; label: string }>;
+  customTypes: CustomProjectType[];
+};
 
 export function PrivateOnboardingClient() {
   const router = useRouter();
   const [athletes, setAthletes] = useState<Athlete[]>([]);
+  const [typeOptions, setTypeOptions] = useState<ProjectTypeOptions>({
+    builtIn: [],
+    customTypes: [],
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState({
@@ -21,20 +26,34 @@ export function PrivateOnboardingClient() {
     contactEmail: "",
     contactPhone: "",
     projectAddress: "",
-    projectType: "residential_extension" as PrivateProjectType,
+    projectTypeSelect: "residential_extension",
+    customTypeLabel: "",
     feeZar: "",
     assignedAthleteId: "",
     designStage: "site_measure_up" as PrivateDesignStage,
   });
 
   useEffect(() => {
-    void fetch("/api/private/athletes")
-      .then((r) => r.json())
-      .then((j) => setAthletes(j.athletes || []));
+    void Promise.all([
+      fetch("/api/private/athletes").then((r) => r.json()),
+      fetch("/api/private/project-types").then((r) => r.json()),
+    ]).then(([athletesJson, typesJson]) => {
+      setAthletes(athletesJson.athletes || []);
+      if (typesJson.builtIn) {
+        setTypeOptions({
+          builtIn: typesJson.builtIn,
+          customTypes: typesJson.customTypes || [],
+        });
+      }
+    });
   }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (form.projectTypeSelect === "other" && !form.customTypeLabel.trim()) {
+      setError("Enter a label for this project type.");
+      return;
+    }
     setSaving(true);
     setError("");
     const r = await fetch("/api/private/projects", {
@@ -46,7 +65,9 @@ export function PrivateOnboardingClient() {
         contactPhone: form.contactPhone || null,
         projectAddress: form.projectAddress,
         name: form.projectAddress,
-        projectType: form.projectType,
+        projectType: form.projectTypeSelect,
+        customProjectTypeLabel:
+          form.projectTypeSelect === "other" ? form.customTypeLabel.trim() : null,
         feeZar: Number(form.feeZar || 0),
         assignedAthleteId: form.assignedAthleteId || null,
         designStage: form.designStage,
@@ -118,18 +139,47 @@ export function PrivateOnboardingClient() {
             Project type
             <select
               className={field}
-              value={form.projectType}
+              value={form.projectTypeSelect}
               onChange={(e) =>
-                setForm({ ...form, projectType: e.target.value as PrivateProjectType })
+                setForm({
+                  ...form,
+                  projectTypeSelect: e.target.value,
+                  customTypeLabel: e.target.value === "other" ? form.customTypeLabel : "",
+                })
               }
             >
-              {(Object.keys(PRIVATE_PROJECT_TYPE_LABELS) as PrivateProjectType[]).map((k) => (
-                <option key={k} value={k}>
-                  {PRIVATE_PROJECT_TYPE_LABELS[k]}
+              {typeOptions.builtIn.map((t) => (
+                <option key={t.key} value={t.key}>
+                  {t.label}
                 </option>
               ))}
+              {typeOptions.customTypes.length > 0 ? (
+                <optgroup label="Saved types">
+                  {typeOptions.customTypes.map((t) => (
+                    <option key={t.id} value={`custom:${t.id}`}>
+                      {t.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ) : null}
+              <option value="other">Other (specify new)</option>
             </select>
           </label>
+          {form.projectTypeSelect === "other" ? (
+            <label className="block text-xs text-slate-400">
+              New project type label
+              <input
+                required
+                className={field}
+                value={form.customTypeLabel}
+                onChange={(e) => setForm({ ...form, customTypeLabel: e.target.value })}
+                placeholder="e.g. Pool house, Renovation"
+              />
+              <span className="mt-1 block text-[11px] text-slate-500">
+                Saved for reuse on future projects.
+              </span>
+            </label>
+          ) : null}
           <label className="block text-xs text-slate-400">
             Fee (excl VAT)
             <input

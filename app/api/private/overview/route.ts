@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
       assignedAthlete: {
         select: { id: true, fullName: true, athleteCode: true, privateWeeklyCapHours: true },
       },
+      customProjectType: { select: { id: true, label: true } },
       actionItems: {
         where: { completedAt: null, clientFacing: true },
         orderBy: { createdAt: "desc" },

@@ -106,6 +106,38 @@ export async function athleteMonthlySummary(athlete: OpsAthlete, reference = new
   };
 }
 
+/** Sum estimated production-support earnings for every month since the athlete started. */
+export async function athleteProductionSupportLifetimeEarnings(athlete: OpsAthlete) {
+  const submissions = await prisma.opsDailySubmission.findMany({
+    where: { athleteId: athlete.id },
+    select: { submissionDate: true, totalHours: true },
+  });
+
+  const hoursByMonth = new Map<string, number>();
+  for (const row of submissions) {
+    const key = `${row.submissionDate.getUTCFullYear()}-${row.submissionDate.getUTCMonth()}`;
+    hoursByMonth.set(key, (hoursByMonth.get(key) ?? 0) + Number(row.totalHours));
+  }
+
+  let total = 0;
+  let cursor = monthStartUtc(athlete.blocharchStartDate);
+  const end = monthStartUtc(new Date());
+
+  while (cursor <= end) {
+    const key = `${cursor.getUTCFullYear()}-${cursor.getUTCMonth()}`;
+    const monthHours = hoursByMonth.get(key) ?? 0;
+    total += computeMonthlyHoursSummary({
+      monthHours,
+      monthlyHourCap: athlete.monthlyHourCap,
+      baseMonthlyPayZar: Number(athlete.baseMonthlyPayZar),
+      overtimeRateZar: Number(athlete.overtimeRateZar),
+    }).totalEarningsZar;
+    cursor = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 1));
+  }
+
+  return total;
+}
+
 export const athleteProjectSelect = {
   id: true,
   name: true,

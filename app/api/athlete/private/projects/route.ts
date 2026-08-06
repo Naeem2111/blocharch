@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
           privateWeeklyCapHours: true,
         },
       },
+      customProjectType: { select: { id: true, label: true } },
     },
     orderBy: { updatedAt: "desc" },
   });

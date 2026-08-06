@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requirePrivateAthleteSession } from "@/lib/private-access";
 import { parseDateOnly } from "@/lib/ops-hours";
+import { privateAthleteHourlyRateZar } from "@/lib/private-athlete-earnings";
 
 export async function GET(request: NextRequest) {
   const gate = await requirePrivateAthleteSession(request);
@@ -83,9 +84,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Roll hours into cost at athlete overtime/base proxy — use base monthly / 160 as hourly zar
-    const athlete = gate.athlete;
-    const hourlyZar = Number(athlete.baseMonthlyPayZar) / Math.max(1, athlete.monthlyHourCap);
+    const hourlyZar = privateAthleteHourlyRateZar(gate.athlete);
     await prisma.privateProject.update({
       where: { id: projectId },
       data: { costZar: { increment: hourlyZar * hours } },

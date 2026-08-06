@@ -25,8 +25,6 @@ export function PrivateProjectsClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [stageOpenId, setStageOpenId] = useState<string | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ projectName: "", clientName: "" });
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -63,42 +61,6 @@ export function PrivateProjectsClient() {
     void load();
   }
 
-  function startEdit(p: ProjectRow) {
-    setEditingId(p.id);
-    setEditForm({ projectName: p.name, clientName: p.client.name });
-    setStageOpenId(null);
-    setError("");
-  }
-
-  function cancelEdit() {
-    setEditingId(null);
-    setEditForm({ projectName: "", clientName: "" });
-  }
-
-  async function saveEdit(projectId: string) {
-    const projectName = editForm.projectName.trim();
-    const clientName = editForm.clientName.trim();
-    if (!projectName || !clientName) {
-      setError("Project name and client name are required.");
-      return;
-    }
-    setSaving(true);
-    setError("");
-    const r = await fetch(`/api/private/projects/${projectId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: projectName, clientName }),
-    });
-    const j = await r.json();
-    setSaving(false);
-    if (!r.ok) {
-      setError(j.error || "Could not save");
-      return;
-    }
-    setEditingId(null);
-    void load();
-  }
-
   if (loading) return <p className="text-sm text-slate-500">Loading projects…</p>;
 
   return (
@@ -132,34 +94,14 @@ export function PrivateProjectsClient() {
               projects.map((p) => (
                 <tr key={p.id} className="border-b border-white/[0.04] align-top">
                   <td className="px-4 py-3">
-                    {editingId === p.id ? (
-                      <input
-                        value={editForm.projectName}
-                        onChange={(e) => setEditForm({ ...editForm, projectName: e.target.value })}
-                        className="w-full min-w-[12rem] rounded-lg border border-white/[0.08] bg-white/[0.04] px-2.5 py-1.5 text-sm text-white"
-                        placeholder="Project name / address"
-                      />
-                    ) : (
-                      <Link
-                        href={`/dashboard/private/projects/${p.id}`}
-                        className="font-medium text-white hover:text-brand-300"
-                      >
-                        {p.name}
-                      </Link>
-                    )}
+                    <Link
+                      href={`/dashboard/private/projects/${p.id}`}
+                      className="font-medium text-white hover:text-brand-300"
+                    >
+                      {p.name}
+                    </Link>
                   </td>
-                  <td className="px-4 py-3 text-slate-300">
-                    {editingId === p.id ? (
-                      <input
-                        value={editForm.clientName}
-                        onChange={(e) => setEditForm({ ...editForm, clientName: e.target.value })}
-                        className="w-full min-w-[10rem] rounded-lg border border-white/[0.08] bg-white/[0.04] px-2.5 py-1.5 text-sm text-white"
-                        placeholder="Client name"
-                      />
-                    ) : (
-                      p.client.name
-                    )}
-                  </td>
+                  <td className="px-4 py-3 text-slate-300">{p.client.name}</td>
                   <td className="px-4 py-3">
                     <span
                       className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-brand-500/20 text-[10px] font-bold text-brand-200"
@@ -211,42 +153,20 @@ export function PrivateProjectsClient() {
                     {p.marginPercent != null ? `${p.marginPercent}%` : "—"}
                   </td>
                   <td className="px-4 py-3">
-                    {editingId === p.id ? (
-                      <div className="flex flex-col gap-1.5">
-                        <button
-                          type="button"
-                          disabled={saving}
-                          onClick={() => void saveEdit(p.id)}
-                          className="text-left text-xs font-medium text-brand-300 hover:underline disabled:opacity-50"
-                        >
-                          Save
-                        </button>
-                        <button
-                          type="button"
-                          disabled={saving}
-                          onClick={cancelEdit}
-                          className="text-left text-xs text-slate-500 hover:text-slate-300 disabled:opacity-50"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => startEdit(p)}
-                          className="text-left text-xs text-slate-400 hover:text-brand-300"
-                        >
-                          Edit
-                        </button>
-                        <Link
-                          href={`/dashboard/private/projects/${p.id}/expenses`}
-                          className="text-xs text-brand-300 hover:underline"
-                        >
-                          Expenses
-                        </Link>
-                      </div>
-                    )}
+                    <div className="flex flex-col gap-1.5">
+                      <Link
+                        href={`/dashboard/private/projects/${p.id}/edit`}
+                        className="text-xs text-slate-400 hover:text-brand-300"
+                      >
+                        Edit
+                      </Link>
+                      <Link
+                        href={`/dashboard/private/projects/${p.id}/expenses`}
+                        className="text-xs text-brand-300 hover:underline"
+                      >
+                        Expenses
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               ))
