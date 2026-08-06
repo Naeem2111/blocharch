@@ -5,6 +5,10 @@ import {
 } from "@/lib/private-constants";
 import { resolvePrivateProjectTypeLabel } from "@/lib/private-project-types";
 import { computePrivateProgressPercent, resolvePrivateProgressPercent, marginPercent, privateStageMeta } from "@/lib/private-progress";
+import {
+  buildPhaseBreakdown,
+  resolvePhaseSplits,
+} from "@/lib/private-phase-splits";
 
 type ProjectWithRelations = PrivateProject & {
   client: Pick<PrivateClient, "id" | "name" | "contactEmail" | "contactPhone" | "slug">;
@@ -29,6 +33,17 @@ export function serializePrivateProject(
   const calculatedProgress = computePrivateProgressPercent({
     designStage: p.designStage,
     stageStartedAt: p.stageStartedAt,
+  });
+
+  const { feePercents, costPercents } = resolvePhaseSplits(
+    p.phaseFeePercents,
+    p.phaseCostPercents,
+  );
+  const phases = buildPhaseBreakdown({
+    designStage: p.designStage,
+    feeZar: fee,
+    phaseFeePercents: feePercents,
+    phaseCostPercents: costPercents,
   });
 
   return {
@@ -61,6 +76,9 @@ export function serializePrivateProject(
     calculatedProgressPercent: calculatedProgress,
     manualProgressPercent: p.manualProgressPercent,
     progressIsManual: p.manualProgressPercent != null,
+    phaseFeePercents: feePercents,
+    phaseCostPercents: costPercents,
+    phases,
     stageMeta: meta,
     updatedAt: p.updatedAt.toISOString(),
     client: {

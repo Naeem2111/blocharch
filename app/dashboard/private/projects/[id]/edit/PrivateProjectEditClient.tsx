@@ -2,16 +2,30 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ProgressSlider } from "@/components/ProgressSlider";
 import { PRIVATE_STAGE_LABELS, PRIVATE_STAGE_ORDER } from "@/lib/private-constants";
+import {
+  defaultPhaseSplits,
+  phaseSplitSum,
+  type PhaseSplitMap,
+} from "@/lib/private-phase-splits";
+import {
+  projectTypeSelectValue,
+  type PrivateProjectTypeOption,
+} from "@/lib/private-project-types";
 import type { PrivateDesignStage } from "@prisma/client";
 
 type Athlete = { id: string; fullName: string; athleteCode: string };
-type CustomProjectType = { id: string; label: string };
-type ProjectTypeOptions = {
-  builtIn: Array<{ key: string; label: string }>;
-  customTypes: CustomProjectType[];
+
+type PhaseRow = {
+  stage: PrivateDesignStage;
+  label: string;
+  status: "completed" | "current" | "upcoming";
+  feePercent: number;
+  costPercent: number;
+  feeZar: number;
+  costZar: number;
 };
 
 type ProjectPayload = {
@@ -28,6 +42,9 @@ type ProjectPayload = {
   progressIsManual: boolean;
   feeZar: number;
   costZar: number;
+  phaseFeePercents: PhaseSplitMap;
+  phaseCostPercents: PhaseSplitMap;
+  phases: PhaseRow[];
   stageNotes: string | null;
   briefReceivedAt: string | null;
   councilSubmittedAt: string | null;
@@ -40,32 +57,38 @@ type ProjectPayload = {
   athlete: { id: string; fullName: string } | null;
 };
 
-function projectTypeSelectValue(project: ProjectPayload): string {
-  if (project.projectType === "other" && project.customProjectTypeId) {
-    return `custom:${project.customProjectTypeId}`;
-  }
-  if (project.projectType === "other") return "other";
-  return project.projectType;
+function zar(n: number) {
+  return `R ${Math.round(n).toLocaleString("en-ZA")}`;
+}
+
+function statusLabel(status: PhaseRow["status"]) {
+  if (status === "completed") return "Complete";
+  if (status === "current") return "Current";
+  return "Upcoming";
+}
+
+function statusClass(status: PhaseRow["status"]) {
+  if (status === "completed") return "bg-emerald-500/15 text-emerald-200 ring-emerald-500/25";
+  if (status === "current") return "bg-brand-500/15 text-brand-200 ring-brand-500/30";
+  return "bg-white/[0.04] text-slate-400 ring-white/[0.08]";
 }
 
 export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
   const router = useRouter();
   const [athletes, setAthletes] = useState<Athlete[]>([]);
-  const [typeOptions, setTypeOptions] = useState<ProjectTypeOptions>({
-    builtIn: [],
-    customTypes: [],
-  });
+  const [typeOptions, setTypeOptions] = useState<PrivateProjectTypeOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [useManualProgress, setUseManualProgress] = useState(false);
+  const [phaseFeePercents, setPhaseFeePercents] = useState<PhaseSplitMap>(defaultPhaseSplits());
+  const [phaseCostPercents, setPhaseCostPercents] = useState<PhaseSplitMap>(defaultPhaseSplits());
   const [form, setForm] = useState({
     clientName: "",
     contactEmail: "",
     contactPhone: "",
     projectName: "",
     projectTypeSelect: "residential_extension",
-    customTypeLabel: "",
     feeZar: "",
     assignedAthleteId: "",
     designStage: "site_measure_up" as PrivateDesignStage,
@@ -95,20 +118,16 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
 
     const p = projectJson.project as ProjectPayload;
     setAthletes(athletesJson.athletes || []);
-    if (typesJson.builtIn) {
-      setTypeOptions({
-        builtIn: typesJson.builtIn,
-        customTypes: typesJson.customTypes || [],
-      });
-    }
+    setTypeOptions(typesJson.types || []);
     setUseManualProgress(p.progressIsManual);
+    setPhaseFeePercents(p.phaseFeePercents);
+    setPhaseCostPercents(p.phaseCostPercents);
     setForm({
       clientName: p.client.name,
       contactEmail: p.client.contactEmail ?? "",
       contactPhone: p.client.contactPhone ?? "",
       projectName: p.name,
       projectTypeSelect: projectTypeSelectValue(p),
-      customTypeLabel: "",
       feeZar: String(p.feeZar),
       assignedAthleteId: p.athlete?.id ?? "",
       designStage: p.designStage as PrivateDesignStage,
@@ -125,18 +144,47 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
     void load();
   }, [load]);
 
+  const feeTotal = Number(form.feeZar || 0);
+  const phaseRows = useMemo(() => {
+    const currentIdx = PRIVATE_STAGE_ORDER.indexOf(form.designStage);
+    return PRIVATE_STAGE_ORDER.map((stage) => {
+      const feePercent = phaseFeePercents[stage];
+      const costPercent = phaseCostPercents[stage];
+      const stageIdx = PRIVATE_STAGE_ORDER.indexOf(stage);
+      let status: PhaseRow["status"] = "upcoming";
+      if (stageIdx < currentIdx) status = "completed";
+      else if (stageIdx === currentIdx) status = "current";
+      return {
+        stage,
+        label: PRIVATE_STAGE_LABELS[stage],
+        status,
+        feePercent,
+        costPercent,
+        feeZar: Math.round((feeTotal * feePercent) / 100),
+        costZar: Math.round((feeTotal * costPercent) / 100),
+      };
+    });
+  }, [form.designStage, form.feeZar, phaseFeePercents, phaseCostPercents, feeTotal]);
+
+  const feeSplitSum = phaseSplitSum(phaseFeePercents);
+  const costSplitSum = phaseSplitSum(phaseCostPercents);
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (form.projectTypeSelect === "other" && !form.customTypeLabel.trim()) {
-      setError("Enter a label for this project type.");
-      return;
-    }
     if (useManualProgress) {
       const n = Number(form.manualProgressPercent);
       if (!Number.isFinite(n) || n < 0 || n > 100) {
         setError("Progress must be between 0 and 100.");
         return;
       }
+    }
+    if (feeSplitSum !== 100) {
+      setError(`Fee splits must total 100% (currently ${feeSplitSum}%).`);
+      return;
+    }
+    if (costSplitSum !== 100) {
+      setError(`Cost splits must total 100% (currently ${costSplitSum}%).`);
+      return;
     }
 
     setSaving(true);
@@ -150,8 +198,6 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
         clientContactPhone: form.contactPhone.trim() || null,
         name: form.projectName.trim(),
         projectType: form.projectTypeSelect,
-        customProjectTypeLabel:
-          form.projectTypeSelect === "other" ? form.customTypeLabel.trim() : null,
         feeZar: Number(form.feeZar || 0),
         assignedAthleteId: form.assignedAthleteId || null,
         designStage: form.designStage,
@@ -159,6 +205,8 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
         stageNotes: form.stageNotes.trim() || null,
         briefReceivedAt: form.briefReceivedAt || null,
         councilSubmittedAt: form.councilSubmittedAt || null,
+        phaseFeePercents,
+        phaseCostPercents,
       }),
     });
     const j = await r.json();
@@ -177,7 +225,7 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
   if (error && !form.clientName) return <p className="text-sm text-red-300">{error}</p>;
 
   return (
-    <form onSubmit={(e) => void submit(e)} className="mx-auto max-w-2xl space-y-8">
+    <form onSubmit={(e) => void submit(e)} className="mx-auto max-w-3xl space-y-8">
       <div className="flex flex-wrap items-center gap-3 text-xs">
         <Link href="/dashboard/private/projects" className="text-slate-500 hover:text-slate-300">
           ← Projects
@@ -187,6 +235,9 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
           className="text-brand-300 hover:underline"
         >
           View project
+        </Link>
+        <Link href="/dashboard/private/project-types" className="text-slate-500 hover:text-slate-300">
+          Manage project types
         </Link>
       </div>
 
@@ -241,43 +292,15 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
             <select
               className={field}
               value={form.projectTypeSelect}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  projectTypeSelect: e.target.value,
-                  customTypeLabel: e.target.value === "other" ? form.customTypeLabel : "",
-                })
-              }
+              onChange={(e) => setForm({ ...form, projectTypeSelect: e.target.value })}
             >
-              {typeOptions.builtIn.map((t) => (
-                <option key={t.key} value={t.key}>
+              {typeOptions.map((t) => (
+                <option key={t.value} value={t.value}>
                   {t.label}
                 </option>
               ))}
-              {typeOptions.customTypes.length > 0 ? (
-                <optgroup label="Saved types">
-                  {typeOptions.customTypes.map((t) => (
-                    <option key={t.id} value={`custom:${t.id}`}>
-                      {t.label}
-                    </option>
-                  ))}
-                </optgroup>
-              ) : null}
-              <option value="other">Other (specify new)</option>
             </select>
           </label>
-          {form.projectTypeSelect === "other" ? (
-            <label className="block text-xs text-slate-400">
-              New project type label
-              <input
-                required
-                className={field}
-                value={form.customTypeLabel}
-                onChange={(e) => setForm({ ...form, customTypeLabel: e.target.value })}
-                placeholder="e.g. Pool house, Renovation"
-              />
-            </label>
-          ) : null}
           <label className="block text-xs text-slate-400">
             Fee (excl VAT)
             <input
@@ -294,10 +317,98 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
       </section>
 
       <section className="card-tool rounded-xl p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-white">Project phases</h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Each design stage with current position, fee split, and cost budget split.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const defaults = defaultPhaseSplits();
+              setPhaseFeePercents(defaults);
+              setPhaseCostPercents(defaults);
+            }}
+            className="rounded-lg bg-white/[0.04] px-3 py-1.5 text-xs text-slate-300 ring-1 ring-white/[0.08] hover:bg-white/[0.07]"
+          >
+            Reset to duration-weighted splits
+          </button>
+        </div>
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full min-w-[40rem] text-left text-sm">
+            <thead>
+              <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-wider text-slate-500">
+                <th className="pb-2 pr-3 font-semibold">Phase</th>
+                <th className="pb-2 pr-3 font-semibold">Status</th>
+                <th className="pb-2 pr-3 font-semibold">Fee %</th>
+                <th className="pb-2 pr-3 font-semibold">Cost %</th>
+                <th className="pb-2 pr-3 font-semibold text-right">Fee</th>
+                <th className="pb-2 font-semibold text-right">Cost budget</th>
+              </tr>
+            </thead>
+            <tbody>
+              {phaseRows.map((row) => (
+                <tr key={row.stage} className="border-b border-white/[0.04]">
+                  <td className="py-3 pr-3 text-slate-200">{row.label}</td>
+                  <td className="py-3 pr-3">
+                    <span
+                      className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider ring-1 ${statusClass(row.status)}`}
+                    >
+                      {statusLabel(row.status)}
+                    </span>
+                  </td>
+                  <td className="py-3 pr-3">
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      className="w-16 rounded border border-white/[0.08] bg-white/[0.04] px-2 py-1 text-sm tabular-nums text-white"
+                      value={phaseFeePercents[row.stage]}
+                      onChange={(e) =>
+                        setPhaseFeePercents((prev) => ({
+                          ...prev,
+                          [row.stage]: Number(e.target.value) || 0,
+                        }))
+                      }
+                    />
+                  </td>
+                  <td className="py-3 pr-3">
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      className="w-16 rounded border border-white/[0.08] bg-white/[0.04] px-2 py-1 text-sm tabular-nums text-white"
+                      value={phaseCostPercents[row.stage]}
+                      onChange={(e) =>
+                        setPhaseCostPercents((prev) => ({
+                          ...prev,
+                          [row.stage]: Number(e.target.value) || 0,
+                        }))
+                      }
+                    />
+                  </td>
+                  <td className="py-3 pr-3 text-right tabular-nums text-slate-400">{zar(row.feeZar)}</td>
+                  <td className="py-3 text-right tabular-nums text-slate-400">{zar(row.costZar)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-3 text-xs text-slate-500">
+          Fee splits total {feeSplitSum}% · Cost splits total {costSplitSum}%
+          {feeSplitSum !== 100 || costSplitSum !== 100 ? (
+            <span className="text-amber-300"> — each must total 100% before saving</span>
+          ) : null}
+        </p>
+      </section>
+
+      <section className="card-tool rounded-xl p-5">
         <h2 className="text-sm font-semibold text-white">Progress & assignment</h2>
         <div className="mt-4 space-y-3">
           <label className="block text-xs text-slate-400">
-            Design stage
+            Current design stage
             <select
               className={field}
               value={form.designStage}

@@ -6,6 +6,7 @@ import { isPrivateDesignStage } from "@/lib/private-constants";
 import { resolveProjectTypeInput } from "@/lib/private-project-types";
 import { serializePrivateProject } from "@/lib/private-serialize";
 import { parseDateOnly } from "@/lib/ops-hours";
+import { defaultPhaseSplits } from "@/lib/private-phase-splits";
 
 const projectInclude = {
   client: {
@@ -102,6 +103,8 @@ export async function POST(request: NextRequest) {
       ? parseDateOnly(String(body.briefReceivedAt))
       : new Date();
 
+    const defaultSplits = defaultPhaseSplits();
+
     const created = await prisma.$transaction(async (tx) => {
       const client = await tx.privateClient.create({
         data: {
@@ -123,6 +126,8 @@ export async function POST(request: NextRequest) {
           customProjectTypeId,
           designStage,
           feeZar,
+          phaseFeePercents: defaultSplits,
+          phaseCostPercents: defaultSplits,
           briefReceivedAt,
           stageStartedAt: new Date(),
           stageNotes: body.stageNotes ? String(body.stageNotes) : null,

@@ -27,6 +27,15 @@ type Detail = {
     athlete: { fullName: string; initials: string } | null;
     client: { id: string; name: string; slug: string | null };
     hoursLifeToDate: number | null;
+    phases: Array<{
+      stage: string;
+      label: string;
+      status: "completed" | "current" | "upcoming";
+      feePercent: number;
+      costPercent: number;
+      feeZar: number;
+      costZar: number;
+    }>;
   };
   updates: Array<{ id: string; title: string; body: string | null; occurredAt: string }>;
   actionItems: Array<{ id: string; title: string; completedAt: string | null; clientFacing: boolean }>;
@@ -272,6 +281,42 @@ export function PrivateProjectDetailClient({ projectId }: { projectId: string })
             </p>
           </div>
         </div>
+
+        {p.phases?.length ? (
+          <div className="mt-6">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+              Phase breakdown
+            </p>
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full min-w-[36rem] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-wider text-slate-500">
+                    <th className="pb-2 pr-3 font-semibold">Phase</th>
+                    <th className="pb-2 pr-3 font-semibold">Status</th>
+                    <th className="pb-2 pr-3 font-semibold">Fee</th>
+                    <th className="pb-2 font-semibold">Cost budget</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {p.phases.map((row) => (
+                    <tr key={row.stage} className="border-b border-white/[0.04]">
+                      <td className="py-2 pr-3 text-slate-200">{row.label}</td>
+                      <td className="py-2 pr-3 capitalize text-slate-400">{row.status}</td>
+                      <td className="py-2 pr-3 tabular-nums text-slate-300">
+                        {zar(row.feeZar)}{" "}
+                        <span className="text-slate-500">({row.feePercent}%)</span>
+                      </td>
+                      <td className="py-2 tabular-nums text-slate-300">
+                        {zar(row.costZar)}{" "}
+                        <span className="text-slate-500">({row.costPercent}%)</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">

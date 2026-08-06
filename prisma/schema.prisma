@@ -790,6 +790,9 @@ enum PrivateProjectType {
 model PrivateProjectCustomType {
   id        String   @id @default(uuid())
   label     String   @unique
+  /** When set, overrides the display label for a built-in PrivateProjectType enum value. */
+  builtInKey PrivateProjectType? @unique @map("built_in_key")
+  sortOrder Int      @default(0) @map("sort_order")
   createdAt DateTime @default(now()) @map("created_at")
 
   projects PrivateProject[]
@@ -838,6 +841,10 @@ model PrivateProject {
   /** When the current design stage started — drives duration-weighted progress. */
   /** When set, overrides duration-weighted progress in UI (0–100). */
   manualProgressPercent Int? @map("manual_progress_percent")
+  /** Per design-stage fee allocation (% of project fee). Keys = PrivateDesignStage. */
+  phaseFeePercents Json? @map("phase_fee_percents")
+  /** Per design-stage cost budget allocation (% of project fee). */
+  phaseCostPercents Json? @map("phase_cost_percents")
   stageStartedAt  DateTime             @default(now()) @map("stage_started_at") @db.Date
   completedAt     DateTime?            @map("completed_at") @db.Date
   handoverOutcome String?              @map("handover_outcome")

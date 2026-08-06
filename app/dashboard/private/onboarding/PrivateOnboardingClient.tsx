@@ -2,32 +2,24 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { PRIVATE_STAGE_LABELS, PRIVATE_STAGE_ORDER } from "@/lib/private-constants";
+import type { PrivateProjectTypeOption } from "@/lib/private-project-types";
 import type { PrivateDesignStage } from "@prisma/client";
 
 type Athlete = { id: string; fullName: string; athleteCode: string };
-type CustomProjectType = { id: string; label: string };
-type ProjectTypeOptions = {
-  builtIn: Array<{ key: string; label: string }>;
-  customTypes: CustomProjectType[];
-};
 
 export function PrivateOnboardingClient() {
   const router = useRouter();
   const [athletes, setAthletes] = useState<Athlete[]>([]);
-  const [typeOptions, setTypeOptions] = useState<ProjectTypeOptions>({
-    builtIn: [],
-    customTypes: [],
-  });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [typeOptions, setTypeOptions] = useState<PrivateProjectTypeOption[]>([]);
+  const [saving, setSaving] = useState(false);  const [error, setError] = useState("");
   const [form, setForm] = useState({
     clientName: "",
     contactEmail: "",
     contactPhone: "",
     projectAddress: "",
     projectTypeSelect: "residential_extension",
-    customTypeLabel: "",
     feeZar: "",
     assignedAthleteId: "",
     designStage: "site_measure_up" as PrivateDesignStage,
@@ -39,19 +31,16 @@ export function PrivateOnboardingClient() {
       fetch("/api/private/project-types").then((r) => r.json()),
     ]).then(([athletesJson, typesJson]) => {
       setAthletes(athletesJson.athletes || []);
-      if (typesJson.builtIn) {
-        setTypeOptions({
-          builtIn: typesJson.builtIn,
-          customTypes: typesJson.customTypes || [],
-        });
+      if (typesJson.types) {
+        setTypeOptions(typesJson.types);
       }
     });
   }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (form.projectTypeSelect === "other" && !form.customTypeLabel.trim()) {
-      setError("Enter a label for this project type.");
+    if (!form.projectTypeSelect) {
+      setError("Select a project type.");
       return;
     }
     setSaving(true);
@@ -66,8 +55,6 @@ export function PrivateOnboardingClient() {
         projectAddress: form.projectAddress,
         name: form.projectAddress,
         projectType: form.projectTypeSelect,
-        customProjectTypeLabel:
-          form.projectTypeSelect === "other" ? form.customTypeLabel.trim() : null,
         feeZar: Number(form.feeZar || 0),
         assignedAthleteId: form.assignedAthleteId || null,
         designStage: form.designStage,
@@ -140,47 +127,20 @@ export function PrivateOnboardingClient() {
             <select
               className={field}
               value={form.projectTypeSelect}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  projectTypeSelect: e.target.value,
-                  customTypeLabel: e.target.value === "other" ? form.customTypeLabel : "",
-                })
-              }
+              onChange={(e) => setForm({ ...form, projectTypeSelect: e.target.value })}
             >
-              {typeOptions.builtIn.map((t) => (
-                <option key={t.key} value={t.key}>
+              {typeOptions.map((t) => (
+                <option key={t.value} value={t.value}>
                   {t.label}
                 </option>
               ))}
-              {typeOptions.customTypes.length > 0 ? (
-                <optgroup label="Saved types">
-                  {typeOptions.customTypes.map((t) => (
-                    <option key={t.id} value={`custom:${t.id}`}>
-                      {t.label}
-                    </option>
-                  ))}
-                </optgroup>
-              ) : null}
-              <option value="other">Other (specify new)</option>
             </select>
           </label>
-          {form.projectTypeSelect === "other" ? (
-            <label className="block text-xs text-slate-400">
-              New project type label
-              <input
-                required
-                className={field}
-                value={form.customTypeLabel}
-                onChange={(e) => setForm({ ...form, customTypeLabel: e.target.value })}
-                placeholder="e.g. Pool house, Renovation"
-              />
-              <span className="mt-1 block text-[11px] text-slate-500">
-                Saved for reuse on future projects.
-              </span>
-            </label>
-          ) : null}
-          <label className="block text-xs text-slate-400">
+          <p className="text-[11px] text-slate-500">
+            <Link href="/dashboard/private/project-types" className="text-brand-300 hover:underline">
+              Manage project types
+            </Link>
+          </p>          <label className="block text-xs text-slate-400">
             Fee (excl VAT)
             <input
               required

@@ -7,6 +7,10 @@ import { PRIVATE_STAGE_LABELS } from "@/lib/private-constants";
 import { serializePrivateProject } from "@/lib/private-serialize";
 import { parseDateOnly } from "@/lib/ops-hours";
 import { resolveProjectTypeInput } from "@/lib/private-project-types";
+import {
+  parsePhaseSplitMap,
+  validatePhaseSplitMap,
+} from "@/lib/private-phase-splits";
 
 const projectInclude = {
   client: {
@@ -164,6 +168,34 @@ export async function PATCH(
       }
       data.projectType = typeResolved.projectType;
       data.customProjectTypeId = typeResolved.customProjectTypeId;
+    }
+    if (body.phaseFeePercents !== undefined) {
+      const map = parsePhaseSplitMap(body.phaseFeePercents);
+      if (!map) {
+        return NextResponse.json({ error: "Invalid fee phase splits" }, { status: 400 });
+      }
+      const check = validatePhaseSplitMap(map);
+      if (!check.ok) {
+        return NextResponse.json(
+          { error: `Fee splits must total 100% (currently ${check.sum}%)` },
+          { status: 400 },
+        );
+      }
+      data.phaseFeePercents = map;
+    }
+    if (body.phaseCostPercents !== undefined) {
+      const map = parsePhaseSplitMap(body.phaseCostPercents);
+      if (!map) {
+        return NextResponse.json({ error: "Invalid cost phase splits" }, { status: 400 });
+      }
+      const check = validatePhaseSplitMap(map);
+      if (!check.ok) {
+        return NextResponse.json(
+          { error: `Cost splits must total 100% (currently ${check.sum}%)` },
+          { status: 400 },
+        );
+      }
+      data.phaseCostPercents = map;
     }
     if (body.status !== undefined) data.status = String(body.status);
     if (body.name !== undefined) {
