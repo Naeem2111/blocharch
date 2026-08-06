@@ -845,6 +845,8 @@ model PrivateProject {
   phaseFeePercents Json? @map("phase_fee_percents")
   /** Per design-stage cost budget allocation (% of project fee). */
   phaseCostPercents Json? @map("phase_cost_percents")
+  /** Custom phases grouping design stages. Billing splits remain per stage. */
+  phaseStructure Json? @map("phase_structure")
   stageStartedAt  DateTime             @default(now()) @map("stage_started_at") @db.Date
   completedAt     DateTime?            @map("completed_at") @db.Date
   handoverOutcome String?              @map("handover_outcome")
@@ -921,11 +923,14 @@ model PrivateProjectExpense {
   description String
   amountZar   Decimal  @map("amount_zar") @db.Decimal(12, 2)
   expenseDate DateTime @default(now()) @map("expense_date") @db.Date
+  /** Design stage this expense is attributed to — drives per-stage cost breakdown. */
+  designStage PrivateDesignStage? @map("design_stage")
   notes       String?  @db.Text
   createdAt   DateTime @default(now()) @map("created_at")
 
   project PrivateProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId, expenseDate])
+  @@index([projectId, designStage])
   @@map("private_project_expenses")
 }

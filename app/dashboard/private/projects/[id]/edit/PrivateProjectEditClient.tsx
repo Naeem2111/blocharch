@@ -6,10 +6,19 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ProgressSlider } from "@/components/ProgressSlider";
 import { PRIVATE_STAGE_LABELS, PRIVATE_STAGE_ORDER } from "@/lib/private-constants";
 import {
+  buildProjectPhaseBreakdown,
   defaultPhaseSplits,
   phaseSplitSum,
   type PhaseSplitMap,
 } from "@/lib/private-phase-splits";
+import {
+  addPhase,
+  assignStageToPhase,
+  defaultPhaseStructure,
+  removePhase,
+  renamePhase,
+  type PhaseStructure,
+} from "@/lib/private-phase-structure";
 import {
   projectTypeSelectValue,
   type PrivateProjectTypeOption,
@@ -43,7 +52,17 @@ type ProjectPayload = {
   feeZar: number;
   costZar: number;
   phaseFeePercents: PhaseSplitMap;
-  phaseCostPercents: PhaseSplitMap;
+  phaseStructure: PhaseStructure;
+  expensesTotalZar: number;
+  unassignedExpenseZar: number;
+  expenseRecords?: Array<{ designStage: string | null; amountZar: number }>;
+  phaseGroups: Array<{
+    id: string;
+    name: string;
+    feeZar: number;
+    costZar: number;
+    stages: PhaseRow[];
+  }>;
   phases: PhaseRow[];
   stageNotes: string | null;
   briefReceivedAt: string | null;
@@ -82,7 +101,10 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
   const [error, setError] = useState("");
   const [useManualProgress, setUseManualProgress] = useState(false);
   const [phaseFeePercents, setPhaseFeePercents] = useState<PhaseSplitMap>(defaultPhaseSplits());
-  const [phaseCostPercents, setPhaseCostPercents] = useState<PhaseSplitMap>(defaultPhaseSplits());
+  const [phaseStructure, setPhaseStructure] = useState<PhaseStructure>(defaultPhaseStructure());
+  const [expenseRecords, setExpenseRecords] = useState<
+    Array<{ designStage: string | null; amountZar: number }>
+  >([]);
   const [form, setForm] = useState({
     clientName: "",
     contactEmail: "",
@@ -121,7 +143,8 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
     setTypeOptions(typesJson.types || []);
     setUseManualProgress(p.progressIsManual);
     setPhaseFeePercents(p.phaseFeePercents);
-    setPhaseCostPercents(p.phaseCostPercents);
+    setPhaseStructure(p.phaseStructure);
+    setExpenseRecords(p.expenseRecords ?? []);
     setForm({
       clientName: p.client.name,
       contactEmail: p.client.contactEmail ?? "",
@@ -145,29 +168,19 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
   }, [load]);
 
   const feeTotal = Number(form.feeZar || 0);
-  const phaseRows = useMemo(() => {
-    const currentIdx = PRIVATE_STAGE_ORDER.indexOf(form.designStage);
-    return PRIVATE_STAGE_ORDER.map((stage) => {
-      const feePercent = phaseFeePercents[stage];
-      const costPercent = phaseCostPercents[stage];
-      const stageIdx = PRIVATE_STAGE_ORDER.indexOf(stage);
-      let status: PhaseRow["status"] = "upcoming";
-      if (stageIdx < currentIdx) status = "completed";
-      else if (stageIdx === currentIdx) status = "current";
-      return {
-        stage,
-        label: PRIVATE_STAGE_LABELS[stage],
-        status,
-        feePercent,
-        costPercent,
-        feeZar: Math.round((feeTotal * feePercent) / 100),
-        costZar: Math.round((feeTotal * costPercent) / 100),
-      };
-    });
-  }, [form.designStage, form.feeZar, phaseFeePercents, phaseCostPercents, feeTotal]);
+  const { phaseGroups, totalExpenseZar, unassignedExpenseZar } = useMemo(
+    () =>
+      buildProjectPhaseBreakdown({
+        designStage: form.designStage,
+        feeZar: feeTotal,
+        phaseFeePercents,
+        phaseStructure,
+        expenses: expenseRecords,
+      }),
+    [form.designStage, feeTotal, phaseFeePercents, phaseStructure, expenseRecords],
+  );
 
   const feeSplitSum = phaseSplitSum(phaseFeePercents);
-  const costSplitSum = phaseSplitSum(phaseCostPercents);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -180,10 +193,6 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
     }
     if (feeSplitSum !== 100) {
       setError(`Fee splits must total 100% (currently ${feeSplitSum}%).`);
-      return;
-    }
-    if (costSplitSum !== 100) {
-      setError(`Cost splits must total 100% (currently ${costSplitSum}%).`);
       return;
     }
 
@@ -206,7 +215,7 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
         briefReceivedAt: form.briefReceivedAt || null,
         councilSubmittedAt: form.councilSubmittedAt || null,
         phaseFeePercents,
-        phaseCostPercents,
+        phaseStructure,
       }),
     });
     const j = await r.json();
@@ -319,88 +328,158 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
       <section className="card-tool rounded-xl p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-sm font-semibold text-white">Project phases</h2>
+            <h2 className="text-sm font-semibold text-white">Phases & stage billing</h2>
             <p className="mt-1 text-xs text-slate-500">
-              Each design stage with current position, fee split, and cost budget split.
+              Create phases, assign design stages to each phase, and set fee/cost splits per stage.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              const defaults = defaultPhaseSplits();
-              setPhaseFeePercents(defaults);
-              setPhaseCostPercents(defaults);
-            }}
-            className="rounded-lg bg-white/[0.04] px-3 py-1.5 text-xs text-slate-300 ring-1 ring-white/[0.08] hover:bg-white/[0.07]"
-          >
-            Reset to duration-weighted splits
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setPhaseStructure((s) => addPhase(s, "New phase"))}
+              className="rounded-lg bg-brand-500/20 px-3 py-1.5 text-xs font-medium text-brand-200 ring-1 ring-brand-500/30"
+            >
+              Add phase
+            </button>
+            <button
+              type="button"
+              onClick={() => setPhaseFeePercents(defaultPhaseSplits())}
+              className="rounded-lg bg-white/[0.04] px-3 py-1.5 text-xs text-slate-300 ring-1 ring-white/[0.08] hover:bg-white/[0.07]"
+            >
+              Reset fee splits
+            </button>
+          </div>
         </div>
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[40rem] text-left text-sm">
-            <thead>
-              <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-wider text-slate-500">
-                <th className="pb-2 pr-3 font-semibold">Phase</th>
-                <th className="pb-2 pr-3 font-semibold">Status</th>
-                <th className="pb-2 pr-3 font-semibold">Fee %</th>
-                <th className="pb-2 pr-3 font-semibold">Cost %</th>
-                <th className="pb-2 pr-3 font-semibold text-right">Fee</th>
-                <th className="pb-2 font-semibold text-right">Cost budget</th>
-              </tr>
-            </thead>
-            <tbody>
-              {phaseRows.map((row) => (
-                <tr key={row.stage} className="border-b border-white/[0.04]">
-                  <td className="py-3 pr-3 text-slate-200">{row.label}</td>
-                  <td className="py-3 pr-3">
-                    <span
-                      className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider ring-1 ${statusClass(row.status)}`}
-                    >
-                      {statusLabel(row.status)}
-                    </span>
-                  </td>
-                  <td className="py-3 pr-3">
-                    <input
-                      type="number"
-                      min={0}
-                      max={100}
-                      className="w-16 rounded border border-white/[0.08] bg-white/[0.04] px-2 py-1 text-sm tabular-nums text-white"
-                      value={phaseFeePercents[row.stage]}
-                      onChange={(e) =>
-                        setPhaseFeePercents((prev) => ({
-                          ...prev,
-                          [row.stage]: Number(e.target.value) || 0,
-                        }))
-                      }
-                    />
-                  </td>
-                  <td className="py-3 pr-3">
-                    <input
-                      type="number"
-                      min={0}
-                      max={100}
-                      className="w-16 rounded border border-white/[0.08] bg-white/[0.04] px-2 py-1 text-sm tabular-nums text-white"
-                      value={phaseCostPercents[row.stage]}
-                      onChange={(e) =>
-                        setPhaseCostPercents((prev) => ({
-                          ...prev,
-                          [row.stage]: Number(e.target.value) || 0,
-                        }))
-                      }
-                    />
-                  </td>
-                  <td className="py-3 pr-3 text-right tabular-nums text-slate-400">{zar(row.feeZar)}</td>
-                  <td className="py-3 text-right tabular-nums text-slate-400">{zar(row.costZar)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+
+        <div className="mt-4 space-y-5">
+          {phaseGroups.map((group) => (
+            <div key={group.id} className="rounded-lg bg-white/[0.03] p-4 ring-1 ring-white/[0.06]">
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  value={phaseStructure.phases.find((p) => p.id === group.id)?.name ?? group.name}
+                  onChange={(e) =>
+                    setPhaseStructure((s) => renamePhase(s, group.id, e.target.value))
+                  }
+                  className="min-w-[10rem] flex-1 rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-sm font-semibold text-white"
+                />
+                <span className="text-xs tabular-nums text-slate-500">
+                  {group.stages.length} stage{group.stages.length === 1 ? "" : "s"} · {zar(group.feeZar)} fee
+                </span>
+                <button
+                  type="button"
+                  disabled={group.stages.length > 0 || phaseStructure.phases.length <= 1}
+                  onClick={() => {
+                    const next = removePhase(phaseStructure, group.id);
+                    if (next) setPhaseStructure(next);
+                  }}
+                  className="rounded px-2 py-0.5 text-[10px] font-medium text-red-300/80 ring-1 ring-red-500/20 hover:bg-red-500/10 disabled:opacity-40"
+                >
+                  Remove phase
+                </button>
+              </div>
+
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full min-w-[40rem] text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-wider text-slate-500">
+                      <th className="pb-2 pr-3 font-semibold">Stage</th>
+                      <th className="pb-2 pr-3 font-semibold">Move to phase</th>
+                      <th className="pb-2 pr-3 font-semibold">Status</th>
+                      <th className="pb-2 pr-3 font-semibold">Fee %</th>
+                      <th className="pb-2 pr-3 font-semibold">Cost %</th>
+                      <th className="pb-2 pr-3 font-semibold text-right">Fee</th>
+                      <th className="pb-2 font-semibold text-right">Expenses</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {group.stages.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-3 text-slate-500">
+                          No stages assigned — move stages here from another phase.
+                        </td>
+                      </tr>
+                    ) : (
+                      group.stages.map((row) => (
+                        <tr key={row.stage} className="border-b border-white/[0.04]">
+                          <td className="py-3 pr-3 text-slate-200">{row.label}</td>
+                          <td className="py-3 pr-3">
+                            <select
+                              value={group.id}
+                              onChange={(e) =>
+                                setPhaseStructure((s) =>
+                                  assignStageToPhase(s, row.stage, e.target.value),
+                                )
+                              }
+                              className="rounded border border-white/[0.08] bg-white/[0.04] px-2 py-1 text-xs text-white"
+                            >
+                              {phaseStructure.phases.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.name}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="py-3 pr-3">
+                            <span
+                              className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider ring-1 ${statusClass(row.status)}`}
+                            >
+                              {statusLabel(row.status)}
+                            </span>
+                          </td>
+                          <td className="py-3 pr-3">
+                            <input
+                              type="number"
+                              min={0}
+                              max={100}
+                              className="w-16 rounded border border-white/[0.08] bg-white/[0.04] px-2 py-1 text-sm tabular-nums text-white"
+                              value={phaseFeePercents[row.stage]}
+                              onChange={(e) =>
+                                setPhaseFeePercents((prev) => ({
+                                  ...prev,
+                                  [row.stage]: Number(e.target.value) || 0,
+                                }))
+                              }
+                            />
+                          </td>
+                          <td className="py-3 pr-3 tabular-nums text-slate-400">
+                            {row.costPercent}%
+                          </td>
+                          <td className="py-3 pr-3 text-right tabular-nums text-slate-400">
+                            {zar(row.feeZar)}
+                          </td>
+                          <td className="py-3 text-right tabular-nums text-slate-400">
+                            {zar(row.expenseZar)}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
         </div>
+
         <p className="mt-3 text-xs text-slate-500">
-          Fee splits total {feeSplitSum}% · Cost splits total {costSplitSum}%
-          {feeSplitSum !== 100 || costSplitSum !== 100 ? (
-            <span className="text-amber-300"> — each must total 100% before saving</span>
+          Fee splits total {feeSplitSum}%
+          {feeSplitSum !== 100 ? (
+            <span className="text-amber-300"> — must total 100% before saving</span>
           ) : null}
+          {" · "}
+          Expenses total {zar(totalExpenseZar)}
+          {unassignedExpenseZar > 0 ? (
+            <span className="text-amber-300">
+              {" "}
+              ({zar(unassignedExpenseZar)} unassigned — set a stage on each expense)
+            </span>
+          ) : null}
+          {" · "}
+          <Link
+            href={`/dashboard/private/projects/${projectId}/expenses`}
+            className="text-brand-300 hover:underline"
+          >
+            Manage expenses
+          </Link>
         </p>
       </section>
 

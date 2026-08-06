@@ -2,7 +2,9 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requirePrivateOpsSession } from "@/lib/private-access";
+import { isPrivateDesignStage, PRIVATE_STAGE_LABELS } from "@/lib/private-constants";
 import { parseDateOnly } from "@/lib/ops-hours";
+import type { PrivateDesignStage } from "@prisma/client";
 
 export async function GET(
   request: NextRequest,
@@ -13,7 +15,7 @@ export async function GET(
 
   const project = await prisma.privateProject.findUnique({
     where: { id: params.id },
-    select: { id: true, name: true },
+    select: { id: true, name: true, designStage: true },
   });
   if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -25,12 +27,14 @@ export async function GET(
   const totalZar = expenses.reduce((sum, e) => sum + Number(e.amountZar), 0);
 
   return NextResponse.json({
-    project: { id: project.id, name: project.name },
+    project: { id: project.id, name: project.name, designStage: project.designStage },
     expenses: expenses.map((e) => ({
       id: e.id,
       description: e.description,
       amountZar: Number(e.amountZar),
       expenseDate: e.expenseDate.toISOString().slice(0, 10),
+      designStage: e.designStage,
+      designStageLabel: e.designStage ? PRIVATE_STAGE_LABELS[e.designStage] : null,
       notes: e.notes,
     })),
     totalZar,
@@ -65,12 +69,16 @@ export async function POST(
     return NextResponse.json({ error: "Invalid expense date" }, { status: 400 });
   }
 
+  const designStageRaw = body.designStage ? String(body.designStage) : project.designStage;
+  const designStage = isPrivateDesignStage(designStageRaw) ? designStageRaw : project.designStage;
+
   const expense = await prisma.privateProjectExpense.create({
     data: {
       projectId: params.id,
       description,
       amountZar,
       expenseDate,
+      designStage,
       notes: body.notes ? String(body.notes).trim() || null : null,
     },
   });
@@ -82,6 +90,7 @@ export async function POST(
         description: expense.description,
         amountZar: Number(expense.amountZar),
         expenseDate: expense.expenseDate.toISOString().slice(0, 10),
+        designStage: expense.designStage,
         notes: expense.notes,
       },
     },
@@ -94,6 +103,7 @@ function serializeExpense(e: {
   description: string;
   amountZar: { toNumber?: () => number } | number | string;
   expenseDate: Date;
+  designStage: string | null;
   notes: string | null;
 }) {
   return {
@@ -101,6 +111,7 @@ function serializeExpense(e: {
     description: e.description,
     amountZar: Number(e.amountZar),
     expenseDate: e.expenseDate.toISOString().slice(0, 10),
+    designStage: e.designStage,
     notes: e.notes,
   };
 }
@@ -125,6 +136,7 @@ export async function PATCH(
     description?: string;
     amountZar?: number;
     expenseDate?: Date;
+    designStage?: PrivateDesignStage | null;
     notes?: string | null;
   } = {};
 
@@ -146,6 +158,16 @@ export async function PATCH(
     const expenseDate = parseDateOnly(String(body.expenseDate));
     if (!expenseDate) return NextResponse.json({ error: "Invalid expense date" }, { status: 400 });
     updateData.expenseDate = expenseDate;
+  }
+
+  if (body.designStage !== undefined) {
+    if (body.designStage === null || body.designStage === "") {
+      updateData.designStage = null;
+    } else if (isPrivateDesignStage(String(body.designStage))) {
+      updateData.designStage = String(body.designStage) as PrivateDesignStage;
+    } else {
+      return NextResponse.json({ error: "Invalid design stage" }, { status: 400 });
+    }
   }
 
   if (body.notes !== undefined) {

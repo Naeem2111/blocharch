@@ -27,6 +27,21 @@ type Detail = {
     athlete: { fullName: string; initials: string } | null;
     client: { id: string; name: string; slug: string | null };
     hoursLifeToDate: number | null;
+    phaseGroups: Array<{
+      id: string;
+      name: string;
+      feeZar: number;
+      costZar: number;
+      stages: Array<{
+        stage: string;
+        label: string;
+        status: "completed" | "current" | "upcoming";
+        feePercent: number;
+        costPercent: number;
+        feeZar: number;
+        costZar: number;
+      }>;
+    }>;
     phases: Array<{
       stage: string;
       label: string;
@@ -282,7 +297,51 @@ export function PrivateProjectDetailClient({ projectId }: { projectId: string })
           </div>
         </div>
 
-        {p.phases?.length ? (
+        {p.phaseGroups?.length ? (
+          <div className="mt-6 space-y-4">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+              Phases & stage billing
+            </p>
+            {p.phaseGroups.map((group) => (
+              <div key={group.id} className="rounded-lg bg-white/[0.03] p-3 ring-1 ring-white/[0.06]">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-white">{group.name}</p>
+                  <p className="text-xs tabular-nums text-slate-500">
+                    {zar(group.feeZar)} fee · {zar(group.costZar)} expenses
+                  </p>
+                </div>
+                <div className="mt-2 overflow-x-auto">
+                  <table className="w-full min-w-[32rem] text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-wider text-slate-500">
+                        <th className="pb-2 pr-3 font-semibold">Stage</th>
+                        <th className="pb-2 pr-3 font-semibold">Status</th>
+                        <th className="pb-2 pr-3 font-semibold">Fee</th>
+                        <th className="pb-2 font-semibold">Expenses</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {group.stages.map((row) => (
+                        <tr key={row.stage} className="border-b border-white/[0.04]">
+                          <td className="py-2 pr-3 text-slate-200">{row.label}</td>
+                          <td className="py-2 pr-3 capitalize text-slate-400">{row.status}</td>
+                          <td className="py-2 pr-3 tabular-nums text-slate-300">
+                            {zar(row.feeZar)}{" "}
+                            <span className="text-slate-500">({row.feePercent}%)</span>
+                          </td>
+                          <td className="py-2 tabular-nums text-slate-300">
+                            {zar(row.costZar)}{" "}
+                            <span className="text-slate-500">({row.costPercent}%)</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : p.phases?.length ? (
           <div className="mt-6">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
               Phase breakdown
@@ -294,7 +353,7 @@ export function PrivateProjectDetailClient({ projectId }: { projectId: string })
                     <th className="pb-2 pr-3 font-semibold">Phase</th>
                     <th className="pb-2 pr-3 font-semibold">Status</th>
                     <th className="pb-2 pr-3 font-semibold">Fee</th>
-                    <th className="pb-2 font-semibold">Cost budget</th>
+                    <th className="pb-2 font-semibold">Expenses</th>
                   </tr>
                 </thead>
                 <tbody>

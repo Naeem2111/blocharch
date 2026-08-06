@@ -10,7 +10,13 @@ import { resolveProjectTypeInput } from "@/lib/private-project-types";
 import {
   parsePhaseSplitMap,
   validatePhaseSplitMap,
+  defaultPhaseSplits,
 } from "@/lib/private-phase-splits";
+import {
+  parsePhaseStructure,
+  validatePhaseStructure,
+  defaultPhaseStructure,
+} from "@/lib/private-phase-structure";
 
 const projectInclude = {
   client: {
@@ -40,6 +46,9 @@ const projectInclude = {
     take: 50,
     include: { athlete: { select: { id: true, fullName: true } } },
   },
+  expenses: {
+    select: { designStage: true, amountZar: true },
+  },
 };
 
 export async function GET(
@@ -67,6 +76,7 @@ export async function GET(
       hoursLifeToDate: Number(hoursLife._sum.hours ?? 0),
       openActionTitle:
         project.actionItems.find((a) => !a.completedAt && a.clientFacing)?.title ?? null,
+      includeExpenseRecords: true,
     }),
     updates: project.updates.map((u) => ({
       id: u.id,
@@ -183,19 +193,16 @@ export async function PATCH(
       }
       data.phaseFeePercents = map;
     }
-    if (body.phaseCostPercents !== undefined) {
-      const map = parsePhaseSplitMap(body.phaseCostPercents);
-      if (!map) {
-        return NextResponse.json({ error: "Invalid cost phase splits" }, { status: 400 });
+    if (body.phaseStructure !== undefined) {
+      const structure = parsePhaseStructure(body.phaseStructure);
+      if (!structure) {
+        return NextResponse.json({ error: "Invalid phase structure" }, { status: 400 });
       }
-      const check = validatePhaseSplitMap(map);
+      const check = validatePhaseStructure(structure);
       if (!check.ok) {
-        return NextResponse.json(
-          { error: `Cost splits must total 100% (currently ${check.sum}%)` },
-          { status: 400 },
-        );
+        return NextResponse.json({ error: check.error }, { status: 400 });
       }
-      data.phaseCostPercents = map;
+      data.phaseStructure = structure;
     }
     if (body.status !== undefined) data.status = String(body.status);
     if (body.name !== undefined) {

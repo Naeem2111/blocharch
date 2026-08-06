@@ -2,12 +2,15 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { PRIVATE_STAGE_LABELS, PRIVATE_STAGE_ORDER } from "@/lib/private-constants";
+import type { PrivateDesignStage } from "@prisma/client";
 
 type ExpenseRow = {
   id: string;
   description: string;
   amountZar: number;
   expenseDate: string;
+  designStage: string | null;
   notes: string | null;
 };
 
@@ -15,6 +18,7 @@ type ExpenseDraft = {
   description: string;
   amountZar: string;
   expenseDate: string;
+  designStage: string;
   notes: string;
 };
 
@@ -27,6 +31,7 @@ function expenseDraft(e: ExpenseRow): ExpenseDraft {
     description: e.description,
     amountZar: String(e.amountZar),
     expenseDate: e.expenseDate,
+    designStage: e.designStage ?? "",
     notes: e.notes ?? "",
   };
 }
@@ -35,6 +40,7 @@ function expenseChanged(original: ExpenseRow, draft: ExpenseDraft): boolean {
   return (
     draft.description.trim() !== original.description ||
     draft.expenseDate !== original.expenseDate ||
+    draft.designStage !== (original.designStage ?? "") ||
     draft.notes.trim() !== (original.notes ?? "") ||
     Number(draft.amountZar) !== original.amountZar
   );
@@ -42,6 +48,7 @@ function expenseChanged(original: ExpenseRow, draft: ExpenseDraft): boolean {
 
 export function PrivateProjectExpensesClient({ projectId }: { projectId: string }) {
   const [projectName, setProjectName] = useState("");
+  const [defaultStage, setDefaultStage] = useState<PrivateDesignStage>("site_measure_up");
   const [expenses, setExpenses] = useState<ExpenseRow[]>([]);
   const [totalZar, setTotalZar] = useState(0);
   const [error, setError] = useState("");
@@ -52,6 +59,7 @@ export function PrivateProjectExpensesClient({ projectId }: { projectId: string 
   const [description, setDescription] = useState("");
   const [amountZar, setAmountZar] = useState("");
   const [expenseDate, setExpenseDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [designStage, setDesignStage] = useState<PrivateDesignStage>("site_measure_up");
 
   const load = useCallback(async () => {
     const r = await fetch(`/api/private/projects/${projectId}/expenses`);
@@ -62,6 +70,10 @@ export function PrivateProjectExpensesClient({ projectId }: { projectId: string 
       return;
     }
     setProjectName(j.project.name);
+    if (j.project.designStage) {
+      setDefaultStage(j.project.designStage);
+      setDesignStage((prev) => prev || j.project.designStage);
+    }
     const rows: ExpenseRow[] = j.expenses || [];
     setExpenses(rows);
     setEditDrafts(Object.fromEntries(rows.map((e) => [e.id, expenseDraft(e)])));
@@ -84,6 +96,7 @@ export function PrivateProjectExpensesClient({ projectId }: { projectId: string 
         description: description.trim(),
         amountZar: Number(amountZar),
         expenseDate,
+        designStage,
       }),
     });
     const j = await r.json();
@@ -122,6 +135,7 @@ export function PrivateProjectExpensesClient({ projectId }: { projectId: string 
         description: draft.description.trim(),
         amountZar: amount,
         expenseDate: draft.expenseDate,
+        designStage: draft.designStage || null,
         notes: draft.notes.trim() || null,
       }),
     });
@@ -176,7 +190,7 @@ export function PrivateProjectExpensesClient({ projectId }: { projectId: string 
         <h2 className="text-lg font-semibold text-white">{projectName}</h2>
         <p className="mt-1 text-sm text-slate-400">Project expenses</p>
         <p className="mt-4 text-2xl font-semibold tabular-nums text-white">{zar(totalZar)}</p>
-        <p className="text-xs text-slate-500">{expenses.length} expense{expenses.length === 1 ? "" : "s"} recorded</p>
+        <p className="text-xs text-slate-500">{expenses.length} expense{expenses.length === 1 ? "" : "s"} recorded · assign each to a stage for cost breakdown</p>
       </div>
 
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
@@ -238,6 +252,27 @@ export function PrivateProjectExpensesClient({ projectId }: { projectId: string 
                       }
                       className={`mt-1 ${field}`}
                     />
+                  </label>
+                  <label className="block text-xs text-slate-400 sm:col-span-2 lg:col-span-4">
+                    Stage (for cost breakdown)
+                    <select
+                      disabled={busy}
+                      value={draft.designStage}
+                      onChange={(ev) =>
+                        setEditDrafts((prev) => ({
+                          ...prev,
+                          [e.id]: { ...draft, designStage: ev.target.value },
+                        }))
+                      }
+                      className={`mt-1 ${field}`}
+                    >
+                      <option value="">Unassigned</option>
+                      {PRIVATE_STAGE_ORDER.map((stage) => (
+                        <option key={stage} value={stage}>
+                          {PRIVATE_STAGE_LABELS[stage]}
+                        </option>
+                      ))}
+                    </select>
                   </label>
                   <label className="block text-xs text-slate-400 sm:col-span-2 lg:col-span-4">
                     Notes
@@ -313,6 +348,20 @@ export function PrivateProjectExpensesClient({ projectId }: { projectId: string 
               placeholder="0"
               className="mt-1 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
             />
+          </label>
+          <label className="block text-xs text-slate-400 sm:col-span-2 lg:col-span-4">
+            Stage (for cost breakdown)
+            <select
+              value={designStage}
+              onChange={(e) => setDesignStage(e.target.value as PrivateDesignStage)}
+              className="mt-1 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+            >
+              {PRIVATE_STAGE_ORDER.map((stage) => (
+                <option key={stage} value={stage}>
+                  {PRIVATE_STAGE_LABELS[stage]}
+                </option>
+              ))}
+            </select>
           </label>
         </div>
         <button

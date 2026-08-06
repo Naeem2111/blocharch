@@ -6,14 +6,16 @@ import {
 import { resolvePrivateProjectTypeLabel } from "@/lib/private-project-types";
 import { computePrivateProgressPercent, resolvePrivateProgressPercent, marginPercent, privateStageMeta } from "@/lib/private-progress";
 import {
-  buildPhaseBreakdown,
+  buildProjectPhaseBreakdown,
   resolvePhaseSplits,
 } from "@/lib/private-phase-splits";
+import { resolvePhaseStructure } from "@/lib/private-phase-structure";
 
 type ProjectWithRelations = PrivateProject & {
   client: Pick<PrivateClient, "id" | "name" | "contactEmail" | "contactPhone" | "slug">;
   assignedAthlete: Pick<OpsAthlete, "id" | "fullName" | "athleteCode" | "privateWeeklyCapHours"> | null;
   customProjectType?: Pick<PrivateProjectCustomType, "id" | "label"> | null;
+  expenses?: Array<{ designStage: string | null; amountZar: { toString(): string } | number }>;
 };
 
 export function serializePrivateProject(
@@ -21,6 +23,7 @@ export function serializePrivateProject(
   extras?: {
     hoursLifeToDate?: number;
     openActionTitle?: string | null;
+    includeExpenseRecords?: boolean;
   },
 ) {
   const fee = Number(p.feeZar);
@@ -35,15 +38,18 @@ export function serializePrivateProject(
     stageStartedAt: p.stageStartedAt,
   });
 
-  const { feePercents, costPercents } = resolvePhaseSplits(
-    p.phaseFeePercents,
-    p.phaseCostPercents,
-  );
-  const phases = buildPhaseBreakdown({
+  const phaseStructure = resolvePhaseStructure(p.phaseStructure);
+  const { feePercents } = resolvePhaseSplits(p.phaseFeePercents, p.phaseCostPercents);
+  const expenseRows = (p.expenses ?? []).map((e) => ({
+    designStage: e.designStage,
+    amountZar: Number(e.amountZar),
+  }));
+  const breakdown = buildProjectPhaseBreakdown({
     designStage: p.designStage,
     feeZar: fee,
     phaseFeePercents: feePercents,
-    phaseCostPercents: costPercents,
+    phaseStructure,
+    expenses: expenseRows,
   });
 
   return {
@@ -77,8 +83,13 @@ export function serializePrivateProject(
     manualProgressPercent: p.manualProgressPercent,
     progressIsManual: p.manualProgressPercent != null,
     phaseFeePercents: feePercents,
-    phaseCostPercents: costPercents,
-    phases,
+    phaseCostPercents: breakdown.costPercents,
+    phaseStructure,
+    phaseGroups: breakdown.phaseGroups,
+    phases: breakdown.stages,
+    expensesTotalZar: breakdown.totalExpenseZar,
+    unassignedExpenseZar: breakdown.unassignedExpenseZar,
+    expenseRecords: extras?.includeExpenseRecords ? expenseRows : undefined,
     stageMeta: meta,
     updatedAt: p.updatedAt.toISOString(),
     client: {

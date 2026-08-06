@@ -5,15 +5,38 @@ import {
   PRIVATE_STAGE_ORDER,
   stageIndex,
 } from "@/lib/private-constants";
+import {
+  defaultPhaseStructure,
+  resolvePhaseStructure,
+  type PhaseStructure,
+  type ProjectPhaseGroup,
+} from "@/lib/private-phase-structure";
+import {
+  computeCostPercentsFromExpenses,
+  emptyStageExpenseTotals,
+  expenseTotalsByStage,
+  type StageExpenseTotals,
+} from "@/lib/private-stage-expenses";
 
 export type PhaseSplitMap = Record<PrivateDesignStage, number>;
 
-export type PhaseBreakdownRow = {
+export type StageBillingRow = {
   stage: PrivateDesignStage;
   label: string;
   status: "completed" | "current" | "upcoming";
   feePercent: number;
   costPercent: number;
+  feeZar: number;
+  /** Actual third-party expenses attributed to this stage. */
+  expenseZar: number;
+  /** @deprecated Use expenseZar — kept for API compatibility. */
+  costZar: number;
+};
+
+export type PhaseGroupBreakdown = {
+  id: string;
+  name: string;
+  stages: StageBillingRow[];
   feeZar: number;
   costZar: number;
 };
@@ -87,23 +110,103 @@ export function phaseStatus(
   return "upcoming";
 }
 
+function buildStageRow(input: {
+  stage: PrivateDesignStage;
+  designStage: PrivateDesignStage;
+  feeZar: number;
+  phaseFeePercents: PhaseSplitMap;
+  stageExpenseZar: number;
+  totalExpenseZar: number;
+}): StageBillingRow {
+  const feePercent = input.phaseFeePercents[input.stage];
+  const expenseZar = Math.round(input.stageExpenseZar);
+  const costPercent =
+    input.totalExpenseZar > 0
+      ? Math.round((input.stageExpenseZar / input.totalExpenseZar) * 100)
+      : 0;
+  return {
+    stage: input.stage,
+    label: PRIVATE_STAGE_LABELS[input.stage],
+    status: phaseStatus(input.stage, input.designStage),
+    feePercent,
+    costPercent,
+    feeZar: Math.round((input.feeZar * feePercent) / 100),
+    expenseZar,
+    costZar: expenseZar,
+  };
+}
+
+/** @deprecated Use buildProjectPhaseBreakdown — flat stage list kept for compatibility. */
 export function buildPhaseBreakdown(input: {
   designStage: PrivateDesignStage;
   feeZar: number;
   phaseFeePercents: PhaseSplitMap;
-  phaseCostPercents: PhaseSplitMap;
-}): PhaseBreakdownRow[] {
-  return PRIVATE_STAGE_ORDER.map((stage) => {
-    const feePercent = input.phaseFeePercents[stage];
-    const costPercent = input.phaseCostPercents[stage];
-    return {
+  stageExpenseTotals?: StageExpenseTotals;
+  totalExpenseZar?: number;
+}): StageBillingRow[] {
+  const totals = input.stageExpenseTotals ?? emptyStageExpenseTotals();
+  const totalExpenseZar = input.totalExpenseZar ?? 0;
+  return PRIVATE_STAGE_ORDER.map((stage) =>
+    buildStageRow({
       stage,
-      label: PRIVATE_STAGE_LABELS[stage],
-      status: phaseStatus(stage, input.designStage),
-      feePercent,
-      costPercent,
-      feeZar: Math.round((input.feeZar * feePercent) / 100),
-      costZar: Math.round((input.feeZar * costPercent) / 100),
+      designStage: input.designStage,
+      feeZar: input.feeZar,
+      phaseFeePercents: input.phaseFeePercents,
+      stageExpenseZar: totals[stage],
+      totalExpenseZar,
+    }),
+  );
+}
+
+export function buildProjectPhaseBreakdown(input: {
+  designStage: PrivateDesignStage;
+  feeZar: number;
+  phaseFeePercents: PhaseSplitMap;
+  phaseStructure: PhaseStructure;
+  expenses?: Array<{ designStage: string | null; amountZar: number }>;
+}): {
+  phaseGroups: PhaseGroupBreakdown[];
+  stages: StageBillingRow[];
+  stageExpenseTotals: StageExpenseTotals;
+  unassignedExpenseZar: number;
+  totalExpenseZar: number;
+  costPercents: PhaseSplitMap;
+} {
+  const { totals, unassignedZar } = expenseTotalsByStage(input.expenses ?? []);
+  const totalExpenseZar = PRIVATE_STAGE_ORDER.reduce((sum, stage) => sum + totals[stage], 0);
+  const costPercents = computeCostPercentsFromExpenses(totals);
+
+  const stages = PRIVATE_STAGE_ORDER.map((stage) =>
+    buildStageRow({
+      stage,
+      designStage: input.designStage,
+      feeZar: input.feeZar,
+      phaseFeePercents: input.phaseFeePercents,
+      stageExpenseZar: totals[stage],
+      totalExpenseZar,
+    }),
+  );
+  const stageByKey = Object.fromEntries(stages.map((s) => [s.stage, s])) as Record<
+    PrivateDesignStage,
+    StageBillingRow
+  >;
+
+  const phaseGroups = input.phaseStructure.phases.map((phase: ProjectPhaseGroup) => {
+    const phaseStages = phase.stageKeys.map((key) => stageByKey[key]).filter(Boolean);
+    return {
+      id: phase.id,
+      name: phase.name,
+      stages: phaseStages,
+      feeZar: phaseStages.reduce((sum, s) => sum + s.feeZar, 0),
+      costZar: phaseStages.reduce((sum, s) => sum + s.expenseZar, 0),
     };
   });
+
+  return { phaseGroups, stages, stageExpenseTotals: totals, unassignedExpenseZar: unassignedZar, totalExpenseZar, costPercents };
 }
+
+export function resolveProjectPhaseStructure(json: unknown): PhaseStructure {
+  return resolvePhaseStructure(json);
+}
+
+export { defaultPhaseStructure };
