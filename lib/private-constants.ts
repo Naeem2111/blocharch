@@ -38,6 +38,9 @@ export const PRIVATE_STAGE_LABELS: Record<PrivateDesignStage, string> = {
 export const PRIVATE_STAGE_DONE_COPY =
   "Design approved — construction is the next, separate phase";
 
+/** Expenses with no design phase — one-off project costs, like housekeeping on daily logs. */
+export const PRIVATE_FIXED_FEE_EXPENSE_LABEL = "Fixed fee";
+
 export const PRIVATE_STAGE_TYPICAL_COPY: Partial<Record<PrivateDesignStage, string>> = {
   council_review:
     "Council review typically takes 6–8 weeks and moves in one step once a decision is made — there's nothing for you to do, and nothing's gone wrong.",

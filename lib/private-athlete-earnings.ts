@@ -18,7 +18,7 @@ export async function athletePrivateWorkEarnings(
   const from = monthStartUtc(reference);
   const to = monthEndUtc(reference);
 
-  const [monthAgg, lifetimeAgg] = await Promise.all([
+  const [monthAgg, lifetimeAgg, monthExpenseAgg, lifetimeExpenseAgg] = await Promise.all([
     prisma.privateHourLog.aggregate({
       where: { athleteId, workDate: { gte: from, lte: to } },
       _sum: { hours: true },
@@ -27,16 +27,30 @@ export async function athletePrivateWorkEarnings(
       where: { athleteId },
       _sum: { hours: true },
     }),
+    prisma.privateProjectExpense.aggregate({
+      where: {
+        athleteId,
+        kind: "athlete",
+        expenseDate: { gte: from, lte: to },
+      },
+      _sum: { amountZar: true },
+    }),
+    prisma.privateProjectExpense.aggregate({
+      where: { athleteId, kind: "athlete" },
+      _sum: { amountZar: true },
+    }),
   ]);
 
   const monthHours = Number(monthAgg._sum.hours ?? 0);
   const lifetimeHours = Number(lifetimeAgg._sum.hours ?? 0);
+  const monthExpenseZar = Number(monthExpenseAgg._sum.amountZar ?? 0);
+  const lifetimeExpenseZar = Number(lifetimeExpenseAgg._sum.amountZar ?? 0);
 
   return {
     hourlyRateZar,
     monthHours,
     lifetimeHours,
-    monthEarningsZar: Math.round(monthHours * hourlyRateZar),
-    lifetimeEarningsZar: Math.round(lifetimeHours * hourlyRateZar),
+    monthEarningsZar: Math.round(monthHours * hourlyRateZar + monthExpenseZar),
+    lifetimeEarningsZar: Math.round(lifetimeHours * hourlyRateZar + lifetimeExpenseZar),
   };
 }

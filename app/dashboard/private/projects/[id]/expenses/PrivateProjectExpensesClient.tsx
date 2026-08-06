@@ -2,14 +2,20 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { PRIVATE_STAGE_LABELS, PRIVATE_STAGE_ORDER } from "@/lib/private-constants";
-import type { PrivateDesignStage } from "@prisma/client";
+import { PRIVATE_FIXED_FEE_EXPENSE_LABEL, PRIVATE_STAGE_LABELS, PRIVATE_STAGE_ORDER } from "@/lib/private-constants";
+import type { PrivateDesignStage, PrivateProjectExpenseKind } from "@prisma/client";
+
+type AthleteOption = { id: string; fullName: string; athleteCode: string };
 
 type ExpenseRow = {
   id: string;
   description: string;
   amountZar: number;
   expenseDate: string;
+  kind: PrivateProjectExpenseKind;
+  kindLabel: string;
+  athleteId: string | null;
+  athleteName: string | null;
   designStage: string | null;
   notes: string | null;
 };
@@ -18,6 +24,8 @@ type ExpenseDraft = {
   description: string;
   amountZar: string;
   expenseDate: string;
+  kind: PrivateProjectExpenseKind;
+  athleteId: string;
   designStage: string;
   notes: string;
 };
@@ -31,6 +39,8 @@ function expenseDraft(e: ExpenseRow): ExpenseDraft {
     description: e.description,
     amountZar: String(e.amountZar),
     expenseDate: e.expenseDate,
+    kind: e.kind,
+    athleteId: e.athleteId ?? "",
     designStage: e.designStage ?? "",
     notes: e.notes ?? "",
   };
@@ -40,6 +50,8 @@ function expenseChanged(original: ExpenseRow, draft: ExpenseDraft): boolean {
   return (
     draft.description.trim() !== original.description ||
     draft.expenseDate !== original.expenseDate ||
+    draft.kind !== original.kind ||
+    draft.athleteId !== (original.athleteId ?? "") ||
     draft.designStage !== (original.designStage ?? "") ||
     draft.notes.trim() !== (original.notes ?? "") ||
     Number(draft.amountZar) !== original.amountZar
@@ -48,6 +60,8 @@ function expenseChanged(original: ExpenseRow, draft: ExpenseDraft): boolean {
 
 export function PrivateProjectExpensesClient({ projectId }: { projectId: string }) {
   const [projectName, setProjectName] = useState("");
+  const [assignedAthleteId, setAssignedAthleteId] = useState("");
+  const [athletes, setAthletes] = useState<AthleteOption[]>([]);
   const [defaultStage, setDefaultStage] = useState<PrivateDesignStage>("site_measure_up");
   const [expenses, setExpenses] = useState<ExpenseRow[]>([]);
   const [totalZar, setTotalZar] = useState(0);
@@ -59,20 +73,33 @@ export function PrivateProjectExpensesClient({ projectId }: { projectId: string 
   const [description, setDescription] = useState("");
   const [amountZar, setAmountZar] = useState("");
   const [expenseDate, setExpenseDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [designStage, setDesignStage] = useState<PrivateDesignStage>("site_measure_up");
+  const [kind, setKind] = useState<PrivateProjectExpenseKind>("third_party");
+  const [athleteId, setAthleteId] = useState("");
+  const [designStage, setDesignStage] = useState("");
 
   const load = useCallback(async () => {
-    const r = await fetch(`/api/private/projects/${projectId}/expenses`);
-    const j = await r.json();
-    if (!r.ok) {
+    const [expensesRes, athletesRes] = await Promise.all([
+      fetch(`/api/private/projects/${projectId}/expenses`),
+      fetch("/api/private/athletes"),
+    ]);
+    const j = await expensesRes.json();
+    const athletesJson = await athletesRes.json();
+
+    if (!expensesRes.ok) {
       setError(j.error || "Not found");
       setLoading(false);
       return;
     }
+
     setProjectName(j.project.name);
+    setAssignedAthleteId(j.project.assignedAthleteId ?? "");
+    setAthletes(athletesJson.athletes || []);
     if (j.project.designStage) {
       setDefaultStage(j.project.designStage);
       setDesignStage((prev) => prev || j.project.designStage);
+    }
+    if (j.project.assignedAthleteId) {
+      setAthleteId((prev) => prev || j.project.assignedAthleteId);
     }
     const rows: ExpenseRow[] = j.expenses || [];
     setExpenses(rows);
@@ -85,8 +112,23 @@ export function PrivateProjectExpensesClient({ projectId }: { projectId: string 
     void load();
   }, [load]);
 
+  function validateAthleteForKind(
+    expenseKind: PrivateProjectExpenseKind,
+    selectedAthleteId: string,
+  ): string | null {
+    if (expenseKind === "athlete" && !selectedAthleteId.trim()) {
+      return "Select an athlete — athlete payments count as income to them.";
+    }
+    return null;
+  }
+
   async function addExpense() {
     if (!description.trim() || !amountZar.trim()) return;
+    const athleteError = validateAthleteForKind(kind, athleteId);
+    if (athleteError) {
+      setError(athleteError);
+      return;
+    }
     setSaving(true);
     setError("");
     const r = await fetch(`/api/private/projects/${projectId}/expenses`, {
@@ -96,7 +138,9 @@ export function PrivateProjectExpensesClient({ projectId }: { projectId: string 
         description: description.trim(),
         amountZar: Number(amountZar),
         expenseDate,
-        designStage,
+        kind,
+        athleteId: kind === "athlete" ? athleteId : null,
+        designStage: designStage || null,
       }),
     });
     const j = await r.json();
@@ -107,6 +151,7 @@ export function PrivateProjectExpensesClient({ projectId }: { projectId: string 
     }
     setDescription("");
     setAmountZar("");
+    setKind("third_party");
     void load();
   }
 
@@ -124,6 +169,11 @@ export function PrivateProjectExpensesClient({ projectId }: { projectId: string 
       setError("Valid amount is required.");
       return;
     }
+    const athleteError = validateAthleteForKind(draft.kind, draft.athleteId);
+    if (athleteError) {
+      setError(athleteError);
+      return;
+    }
 
     setItemLoading(expenseId);
     setError("");
@@ -135,6 +185,8 @@ export function PrivateProjectExpensesClient({ projectId }: { projectId: string 
         description: draft.description.trim(),
         amountZar: amount,
         expenseDate: draft.expenseDate,
+        kind: draft.kind,
+        athleteId: draft.kind === "athlete" ? draft.athleteId : null,
         designStage: draft.designStage || null,
         notes: draft.notes.trim() || null,
       }),
@@ -190,7 +242,10 @@ export function PrivateProjectExpensesClient({ projectId }: { projectId: string 
         <h2 className="text-lg font-semibold text-white">{projectName}</h2>
         <p className="mt-1 text-sm text-slate-400">Project expenses</p>
         <p className="mt-4 text-2xl font-semibold tabular-nums text-white">{zar(totalZar)}</p>
-        <p className="text-xs text-slate-500">{expenses.length} expense{expenses.length === 1 ? "" : "s"} recorded · assign each to a phase for cost breakdown</p>
+        <p className="text-xs text-slate-500">
+          {expenses.length} expense{expenses.length === 1 ? "" : "s"} recorded · assign a phase,
+          use fixed fee for one-off costs, or mark athlete payments as income
+        </p>
       </div>
 
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
@@ -222,6 +277,54 @@ export function PrivateProjectExpensesClient({ projectId }: { projectId: string 
                       className={`mt-1 ${field}`}
                     />
                   </label>
+                  <label className="block text-xs text-slate-400">
+                    Type
+                    <select
+                      disabled={busy}
+                      value={draft.kind}
+                      onChange={(ev) => {
+                        const nextKind = ev.target.value as PrivateProjectExpenseKind;
+                        setEditDrafts((prev) => ({
+                          ...prev,
+                          [e.id]: {
+                            ...draft,
+                            kind: nextKind,
+                            athleteId:
+                              nextKind === "athlete"
+                                ? draft.athleteId || assignedAthleteId
+                                : "",
+                          },
+                        }));
+                      }}
+                      className={`mt-1 ${field}`}
+                    >
+                      <option value="third_party">Third party</option>
+                      <option value="athlete">Athlete payment (income)</option>
+                    </select>
+                  </label>
+                  {draft.kind === "athlete" ? (
+                    <label className="block text-xs text-slate-400 sm:col-span-2">
+                      Athlete
+                      <select
+                        disabled={busy}
+                        value={draft.athleteId}
+                        onChange={(ev) =>
+                          setEditDrafts((prev) => ({
+                            ...prev,
+                            [e.id]: { ...draft, athleteId: ev.target.value },
+                          }))
+                        }
+                        className={`mt-1 ${field}`}
+                      >
+                        <option value="">Select athlete…</option>
+                        {athletes.map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.fullName}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
                   <label className="block text-xs text-slate-400 sm:col-span-2">
                     Description
                     <input
@@ -254,7 +357,7 @@ export function PrivateProjectExpensesClient({ projectId }: { projectId: string 
                     />
                   </label>
                   <label className="block text-xs text-slate-400 sm:col-span-2 lg:col-span-4">
-                    Phase (for cost breakdown)
+                    Phase or fixed fee
                     <select
                       disabled={busy}
                       value={draft.designStage}
@@ -266,13 +369,18 @@ export function PrivateProjectExpensesClient({ projectId }: { projectId: string 
                       }
                       className={`mt-1 ${field}`}
                     >
-                      <option value="">Unassigned</option>
+                      <option value="">{PRIVATE_FIXED_FEE_EXPENSE_LABEL}</option>
                       {PRIVATE_STAGE_ORDER.map((stage) => (
                         <option key={stage} value={stage}>
                           {PRIVATE_STAGE_LABELS[stage]}
                         </option>
                       ))}
                     </select>
+                    {!draft.designStage ? (
+                      <span className="mt-1 block text-[10px] text-slate-500">
+                        One-off cost — not tied to a design phase.
+                      </span>
+                    ) : null}
                   </label>
                   <label className="block text-xs text-slate-400 sm:col-span-2 lg:col-span-4">
                     Notes
@@ -291,6 +399,12 @@ export function PrivateProjectExpensesClient({ projectId }: { projectId: string 
                   </label>
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {draft.kind === "athlete" && draft.athleteId ? (
+                    <span className="text-[10px] text-brand-200/80">
+                      Counts as income to{" "}
+                      {athletes.find((a) => a.id === draft.athleteId)?.fullName ?? e.athleteName}
+                    </span>
+                  ) : null}
                   {changed ? (
                     <button
                       type="button"
@@ -328,12 +442,47 @@ export function PrivateProjectExpensesClient({ projectId }: { projectId: string 
               className="mt-1 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
             />
           </label>
+          <label className="block text-xs text-slate-400">
+            Type
+            <select
+              value={kind}
+              onChange={(e) => {
+                const nextKind = e.target.value as PrivateProjectExpenseKind;
+                setKind(nextKind);
+                if (nextKind === "athlete" && !athleteId && assignedAthleteId) {
+                  setAthleteId(assignedAthleteId);
+                }
+                if (nextKind === "third_party") setAthleteId("");
+              }}
+              className="mt-1 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+            >
+              <option value="third_party">Third party</option>
+              <option value="athlete">Athlete payment (income)</option>
+            </select>
+          </label>
+          {kind === "athlete" ? (
+            <label className="block text-xs text-slate-400 sm:col-span-2">
+              Athlete
+              <select
+                value={athleteId}
+                onChange={(e) => setAthleteId(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+              >
+                <option value="">Select athlete…</option>
+                {athletes.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.fullName}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           <label className="block text-xs text-slate-400 sm:col-span-2">
             Description
             <input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="e.g. Surveyor fee"
+              placeholder={kind === "athlete" ? "e.g. Site visit fee" : "e.g. Surveyor fee"}
               className="mt-1 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
             />
           </label>
@@ -350,20 +499,32 @@ export function PrivateProjectExpensesClient({ projectId }: { projectId: string 
             />
           </label>
           <label className="block text-xs text-slate-400 sm:col-span-2 lg:col-span-4">
-            Phase (for cost breakdown)
+            Phase or fixed fee
             <select
               value={designStage}
-              onChange={(e) => setDesignStage(e.target.value as PrivateDesignStage)}
+              onChange={(e) => setDesignStage(e.target.value)}
               className="mt-1 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
             >
+              <option value="">{PRIVATE_FIXED_FEE_EXPENSE_LABEL}</option>
               {PRIVATE_STAGE_ORDER.map((stage) => (
                 <option key={stage} value={stage}>
                   {PRIVATE_STAGE_LABELS[stage]}
                 </option>
               ))}
             </select>
+            {!designStage ? (
+              <span className="mt-1 block text-[10px] text-slate-500">
+                One-off cost — not tied to a design phase (like housekeeping on daily logs).
+              </span>
+            ) : null}
           </label>
         </div>
+        {kind === "athlete" ? (
+          <p className="mt-2 text-xs text-slate-500">
+            Athlete payments are project costs and count toward the athlete&apos;s private work
+            income.
+          </p>
+        ) : null}
         <button
           type="button"
           disabled={saving}

@@ -11,7 +11,7 @@ export default function PrivateProjectExpensesPage({
       <PageHeader
         title="Project expenses"
         badge="Private"
-        description="Disbursements and third-party costs for this project."
+        description="Third-party costs and athlete payments for this project."
         className="mb-8"
       />
       <PrivateProjectExpensesClient projectId={params.id} />

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ProgressSlider } from "@/components/ProgressSlider";
-import { PRIVATE_STAGE_LABELS, PRIVATE_STAGE_ORDER } from "@/lib/private-constants";
+import { PRIVATE_FIXED_FEE_EXPENSE_LABEL, PRIVATE_STAGE_LABELS, PRIVATE_STAGE_ORDER } from "@/lib/private-constants";
 import {
   buildProjectPhaseBreakdown,
   defaultPhaseSplits,
@@ -663,9 +663,10 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
           {" · "}
           Expenses total {zar(totalExpenseZar)}
           {unassignedExpenseZar > 0 ? (
-            <span className="text-amber-300">
+            <span className="text-slate-400">
               {" "}
-              ({zar(unassignedExpenseZar)} unassigned — set a phase on each expense)
+              ({zar(unassignedExpenseZar)} {PRIVATE_FIXED_FEE_EXPENSE_LABEL.toLowerCase()} — not
+              tied to a phase)
             </span>
           ) : null}
           {" · "}
