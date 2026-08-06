@@ -219,8 +219,10 @@ model User {
   role         UserRole
   disabled     Boolean  @default(false)
   /** UI theme preference — "dark" or "light". */
-  theme        String   @default("dark")
-  createdAt    DateTime @default(now()) @map("created_at")
+  theme           String   @default("dark")
+  /** Custom sidebar section/link layout (JSON). */
+  sidebarNavOrder Json?    @map("sidebar_nav_order")
+  createdAt       DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   ownedPlannerBoards PlannerBoard[]       @relation("PlannerBoardOwner")

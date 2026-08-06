@@ -8,7 +8,7 @@ import {
 import { isAdminOnlyAccount } from "@/lib/admin-only-accounts";
 
 /** Admin sidebar perspective — role-based console views. */
-export type AdminConsoleView = "all" | "admin" | "manager" | "athlete";
+export type AdminConsoleView = "all" | "admin" | "manager" | "sales" | "athlete";
 
 export const ADMIN_CONSOLE_VIEWS: {
 	id: AdminConsoleView;
@@ -43,6 +43,12 @@ export const ADMIN_CONSOLE_VIEWS: {
 		home: "/dashboard",
 	},
 	{
+		id: "sales",
+		label: "Sales",
+		sections: ["marketing"],
+		home: "/dashboard",
+	},
+	{
 		id: "athlete",
 		label: "Athlete",
 		sections: ["athlete_portal"],
@@ -51,7 +57,7 @@ export const ADMIN_CONSOLE_VIEWS: {
 ];
 
 const LEGACY_VIEW_MAP: Record<string, AdminConsoleView> = {
-	marketing: "manager",
+	marketing: "sales",
 	operations: "admin",
 	planner: "admin",
 };
@@ -90,7 +96,7 @@ export function adminViewFromPath(pathname: string): AdminConsoleView {
 	if (pathname.startsWith("/dashboard/planner")) return "admin";
 	if (isOpsDashboardPath(pathname)) return "admin";
 	if (isPrivateDashboardPath(pathname)) return "admin";
-	if (isMarketingDashboardPath(pathname)) return "manager";
+	if (isMarketingDashboardPath(pathname)) return "sales";
 	return "manager";
 }
 

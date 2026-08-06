@@ -1,7 +1,9 @@
 import { randomUUID } from "crypto";
 import { hashPassword } from "@/lib/password";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { DEFAULT_THEME, normalizeTheme, type ThemePreference } from "@/lib/theme";
+import { parseSidebarNavOrder, type SidebarNavOrder } from "@/lib/sidebar-nav-order";
 
 export type UserRole = "admin" | "manager" | "user" | "sales";
 
@@ -12,6 +14,7 @@ export interface UserRecord {
   role: UserRole;
   disabled?: boolean;
   theme: ThemePreference;
+  sidebarNavOrder: SidebarNavOrder | null;
   createdAt: string;
 }
 
@@ -30,6 +33,7 @@ function bootstrapIfEmpty(): UserRecord {
     passwordHash: hashPassword(password),
     role: "admin",
     theme: DEFAULT_THEME,
+    sidebarNavOrder: null,
     createdAt: now,
   };
   return admin;
@@ -58,6 +62,7 @@ function toUserRecord(row: {
   role: UserRole;
   disabled: boolean;
   theme?: string | null;
+  sidebarNavOrder?: unknown;
   createdAt: Date;
 }): UserRecord {
   return {
@@ -67,6 +72,7 @@ function toUserRecord(row: {
     role: row.role as UserRole,
     disabled: row.disabled,
     theme: normalizeTheme(row.theme),
+    sidebarNavOrder: parseSidebarNavOrder(row.sidebarNavOrder),
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -93,6 +99,7 @@ export async function listUsersPublic(): Promise<Omit<UserRecord, "passwordHash"
     role: rest.role as UserRole,
     disabled: rest.disabled,
     theme: normalizeTheme(rest.theme),
+    sidebarNavOrder: parseSidebarNavOrder(rest.sidebarNavOrder),
     createdAt: rest.createdAt.toISOString(),
   }));
 }
@@ -192,16 +199,31 @@ export async function updateUser(
 
 export async function updateUserPreferences(
   id: string,
-  patch: { theme?: ThemePreference }
+  patch: { theme?: ThemePreference; sidebarNavOrder?: SidebarNavOrder | null }
 ): Promise<{ ok: true; user: Omit<UserRecord, "passwordHash"> } | { ok: false; error: string }> {
   await ensureBootstrapAdmin();
   const current = await prisma.user.findUnique({ where: { id } });
   if (!current) return { ok: false, error: "User not found" };
 
+  if (patch.sidebarNavOrder !== undefined && patch.sidebarNavOrder !== null) {
+    const normalized = parseSidebarNavOrder(patch.sidebarNavOrder);
+    if (!normalized) {
+      return { ok: false, error: "Invalid sidebar layout" };
+    }
+  }
+
   const updated = await prisma.user.update({
     where: { id },
     data: {
       ...(patch.theme !== undefined ? { theme: patch.theme } : {}),
+      ...(patch.sidebarNavOrder !== undefined
+        ? {
+            sidebarNavOrder:
+              patch.sidebarNavOrder === null
+                ? Prisma.JsonNull
+                : (patch.sidebarNavOrder as Prisma.InputJsonValue),
+          }
+        : {}),
     },
   });
   const { passwordHash: _, ...pub } = toUserRecord(updated);

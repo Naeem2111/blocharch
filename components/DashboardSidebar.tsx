@@ -15,10 +15,12 @@ import {
 	type AppModule,
 } from "@/lib/permissions";
 import {
-	applyItemOrder,
 	applySectionOrder,
+	defaultItemsBySection,
 	loadSidebarNavOrder,
+	moveNavItem,
 	reorderIds,
+	resolveItemsBySection,
 	saveSidebarNavOrder,
 	type SidebarNavOrder,
 } from "@/lib/sidebar-nav-order";
@@ -674,6 +676,14 @@ const NAV_SECTIONS: NavSection[] = [
 	{ id: "admin", label: "Users & access", module: "admin", items: ADMIN_NAV },
 ];
 
+const ALL_NAV_ITEMS_BY_HREF = new Map<string, NavItem>(
+	NAV_SECTIONS.flatMap((section) => section.items.map((item) => [item.href, item] as const)),
+);
+
+type DragItemState = { sectionId: string; index: number; href: string } | null;
+type DragSectionState = { index: number } | null;
+type DropTargetState = { sectionId: string; index: number } | null;
+
 function navActive(pathname: string, href: string): boolean {
 	if (href === "/dashboard") return pathname === "/dashboard";
 	if (href === "/dashboard/ops") return pathname === "/dashboard/ops";
@@ -761,16 +771,13 @@ function NavLink({
 	);
 }
 
-type DragItemState = { sectionId: string; index: number } | null;
-type DragSectionState = { index: number } | null;
-
 function DraggableNavItem({
 	item,
 	sectionId,
 	index,
 	pathname,
 	dragging,
-	dropIndex,
+	dropTarget,
 	onDragStart,
 	onDragOver,
 	onDrop,
@@ -786,8 +793,8 @@ function DraggableNavItem({
 	badge?: number;
 	urgent?: boolean;
 	dragging: DragItemState;
-	dropIndex: number | null;
-	onDragStart: (sectionId: string, index: number) => void;
+	dropTarget: DropTargetState;
+	onDragStart: (sectionId: string, index: number, href: string) => void;
 	onDragOver: (sectionId: string, index: number) => void;
 	onDrop: (sectionId: string, index: number) => void;
 	onDragEnd: () => void;
@@ -796,7 +803,8 @@ function DraggableNavItem({
 	const isDragging =
 		dragging?.sectionId === sectionId && dragging.index === index;
 	const showDropBefore =
-		dropIndex === index &&
+		dropTarget?.sectionId === sectionId &&
+		dropTarget.index === index &&
 		dragging !== null &&
 		(dragging.sectionId !== sectionId || dragging.index !== index);
 
@@ -804,7 +812,7 @@ function DraggableNavItem({
 		<div
 			className={`relative flex items-center gap-0.5 ${isDragging ? "opacity-40" : ""}`}
 			onDragOver={(e) => {
-				if (!dragging || dragging.sectionId !== sectionId) return;
+				if (!dragging) return;
 				e.preventDefault();
 				onDragOver(sectionId, index);
 			}}
@@ -825,7 +833,7 @@ function DraggableNavItem({
 						"application/x-sidebar-item",
 						`${sectionId}:${index}`,
 					);
-					onDragStart(sectionId, index);
+					onDragStart(sectionId, index, item.href);
 				}}
 				onDragEnd={onDragEnd}
 			>
@@ -838,6 +846,46 @@ function DraggableNavItem({
 				urgent={urgent}
 				onNavigate={onNavigate}
 			/>
+		</div>
+	);
+}
+
+function NavSectionDropTail({
+	sectionId,
+	index,
+	dragging,
+	dropTarget,
+	onDragOver,
+	onDrop,
+}: {
+	sectionId: string;
+	index: number;
+	dragging: DragItemState;
+	dropTarget: DropTargetState;
+	onDragOver: (sectionId: string, index: number) => void;
+	onDrop: (sectionId: string, index: number) => void;
+}) {
+	const showDrop =
+		dragging !== null &&
+		dropTarget?.sectionId === sectionId &&
+		dropTarget.index === index;
+
+	return (
+		<div
+			className={`relative min-h-2 ${dragging ? "py-0.5" : ""}`}
+			onDragOver={(e) => {
+				if (!dragging) return;
+				e.preventDefault();
+				onDragOver(sectionId, index);
+			}}
+			onDrop={(e) => {
+				e.preventDefault();
+				onDrop(sectionId, index);
+			}}
+		>
+			{showDrop ? (
+				<span className="pointer-events-none absolute inset-x-1 top-0 h-0.5 rounded-full bg-brand-400/80" />
+			) : null}
 		</div>
 	);
 }
@@ -957,9 +1005,10 @@ export function DashboardSidebar({
 	const [hydrated, setHydrated] = useState(false);
 	const skipSaveRef = useRef(true);
 	const [dragItem, setDragItem] = useState<DragItemState>(null);
-	const [dropItemIndex, setDropItemIndex] = useState<number | null>(null);
+	const [dropTarget, setDropTarget] = useState<DropTargetState>(null);
 	const [dragSection, setDragSection] = useState<DragSectionState>(null);
 	const [dropSectionIndex, setDropSectionIndex] = useState<number | null>(null);
+	const saveServerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const [adminView, setAdminView] = useState<AdminConsoleView>("all");
 
 	const showConsoleViewSwitcher = canShowAdminConsoleViewSwitcher(user);
@@ -975,11 +1024,11 @@ export function DashboardSidebar({
 	}, [user.id, user.role, pathname, showConsoleViewSwitcher]);
 
 	useEffect(() => {
-		const saved = loadSidebarNavOrder(user.id);
+		const saved = user.sidebarNavOrder ?? loadSidebarNavOrder(user.id);
 		setNavOrder(saved);
 		skipSaveRef.current = saved !== null;
 		setHydrated(true);
-	}, [user.id]);
+	}, [user.id, user.sidebarNavOrder]);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -1025,6 +1074,17 @@ export function DashboardSidebar({
 			return;
 		}
 		saveSidebarNavOrder(user.id, navOrder);
+		if (saveServerTimerRef.current) clearTimeout(saveServerTimerRef.current);
+		saveServerTimerRef.current = setTimeout(() => {
+			void fetch("/api/me/preferences", {
+				method: "PATCH",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ sidebarNavOrder: navOrder }),
+			});
+		}, 600);
+		return () => {
+			if (saveServerTimerRef.current) clearTimeout(saveServerTimerRef.current);
+		};
 	}, [navOrder, hydrated, user.id]);
 
 	const collapsedSectionIds = useMemo(
@@ -1035,7 +1095,7 @@ export function DashboardSidebar({
 	const adminViewActive = showConsoleViewSwitcher ? adminView : null;
 	const managerOpsNav = useManagerOpsNavFilter(user.role, adminViewActive);
 
-	const visibleSections = useMemo(() => {
+	const baseSections = useMemo(() => {
 		const filtered = NAV_SECTIONS.filter((section) => {
 			if (section.id === "onboarding" || section.id === "ops") {
 				if (section.id === "ops") return canAccessOpsOverview(user.role);
@@ -1051,8 +1111,7 @@ export function DashboardSidebar({
 						sectionsForAdminView(adminViewActive).includes(section.id),
 					)
 				: filtered;
-		const ordered = applySectionOrder(viewFiltered, navOrder?.sections);
-		return ordered.map((section) => {
+		return viewFiltered.map((section) => {
 			const items =
 				section.id === "ops" && managerOpsNav
 					? section.items.filter(
@@ -1060,12 +1119,40 @@ export function DashboardSidebar({
 								item.href === "/dashboard/ops" || item.href === "/dashboard/ops/pipeline",
 						)
 					: section.items;
-			return {
-				...section,
-				items: applyItemOrder(items, navOrder?.items[section.id]),
-			};
+			return { ...section, items };
 		});
-	}, [user.role, user.username, navOrder, adminViewActive, managerOpsNav, showConsoleViewSwitcher]);
+	}, [user.role, user.username, adminViewActive, managerOpsNav, showConsoleViewSwitcher]);
+
+	const accessibleHrefs = useMemo(
+		() => new Set(baseSections.flatMap((s) => s.items.map((i) => i.href))),
+		[baseSections],
+	);
+
+	const defaultItemsMap = useMemo(
+		() => defaultItemsBySection(baseSections),
+		[baseSections],
+	);
+
+	const itemsBySection = useMemo(
+		() =>
+			resolveItemsBySection(
+				baseSections.map((s) => s.id),
+				defaultItemsMap,
+				navOrder?.items,
+				accessibleHrefs,
+			),
+		[baseSections, defaultItemsMap, navOrder?.items, accessibleHrefs],
+	);
+
+	const visibleSections = useMemo(() => {
+		const ordered = applySectionOrder(baseSections, navOrder?.sections);
+		return ordered.map((section) => ({
+			...section,
+			items: (itemsBySection[section.id] ?? [])
+				.map((href) => ALL_NAV_ITEMS_BY_HREF.get(href))
+				.filter((item): item is NavItem => item != null),
+		}));
+	}, [baseSections, navOrder?.sections, itemsBySection]);
 
 	const persistSectionOrder = (ids: string[]) => {
 		setNavOrder((prev) => ({
@@ -1075,10 +1162,10 @@ export function DashboardSidebar({
 		}));
 	};
 
-	const persistItemOrder = (sectionId: string, hrefs: string[]) => {
+	const persistItemsMap = (items: Record<string, string[]>) => {
 		setNavOrder((prev) => ({
 			sections: prev?.sections ?? visibleSections.map((s) => s.id),
-			items: { ...(prev?.items ?? {}), [sectionId]: hrefs },
+			items,
 			collapsedSections: prev?.collapsedSections,
 		}));
 	};
@@ -1098,18 +1185,21 @@ export function DashboardSidebar({
 	};
 
 	const handleItemDrop = (sectionId: string, toIndex: number) => {
-		if (!dragItem || dragItem.sectionId !== sectionId) {
+		if (!dragItem) {
 			setDragItem(null);
-			setDropItemIndex(null);
+			setDropTarget(null);
 			return;
 		}
-		const section = visibleSections.find((s) => s.id === sectionId);
-		if (!section) return;
-		const hrefs = section.items.map((i) => i.href);
-		const next = reorderIds(hrefs, dragItem.index, toIndex);
-		persistItemOrder(sectionId, next);
+		const nextItems = moveNavItem(
+			itemsBySection,
+			dragItem.sectionId,
+			dragItem.index,
+			sectionId,
+			toIndex,
+		);
+		persistItemsMap(nextItems);
 		setDragItem(null);
-		setDropItemIndex(null);
+		setDropTarget(null);
 	};
 
 	const handleSectionDrop = (toIndex: number) => {
@@ -1167,8 +1257,8 @@ export function DashboardSidebar({
 				aria-label="Main"
 			>
 				<p className="hidden px-1 pb-2 text-[10px] text-slate-600 lg:block">
-					Drag <span className="text-slate-500">⋮⋮</span> to reorder sections
-					and links. Saved for your account on this device.
+					Drag <span className="text-slate-500">⋮⋮</span> to reorder sections and move links
+					between groups. Saved to your account.
 				</p>
 				{visibleSections.map((section, sectionIndex) => {
 					const sectionCollapsed = collapsedSectionIds.has(section.id);
@@ -1217,22 +1307,32 @@ export function DashboardSidebar({
 															: false
 											}
 											dragging={dragItem}
-											dropIndex={dropItemIndex}
-											onDragStart={(sid, idx) => {
-												setDragItem({ sectionId: sid, index: idx });
+											dropTarget={dropTarget}
+											onDragStart={(sid, idx, href) => {
+												setDragItem({ sectionId: sid, index: idx, href });
 												setDragSection(null);
 											}}
 											onDragOver={(sid, idx) => {
-												if (dragItem?.sectionId === sid) setDropItemIndex(idx);
+												if (dragItem) setDropTarget({ sectionId: sid, index: idx });
 											}}
 											onDrop={handleItemDrop}
 											onDragEnd={() => {
 												setDragItem(null);
-												setDropItemIndex(null);
+												setDropTarget(null);
 											}}
 											onNavigate={onNavigate}
 										/>
 									))}
+									<NavSectionDropTail
+										sectionId={section.id}
+										index={section.items.length}
+										dragging={dragItem}
+										dropTarget={dropTarget}
+										onDragOver={(sid, idx) => {
+											if (dragItem) setDropTarget({ sectionId: sid, index: idx });
+										}}
+										onDrop={handleItemDrop}
+									/>
 								</div>
 							) : null}
 						</div>

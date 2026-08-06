@@ -66,8 +66,8 @@ export function AdminViewSwitcher({
 			</label>
 			<p className="mt-2 text-[10px] leading-relaxed text-slate-600">
 				{adminOnly
-					? "Preview the console as Admin, Manager, or Show all. This account stays admin-only."
-					: "Preview the console as Admin, Manager, Athlete, or Show all."}
+					? "Preview the console as Admin, Manager, Sales, or Show all. This account stays admin-only."
+					: "Preview the console as Admin, Manager, Sales, Athlete, or Show all."}
 			</p>
 		</div>
 	);
