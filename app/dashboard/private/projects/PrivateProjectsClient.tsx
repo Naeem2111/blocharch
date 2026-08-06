@@ -77,12 +77,13 @@ export function PrivateProjectsClient() {
               <th className="px-4 py-3 font-semibold">Progress</th>
               <th className="px-4 py-3 font-semibold">Fee</th>
               <th className="px-4 py-3 font-semibold">Margin</th>
+              <th className="px-4 py-3 font-semibold"></th>
             </tr>
           </thead>
           <tbody>
             {projects.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-slate-500">
+                <td colSpan={8} className="px-4 py-8 text-slate-500">
                   No active private projects.{" "}
                   <Link href="/dashboard/private/onboarding" className="text-brand-300 hover:underline">
                     Onboard one
@@ -150,6 +151,14 @@ export function PrivateProjectsClient() {
                   <td className="px-4 py-3 tabular-nums text-slate-300">{zar(p.feeZar)}</td>
                   <td className="px-4 py-3 tabular-nums text-slate-300">
                     {p.marginPercent != null ? `${p.marginPercent}%` : "—"}
+                  </td>
+                  <td className="px-4 py-3">
+                    <Link
+                      href={`/dashboard/private/projects/${p.id}/expenses`}
+                      className="text-xs text-brand-300 hover:underline"
+                    >
+                      Expenses
+                    </Link>
                   </td>
                 </tr>
               ))

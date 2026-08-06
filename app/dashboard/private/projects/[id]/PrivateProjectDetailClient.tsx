@@ -114,6 +114,12 @@ export function PrivateProjectDetailClient({ projectId }: { projectId: string })
             Open client portal
           </a>
         ) : null}
+        <Link
+          href={`/dashboard/private/projects/${projectId}/expenses`}
+          className="text-xs text-brand-300 hover:underline"
+        >
+          Expenses
+        </Link>
       </div>
 
       <div className="card-tool rounded-xl p-6">

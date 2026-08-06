@@ -835,6 +835,7 @@ model PrivateProject {
   updates         PrivateProjectUpdate[]
   actionItems     PrivateActionItem[]
   hourLogs        PrivateHourLog[]
+  expenses        PrivateProjectExpense[]
 
   @@index([clientId])
   @@index([assignedAthleteId])
@@ -889,4 +890,20 @@ model PrivateHourLog {
   @@index([athleteId, workDate])
   @@index([projectId, workDate])
   @@map("private_hour_logs")
+}
+
+/** Third-party / disbursement costs on a private project (separate from athlete labour in costZar). */
+model PrivateProjectExpense {
+  id          String   @id @default(uuid())
+  projectId   String   @map("project_id")
+  description String
+  amountZar   Decimal  @map("amount_zar") @db.Decimal(12, 2)
+  expenseDate DateTime @default(now()) @map("expense_date") @db.Date
+  notes       String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  project PrivateProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, expenseDate])
+  @@map("private_project_expenses")
 }
