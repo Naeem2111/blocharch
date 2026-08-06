@@ -5,17 +5,6 @@ import { requirePrivateOpsSession } from "@/lib/private-access";
 import { serializePrivateProject } from "@/lib/private-serialize";
 import { PRIVATE_STAGE_LABELS } from "@/lib/private-constants";
 
-function startOfWeekUtc(d = new Date()): Date {
-  const day = d.getUTCDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  const monday = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + diff));
-  return monday;
-}
-
-function endOfWeekUtc(start: Date): Date {
-  return new Date(start.getTime() + 7 * 86_400_000);
-}
-
 function monthBounds(d = new Date()) {
   const start = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
   const end = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1));
@@ -26,8 +15,6 @@ export async function GET(request: NextRequest) {
   const gate = await requirePrivateOpsSession(request);
   if (gate instanceof NextResponse) return gate;
 
-  const weekStart = startOfWeekUtc();
-  const weekEnd = endOfWeekUtc(weekStart);
   const { start: monthStart, end: monthEnd } = monthBounds();
 
   const activeProjects = await prisma.privateProject.findMany({
@@ -50,36 +37,6 @@ export async function GET(request: NextRequest) {
   const athleteIds = Array.from(
     new Set(activeProjects.map((p) => p.assignedAthleteId).filter(Boolean) as string[]),
   );
-
-  const weekLogs = athleteIds.length
-    ? await prisma.privateHourLog.groupBy({
-        by: ["athleteId"],
-        where: {
-          athleteId: { in: athleteIds },
-          workDate: { gte: weekStart, lt: weekEnd },
-        },
-        _sum: { hours: true },
-      })
-    : [];
-
-  const hoursByAthlete = new Map(
-    weekLogs.map((r) => [r.athleteId, Number(r._sum.hours ?? 0)]),
-  );
-
-  const athletes = athleteIds.length
-    ? await prisma.opsAthlete.findMany({
-        where: { id: { in: athleteIds } },
-        select: { id: true, fullName: true, privateWeeklyCapHours: true },
-      })
-    : [];
-
-  const capacity = athletes.map((a) => ({
-    athleteId: a.id,
-    athleteName: a.fullName,
-    privateHoursThisWeek: hoursByAthlete.get(a.id) ?? 0,
-    weeklyCap: a.privateWeeklyCapHours,
-    overCap: (hoursByAthlete.get(a.id) ?? 0) > a.privateWeeklyCapHours,
-  }));
 
   const feeSum = activeProjects.reduce((s, p) => s + Number(p.feeZar), 0);
   const costSum = activeProjects.reduce((s, p) => s + Number(p.costZar), 0);
@@ -142,7 +99,6 @@ export async function GET(request: NextRequest) {
       blendedMarginPercent: blendedMargin,
       inCouncilReview,
     },
-    capacity,
     needsAttention,
     upcomingMoves,
     projects: activeProjects.map((p) =>

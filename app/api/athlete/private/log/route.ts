@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requirePrivateAthleteSession } from "@/lib/private-access";
 import { parseDateOnly } from "@/lib/ops-hours";
 import { privateAthleteHourlyRateZar } from "@/lib/private-athlete-earnings";
+import { resolvePrivateProgressPercent } from "@/lib/private-progress";
 
 export async function GET(request: NextRequest) {
   const gate = await requirePrivateAthleteSession(request);
@@ -24,11 +25,27 @@ export async function GET(request: NextRequest) {
       status: { in: ["active", "on_hold"] },
     },
     orderBy: { name: "asc" },
-    select: { id: true, name: true, address: true },
+    select: {
+      id: true,
+      name: true,
+      address: true,
+      designStage: true,
+      stageStartedAt: true,
+      manualProgressPercent: true,
+    },
   });
 
   return NextResponse.json({
-    projects,
+    projects: projects.map((p) => ({
+      id: p.id,
+      name: p.name,
+      address: p.address,
+      progressPercent: resolvePrivateProgressPercent({
+        designStage: p.designStage,
+        stageStartedAt: p.stageStartedAt,
+        manualProgressPercent: p.manualProgressPercent,
+      }),
+    })),
     logs: logs.map((l) => ({
       id: l.id,
       projectId: l.projectId,
@@ -74,20 +91,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Project not found or not assigned to you" }, { status: 404 });
     }
 
-    const log = await prisma.privateHourLog.create({
-      data: {
-        projectId,
-        athleteId: gate.athlete.id,
-        workDate,
-        hours,
-        notes,
-      },
-    });
+    const rawProgress = body.completionPercent ?? body.progressPercent;
+    let manualProgressPercent: number | undefined;
+    if (rawProgress !== undefined && rawProgress !== null && rawProgress !== "") {
+      const n = Number(rawProgress);
+      if (!Number.isFinite(n) || n < 0 || n > 100) {
+        return NextResponse.json({ error: "Progress must be between 0 and 100" }, { status: 400 });
+      }
+      manualProgressPercent = Math.round(n);
+    }
 
     const hourlyZar = privateAthleteHourlyRateZar(gate.athlete);
-    await prisma.privateProject.update({
-      where: { id: projectId },
-      data: { costZar: { increment: hourlyZar * hours } },
+    const log = await prisma.$transaction(async (tx) => {
+      const created = await tx.privateHourLog.create({
+        data: {
+          projectId,
+          athleteId: gate.athlete.id,
+          workDate,
+          hours,
+          notes,
+        },
+      });
+      await tx.privateProject.update({
+        where: { id: projectId },
+        data: {
+          costZar: { increment: hourlyZar * hours },
+          ...(manualProgressPercent !== undefined ? { manualProgressPercent } : {}),
+        },
+      });
+      return created;
     });
 
     return NextResponse.json(

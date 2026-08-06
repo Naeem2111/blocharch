@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { ProgressSlider } from "@/components/ProgressSlider";
 
-type ProjectOpt = { id: string; name: string };
+type ProjectOpt = { id: string; name: string; progressPercent: number };
 type LogRow = {
   id: string;
   projectName: string;
@@ -22,24 +23,42 @@ export function AthletePrivateLogClient() {
     date: new Date().toISOString().slice(0, 10),
     hours: "",
     notes: "",
+    completionPercent: 0,
   });
 
   const load = useCallback(async () => {
     const r = await fetch("/api/athlete/private/log");
     const j = await r.json();
     if (r.ok) {
-      setProjects(j.projects || []);
+      const projs: ProjectOpt[] = j.projects || [];
+      setProjects(projs);
       setLogs(j.logs || []);
-      if (!form.projectId && j.projects?.[0]) {
-        setForm((f) => ({ ...f, projectId: j.projects[0].id }));
-      }
+      setForm((f) => {
+        const nextProjectId = f.projectId || projs[0]?.id || "";
+        const selected = projs.find((p) => p.id === nextProjectId);
+        return {
+          ...f,
+          projectId: nextProjectId,
+          completionPercent: selected?.progressPercent ?? 0,
+        };
+      });
     }
-  }, [form.projectId]);
+  }, []);
 
   useEffect(() => {
     void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [load]);
+
+  function handleProjectChange(projectId: string) {
+    const p = projects.find((x) => x.id === projectId);
+    setForm((f) => ({
+      ...f,
+      projectId,
+      completionPercent: projectId ? (p?.progressPercent ?? 0) : 0,
+    }));
+  }
+
+  const selectedProject = projects.find((p) => p.id === form.projectId);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -54,6 +73,7 @@ export function AthletePrivateLogClient() {
         date: form.date,
         hours: Number(form.hours),
         notes: form.notes || null,
+        completionPercent: form.completionPercent,
       }),
     });
     const j = await r.json();
@@ -82,7 +102,7 @@ export function AthletePrivateLogClient() {
             required
             className={field}
             value={form.projectId}
-            onChange={(e) => setForm({ ...form, projectId: e.target.value })}
+            onChange={(e) => handleProjectChange(e.target.value)}
           >
             <option value="">Select project</option>
             {projects.map((p) => (
@@ -115,6 +135,18 @@ export function AthletePrivateLogClient() {
             onChange={(e) => setForm({ ...form, hours: e.target.value })}
           />
         </label>
+        {form.projectId ? (
+          <ProgressSlider
+            value={form.completionPercent}
+            onChange={(v) => setForm((f) => ({ ...f, completionPercent: v }))}
+            disabled={saving}
+            label={
+              selectedProject
+                ? `Project progress (currently ${selectedProject.progressPercent}% on record)`
+                : "Project progress"
+            }
+          />
+        ) : null}
         <label className="block text-xs text-slate-400">
           Notes
           <textarea
@@ -133,9 +165,8 @@ export function AthletePrivateLogClient() {
           {saving ? "Logging…" : "Log hours"}
         </button>
         <p className="text-xs leading-relaxed text-slate-500">
-          This entry lands on the private-projects record, adds to your private-work hours on
-          Overview’s capacity bar, and rolls into private Commercial & analytics — never into
-          Athlete operations’ lane billing.
+          This entry lands on the private-projects record and rolls into private Commercial &
+          analytics — never into Athlete operations’ lane billing.
         </p>
       </form>
 

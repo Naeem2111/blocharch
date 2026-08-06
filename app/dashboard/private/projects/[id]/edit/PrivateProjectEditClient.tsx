@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { ProgressSlider } from "@/components/ProgressSlider";
 import { PRIVATE_STAGE_LABELS, PRIVATE_STAGE_ORDER } from "@/lib/private-constants";
 import type { PrivateDesignStage } from "@prisma/client";
 
@@ -322,20 +323,16 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
               Override calculated progress with a manual percentage
             </label>
             {useManualProgress ? (
-              <label className="mt-3 block text-xs text-slate-400">
-                Progress complete (%)
-                <input
-                  required
-                  type="number"
-                  min={0}
-                  max={100}
-                  className={field}
-                  value={form.manualProgressPercent}
-                  onChange={(e) =>
-                    setForm({ ...form, manualProgressPercent: e.target.value })
-                  }
+              <div className="mt-3">
+                <ProgressSlider
+                  value={Number(form.manualProgressPercent) || 0}
+                  onChange={(v) => {
+                    setUseManualProgress(true);
+                    setForm({ ...form, manualProgressPercent: String(v) });
+                  }}
+                  label="Progress complete"
                 />
-              </label>
+              </div>
             ) : (
               <p className="mt-2 text-xs text-slate-500">
                 Progress is calculated from design stage and time in stage.

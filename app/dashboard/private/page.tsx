@@ -7,7 +7,7 @@ export default function PrivateOverviewPage() {
       <PageHeader
         title="Private projects"
         badge="Ops overview"
-        description="The private-projects book — capacity, revenue, and what needs attention. Separate from Production Lane."
+        description="The private-projects book — revenue and what needs attention. Separate from Production Lane."
         className="mb-8"
       />
       <PrivateOverviewClient />

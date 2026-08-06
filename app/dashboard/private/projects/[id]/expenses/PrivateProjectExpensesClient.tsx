@@ -11,8 +11,33 @@ type ExpenseRow = {
   notes: string | null;
 };
 
+type ExpenseDraft = {
+  description: string;
+  amountZar: string;
+  expenseDate: string;
+  notes: string;
+};
+
 function zar(n: number) {
   return `R ${Math.round(n).toLocaleString("en-ZA")}`;
+}
+
+function expenseDraft(e: ExpenseRow): ExpenseDraft {
+  return {
+    description: e.description,
+    amountZar: String(e.amountZar),
+    expenseDate: e.expenseDate,
+    notes: e.notes ?? "",
+  };
+}
+
+function expenseChanged(original: ExpenseRow, draft: ExpenseDraft): boolean {
+  return (
+    draft.description.trim() !== original.description ||
+    draft.expenseDate !== original.expenseDate ||
+    draft.notes.trim() !== (original.notes ?? "") ||
+    Number(draft.amountZar) !== original.amountZar
+  );
 }
 
 export function PrivateProjectExpensesClient({ projectId }: { projectId: string }) {
@@ -22,6 +47,8 @@ export function PrivateProjectExpensesClient({ projectId }: { projectId: string 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [itemLoading, setItemLoading] = useState<string | null>(null);
+  const [editDrafts, setEditDrafts] = useState<Record<string, ExpenseDraft>>({});
   const [description, setDescription] = useState("");
   const [amountZar, setAmountZar] = useState("");
   const [expenseDate, setExpenseDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -35,7 +62,9 @@ export function PrivateProjectExpensesClient({ projectId }: { projectId: string 
       return;
     }
     setProjectName(j.project.name);
-    setExpenses(j.expenses || []);
+    const rows: ExpenseRow[] = j.expenses || [];
+    setExpenses(rows);
+    setEditDrafts(Object.fromEntries(rows.map((e) => [e.id, expenseDraft(e)])));
     setTotalZar(j.totalZar ?? 0);
     setLoading(false);
   }, [projectId]);
@@ -68,6 +97,64 @@ export function PrivateProjectExpensesClient({ projectId }: { projectId: string 
     void load();
   }
 
+  async function saveExpense(expenseId: string) {
+    const original = expenses.find((e) => e.id === expenseId);
+    const draft = editDrafts[expenseId];
+    if (!original || !draft) return;
+    if (!expenseChanged(original, draft)) return;
+    if (!draft.description.trim()) {
+      setError("Description is required.");
+      return;
+    }
+    const amount = Number(draft.amountZar);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError("Valid amount is required.");
+      return;
+    }
+
+    setItemLoading(expenseId);
+    setError("");
+    const r = await fetch(`/api/private/projects/${projectId}/expenses`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        expenseId,
+        description: draft.description.trim(),
+        amountZar: amount,
+        expenseDate: draft.expenseDate,
+        notes: draft.notes.trim() || null,
+      }),
+    });
+    const j = await r.json();
+    setItemLoading(null);
+    if (!r.ok) {
+      setError(j.error || "Could not save expense");
+      return;
+    }
+    void load();
+  }
+
+  async function removeExpense(expenseId: string) {
+    if (!confirm("Remove this expense?")) return;
+    setItemLoading(expenseId);
+    setError("");
+    const r = await fetch(`/api/private/projects/${projectId}/expenses`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ expenseId }),
+    });
+    const j = await r.json();
+    setItemLoading(null);
+    if (!r.ok) {
+      setError(j.error || "Could not remove expense");
+      return;
+    }
+    void load();
+  }
+
+  const field =
+    "w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-sm text-white";
+
   if (loading) return <p className="text-sm text-slate-500">Loading expenses…</p>;
   if (error && !projectName) return <p className="text-sm text-red-300">{error}</p>;
 
@@ -94,35 +181,104 @@ export function PrivateProjectExpensesClient({ projectId }: { projectId: string 
 
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
 
-      <div className="card-tool overflow-x-auto rounded-xl">
-        <table className="w-full min-w-[36rem] text-left text-sm">
-          <thead>
-            <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-wider text-slate-500">
-              <th className="px-4 py-3 font-semibold">Date</th>
-              <th className="px-4 py-3 font-semibold">Description</th>
-              <th className="px-4 py-3 font-semibold">Notes</th>
-              <th className="px-4 py-3 font-semibold text-right">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            {expenses.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="px-4 py-8 text-slate-500">
-                  No expenses recorded yet.
-                </td>
-              </tr>
-            ) : (
-              expenses.map((e) => (
-                <tr key={e.id} className="border-b border-white/[0.04]">
-                  <td className="px-4 py-3 text-slate-400">{e.expenseDate}</td>
-                  <td className="px-4 py-3 text-white">{e.description}</td>
-                  <td className="px-4 py-3 text-slate-500">{e.notes ?? "—"}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-slate-300">{zar(e.amountZar)}</td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+      <div className="space-y-3">
+        {expenses.length === 0 ? (
+          <p className="text-sm text-slate-500">No expenses recorded yet.</p>
+        ) : (
+          expenses.map((e) => {
+            const draft = editDrafts[e.id] ?? expenseDraft(e);
+            const changed = expenseChanged(e, draft);
+            const busy = itemLoading === e.id;
+
+            return (
+              <div key={e.id} className="card-tool rounded-xl p-4">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <label className="block text-xs text-slate-400">
+                    Date
+                    <input
+                      type="date"
+                      disabled={busy}
+                      value={draft.expenseDate}
+                      onChange={(ev) =>
+                        setEditDrafts((prev) => ({
+                          ...prev,
+                          [e.id]: { ...draft, expenseDate: ev.target.value },
+                        }))
+                      }
+                      className={`mt-1 ${field}`}
+                    />
+                  </label>
+                  <label className="block text-xs text-slate-400 sm:col-span-2">
+                    Description
+                    <input
+                      disabled={busy}
+                      value={draft.description}
+                      onChange={(ev) =>
+                        setEditDrafts((prev) => ({
+                          ...prev,
+                          [e.id]: { ...draft, description: ev.target.value },
+                        }))
+                      }
+                      className={`mt-1 ${field}`}
+                    />
+                  </label>
+                  <label className="block text-xs text-slate-400">
+                    Amount (ZAR)
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      disabled={busy}
+                      value={draft.amountZar}
+                      onChange={(ev) =>
+                        setEditDrafts((prev) => ({
+                          ...prev,
+                          [e.id]: { ...draft, amountZar: ev.target.value },
+                        }))
+                      }
+                      className={`mt-1 ${field}`}
+                    />
+                  </label>
+                  <label className="block text-xs text-slate-400 sm:col-span-2 lg:col-span-4">
+                    Notes
+                    <input
+                      disabled={busy}
+                      value={draft.notes}
+                      onChange={(ev) =>
+                        setEditDrafts((prev) => ({
+                          ...prev,
+                          [e.id]: { ...draft, notes: ev.target.value },
+                        }))
+                      }
+                      placeholder="Optional"
+                      className={`mt-1 ${field}`}
+                    />
+                  </label>
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {changed ? (
+                    <button
+                      type="button"
+                      disabled={busy || !draft.description.trim()}
+                      onClick={() => void saveExpense(e.id)}
+                      className="rounded bg-brand-500/20 px-2 py-0.5 text-[10px] font-medium text-brand-200 ring-1 ring-brand-500/30 disabled:opacity-50"
+                    >
+                      {busy ? "Saving…" : "Save"}
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void removeExpense(e.id)}
+                    className="rounded px-2 py-0.5 text-[10px] font-medium text-red-300/80 ring-1 ring-red-500/20 hover:bg-red-500/10 disabled:opacity-50"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
 
       <section className="card-tool rounded-xl p-5">

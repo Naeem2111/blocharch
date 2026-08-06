@@ -88,3 +88,101 @@ export async function POST(
     { status: 201 },
   );
 }
+
+function serializeExpense(e: {
+  id: string;
+  description: string;
+  amountZar: { toNumber?: () => number } | number | string;
+  expenseDate: Date;
+  notes: string | null;
+}) {
+  return {
+    id: e.id,
+    description: e.description,
+    amountZar: Number(e.amountZar),
+    expenseDate: e.expenseDate.toISOString().slice(0, 10),
+    notes: e.notes,
+  };
+}
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { id: string } },
+) {
+  const gate = await requirePrivateOpsSession(request);
+  if (gate instanceof NextResponse) return gate;
+
+  const body = await request.json();
+  const expenseId = String(body.expenseId || "").trim();
+  if (!expenseId) return NextResponse.json({ error: "expenseId required" }, { status: 400 });
+
+  const expense = await prisma.privateProjectExpense.findFirst({
+    where: { id: expenseId, projectId: params.id },
+  });
+  if (!expense) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const updateData: {
+    description?: string;
+    amountZar?: number;
+    expenseDate?: Date;
+    notes?: string | null;
+  } = {};
+
+  if (body.description !== undefined) {
+    const description = String(body.description).trim();
+    if (!description) return NextResponse.json({ error: "Description required" }, { status: 400 });
+    updateData.description = description;
+  }
+
+  if (body.amountZar !== undefined) {
+    const amountZar = Number(body.amountZar);
+    if (!Number.isFinite(amountZar) || amountZar <= 0) {
+      return NextResponse.json({ error: "Valid amount required" }, { status: 400 });
+    }
+    updateData.amountZar = amountZar;
+  }
+
+  if (body.expenseDate !== undefined) {
+    const expenseDate = parseDateOnly(String(body.expenseDate));
+    if (!expenseDate) return NextResponse.json({ error: "Invalid expense date" }, { status: 400 });
+    updateData.expenseDate = expenseDate;
+  }
+
+  if (body.notes !== undefined) {
+    updateData.notes = body.notes ? String(body.notes).trim() || null : null;
+  }
+
+  if (Object.keys(updateData).length === 0) {
+    return NextResponse.json({ error: "No updates provided" }, { status: 400 });
+  }
+
+  const updated = await prisma.privateProjectExpense.update({
+    where: { id: expenseId },
+    data: updateData,
+  });
+
+  return NextResponse.json({ expense: serializeExpense(updated) });
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } },
+) {
+  const gate = await requirePrivateOpsSession(request);
+  if (gate instanceof NextResponse) return gate;
+
+  const body = await request.json().catch(() => ({}));
+  const expenseId = String(
+    body.expenseId || request.nextUrl.searchParams.get("expenseId") || "",
+  ).trim();
+  if (!expenseId) return NextResponse.json({ error: "expenseId required" }, { status: 400 });
+
+  const expense = await prisma.privateProjectExpense.findFirst({
+    where: { id: expenseId, projectId: params.id },
+  });
+  if (!expense) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  await prisma.privateProjectExpense.delete({ where: { id: expenseId } });
+
+  return NextResponse.json({ ok: true });
+}

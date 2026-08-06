@@ -51,11 +51,25 @@ export async function PATCH(
   });
   if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  const updateData: { completedAt?: Date | null; title?: string } = {};
+
+  if (body.complete !== undefined) {
+    updateData.completedAt = body.complete === false ? null : new Date();
+  }
+
+  if (body.title !== undefined) {
+    const title = String(body.title).trim();
+    if (!title) return NextResponse.json({ error: "Title required" }, { status: 400 });
+    updateData.title = title;
+  }
+
+  if (Object.keys(updateData).length === 0) {
+    return NextResponse.json({ error: "No updates provided" }, { status: 400 });
+  }
+
   const updated = await prisma.privateActionItem.update({
     where: { id: actionId },
-    data: {
-      completedAt: body.complete === false ? null : new Date(),
-    },
+    data: updateData,
   });
 
   return NextResponse.json({
@@ -66,4 +80,27 @@ export async function PATCH(
       completedAt: updated.completedAt?.toISOString() ?? null,
     },
   });
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } },
+) {
+  const gate = await requirePrivateOpsSession(request);
+  if (gate instanceof NextResponse) return gate;
+
+  const body = await request.json().catch(() => ({}));
+  const actionId = String(
+    body.actionItemId || request.nextUrl.searchParams.get("actionItemId") || "",
+  ).trim();
+  if (!actionId) return NextResponse.json({ error: "actionItemId required" }, { status: 400 });
+
+  const item = await prisma.privateActionItem.findFirst({
+    where: { id: actionId, projectId: params.id },
+  });
+  if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  await prisma.privateActionItem.delete({ where: { id: actionId } });
+
+  return NextResponse.json({ ok: true });
 }

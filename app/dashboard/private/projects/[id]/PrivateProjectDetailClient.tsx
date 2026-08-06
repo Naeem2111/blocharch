@@ -43,6 +43,8 @@ export function PrivateProjectDetailClient({ projectId }: { projectId: string })
   const [actionTitle, setActionTitle] = useState("");
   const [saving, setSaving] = useState(false);
   const [completingAction, setCompletingAction] = useState<string | null>(null);
+  const [itemLoading, setItemLoading] = useState<string | null>(null);
+  const [editTitles, setEditTitles] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     const r = await fetch(`/api/private/projects/${projectId}`);
@@ -53,6 +55,11 @@ export function PrivateProjectDetailClient({ projectId }: { projectId: string })
     }
     setData(j);
     setNotes(j.project.stageNotes ?? "");
+    const titles: Record<string, string> = {};
+    for (const a of (j.actionItems as Detail["actionItems"]).filter((x) => !x.completedAt)) {
+      titles[a.id] = a.title;
+    }
+    setEditTitles(titles);
   }, [projectId]);
 
   useEffect(() => {
@@ -102,6 +109,33 @@ export function PrivateProjectDetailClient({ projectId }: { projectId: string })
       body: JSON.stringify({ actionItemId, complete: true }),
     });
     setCompletingAction(null);
+    void load();
+  }
+
+  async function saveActionTitle(actionItemId: string) {
+    const original = data?.actionItems.find((a) => a.id === actionItemId)?.title;
+    const title = editTitles[actionItemId]?.trim();
+    if (!title) return;
+    if (title === original) return;
+    setItemLoading(actionItemId);
+    await fetch(`/api/private/projects/${projectId}/actions`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ actionItemId, title }),
+    });
+    setItemLoading(null);
+    void load();
+  }
+
+  async function removeAction(actionItemId: string) {
+    if (!confirm("Remove this action item?")) return;
+    setItemLoading(actionItemId);
+    await fetch(`/api/private/projects/${projectId}/actions`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ actionItemId }),
+    });
+    setItemLoading(null);
     void load();
   }
 
@@ -307,26 +341,62 @@ export function PrivateProjectDetailClient({ projectId }: { projectId: string })
       <section className="card-tool rounded-xl p-5">
         <h3 className="text-sm font-semibold text-white">Client action items</h3>
         <ul className="mt-3 space-y-2">
-          {data.actionItems.filter((a) => !a.completedAt).map((a) => (
-            <li key={a.id} className="flex items-start gap-3 text-sm text-slate-300">
-              <input
-                type="checkbox"
-                checked={false}
-                disabled={completingAction === a.id}
-                onChange={() => void completeAction(a.id)}
-                className="mt-0.5 h-4 w-4 shrink-0 rounded border-white/20 bg-transparent accent-brand-400"
-                aria-label={`Mark "${a.title}" as done`}
-              />
-              <span className="min-w-0 flex-1">
-                {a.title}
-                {!a.clientFacing ? (
-                  <span className="ml-2 text-[10px] uppercase tracking-wider text-slate-500">
-                    Internal
-                  </span>
-                ) : null}
-              </span>
-            </li>
-          ))}
+          {data.actionItems.filter((a) => !a.completedAt).map((a) => {
+            const loading = itemLoading === a.id || completingAction === a.id;
+            const originalTitle = a.title;
+            const editedTitle = editTitles[a.id] ?? a.title;
+            const titleChanged = editedTitle.trim() !== originalTitle;
+            return (
+              <li key={a.id} className="flex items-start gap-3 text-sm text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={false}
+                  disabled={loading}
+                  onChange={() => void completeAction(a.id)}
+                  className="mt-2 h-4 w-4 shrink-0 rounded border-white/20 bg-transparent accent-brand-400"
+                  aria-label={`Mark "${a.title}" as done`}
+                />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <input
+                    value={editedTitle}
+                    disabled={loading}
+                    onChange={(e) =>
+                      setEditTitles((prev) => ({ ...prev, [a.id]: e.target.value }))
+                    }
+                    onBlur={() => {
+                      if (titleChanged) void saveActionTitle(a.id);
+                    }}
+                    className="w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-sm text-white"
+                  />
+                  <div className="flex flex-wrap items-center gap-2">
+                    {!a.clientFacing ? (
+                      <span className="text-[10px] uppercase tracking-wider text-slate-500">
+                        Internal
+                      </span>
+                    ) : null}
+                    {titleChanged ? (
+                      <button
+                        type="button"
+                        disabled={loading || !editedTitle.trim()}
+                        onClick={() => void saveActionTitle(a.id)}
+                        className="rounded bg-brand-500/20 px-2 py-0.5 text-[10px] font-medium text-brand-200 ring-1 ring-brand-500/30 disabled:opacity-50"
+                      >
+                        {loading ? "Saving…" : "Save"}
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={() => void removeAction(a.id)}
+                      className="rounded px-2 py-0.5 text-[10px] font-medium text-red-300/80 ring-1 ring-red-500/20 hover:bg-red-500/10 disabled:opacity-50"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              </li>
+            );
+          })}
           {data.actionItems.filter((a) => !a.completedAt).length === 0 ? (
             <li className="text-sm text-slate-500">None open.</li>
           ) : null}
