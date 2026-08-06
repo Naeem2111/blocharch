@@ -133,8 +133,33 @@ export async function PATCH(
         : null;
     }
     if (body.status !== undefined) data.status = String(body.status);
+    if (body.name !== undefined) {
+      const name = String(body.name).trim();
+      if (!name) {
+        return NextResponse.json({ error: "Project name is required" }, { status: 400 });
+      }
+      data.name = name;
+    }
+    if (body.address !== undefined) {
+      data.address = String(body.address || "").trim() || null;
+    } else if (body.name !== undefined && existing.address === existing.name) {
+      data.address = data.name;
+    }
+
+    const clientName =
+      body.clientName !== undefined ? String(body.clientName).trim() : undefined;
+    if (clientName !== undefined && !clientName) {
+      return NextResponse.json({ error: "Client name is required" }, { status: 400 });
+    }
 
     const updated = await prisma.$transaction(async (tx) => {
+      if (clientName !== undefined) {
+        await tx.privateClient.update({
+          where: { id: existing.clientId },
+          data: { name: clientName },
+        });
+      }
+
       const project = await tx.privateProject.update({
         where: { id: params.id },
         data,

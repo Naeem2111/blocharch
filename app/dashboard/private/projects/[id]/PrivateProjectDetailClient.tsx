@@ -25,7 +25,7 @@ type Detail = {
       daysIntoStage: number;
     };
     athlete: { fullName: string; initials: string } | null;
-    client: { name: string; slug: string | null };
+    client: { id: string; name: string; slug: string | null };
     hoursLifeToDate: number | null;
   };
   updates: Array<{ id: string; title: string; body: string | null; occurredAt: string }>;
@@ -43,6 +43,9 @@ export function PrivateProjectDetailClient({ projectId }: { projectId: string })
   const [actionTitle, setActionTitle] = useState("");
   const [saving, setSaving] = useState(false);
   const [completingAction, setCompletingAction] = useState<string | null>(null);
+  const [editingDetails, setEditingDetails] = useState(false);
+  const [projectName, setProjectName] = useState("");
+  const [clientName, setClientName] = useState("");
 
   const load = useCallback(async () => {
     const r = await fetch(`/api/private/projects/${projectId}`);
@@ -53,6 +56,8 @@ export function PrivateProjectDetailClient({ projectId }: { projectId: string })
     }
     setData(j);
     setNotes(j.project.stageNotes ?? "");
+    setProjectName(j.project.name);
+    setClientName(j.project.client.name);
   }, [projectId]);
 
   useEffect(() => {
@@ -105,8 +110,43 @@ export function PrivateProjectDetailClient({ projectId }: { projectId: string })
     void load();
   }
 
-  if (error) return <p className="text-sm text-red-300">{error}</p>;
-  if (!data) return <p className="text-sm text-slate-500">Loading…</p>;
+  async function saveDetails() {
+    const name = projectName.trim();
+    const client = clientName.trim();
+    if (!name || !client) {
+      setError("Project name and client name are required.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    const r = await fetch(`/api/private/projects/${projectId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, clientName: client }),
+    });
+    const j = await r.json();
+    setSaving(false);
+    if (!r.ok) {
+      setError(j.error || "Could not save");
+      return;
+    }
+    setEditingDetails(false);
+    void load();
+  }
+
+  function cancelDetailsEdit() {
+    if (data) {
+      setProjectName(data.project.name);
+      setClientName(data.project.client.name);
+    }
+    setEditingDetails(false);
+    setError("");
+  }
+
+  if (!data) {
+    if (error) return <p className="text-sm text-red-300">{error}</p>;
+    return <p className="text-sm text-slate-500">Loading…</p>;
+  }
 
   const p = data.project;
   const openActions = data.actionItems.filter((a) => !a.completedAt && a.clientFacing);
@@ -114,6 +154,7 @@ export function PrivateProjectDetailClient({ projectId }: { projectId: string })
 
   return (
     <div className="space-y-6">
+      {error ? <p className="text-sm text-red-300">{error}</p> : null}
       <div className="flex flex-wrap items-center gap-3">
         <Link href="/dashboard/private/projects" className="text-xs text-slate-500 hover:text-slate-300">
           ← Projects
@@ -180,8 +221,64 @@ export function PrivateProjectDetailClient({ projectId }: { projectId: string })
       ) : null}
 
       <div className="card-tool rounded-xl p-6">
-        <h2 className="text-lg font-semibold text-white">{p.name}</h2>
-        <p className="mt-1 text-sm text-slate-400">{p.client.name}</p>
+        {editingDetails ? (
+          <div className="space-y-4">
+            <label className="block text-xs text-slate-400">
+              Client name
+              <input
+                value={clientName}
+                onChange={(e) => setClientName(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+              />
+            </label>
+            <label className="block text-xs text-slate-400">
+              Project name
+              <input
+                value={projectName}
+                onChange={(e) => setProjectName(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+              />
+            </label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => void saveDetails()}
+                className="rounded-lg bg-brand-500/20 px-3 py-1.5 text-xs font-medium text-brand-200 ring-1 ring-brand-500/30 disabled:opacity-50"
+              >
+                Save
+              </button>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={cancelDetailsEdit}
+                className="rounded-lg px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                Client
+              </p>
+              <p className="mt-1 text-sm text-slate-300">{p.client.name}</p>
+              <p className="mt-4 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                Project
+              </p>
+              <h2 className="mt-1 text-lg font-semibold text-white">{p.name}</h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => setEditingDetails(true)}
+              className="rounded-lg bg-white/[0.04] px-3 py-1.5 text-xs text-slate-300 ring-1 ring-white/[0.08] hover:bg-white/[0.07]"
+            >
+              Edit
+            </button>
+          </div>
+        )}
 
         <div className="mt-6">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">

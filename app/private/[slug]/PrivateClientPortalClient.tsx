@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { PRIVATE_STAGE_DONE_COPY } from "@/lib/private-constants";
+import { PlannerDoneToggle } from "@/components/planner/PlannerDoneToggle";
 
 type PortalData = NonNullable<
   Awaited<ReturnType<typeof import("@/lib/private-public-portal").getPublicPrivateProjectBySlug>>
@@ -35,7 +36,20 @@ export function PrivateClientPortalClient({
     data.completedActionItems,
   );
   const [completing, setCompleting] = useState<string | null>(null);
+  const [recentlyCompleted, setRecentlyCompleted] = useState<Set<string>>(new Set());
+  const completedDetailsRef = useRef<HTMLDetailsElement>(null);
   const current = stages.find((s) => s.state === "current");
+
+  function markRecentlyCompleted(id: string) {
+    setRecentlyCompleted((prev) => new Set(prev).add(id));
+    window.setTimeout(() => {
+      setRecentlyCompleted((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }, 700);
+  }
 
   async function completeAction(actionItemId: string) {
     setCompleting(actionItemId);
@@ -58,6 +72,8 @@ export function PrivateClientPortalClient({
         },
         ...prev,
       ]);
+      markRecentlyCompleted(j.actionItem.id);
+      if (completedDetailsRef.current) completedDetailsRef.current.open = true;
     } finally {
       setCompleting(null);
     }
@@ -119,16 +135,19 @@ export function PrivateClientPortalClient({
                   {actionItems.map((item, index) => (
                     <li
                       key={item.id}
-                      className="flex items-start gap-3 rounded-lg bg-amber-500/5 px-3 py-2.5 ring-1 ring-amber-500/15"
+                      className={`flex items-start gap-3 rounded-lg bg-amber-500/5 px-3 py-2.5 ring-1 ring-amber-500/15 transition-shadow duration-200 ${
+                        completing === item.id ? "ring-emerald-500/30 shadow-[0_0_0_2px_rgb(34_197_94_/_0.28)]" : ""
+                      }`}
                     >
                       <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-3">
-                        <input
-                          type="checkbox"
+                        <PlannerDoneToggle
                           checked={false}
                           disabled={completing === item.id}
-                          onChange={() => void completeAction(item.id)}
-                          className="mt-0.5 h-4 w-4 shrink-0 rounded border-amber-400/40 bg-transparent accent-amber-400"
-                          aria-label={`Mark "${item.title}" as done`}
+                          title={`Mark "${item.title}" as done`}
+                          onCompletingStart={() => setCompleting(item.id)}
+                          onToggle={(next) => {
+                            if (next) void completeAction(item.id);
+                          }}
                         />
                         <span className="min-w-0 flex-1">
                           <span className="block text-[10px] font-medium uppercase tracking-wider text-amber-200/60">
@@ -149,27 +168,54 @@ export function PrivateClientPortalClient({
             ) : null}
 
             {completedActionItems.length > 0 ? (
-              <details className="mt-5 rounded-xl bg-white/[0.03] p-4 ring-1 ring-white/[0.06]">
+              <details
+                ref={completedDetailsRef}
+                className="mt-5 rounded-xl bg-white/[0.03] p-4 ring-1 ring-white/[0.06]"
+              >
                 <summary className="cursor-pointer text-[10px] font-semibold uppercase tracking-wider text-slate-400 hover:text-slate-200">
                   Completed actions ({completedActionItems.length})
                 </summary>
                 <ul className="mt-3 space-y-2">
-                  {completedActionItems.map((item) => (
-                    <li
-                      key={item.id}
-                      className="flex items-start justify-between gap-3 rounded-lg bg-white/[0.02] px-3 py-2 text-sm"
-                    >
-                      <span className="flex min-w-0 items-start gap-2 text-slate-400">
-                        <span className="mt-0.5 text-emerald-400" aria-hidden>
-                          ✓
+                  {completedActionItems.map((item) => {
+                    const isNew = recentlyCompleted.has(item.id);
+                    return (
+                      <li
+                        key={item.id}
+                        className={`flex items-start justify-between gap-3 rounded-lg bg-white/[0.02] px-3 py-2 text-sm transition-colors duration-300 ${
+                          isNew ? "bg-emerald-500/10 ring-1 ring-emerald-500/20" : ""
+                        }`}
+                      >
+                        <span className="flex min-w-0 items-start gap-2 text-slate-400">
+                          <span
+                            className={`planner-done-toggle mt-0.5 shrink-0 planner-done-toggle-checked ${
+                              isNew ? "planner-done-toggle-animating" : ""
+                            }`}
+                            aria-hidden
+                          >
+                            <svg
+                              viewBox="0 0 12 12"
+                              className="planner-done-check planner-done-check-visible"
+                              aria-hidden
+                            >
+                              <path
+                                className="planner-done-check-path"
+                                d="M2 6l3 3 5-5"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                          </span>
+                          <span className="line-through decoration-slate-600">{item.title}</span>
                         </span>
-                        <span className="line-through decoration-slate-600">{item.title}</span>
-                      </span>
-                      <span className="shrink-0 text-xs text-slate-500">
-                        {formatDate(item.completedAt)}
-                      </span>
-                    </li>
-                  ))}
+                        <span className="shrink-0 text-xs text-slate-500">
+                          {formatDate(item.completedAt)}
+                        </span>
+                      </li>
+                    );
+                  })}
                 </ul>
               </details>
             ) : null}
