@@ -12,7 +12,7 @@ export type AppModule =
 
 const MODULE_ROLES: Record<AppModule, readonly UserRole[]> = {
   /** Lead directory, map, outreach — internal Blocharch staff only. */
-  marketing: ["admin", "manager"],
+  marketing: ["admin", "manager", "sales"],
   /** Kanban / project boards — all signed-in users. */
   planner: ["admin", "manager", "user"],
   /** User management and system settings. */
@@ -93,6 +93,14 @@ export function isMarketingApiPath(path: string): boolean {
   if (path === "/api/templates") return true;
   if (path.startsWith("/api/geocode")) return true;
   return false;
+}
+
+export function isPlannerDashboardPath(path: string): boolean {
+  return path.startsWith("/dashboard/planner");
+}
+
+export function isPlannerApiPath(path: string): boolean {
+  return path.startsWith("/api/planner/");
 }
 
 export function isAdminDashboardPath(path: string): boolean {

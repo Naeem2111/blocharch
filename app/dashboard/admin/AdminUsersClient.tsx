@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 type UserRow = {
   id: string;
   username: string;
-  role: "admin" | "manager" | "user";
+  role: "admin" | "manager" | "user" | "sales";
   disabled?: boolean;
   createdAt: string;
 };
@@ -15,7 +15,11 @@ export function AdminUsersClient({ currentUserId }: { currentUserId: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
-  const [createForm, setCreateForm] = useState({ username: "", password: "", role: "user" as "user" | "admin" | "manager" });
+  const [createForm, setCreateForm] = useState({
+    username: "",
+    password: "",
+    role: "user" as "user" | "admin" | "manager" | "sales",
+  });
   const [creating, setCreating] = useState(false);
   const [pwDraft, setPwDraft] = useState<Record<string, string>>({});
 
@@ -150,10 +154,16 @@ export function AdminUsersClient({ currentUserId }: { currentUserId: string }) {
             <select
               className="select-console mt-1 w-full rounded-md px-3 py-2 text-sm outline-none focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/40"
               value={createForm.role}
-              onChange={(e) => setCreateForm((f) => ({ ...f, role: e.target.value as "user" | "admin" | "manager" }))}
+              onChange={(e) =>
+                setCreateForm((f) => ({
+                  ...f,
+                  role: e.target.value as "user" | "admin" | "manager" | "sales",
+                }))
+              }
             >
               <option value="user">User</option>
               <option value="manager">Manager</option>
+              <option value="sales">Sales</option>
               <option value="admin">Admin</option>
             </select>
           </label>
@@ -203,6 +213,7 @@ export function AdminUsersClient({ currentUserId }: { currentUserId: string }) {
                     >
                       <option value="user">User</option>
                       <option value="manager">Manager</option>
+                      <option value="sales">Sales</option>
                       <option value="admin">Admin</option>
                     </select>
                   </td>

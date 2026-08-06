@@ -15,7 +15,12 @@ export async function PATCH(request: NextRequest, context: Ctx) {
     if (typeof body.password === "string" && body.password.length > 0) {
       patch.password = body.password;
     }
-    if (body.role === "admin" || body.role === "manager" || body.role === "user") {
+    if (
+      body.role === "admin" ||
+      body.role === "manager" ||
+      body.role === "user" ||
+      body.role === "sales"
+    ) {
       patch.role = body.role;
     }
     if (typeof body.disabled === "boolean") {

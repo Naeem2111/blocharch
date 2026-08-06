@@ -3,7 +3,7 @@ import { hashPassword } from "@/lib/password";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_THEME, normalizeTheme, type ThemePreference } from "@/lib/theme";
 
-export type UserRole = "admin" | "manager" | "user";
+export type UserRole = "admin" | "manager" | "user" | "sales";
 
 export interface UserRecord {
   id: string;
