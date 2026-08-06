@@ -16,6 +16,7 @@ import {
 import { daysUntilDueFromIso, projectDueColor } from "@/lib/project-color-scale";
 import { computeProjectTimeline } from "@/lib/project-timeline";
 import { formatProjectFullTitle } from "@/lib/project-display";
+import { parseClientDeliverables, type ClientPortalDeliverable } from "@/lib/client-portal-deliverables";
 import { formatProjectDueAt, dueAtFallbackForDateOnly, splitProjectDueAtWallClock } from "@/lib/project-deadline";
 import {
   emptyProjectDueFields,
@@ -66,6 +67,8 @@ type ProjectRow = {
   dueAt: string | null;
   notes: string | null;
   progressPercent: number | null;
+  clientDescription: string | null;
+  clientDeliverables: unknown;
 };
 
 const emptyCreate = {
@@ -177,7 +180,6 @@ export function OpsProjectsClient() {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editClientId, setEditClientId] = useState("");
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [form, setForm] = useState(emptyCreate);
@@ -185,6 +187,7 @@ export function OpsProjectsClient() {
   const [scope, setScope] = useState<"active" | "all">("active");
   const [calendarMonth, setCalendarMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [editForm, setEditForm] = useState({
+    clientId: "",
     assignedAthleteIds: [] as string[],
     primaryAthleteId: "",
     projectLeadContactId: "",
@@ -197,6 +200,8 @@ export function OpsProjectsClient() {
     startDate: "",
     ...emptyProjectDueFields(),
     notes: "",
+    clientDescription: "",
+    deliverables: [] as ClientPortalDeliverable[],
   });
 
   const load = useCallback(async () => {
@@ -292,8 +297,8 @@ export function OpsProjectsClient() {
       "";
     const due = splitProjectDueAtWallClock(p.dueAt ?? (p.dueDate ? dueAtFallbackForDateOnly(p.dueDate) : null));
     setEditingId(p.id);
-    setEditClientId(p.clientId);
     setEditForm({
+      clientId: p.clientId,
       assignedAthleteIds,
       primaryAthleteId,
       projectLeadContactId: p.projectLeadContactId ?? "",
@@ -308,6 +313,8 @@ export function OpsProjectsClient() {
       dueTime: due.time || emptyProjectDueFields().dueTime,
       dueAmPm: due.ampm,
       notes: p.notes ?? "",
+      clientDescription: p.clientDescription ?? "",
+      deliverables: parseClientDeliverables(p.clientDeliverables),
     });
     setError("");
     setMsg("");
@@ -321,6 +328,7 @@ export function OpsProjectsClient() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...assignment,
+        clientId: editForm.clientId,
         projectLeadContactId: editForm.projectLeadContactId || null,
         name: editForm.name,
         projectNumber: editForm.projectNumber,
@@ -333,6 +341,8 @@ export function OpsProjectsClient() {
         dueTime: editForm.dueTime || null,
         dueAmPm: editForm.dueAmPm,
         notes: editForm.notes || null,
+        clientDescription: editForm.clientDescription.trim() || null,
+        clientDeliverables: editForm.deliverables.filter((d) => d.label.trim()),
       }),
     });
     const j = await r.json();
@@ -341,7 +351,6 @@ export function OpsProjectsClient() {
       return;
     }
     setEditingId(null);
-    setEditClientId("");
     setMsg("Project updated.");
     await load();
   }
@@ -423,7 +432,7 @@ export function OpsProjectsClient() {
 
   const createClient = clients.find((c) => c.id === form.clientId) ?? null;
   const createClientContacts = createClient?.contacts ?? [];
-  const editClient = clients.find((c) => c.id === editClientId) ?? null;
+  const editClient = clients.find((c) => c.id === editForm.clientId) ?? null;
   const editClientContacts = editClient?.contacts ?? [];
   const selectedFilterClient = clients.find((c) => c.id === clientFilterId) ?? null;
 
@@ -448,7 +457,48 @@ export function OpsProjectsClient() {
       >
         {editingId === p.id ? (
           <div className="grid gap-3 md:grid-cols-2">
-            <label className="text-xs text-slate-400">Name<input value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
+            <label className="text-xs text-slate-400">
+              Client
+              <div className="mt-1 flex items-center gap-2">
+                {editClient ? (
+                  <ClientAvatar
+                    name={editClient.name}
+                    logoUrl={editClient.logoUrl}
+                    backgroundColor={editClient.logoBgColor}
+                    textTone={asAvatarTextTone(editClient.logoTextTone)}
+                    size={28}
+                  />
+                ) : null}
+                <select
+                  required
+                  value={editForm.clientId}
+                  onChange={(e) => {
+                    const clientId = e.target.value;
+                    setEditForm((f) => ({
+                      ...f,
+                      clientId,
+                      projectLeadContactId: "",
+                    }));
+                  }}
+                  className="select-console block min-w-0 flex-1 rounded-md px-3 py-2 text-sm"
+                >
+                  <option value="">Select…</option>
+                  {clients.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </label>
+            <label className="text-xs text-slate-400">
+              Project title
+              <input
+                value={editForm.name}
+                onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                className={inputClass}
+              />
+            </label>
             <AthleteAssignmentsEditor
               className="md:col-span-2"
               athleteIds={editForm.assignedAthleteIds}
@@ -462,8 +512,11 @@ export function OpsProjectsClient() {
                 value={editForm.projectLeadContactId}
                 onChange={(e) => setEditForm((f) => ({ ...f, projectLeadContactId: e.target.value }))}
                 className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
+                disabled={!editForm.clientId}
               >
-                <option value="">None (hidden on client portal)</option>
+                <option value="">
+                  {editForm.clientId ? "None (hidden on client portal)" : "Select client first"}
+                </option>
                 {editClientContacts.map((ct) => (
                   <option key={ct.id} value={ct.id}>
                     {ct.name}
@@ -471,13 +524,27 @@ export function OpsProjectsClient() {
                   </option>
                 ))}
               </select>
-              {editClientContacts.length === 0 ? (
+              {editForm.clientId && editClientContacts.length === 0 ? (
                 <span className="mt-1 block text-[10px] text-amber-400">
                   Add office leads on the client record first (Ops → Clients).
                 </span>
               ) : (
                 <span className="mt-1 block text-[10px] text-slate-500">Shown to clients on the project portal</span>
               )}
+            </label>
+            <label className="text-xs text-slate-400">
+              Stage / package
+              <select
+                value={projectStageSelectValue(editForm.currentStage as OpsProjectPhase)}
+                onChange={(e) => setEditForm((f) => ({ ...f, currentStage: e.target.value }))}
+                className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
+              >
+                {OPS_PROJECT_STAGE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
             </label>
             <label className="text-xs text-slate-400">
               Athlete code
@@ -496,22 +563,41 @@ export function OpsProjectsClient() {
                 className={inputClass}
               />
             </label>
-            <label className="text-xs text-slate-400">Complexity<select value={editForm.complexity} onChange={(e) => setEditForm((f) => ({ ...f, complexity: e.target.value }))} className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
             <label className="text-xs text-slate-400">
-              Stage / package
+              Complexity
               <select
-                value={projectStageSelectValue(editForm.currentStage as OpsProjectPhase)}
-                onChange={(e) => setEditForm((f) => ({ ...f, currentStage: e.target.value }))}
+                value={editForm.complexity}
+                onChange={(e) => setEditForm((f) => ({ ...f, complexity: e.target.value }))}
                 className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
               >
-                {OPS_PROJECT_STAGE_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </label>
+            <label className="text-xs text-slate-400">
+              Status
+              <select
+                value={editForm.currentStatus}
+                onChange={(e) => setEditForm((f) => ({ ...f, currentStatus: e.target.value }))}
+                className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
+              >
+                {Object.entries(PROJECT_STATUS_LABELS).map(([k, l]) => (
+                  <option key={k} value={k}>
+                    {l}
                   </option>
                 ))}
               </select>
             </label>
-            <label className="text-xs text-slate-400">Status<select value={editForm.currentStatus} onChange={(e) => setEditForm((f) => ({ ...f, currentStatus: e.target.value }))} className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm">{Object.entries(PROJECT_STATUS_LABELS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
+            <label className="text-xs text-slate-400">
+              Start date
+              <input
+                type="date"
+                value={editForm.startDate}
+                onChange={(e) => setEditForm((f) => ({ ...f, startDate: e.target.value }))}
+                className={inputClass}
+              />
+            </label>
             <ProjectDueDateTimeFields
               className="md:col-span-2"
               value={{
@@ -521,7 +607,91 @@ export function OpsProjectsClient() {
               }}
               onChange={(due) => setEditForm((f) => ({ ...f, ...due }))}
             />
-            <label className="text-xs text-slate-400 md:col-span-2">Notes<textarea value={editForm.notes} onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))} rows={2} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
+            {editForm.name || editForm.address ? (
+              <p className="text-xs text-slate-500 md:col-span-2">
+                Full title preview:{" "}
+                {formatProjectFullTitle(
+                  editForm.name || editForm.address,
+                  editForm.currentStage as OpsProjectPhase
+                )}
+              </p>
+            ) : null}
+            <label className="text-xs text-slate-400 md:col-span-2">
+              Client-facing description
+              <textarea
+                value={editForm.clientDescription}
+                onChange={(e) => setEditForm((f) => ({ ...f, clientDescription: e.target.value }))}
+                rows={3}
+                placeholder="Summary shown on the client portal…"
+                className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+              />
+            </label>
+            <div className="md:col-span-2">
+              <p className="text-xs text-slate-400">Deliverables & documents</p>
+              <ul className="mt-2 space-y-2">
+                {editForm.deliverables.map((d, i) => (
+                  <li key={i} className="flex flex-wrap gap-2">
+                    <input
+                      value={d.label}
+                      onChange={(e) =>
+                        setEditForm((f) => {
+                          const next = [...f.deliverables];
+                          next[i] = { ...next[i]!, label: e.target.value };
+                          return { ...f, deliverables: next };
+                        })
+                      }
+                      placeholder="Label"
+                      className="min-w-[8rem] flex-1 rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+                    />
+                    <input
+                      value={d.url ?? ""}
+                      onChange={(e) =>
+                        setEditForm((f) => {
+                          const next = [...f.deliverables];
+                          next[i] = { ...next[i]!, url: e.target.value || null };
+                          return { ...f, deliverables: next };
+                        })
+                      }
+                      placeholder="https://…"
+                      className="min-w-[12rem] flex-[2] rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setEditForm((f) => ({
+                          ...f,
+                          deliverables: f.deliverables.filter((_, j) => j !== i),
+                        }))
+                      }
+                      className="text-xs text-red-400 hover:underline"
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <button
+                type="button"
+                onClick={() =>
+                  setEditForm((f) => ({
+                    ...f,
+                    deliverables: [...f.deliverables, { label: "", url: null }],
+                  }))
+                }
+                className="mt-2 text-xs text-brand-300 hover:underline"
+              >
+                + Add deliverable
+              </button>
+            </div>
+            <label className="text-xs text-slate-400 md:col-span-2">
+              Internal notes
+              <textarea
+                value={editForm.notes}
+                onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))}
+                rows={2}
+                className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+              />
+            </label>
             <div className="flex flex-wrap gap-2 md:col-span-2">
               <button
                 type="button"
@@ -530,8 +700,12 @@ export function OpsProjectsClient() {
               >
                 Save
               </button>
-              <button type="button" onClick={() => { setEditingId(null); setEditClientId(""); }} className="text-xs text-slate-500">Cancel</button>
-              <button type="button" onClick={() => void deleteProject(p.id, p.name)} className="text-xs text-red-400 hover:text-red-300">Delete project</button>
+              <button type="button" onClick={() => setEditingId(null)} className="text-xs text-slate-500">
+                Cancel
+              </button>
+              <button type="button" onClick={() => void deleteProject(p.id, p.name)} className="text-xs text-red-400 hover:text-red-300">
+                Delete project
+              </button>
             </div>
           </div>
         ) : (

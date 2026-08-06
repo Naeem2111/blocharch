@@ -137,13 +137,28 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   if (gate instanceof NextResponse) return gate;
 
   const { projectId } = await context.params;
-  const existing = await prisma.opsProject.findUnique({ where: { id: projectId } });
+  const existing = await prisma.opsProject.findUnique({
+    where: { id: projectId },
+    include: { client: { select: { slug: true, publicPortalEnabled: true } } },
+  });
   if (!existing) return NextResponse.json({ error: "Project not found" }, { status: 404 });
 
   try {
     const body = await request.json();
     const data: Record<string, unknown> = {};
     let assignmentUpdate: { athleteIds: string[]; primaryAthleteId: string | null } | null = null;
+
+    let clientIdForLead = existing.clientId;
+    if (body.clientId != null) {
+      const clientId = String(body.clientId).trim();
+      if (!clientId) {
+        return NextResponse.json({ error: "Client is required" }, { status: 400 });
+      }
+      const client = await prisma.opsClient.findUnique({ where: { id: clientId } });
+      if (!client) return NextResponse.json({ error: "Client not found" }, { status: 404 });
+      data.clientId = clientId;
+      clientIdForLead = clientId;
+    }
 
     const hasAssignmentFields =
       body.assignedAthleteId !== undefined ||
@@ -170,10 +185,20 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
     if (body.projectLeadContactId !== undefined) {
       const cid = body.projectLeadContactId ? String(body.projectLeadContactId).trim() : null;
-      const leadError = await validateProjectLeadContactDb(prisma, existing.clientId, cid);
+      const leadError = await validateProjectLeadContactDb(prisma, clientIdForLead, cid);
       if (leadError) return NextResponse.json({ error: leadError }, { status: 400 });
       data.projectLeadContactId = cid;
       data.projectLeadAthleteId = null;
+    } else if (data.clientId && existing.projectLeadContactId) {
+      const leadError = await validateProjectLeadContactDb(
+        prisma,
+        clientIdForLead,
+        existing.projectLeadContactId
+      );
+      if (leadError) {
+        data.projectLeadContactId = null;
+        data.projectLeadAthleteId = null;
+      }
     }
     if (body.address !== undefined) data.address = body.address ? String(body.address).trim() : null;
     if (body.projectLead !== undefined) data.projectLead = body.projectLead ? String(body.projectLead).trim() : null;
@@ -346,6 +371,13 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     if (project.client.slug && project.client.publicPortalEnabled) {
       revalidatePath(clientPortalPath(project.client.slug));
+    }
+    if (
+      existing.client.slug &&
+      existing.client.publicPortalEnabled &&
+      existing.clientId !== project.clientId
+    ) {
+      revalidatePath(clientPortalPath(existing.client.slug));
     }
 
     const hoursAgg = await prisma.opsSubmissionLineItem.aggregate({
