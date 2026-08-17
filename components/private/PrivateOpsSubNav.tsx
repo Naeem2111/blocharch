@@ -7,6 +7,7 @@ export type PrivateNavItem = {
 
 export const PRIVATE_OPS_NAV: PrivateNavItem[] = [
   { href: "/dashboard/private", label: "Overview" },
+  { href: "/dashboard/private/clients", label: "Clients" },
   { href: "/dashboard/private/commercial", label: "Commercial & analytics" },
   { href: "/dashboard/private/projects", label: "Projects" },
   { href: "/dashboard/private/onboarding", label: "Onboarding" },

@@ -837,6 +837,9 @@ model PrivateProject {
   outOfScopeBilledZar Decimal          @default(0) @map("out_of_scope_billed_zar") @db.Decimal(12, 2)
   outOfScopeFlag  Boolean              @default(false) @map("out_of_scope_flag")
   stageNotes      String?              @map("stage_notes") @db.Text
+  /** Client-facing project summary — only shown on the portal when set. */
+  clientDescription String?            @map("client_description") @db.Text
+  dueDate         DateTime?            @map("due_date") @db.Date
   briefReceivedAt DateTime?            @map("brief_received_at") @db.Date
   councilSubmittedAt DateTime?         @map("council_submitted_at") @db.Date
   /** When the current design stage started — drives duration-weighted progress. */
@@ -861,6 +864,7 @@ model PrivateProject {
   actionItems     PrivateActionItem[]
   hourLogs        PrivateHourLog[]
   expenses        PrivateProjectExpense[]
+  documents       PrivateProjectDocument[]
 
   @@index([clientId])
   @@index([assignedAthleteId])
@@ -873,8 +877,8 @@ model PrivateProjectUpdate {
   projectId String   @map("project_id")
   title     String
   body      String?  @db.Text
-  /** Shown on the client portal feed. */
-  clientVisible Boolean @default(true) @map("client_visible")
+  /** Shown on the client portal feed. Publish explicitly from the dashboard. */
+  clientVisible Boolean @default(false) @map("client_visible")
   occurredAt DateTime @default(now()) @map("occurred_at") @db.Date
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -897,6 +901,24 @@ model PrivateActionItem {
 
   @@index([projectId, completedAt])
   @@map("private_action_items")
+}
+
+/** Files attached to a private project. Only clientVisible rows appear on the portal. */
+model PrivateProjectDocument {
+  id             String   @id @default(uuid())
+  projectId      String   @map("project_id")
+  title          String
+  originalName   String   @map("original_name")
+  fileUrl        String   @map("file_url")
+  mimeType       String?  @map("mime_type")
+  sizeBytes      Int      @default(0) @map("size_bytes")
+  clientVisible  Boolean  @default(false) @map("client_visible")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  project PrivateProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, clientVisible])
+  @@map("private_project_documents")
 }
 
 /** Athlete hours on private projects — never mixes with Production Lane billing. */

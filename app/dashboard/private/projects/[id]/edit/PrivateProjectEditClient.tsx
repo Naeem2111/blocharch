@@ -74,6 +74,8 @@ type ProjectPayload = {
   }>;
   phases: PhaseRow[];
   stageNotes: string | null;
+  clientDescription: string | null;
+  dueDate: string | null;
   briefReceivedAt: string | null;
   councilSubmittedAt: string | null;
   client: {
@@ -128,6 +130,8 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
     designStage: "site_measure_up" as PrivateDesignStage,
     manualProgressPercent: "",
     stageNotes: "",
+    clientDescription: "",
+    dueDate: "",
     briefReceivedAt: "",
     councilSubmittedAt: "",
   });
@@ -169,6 +173,8 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
       manualProgressPercent:
         p.manualProgressPercent != null ? String(p.manualProgressPercent) : String(p.calculatedProgressPercent),
       stageNotes: p.stageNotes ?? "",
+      clientDescription: p.clientDescription ?? "",
+      dueDate: p.dueDate ?? "",
       briefReceivedAt: p.briefReceivedAt ?? "",
       councilSubmittedAt: p.councilSubmittedAt ?? "",
     });
@@ -303,6 +309,8 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
         designStage: form.designStage,
         manualProgressPercent: useManualProgress ? Number(form.manualProgressPercent) : null,
         stageNotes: form.stageNotes.trim() || null,
+        clientDescription: form.clientDescription.trim() || null,
+        dueDate: form.dueDate || null,
         briefReceivedAt: form.briefReceivedAt || null,
         councilSubmittedAt: form.councilSubmittedAt || null,
         phaseFeePercents: syncedFeePercents,
@@ -385,6 +393,16 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
               className={field}
               value={form.projectName}
               onChange={(e) => setForm({ ...form, projectName: e.target.value })}
+            />
+          </label>
+          <label className="block text-xs text-slate-400">
+            Client-facing description
+            <textarea
+              rows={3}
+              className={field}
+              value={form.clientDescription}
+              onChange={(e) => setForm({ ...form, clientDescription: e.target.value })}
+              placeholder="Only shown on the client portal when filled in."
             />
           </label>
           <label className="block text-xs text-slate-400">
@@ -753,6 +771,15 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
               className={field}
               value={form.stageNotes}
               onChange={(e) => setForm({ ...form, stageNotes: e.target.value })}
+            />
+          </label>
+          <label className="block text-xs text-slate-400">
+            Target completion
+            <input
+              type="date"
+              className={field}
+              value={form.dueDate}
+              onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
             />
           </label>
           <label className="block text-xs text-slate-400">

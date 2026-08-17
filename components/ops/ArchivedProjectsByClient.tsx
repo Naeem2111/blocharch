@@ -175,9 +175,9 @@ export function ArchivedProjectsByClient({
                                   displayTitle: p.displayTitle,
                                 })
                               }
-                              className="text-xs text-slate-500 hover:text-slate-300 disabled:opacity-40"
+                              className="text-xs text-brand-300 hover:text-brand-200 disabled:opacity-40"
                             >
-                              {reactivatingId === p.id ? "Moving…" : "Still in progress"}
+                              {reactivatingId === p.id ? "Moving…" : "Bring back to active"}
                             </button>
                           ) : null}
                         </div>

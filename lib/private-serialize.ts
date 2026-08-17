@@ -69,6 +69,8 @@ export function serializePrivateProject(
     outOfScopeBilledZar: Number(p.outOfScopeBilledZar),
     outOfScopeFlag: p.outOfScopeFlag,
     stageNotes: p.stageNotes,
+    clientDescription: p.clientDescription,
+    dueDate: p.dueDate?.toISOString().slice(0, 10) ?? null,
     briefReceivedAt: p.briefReceivedAt?.toISOString().slice(0, 10) ?? null,
     councilSubmittedAt: p.councilSubmittedAt?.toISOString().slice(0, 10) ?? null,
     stageStartedAt: p.stageStartedAt.toISOString().slice(0, 10),

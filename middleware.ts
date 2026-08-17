@@ -18,6 +18,7 @@ import {
   isPlannerDashboardPath,
   isPrivateApiPath,
   isPrivateDashboardPath,
+  isPrivatePublicApiPath,
 } from "@/lib/permissions";
 
 const AUTH_COOKIE = "blocarch_session";
@@ -97,7 +98,9 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  if ((isPrivateDashboardPath(path) || isPrivateApiPath(path)) && !n8nAuthorized) {
+  const publicPrivatePortalApi = isPrivatePublicApiPath(path);
+
+  if ((isPrivateDashboardPath(path) || isPrivateApiPath(path)) && !n8nAuthorized && !publicPrivatePortalApi) {
     if (!role || !canAccessModule(role, "private_work", username)) {
       if (isApi) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -107,7 +110,7 @@ export async function middleware(request: NextRequest) {
   }
 
   const isProtected = path.startsWith("/dashboard") || path.startsWith("/api/") || path === "/";
-  if (isProtected && !isAuthenticated && !n8nAuthorized) {
+  if (isProtected && !isAuthenticated && !n8nAuthorized && !publicPrivatePortalApi) {
     if (isApi) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

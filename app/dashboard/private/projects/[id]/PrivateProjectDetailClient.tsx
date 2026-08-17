@@ -16,6 +16,8 @@ type Detail = {
     costZar: number;
     marginPercent: number | null;
     stageNotes: string | null;
+    clientDescription: string | null;
+    dueDate: string | null;
     briefReceivedAt: string | null;
     councilSubmittedAt: string | null;
     stageMeta: {
@@ -54,8 +56,22 @@ type Detail = {
       costZar: number;
     }>;
   };
-  updates: Array<{ id: string; title: string; body: string | null; occurredAt: string }>;
+  updates: Array<{
+    id: string;
+    title: string;
+    body: string | null;
+    clientVisible: boolean;
+    occurredAt: string;
+  }>;
   actionItems: Array<{ id: string; title: string; completedAt: string | null; clientFacing: boolean }>;
+  documents: Array<{
+    id: string;
+    title: string;
+    originalName: string;
+    fileUrl: string;
+    clientVisible: boolean;
+    createdAt: string;
+  }>;
 };
 
 function zar(n: number) {
@@ -71,6 +87,14 @@ export function PrivateProjectDetailClient({ projectId }: { projectId: string })
   const [completingAction, setCompletingAction] = useState<string | null>(null);
   const [itemLoading, setItemLoading] = useState<string | null>(null);
   const [editTitles, setEditTitles] = useState<Record<string, string>>({});
+  const [actionFacing, setActionFacing] = useState(true);
+  const [updateTitle, setUpdateTitle] = useState("");
+  const [updateBody, setUpdateBody] = useState("");
+  const [updateVisible, setUpdateVisible] = useState(false);
+  const [docTitle, setDocTitle] = useState("");
+  const [docVisible, setDocVisible] = useState(false);
+  const [docFile, setDocFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const load = useCallback(async () => {
     const r = await fetch(`/api/private/projects/${projectId}`);
@@ -79,7 +103,11 @@ export function PrivateProjectDetailClient({ projectId }: { projectId: string })
       setError(j.error || "Not found");
       return;
     }
-    setData(j);
+    setData({
+      ...j,
+      documents: j.documents || [],
+      updates: j.updates || [],
+    });
     setNotes(j.project.stageNotes ?? "");
     const titles: Record<string, string> = {};
     for (const a of (j.actionItems as Detail["actionItems"]).filter((x) => !x.completedAt)) {
@@ -120,7 +148,7 @@ export function PrivateProjectDetailClient({ projectId }: { projectId: string })
     await fetch(`/api/private/projects/${projectId}/actions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: actionTitle.trim() }),
+      body: JSON.stringify({ title: actionTitle.trim(), clientFacing: actionFacing }),
     });
     setActionTitle("");
     setSaving(false);
@@ -165,6 +193,116 @@ export function PrivateProjectDetailClient({ projectId }: { projectId: string })
     void load();
   }
 
+  async function toggleActionFacing(actionItemId: string, clientFacing: boolean) {
+    setItemLoading(actionItemId);
+    await fetch(`/api/private/projects/${projectId}/actions`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ actionItemId, clientFacing }),
+    });
+    setItemLoading(null);
+    void load();
+  }
+
+  async function addUpdate() {
+    if (!updateTitle.trim()) return;
+    setSaving(true);
+    setError("");
+    const r = await fetch(`/api/private/projects/${projectId}/updates`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: updateTitle.trim(),
+        body: updateBody.trim() || null,
+        clientVisible: updateVisible,
+      }),
+    });
+    const j = await r.json().catch(() => ({}));
+    setSaving(false);
+    if (!r.ok) {
+      setError(j.error || "Could not add update");
+      return;
+    }
+    setUpdateTitle("");
+    setUpdateBody("");
+    setUpdateVisible(false);
+    void load();
+  }
+
+  async function toggleUpdateVisible(updateId: string, clientVisible: boolean) {
+    setItemLoading(updateId);
+    await fetch(`/api/private/projects/${projectId}/updates`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ updateId, clientVisible }),
+    });
+    setItemLoading(null);
+    void load();
+  }
+
+  async function removeUpdate(updateId: string) {
+    if (!confirm("Remove this update?")) return;
+    setItemLoading(updateId);
+    await fetch(`/api/private/projects/${projectId}/updates`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ updateId }),
+    });
+    setItemLoading(null);
+    void load();
+  }
+
+  async function uploadDocument(e: React.FormEvent) {
+    e.preventDefault();
+    if (!docFile) {
+      setError("Choose a file to upload.");
+      return;
+    }
+    setUploading(true);
+    setError("");
+    const form = new FormData();
+    form.set("file", docFile);
+    form.set("title", docTitle.trim() || docFile.name);
+    form.set("clientVisible", docVisible ? "true" : "false");
+    const r = await fetch(`/api/private/projects/${projectId}/documents`, {
+      method: "POST",
+      body: form,
+    });
+    const j = await r.json().catch(() => ({}));
+    setUploading(false);
+    if (!r.ok) {
+      setError(j.error || "Could not upload document");
+      return;
+    }
+    setDocTitle("");
+    setDocFile(null);
+    setDocVisible(false);
+    void load();
+  }
+
+  async function toggleDocumentVisible(documentId: string, clientVisible: boolean) {
+    setItemLoading(documentId);
+    await fetch(`/api/private/projects/${projectId}/documents`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ documentId, clientVisible }),
+    });
+    setItemLoading(null);
+    void load();
+  }
+
+  async function removeDocument(documentId: string) {
+    if (!confirm("Remove this document?")) return;
+    setItemLoading(documentId);
+    await fetch(`/api/private/projects/${projectId}/documents`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ documentId }),
+    });
+    setItemLoading(null);
+    void load();
+  }
+
   if (!data) {
     if (error) return <p className="text-sm text-red-300">{error}</p>;
     return <p className="text-sm text-slate-500">Loading…</p>;
@@ -180,6 +318,12 @@ export function PrivateProjectDetailClient({ projectId }: { projectId: string })
       <div className="flex flex-wrap items-center gap-3">
         <Link href="/dashboard/private/projects" className="text-xs text-slate-500 hover:text-slate-300">
           ← Projects
+        </Link>
+        <Link
+          href="/dashboard/private/clients"
+          className="text-xs text-slate-500 hover:text-slate-300"
+        >
+          Clients
         </Link>
         {p.client.slug ? (
           <a
@@ -204,6 +348,10 @@ export function PrivateProjectDetailClient({ projectId }: { projectId: string })
           Edit project
         </Link>
       </div>
+      <p className="text-xs text-slate-500">
+        The client portal only shows what you publish: description, dates, documents, updates, and
+        actions marked “Show on portal”.
+      </p>
 
       {openActions.length > 0 ? (
         <div className="rounded-xl bg-amber-500/10 p-5 ring-1 ring-amber-500/25">
@@ -258,6 +406,14 @@ export function PrivateProjectDetailClient({ projectId }: { projectId: string })
             Project
           </p>
           <h2 className="mt-1 text-lg font-semibold text-white">{p.name}</h2>
+          {p.clientDescription ? (
+            <p className="mt-2 text-sm leading-relaxed text-slate-400">{p.clientDescription}</p>
+          ) : (
+            <p className="mt-2 text-xs text-slate-600">
+              No client-facing description yet — add one in Edit project before it appears on the
+              portal.
+            </p>
+          )}
         </div>
 
         <div className="mt-6">
@@ -433,6 +589,10 @@ export function PrivateProjectDetailClient({ projectId }: { projectId: string })
           ) : null}
           <dl className="mt-4 space-y-2 text-sm">
             <div className="flex justify-between gap-3">
+              <dt className="text-slate-500">Target completion</dt>
+              <dd className="text-slate-300">{p.dueDate ?? "—"}</dd>
+            </div>
+            <div className="flex justify-between gap-3">
               <dt className="text-slate-500">Brief received</dt>
               <dd className="text-slate-300">{p.briefReceivedAt ?? "—"}</dd>
             </div>
@@ -475,11 +635,16 @@ export function PrivateProjectDetailClient({ projectId }: { projectId: string })
                     className="w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-sm text-white"
                   />
                   <div className="flex flex-wrap items-center gap-2">
-                    {!a.clientFacing ? (
-                      <span className="text-[10px] uppercase tracking-wider text-slate-500">
-                        Internal
-                      </span>
-                    ) : null}
+                    <label className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-slate-500">
+                      <input
+                        type="checkbox"
+                        checked={a.clientFacing}
+                        disabled={loading}
+                        onChange={(e) => void toggleActionFacing(a.id, e.target.checked)}
+                        className="h-3.5 w-3.5 accent-brand-400"
+                      />
+                      Show on portal
+                    </label>
                     {titleChanged ? (
                       <button
                         type="button"
@@ -507,21 +672,32 @@ export function PrivateProjectDetailClient({ projectId }: { projectId: string })
             <li className="text-sm text-slate-500">None open.</li>
           ) : null}
         </ul>
-        <div className="mt-3 flex gap-2">
-          <input
-            value={actionTitle}
-            onChange={(e) => setActionTitle(e.target.value)}
-            placeholder="e.g. Confirm glazing budget"
-            className="flex-1 rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
-          />
-          <button
-            type="button"
-            disabled={saving}
-            onClick={() => void addAction()}
-            className="rounded-lg bg-brand-500/20 px-3 py-1.5 text-xs font-medium text-brand-200 ring-1 ring-brand-500/30"
-          >
-            Add
-          </button>
+        <div className="mt-3 space-y-2">
+          <div className="flex gap-2">
+            <input
+              value={actionTitle}
+              onChange={(e) => setActionTitle(e.target.value)}
+              placeholder="e.g. Confirm glazing budget"
+              className="flex-1 rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+            />
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => void addAction()}
+              className="rounded-lg bg-brand-500/20 px-3 py-1.5 text-xs font-medium text-brand-200 ring-1 ring-brand-500/30"
+            >
+              Add
+            </button>
+          </div>
+          <label className="flex items-center gap-2 text-xs text-slate-500">
+            <input
+              type="checkbox"
+              checked={actionFacing}
+              onChange={(e) => setActionFacing(e.target.checked)}
+              className="h-3.5 w-3.5 accent-brand-400"
+            />
+            Show on client portal
+          </label>
         </div>
 
         {completedActions.length > 0 ? (
@@ -557,18 +733,172 @@ export function PrivateProjectDetailClient({ projectId }: { projectId: string })
       </section>
 
       <section className="card-tool rounded-xl p-5">
-        <h3 className="text-sm font-semibold text-white">Recent updates</h3>
+        <h3 className="text-sm font-semibold text-white">Project updates</h3>
+        <p className="mt-1 text-xs text-slate-500">
+          Unpublished updates stay internal. Tick “Show on portal” only when the wording is ready
+          for the client.
+        </p>
         <ul className="mt-3 space-y-3">
-          {data.updates.map((u) => (
-            <li key={u.id} className="flex justify-between gap-3 text-sm">
-              <div>
-                <p className="text-slate-200">{u.title}</p>
-                {u.body ? <p className="text-xs text-slate-500">{u.body}</p> : null}
-              </div>
-              <span className="shrink-0 text-xs text-slate-500">{u.occurredAt}</span>
-            </li>
-          ))}
+          {data.updates.length === 0 ? (
+            <li className="text-sm text-slate-500">None yet.</li>
+          ) : (
+            data.updates.map((u) => {
+              const loading = itemLoading === u.id;
+              return (
+                <li key={u.id} className="rounded-lg bg-white/[0.03] p-3 ring-1 ring-white/[0.06]">
+                  <div className="flex justify-between gap-3 text-sm">
+                    <div>
+                      <p className="text-slate-200">{u.title}</p>
+                      {u.body ? <p className="mt-1 text-xs text-slate-500">{u.body}</p> : null}
+                    </div>
+                    <span className="shrink-0 text-xs text-slate-500">{u.occurredAt}</span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <label className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-slate-500">
+                      <input
+                        type="checkbox"
+                        checked={u.clientVisible}
+                        disabled={loading}
+                        onChange={(e) => void toggleUpdateVisible(u.id, e.target.checked)}
+                        className="h-3.5 w-3.5 accent-brand-400"
+                      />
+                      Show on portal
+                    </label>
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={() => void removeUpdate(u.id)}
+                      className="rounded px-2 py-0.5 text-[10px] font-medium text-red-300/80 ring-1 ring-red-500/20 hover:bg-red-500/10 disabled:opacity-50"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </li>
+              );
+            })
+          )}
         </ul>
+        <div className="mt-4 space-y-2 border-t border-white/[0.06] pt-4">
+          <input
+            value={updateTitle}
+            onChange={(e) => setUpdateTitle(e.target.value)}
+            placeholder="Update title"
+            className="w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+          />
+          <textarea
+            value={updateBody}
+            onChange={(e) => setUpdateBody(e.target.value)}
+            rows={2}
+            placeholder="Optional detail for the client"
+            className="w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+          />
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-xs text-slate-500">
+              <input
+                type="checkbox"
+                checked={updateVisible}
+                onChange={(e) => setUpdateVisible(e.target.checked)}
+                className="h-3.5 w-3.5 accent-brand-400"
+              />
+              Show on client portal
+            </label>
+            <button
+              type="button"
+              disabled={saving || !updateTitle.trim()}
+              onClick={() => void addUpdate()}
+              className="rounded-lg bg-brand-500/20 px-3 py-1.5 text-xs font-medium text-brand-200 ring-1 ring-brand-500/30 disabled:opacity-50"
+            >
+              Post update
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section className="card-tool rounded-xl p-5">
+        <h3 className="text-sm font-semibold text-white">Documents</h3>
+        <p className="mt-1 text-xs text-slate-500">
+          Files stay hidden from the client until you publish them. PDF, image, Word, or Excel —
+          15 MB max.
+        </p>
+        <ul className="mt-3 space-y-2">
+          {(data.documents ?? []).length === 0 ? (
+            <li className="text-sm text-slate-500">No documents yet.</li>
+          ) : (
+            (data.documents ?? []).map((d) => {
+              const loading = itemLoading === d.id;
+              return (
+                <li
+                  key={d.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white/[0.03] px-3 py-2 ring-1 ring-white/[0.06]"
+                >
+                  <div className="min-w-0">
+                    <a
+                      href={d.fileUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-sm text-slate-200 hover:text-brand-300"
+                    >
+                      {d.title}
+                    </a>
+                    <p className="text-[11px] text-slate-500">{d.originalName}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-slate-500">
+                      <input
+                        type="checkbox"
+                        checked={d.clientVisible}
+                        disabled={loading}
+                        onChange={(e) => void toggleDocumentVisible(d.id, e.target.checked)}
+                        className="h-3.5 w-3.5 accent-brand-400"
+                      />
+                      Show on portal
+                    </label>
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={() => void removeDocument(d.id)}
+                      className="rounded px-2 py-0.5 text-[10px] font-medium text-red-300/80 ring-1 ring-red-500/20 hover:bg-red-500/10 disabled:opacity-50"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </li>
+              );
+            })
+          )}
+        </ul>
+        <form onSubmit={(e) => void uploadDocument(e)} className="mt-4 space-y-2 border-t border-white/[0.06] pt-4">
+          <input
+            value={docTitle}
+            onChange={(e) => setDocTitle(e.target.value)}
+            placeholder="Document title (optional)"
+            className="w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+          />
+          <input
+            type="file"
+            accept=".pdf,.doc,.docx,.xls,.xlsx,image/jpeg,image/png,image/webp,image/gif"
+            onChange={(e) => setDocFile(e.target.files?.[0] ?? null)}
+            className="w-full text-xs text-slate-400 file:mr-3 file:rounded-md file:border-0 file:bg-white/[0.08] file:px-3 file:py-1.5 file:text-xs file:text-slate-200"
+          />
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-xs text-slate-500">
+              <input
+                type="checkbox"
+                checked={docVisible}
+                onChange={(e) => setDocVisible(e.target.checked)}
+                className="h-3.5 w-3.5 accent-brand-400"
+              />
+              Show on client portal
+            </label>
+            <button
+              type="submit"
+              disabled={uploading || !docFile}
+              className="rounded-lg bg-brand-500/20 px-3 py-1.5 text-xs font-medium text-brand-200 ring-1 ring-brand-500/30 disabled:opacity-50"
+            >
+              {uploading ? "Uploading…" : "Upload"}
+            </button>
+          </div>
+        </form>
       </section>
     </div>
   );

@@ -105,6 +105,7 @@ export function PrivateProjectExpensesClient({ projectId }: { projectId: string 
     setExpenses(rows);
     setEditDrafts(Object.fromEntries(rows.map((e) => [e.id, expenseDraft(e)])));
     setTotalZar(j.totalZar ?? 0);
+    setError("");
     setLoading(false);
   }, [projectId]);
 
@@ -122,8 +123,17 @@ export function PrivateProjectExpensesClient({ projectId }: { projectId: string 
     return null;
   }
 
-  async function addExpense() {
-    if (!description.trim() || !amountZar.trim()) return;
+  async function addExpense(e?: React.FormEvent) {
+    e?.preventDefault();
+    if (!description.trim()) {
+      setError("Enter a description.");
+      return;
+    }
+    const amount = Number(amountZar);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError("Enter an amount greater than 0.");
+      return;
+    }
     const athleteError = validateAthleteForKind(kind, athleteId);
     if (athleteError) {
       setError(athleteError);
@@ -131,28 +141,33 @@ export function PrivateProjectExpensesClient({ projectId }: { projectId: string 
     }
     setSaving(true);
     setError("");
-    const r = await fetch(`/api/private/projects/${projectId}/expenses`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        description: description.trim(),
-        amountZar: Number(amountZar),
-        expenseDate,
-        kind,
-        athleteId: kind === "athlete" ? athleteId : null,
-        designStage: designStage || null,
-      }),
-    });
-    const j = await r.json();
-    setSaving(false);
-    if (!r.ok) {
-      setError(j.error || "Could not add expense");
-      return;
+    try {
+      const r = await fetch(`/api/private/projects/${projectId}/expenses`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          description: description.trim(),
+          amountZar: amount,
+          expenseDate,
+          kind,
+          athleteId: kind === "athlete" ? athleteId : null,
+          designStage: designStage || null,
+        }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setError(typeof j.error === "string" ? j.error : "Could not add expense");
+        return;
+      }
+      setDescription("");
+      setAmountZar("");
+      setKind("third_party");
+      void load();
+    } catch {
+      setError("Could not add expense");
+    } finally {
+      setSaving(false);
     }
-    setDescription("");
-    setAmountZar("");
-    setKind("third_party");
-    void load();
   }
 
   async function saveExpense(expenseId: string) {
@@ -430,7 +445,7 @@ export function PrivateProjectExpensesClient({ projectId }: { projectId: string 
         )}
       </div>
 
-      <section className="card-tool rounded-xl p-5">
+      <form className="card-tool rounded-xl p-5" onSubmit={(e) => void addExpense(e)}>
         <h3 className="text-sm font-semibold text-white">Add expense</h3>
         <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <label className="block text-xs text-slate-400">
@@ -480,6 +495,7 @@ export function PrivateProjectExpensesClient({ projectId }: { projectId: string 
           <label className="block text-xs text-slate-400 sm:col-span-2">
             Description
             <input
+              required
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder={kind === "athlete" ? "e.g. Site visit fee" : "e.g. Surveyor fee"}
@@ -489,8 +505,9 @@ export function PrivateProjectExpensesClient({ projectId }: { projectId: string 
           <label className="block text-xs text-slate-400">
             Amount (ZAR)
             <input
+              required
               type="number"
-              min="0"
+              min="0.01"
               step="0.01"
               value={amountZar}
               onChange={(e) => setAmountZar(e.target.value)}
@@ -526,14 +543,13 @@ export function PrivateProjectExpensesClient({ projectId }: { projectId: string 
           </p>
         ) : null}
         <button
-          type="button"
+          type="submit"
           disabled={saving}
-          onClick={() => void addExpense()}
-          className="mt-3 rounded-lg bg-brand-500/20 px-3 py-1.5 text-xs font-medium text-brand-200 ring-1 ring-brand-500/30"
+          className="mt-3 rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-brand-400 disabled:opacity-60"
         >
-          Add expense
+          {saving ? "Adding…" : "Add expense"}
         </button>
-      </section>
+      </form>
     </div>
   );
 }

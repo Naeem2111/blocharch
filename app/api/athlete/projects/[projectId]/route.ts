@@ -12,7 +12,6 @@ import {
   serializeProjectForAthlete,
 } from "@/lib/ops-access";
 import { syncProjectAfterOpsUpdate } from "@/lib/planner-project-sync";
-import { REACTIVATION_PROGRESS_PERCENT } from "@/lib/sync-project-progress";
 
 type RouteContext = { params: Promise<{ projectId: string }> };
 
@@ -119,25 +118,22 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         return NextResponse.json({ error: "Invalid project status" }, { status: 400 });
       }
       const wasCompleted = project.currentStatus === "completed" || project.currentStatus === "handed_over";
-      if (wasCompleted && status !== "in_progress") {
+      if (wasCompleted) {
         return NextResponse.json(
-          { error: "Reactivate completed projects by setting status to In Progress" },
-          { status: 400 }
+          {
+            error:
+              "Ask a manager or admin to bring this project back to active from Project archives.",
+          },
+          { status: 403 },
         );
       }
-      if (!wasCompleted && (status === "completed" || status === "handed_over")) {
+      if (status === "completed" || status === "handed_over") {
         return NextResponse.json(
           { error: "Projects complete automatically at 100% progress in the Daily Log" },
           { status: 400 }
         );
       }
       data.currentStatus = status;
-      if (wasCompleted && status === "in_progress") {
-        data.progressPercent = REACTIVATION_PROGRESS_PERCENT;
-        data.completedAt = null;
-        data.deadlineBeatenDays = null;
-        data.deadlineBeatenMinutes = null;
-      }
     }
 
     if (body.notes !== undefined) {
@@ -153,24 +149,6 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       data,
       select: athleteProjectSelect,
     });
-
-    if (data.currentStatus === "in_progress" && (project.currentStatus === "completed" || project.currentStatus === "handed_over")) {
-      const latestLine = await prisma.opsSubmissionLineItem.findFirst({
-        where: {
-          projectId,
-          completionPercent: { not: null },
-          submission: { athleteId: athlete.id },
-        },
-        orderBy: [{ submission: { submissionDate: "desc" } }, { submission: { updatedAt: "desc" } }],
-        select: { id: true },
-      });
-      if (latestLine) {
-        await prisma.opsSubmissionLineItem.update({
-          where: { id: latestLine.id },
-          data: { completionPercent: REACTIVATION_PROGRESS_PERCENT },
-        });
-      }
-    }
 
     if (data.currentStatus !== undefined) {
       await syncProjectAfterOpsUpdate(

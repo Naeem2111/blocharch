@@ -62,6 +62,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
+    const existingClientId = body.clientId ? String(body.clientId).trim() : "";
     const clientName = String(body.clientName || "").trim();
     const contactEmail = body.contactEmail ? String(body.contactEmail).trim() : null;
     const contactPhone = body.contactPhone ? String(body.contactPhone).trim() : null;
@@ -80,7 +81,7 @@ export async function POST(request: NextRequest) {
     }
     const { projectType, customProjectTypeId } = projectTypeResolved;
 
-    if (!clientName) {
+    if (!existingClientId && !clientName) {
       return NextResponse.json({ error: "Client name is required" }, { status: 400 });
     }
     if (!name) {
@@ -96,31 +97,43 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    let slug = slugifyPrivateClient(clientName);
-    const existingSlug = await prisma.privateClient.findUnique({ where: { slug } });
-    if (existingSlug) slug = `${slug}-${Date.now().toString(36).slice(-4)}`;
-
     const briefReceivedAt = body.briefReceivedAt
       ? parseDateOnly(String(body.briefReceivedAt))
       : new Date();
+    const dueDate = body.dueDate ? parseDateOnly(String(body.dueDate)) : null;
+    const clientDescription = body.clientDescription
+      ? String(body.clientDescription).trim()
+      : null;
 
     const defaultStructure = defaultPhaseStructure();
     const defaultSplits = defaultPhaseSplits(defaultStructure);
 
     const created = await prisma.$transaction(async (tx) => {
-      const client = await tx.privateClient.create({
-        data: {
-          name: clientName,
-          contactEmail,
-          contactPhone,
-          slug,
-          portalEnabled: true,
-        },
-      });
+      let clientId = existingClientId;
+      if (clientId) {
+        const existing = await tx.privateClient.findUnique({ where: { id: clientId } });
+        if (!existing) {
+          throw new Error("CLIENT_NOT_FOUND");
+        }
+      } else {
+        let slug = slugifyPrivateClient(clientName);
+        const existingSlug = await tx.privateClient.findUnique({ where: { slug } });
+        if (existingSlug) slug = `${slug}-${Date.now().toString(36).slice(-4)}`;
+        const client = await tx.privateClient.create({
+          data: {
+            name: clientName,
+            contactEmail,
+            contactPhone,
+            slug,
+            portalEnabled: true,
+          },
+        });
+        clientId = client.id;
+      }
 
       const project = await tx.privateProject.create({
         data: {
-          clientId: client.id,
+          clientId,
           assignedAthleteId,
           name,
           address: address || name,
@@ -128,6 +141,8 @@ export async function POST(request: NextRequest) {
           customProjectTypeId,
           designStage,
           feeZar,
+          clientDescription,
+          dueDate,
           phaseFeePercents: defaultSplits,
           phaseCostPercents: defaultSplits,
           phaseStructure: defaultStructure,
@@ -143,7 +158,7 @@ export async function POST(request: NextRequest) {
           projectId: project.id,
           title: "Project opened",
           body: `Brief received. Starting at ${designStage.replace(/_/g, " ")}.`,
-          clientVisible: true,
+          clientVisible: false,
           occurredAt: briefReceivedAt ?? new Date(),
         },
       });
@@ -153,6 +168,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ project: serializePrivateProject(created) }, { status: 201 });
   } catch (e) {
+    if (e instanceof Error && e.message === "CLIENT_NOT_FOUND") {
+      return NextResponse.json({ error: "Client not found" }, { status: 400 });
+    }
     console.error(e);
     return NextResponse.json({ error: "Could not create client & project" }, { status: 500 });
   }

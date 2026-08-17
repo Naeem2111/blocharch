@@ -58,6 +58,19 @@ export function PrivateOverviewClient() {
 
   return (
     <div className="space-y-8">
+      <p className="text-sm text-slate-400">
+        <Link href="/dashboard/private/clients" className="text-brand-300 hover:underline">
+          Clients
+        </Link>
+        {" · "}
+        <Link href="/dashboard/private/onboarding" className="text-brand-300 hover:underline">
+          Onboard a project
+        </Link>
+        {" · "}
+        <Link href="/dashboard/private/projects" className="text-brand-300 hover:underline">
+          All projects
+        </Link>
+      </p>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label="Active private projects"

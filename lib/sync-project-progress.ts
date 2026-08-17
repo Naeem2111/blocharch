@@ -10,7 +10,7 @@ import {
 } from "@/lib/planner-project-sync";
 
 /** Progress when a completed project is moved back to active work. */
-export const REACTIVATION_PROGRESS_PERCENT = 90;
+export const REACTIVATION_PROGRESS_PERCENT = 85;
 
 type LatestCompletionLog = {
   progressPercent: number;
@@ -102,6 +102,97 @@ export async function reactivateProjectOnAthleteReassign(
     deadlineBeatenDays: null,
     deadlineBeatenMinutes: null,
   };
+}
+
+export async function reactivateArchivedOpsProject(projectId: string): Promise<
+  | { ok: true }
+  | { ok: false; error: string; status: 400 | 404 }
+> {
+  const project = await prisma.opsProject.findUnique({
+    where: { id: projectId },
+    select: {
+      id: true,
+      name: true,
+      assignedAthleteId: true,
+      currentStatus: true,
+    },
+  });
+  if (!project) return { ok: false, error: "Project not found", status: 404 };
+
+  const wasCompleted =
+    project.currentStatus === "completed" || project.currentStatus === "handed_over";
+  if (!wasCompleted) {
+    return {
+      ok: false,
+      error: "Only archived projects can be brought back to active",
+      status: 400,
+    };
+  }
+
+  const latestLine =
+    (project.assignedAthleteId
+      ? await prisma.opsSubmissionLineItem.findFirst({
+          where: {
+            projectId,
+            completionPercent: { not: null },
+            submission: { athleteId: project.assignedAthleteId },
+          },
+          orderBy: [
+            { submission: { submissionDate: "desc" } },
+            { submission: { updatedAt: "desc" } },
+          ],
+          select: { id: true },
+        })
+      : null) ??
+    (await prisma.opsSubmissionLineItem.findFirst({
+      where: { projectId, completionPercent: { not: null } },
+      orderBy: [
+        { submission: { submissionDate: "desc" } },
+        { submission: { updatedAt: "desc" } },
+      ],
+      select: { id: true },
+    }));
+
+  const updated = await prisma.$transaction(async (tx) => {
+    if (latestLine) {
+      await tx.opsSubmissionLineItem.update({
+        where: { id: latestLine.id },
+        data: { completionPercent: REACTIVATION_PROGRESS_PERCENT },
+      });
+    }
+    return tx.opsProject.update({
+      where: { id: projectId },
+      data: {
+        currentStatus: "in_progress",
+        progressPercent: REACTIVATION_PROGRESS_PERCENT,
+        completedAt: null,
+        deadlineBeatenDays: null,
+        deadlineBeatenMinutes: null,
+        portalDisplayLocked: false,
+      },
+      select: {
+        assignedAthleteId: true,
+        currentStatus: true,
+        name: true,
+      },
+    });
+  });
+
+  await syncProjectAfterOpsUpdate(
+    projectId,
+    {
+      assignedAthleteId: project.assignedAthleteId,
+      currentStatus: project.currentStatus,
+      name: project.name,
+    },
+    {
+      assignedAthleteId: updated.assignedAthleteId,
+      currentStatus: updated.currentStatus,
+      name: updated.name,
+    },
+  );
+
+  return { ok: true };
 }
 
 /** Recalculate project progress from the primary assignee's daily log entries. */

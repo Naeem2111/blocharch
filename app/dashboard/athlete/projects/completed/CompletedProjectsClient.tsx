@@ -12,8 +12,6 @@ import { asAvatarTextTone } from "@/lib/avatar-text-tone";
 export function CompletedProjectsClient() {
   const [projects, setProjects] = useState<ArchivedProjectRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [msg, setMsg] = useState("");
   const [clientFilterId, setClientFilterId] = useState("");
   const [detailProjectId, setDetailProjectId] = useState<string | null>(null);
 
@@ -61,35 +59,6 @@ export function CompletedProjectsClient() {
 
   const selectedFilterClient = clientOptions.find((c) => c.id === clientFilterId) ?? null;
 
-  async function reactivate(project: { id: string; name: string; displayTitle?: string }) {
-    const label = project.displayTitle ?? project.name;
-    if (
-      !window.confirm(
-        `Move "${label}" back to My Projects? Progress will reset from 100% to 90% so you can keep logging daily work.`
-      )
-    ) {
-      return;
-    }
-    setBusyId(project.id);
-    setMsg("");
-    try {
-      const r = await fetch(`/api/athlete/projects/${encodeURIComponent(project.id)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ currentStatus: "in_progress" }),
-      });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) {
-        window.alert((j as { error?: string }).error || "Could not reactivate project");
-        return;
-      }
-      setMsg(`"${label}" is active again in My Projects.`);
-      await load();
-    } finally {
-      setBusyId(null);
-    }
-  }
-
   if (loading && projects.length === 0) {
     return <p className="text-sm text-slate-500">Loading completed projects…</p>;
   }
@@ -136,14 +105,10 @@ export function CompletedProjectsClient() {
         {loading ? <p className="pb-2 text-xs text-slate-500">Refreshing…</p> : null}
       </div>
 
-      {msg ? <p className="text-sm text-brand-300">{msg}</p> : null}
-
       <ArchivedProjectsByClient
         projects={filteredProjects}
         showAssignedAthlete={false}
         onOpen={setDetailProjectId}
-        onReactivate={reactivate}
-        reactivatingId={busyId}
         emptyMessage={
           clientFilterId
             ? "No completed projects for this client."

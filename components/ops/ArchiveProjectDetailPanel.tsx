@@ -83,11 +83,15 @@ export function ArchiveProjectDetailPanel({
   onClose,
   detailPath = "/api/ops/projects",
   showOpsEditHint = true,
+  onReactivate,
+  reactivating = false,
 }: {
   projectId: string;
   onClose: () => void;
   detailPath?: string;
   showOpsEditHint?: boolean;
+  onReactivate?: () => void;
+  reactivating?: boolean;
 }) {
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [submissions, setSubmissions] = useState<SubmissionRow[]>([]);
@@ -463,14 +467,27 @@ export function ArchiveProjectDetailPanel({
                   Hours logged: <span className="text-slate-300">{project.hoursLogged}h</span>
                 </div>
               </dl>
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => void savePortalDisplay()}
-                className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50"
-              >
-                {saving ? "Saving…" : "Save client portal display"}
-              </button>
+              <div className="flex flex-wrap gap-2">
+                {onReactivate &&
+                (project.currentStatus === "completed" || project.currentStatus === "handed_over") ? (
+                  <button
+                    type="button"
+                    disabled={reactivating || saving}
+                    onClick={() => onReactivate()}
+                    className="rounded-lg bg-white/[0.06] px-4 py-2 text-sm font-medium text-brand-200 ring-1 ring-brand-500/30 disabled:opacity-50"
+                  >
+                    {reactivating ? "Moving…" : "Bring back to active (85%)"}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => void savePortalDisplay()}
+                  className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50"
+                >
+                  {saving ? "Saving…" : "Save client portal display"}
+                </button>
+              </div>
             </div>
 
             <details className="text-sm">

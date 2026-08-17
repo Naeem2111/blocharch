@@ -48,7 +48,12 @@ export function canAccessOpsOverview(role: UserRole): boolean {
 export function canAccessOpsDashboardPath(role: UserRole, path: string): boolean {
   if (role === "admin" && canAccessModule(role, "ops")) return true;
   if (role === "manager") {
-    return path === "/dashboard/ops" || path.startsWith("/dashboard/ops/pipeline");
+    return (
+      path === "/dashboard/ops" ||
+      path.startsWith("/dashboard/ops/pipeline") ||
+      path === "/dashboard/ops/archives" ||
+      path.startsWith("/dashboard/ops/archives/")
+    );
   }
   return false;
 }
@@ -60,6 +65,8 @@ export function canAccessOpsApiPath(role: UserRole, path: string): boolean {
     if (normalized === "/api/ops/overview") return true;
     if (normalized.startsWith("/api/ops/pipeline")) return true;
     if (normalized === "/api/ops/clients" || normalized === "/api/ops/athletes") return true;
+    if (normalized === "/api/ops/archives") return true;
+    if (/^\/api\/ops\/projects\/[^/]+\/reactivate$/.test(normalized)) return true;
     return false;
   }
   return false;
@@ -133,4 +140,9 @@ export function isPrivateDashboardPath(path: string): boolean {
 
 export function isPrivateApiPath(path: string): boolean {
   return path.startsWith("/api/private/");
+}
+
+/** Unauthenticated client-portal actions (complete approvals, etc.). */
+export function isPrivatePublicApiPath(path: string): boolean {
+  return path.startsWith("/api/private/portal/");
 }

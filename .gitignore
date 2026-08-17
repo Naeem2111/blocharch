@@ -42,5 +42,9 @@ data/users.json
 public/uploads/clients/*
 !public/uploads/clients/.gitkeep
 
+# Private project documents
+public/uploads/private/*
+!public/uploads/private/.gitkeep
+
 # Vercel
 .vercel

@@ -33,7 +33,7 @@ export function PrivateClientPortalClient({
   slug: string;
   data: PortalData;
 }) {
-  const { project, stages, phaseGroups, updates } = data;
+  const { project, stages, phaseGroups, updates, documents = [] } = data;
   const [actionItems, setActionItems] = useState<ActionItem[]>(data.actionItems);
   const [completedActionItems, setCompletedActionItems] = useState<CompletedActionItem[]>(
     data.completedActionItems,
@@ -164,6 +164,43 @@ export function PrivateClientPortalClient({
           <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
             {project.address}
           </h1>
+          {project.clientDescription ? (
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate-400">
+              {project.clientDescription}
+            </p>
+          ) : null}
+
+          {(project.briefReceivedAt || project.dueDate || project.councilSubmittedAt) ? (
+            <dl className="mt-5 grid gap-3 sm:grid-cols-3">
+              {project.briefReceivedAt ? (
+                <div className="rounded-xl bg-white/[0.03] px-4 py-3 ring-1 ring-white/[0.06]">
+                  <dt className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                    Brief received
+                  </dt>
+                  <dd className="mt-1 text-sm text-slate-200">{formatDate(project.briefReceivedAt)}</dd>
+                </div>
+              ) : null}
+              {project.dueDate ? (
+                <div className="rounded-xl bg-white/[0.03] px-4 py-3 ring-1 ring-white/[0.06]">
+                  <dt className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                    Target completion
+                  </dt>
+                  <dd className="mt-1 text-sm text-slate-200">{formatDate(project.dueDate)}</dd>
+                </div>
+              ) : null}
+              {project.councilSubmittedAt ? (
+                <div className="rounded-xl bg-white/[0.03] px-4 py-3 ring-1 ring-white/[0.06]">
+                  <dt className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                    Council submitted
+                  </dt>
+                  <dd className="mt-1 text-sm text-slate-200">
+                    {formatDate(project.councilSubmittedAt)}
+                    {project.estCouncilDecision ? ` · decision ~ ${project.estCouncilDecision}` : ""}
+                  </dd>
+                </div>
+              ) : null}
+            </dl>
+          ) : null}
 
           <section className="mt-8 card-tool rounded-2xl p-6 sm:p-8">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
@@ -406,7 +443,10 @@ export function PrivateClientPortalClient({
                     key={`${u.occurredAt}-${i}`}
                     className="flex justify-between gap-4 border-b border-white/[0.05] pb-3 text-sm"
                   >
-                    <span className="text-slate-200">{u.title}</span>
+                    <div>
+                      <p className="text-slate-200">{u.title}</p>
+                      {u.body ? <p className="mt-1 text-xs leading-relaxed text-slate-500">{u.body}</p> : null}
+                    </div>
                     <span className="shrink-0 text-slate-500">{formatDate(u.occurredAt)}</span>
                   </li>
                 ))
@@ -416,6 +456,27 @@ export function PrivateClientPortalClient({
               Last updated {formatDate(project.updatedAt)}
             </p>
           </section>
+
+          {documents.length > 0 ? (
+            <section className="mt-10">
+              <h2 className="text-sm font-semibold text-white">Documents</h2>
+              <ul className="mt-4 space-y-2">
+                {documents.map((d) => (
+                  <li key={d.id}>
+                    <a
+                      href={d.fileUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center justify-between gap-3 rounded-lg bg-white/[0.03] px-4 py-3 text-sm text-slate-200 ring-1 ring-white/[0.06] hover:bg-white/[0.05] hover:text-brand-200"
+                    >
+                      <span>{d.title}</span>
+                      <span className="shrink-0 text-xs text-slate-500">Open</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
           </div>
         </div>
       </div>

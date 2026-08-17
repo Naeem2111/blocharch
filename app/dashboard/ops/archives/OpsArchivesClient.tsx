@@ -9,10 +9,12 @@ import {
 import { AthleteAvatar } from "@/components/ops/AthleteAvatar";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
 import { asAvatarTextTone } from "@/lib/avatar-text-tone";
+import { actsAsManager } from "@/lib/effective-roles";
 import {
   PROJECT_PHASE_LABELS,
   TASK_TYPE_LABELS,
 } from "@/lib/ops-constants";
+import type { UserRole } from "@/lib/users-store";
 
 type FilterOption = {
   id: string;
@@ -117,6 +119,19 @@ export function OpsArchivesClient() {
   const [clients, setClients] = useState<FilterOption[]>([]);
   const [athletes, setAthletes] = useState<FilterOptionAthlete[]>([]);
   const [detailProjectId, setDetailProjectId] = useState<string | null>(null);
+  const [canReactivate, setCanReactivate] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => {
+    void fetch("/api/me")
+      .then(async (r) => {
+        const j = await r.json().catch(() => ({}));
+        const role = j?.user?.role as UserRole | undefined;
+        setCanReactivate(Boolean(role && actsAsManager(role)));
+      })
+      .catch(() => setCanReactivate(false));
+  }, []);
 
   useEffect(() => {
     void Promise.all([fetch("/api/ops/clients"), fetch("/api/ops/athletes")])
@@ -170,12 +185,53 @@ export function OpsArchivesClient() {
       return;
     }
     setData(j);
+    if (Array.isArray(j.filterOptions?.clients) && j.filterOptions.clients.length) {
+      setClients(j.filterOptions.clients);
+    }
+    if (Array.isArray(j.filterOptions?.athletes) && j.filterOptions.athletes.length) {
+      setAthletes(
+        j.filterOptions.athletes.map((a: { id: string; fullName: string; athleteCode: string }) => ({
+          id: a.id,
+          fullName: a.fullName,
+          athleteCode: a.athleteCode,
+        })),
+      );
+    }
     setLoading(false);
   }, [clientFilterId, athleteFilterId]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  async function reactivate(project: { id: string; name: string; displayTitle?: string }) {
+    const label = project.displayTitle ?? project.name;
+    if (
+      !window.confirm(
+        `Bring "${label}" back to active work at 85%? It will leave archives and appear on the athlete's My Projects list.`,
+      )
+    ) {
+      return;
+    }
+    setBusyId(project.id);
+    setMsg("");
+    setError("");
+    try {
+      const r = await fetch(`/api/ops/projects/${encodeURIComponent(project.id)}/reactivate`, {
+        method: "POST",
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setError((j as { error?: string }).error || "Could not bring project back to active");
+        return;
+      }
+      setMsg(`"${label}" is active again at 85%.`);
+      if (detailProjectId === project.id) setDetailProjectId(null);
+      await load();
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   const tabCounts = useMemo(
     () => ({
@@ -248,6 +304,7 @@ export function OpsArchivesClient() {
       </div>
 
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
+      {msg ? <p className="text-sm text-brand-300">{msg}</p> : null}
 
       <div className="flex flex-wrap gap-2 border-b border-white/[0.06] pb-3">
         {(
@@ -277,6 +334,8 @@ export function OpsArchivesClient() {
         <ArchivedProjectsByClient
           projects={data?.projects ?? []}
           onOpen={setDetailProjectId}
+          onReactivate={canReactivate ? reactivate : undefined}
+          reactivatingId={busyId}
         />
       ) : null}
 
@@ -422,7 +481,19 @@ export function OpsArchivesClient() {
         </div>
       ) : null}
       {detailProjectId ? (
-        <ArchiveProjectDetailPanel projectId={detailProjectId} onClose={() => setDetailProjectId(null)} />
+        <ArchiveProjectDetailPanel
+          projectId={detailProjectId}
+          onClose={() => setDetailProjectId(null)}
+          onReactivate={
+            canReactivate
+              ? () => {
+                  const project = data?.projects.find((p) => p.id === detailProjectId);
+                  if (project) void reactivate(project);
+                }
+              : undefined
+          }
+          reactivating={busyId === detailProjectId}
+        />
       ) : null}
     </div>
   );

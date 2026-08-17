@@ -51,7 +51,7 @@ export async function PATCH(
   });
   if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const updateData: { completedAt?: Date | null; title?: string } = {};
+  const updateData: { completedAt?: Date | null; title?: string; clientFacing?: boolean } = {};
 
   if (body.complete !== undefined) {
     updateData.completedAt = body.complete === false ? null : new Date();
@@ -61,6 +61,10 @@ export async function PATCH(
     const title = String(body.title).trim();
     if (!title) return NextResponse.json({ error: "Title required" }, { status: 400 });
     updateData.title = title;
+  }
+
+  if (body.clientFacing !== undefined) {
+    updateData.clientFacing = Boolean(body.clientFacing);
   }
 
   if (Object.keys(updateData).length === 0) {

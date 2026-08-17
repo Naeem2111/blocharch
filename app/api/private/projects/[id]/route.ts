@@ -52,6 +52,7 @@ const projectInclude = {
   expenses: {
     select: { designStage: true, amountZar: true },
   },
+  documents: { orderBy: { createdAt: "desc" as const } },
 };
 
 export async function GET(
@@ -93,6 +94,16 @@ export async function GET(
       title: a.title,
       clientFacing: a.clientFacing,
       completedAt: a.completedAt?.toISOString() ?? null,
+    })),
+    documents: project.documents.map((d) => ({
+      id: d.id,
+      title: d.title,
+      originalName: d.originalName,
+      fileUrl: d.fileUrl,
+      mimeType: d.mimeType,
+      sizeBytes: d.sizeBytes,
+      clientVisible: d.clientVisible,
+      createdAt: d.createdAt.toISOString(),
     })),
     hourLogs: project.hourLogs.map((l) => ({
       id: l.id,
@@ -137,6 +148,12 @@ export async function PATCH(
       }
     }
     if (body.stageNotes !== undefined) data.stageNotes = String(body.stageNotes || "") || null;
+    if (body.clientDescription !== undefined) {
+      data.clientDescription = String(body.clientDescription || "").trim() || null;
+    }
+    if (body.dueDate !== undefined) {
+      data.dueDate = body.dueDate ? parseDateOnly(String(body.dueDate)) : null;
+    }
     if (body.assignedAthleteId !== undefined) {
       const athleteId = body.assignedAthleteId ? String(body.assignedAthleteId) : null;
       if (athleteId) {
@@ -300,7 +317,7 @@ export async function PATCH(
               data.designStage === "council_approved"
                 ? "Design approved — construction is the next, separate phase."
                 : `Moved to ${label}.`,
-            clientVisible: true,
+            clientVisible: false,
             occurredAt: new Date(),
           },
         });

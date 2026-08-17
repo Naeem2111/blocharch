@@ -140,30 +140,35 @@ export async function POST(
     return NextResponse.json({ error: "Invalid design phase" }, { status: 400 });
   }
 
-  const expense = await prisma.$transaction(async (tx) => {
-    const created = await tx.privateProjectExpense.create({
-      data: {
-        projectId: params.id,
-        description,
-        amountZar,
-        expenseDate,
-        kind,
-        athleteId,
-        designStage,
-        notes: body.notes ? String(body.notes).trim() || null : null,
-      },
-      include: { athlete: { select: { id: true, fullName: true } } },
-    });
-    if (kind === "athlete") {
-      await tx.privateProject.update({
-        where: { id: params.id },
-        data: { costZar: { increment: amountZar } },
+  try {
+    const expense = await prisma.$transaction(async (tx) => {
+      const created = await tx.privateProjectExpense.create({
+        data: {
+          projectId: params.id,
+          description,
+          amountZar,
+          expenseDate,
+          kind,
+          athleteId,
+          designStage,
+          notes: body.notes ? String(body.notes).trim() || null : null,
+        },
+        include: { athlete: { select: { id: true, fullName: true } } },
       });
-    }
-    return created;
-  });
+      if (kind === "athlete") {
+        await tx.privateProject.update({
+          where: { id: params.id },
+          data: { costZar: { increment: amountZar } },
+        });
+      }
+      return created;
+    });
 
-  return NextResponse.json({ expense: serializeExpense(expense) }, { status: 201 });
+    return NextResponse.json({ expense: serializeExpense(expense) }, { status: 201 });
+  } catch (e) {
+    console.error(e);
+    return NextResponse.json({ error: "Could not add expense" }, { status: 500 });
+  }
 }
 
 export async function PATCH(

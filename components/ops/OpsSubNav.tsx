@@ -68,7 +68,10 @@ export function OpsSubNav({ pathname }: { pathname: string }) {
 
   const navItems =
     role && canAccessOpsOverview(role) && role !== "admin"
-      ? OPS_NAV.filter((item) => item.href === "/dashboard/ops/pipeline")
+      ? OPS_NAV.filter(
+          (item) =>
+            item.href === "/dashboard/ops/pipeline" || item.href === "/dashboard/ops/archives",
+        )
       : OPS_NAV;
 
   return (

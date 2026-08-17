@@ -33,6 +33,11 @@ export async function getPublicPrivateProjectBySlug(slug: string) {
         orderBy: [{ completedAt: "desc" }, { createdAt: "desc" }],
         take: 40,
       },
+      documents: {
+        where: { clientVisible: true },
+        orderBy: { createdAt: "desc" },
+        take: 40,
+      },
     },
   });
   if (!project) return null;
@@ -77,12 +82,13 @@ export async function getPublicPrivateProjectBySlug(slug: string) {
       designStageLabel: PRIVATE_STAGE_LABELS[project.designStage],
       progressPercent,
       stageMeta: meta,
-      stageNotes: project.stageNotes,
       quietExplanation: meta.quietExplanation,
       doneCopy:
         project.designStage === "council_approved" ? PRIVATE_STAGE_DONE_COPY : null,
       briefReceivedAt: project.briefReceivedAt?.toISOString().slice(0, 10) ?? null,
       councilSubmittedAt: project.councilSubmittedAt?.toISOString().slice(0, 10) ?? null,
+      dueDate: project.dueDate?.toISOString().slice(0, 10) ?? null,
+      clientDescription: project.clientDescription,
       estCouncilDecision,
       updatedAt: project.updatedAt.toISOString().slice(0, 10),
       outOfScopeFlag: project.outOfScopeFlag,
@@ -103,6 +109,11 @@ export async function getPublicPrivateProjectBySlug(slug: string) {
       title: u.title,
       body: u.body,
       occurredAt: u.occurredAt.toISOString().slice(0, 10),
+    })),
+    documents: project.documents.map((d) => ({
+      id: d.id,
+      title: d.title,
+      fileUrl: d.fileUrl,
     })),
   };
 }
