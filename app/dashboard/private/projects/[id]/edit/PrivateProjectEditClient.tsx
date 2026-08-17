@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { PrivateDeleteProjectButton } from "@/components/private/PrivateDeleteProjectButton";
 import { ProgressSlider } from "@/components/ProgressSlider";
 import { PRIVATE_FIXED_FEE_EXPENSE_LABEL, PRIVATE_STAGE_LABELS, PRIVATE_STAGE_ORDER } from "@/lib/private-constants";
 import {
@@ -103,7 +104,13 @@ function statusClass(status: PhaseRow["status"]) {
   return "bg-white/[0.04] text-slate-400 ring-white/[0.08]";
 }
 
-export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
+export function PrivateProjectEditClient({
+  projectId,
+  canDelete = false,
+}: {
+  projectId: string;
+  canDelete?: boolean;
+}) {
   const router = useRouter();
   const [athletes, setAthletes] = useState<Athlete[]>([]);
   const [typeOptions, setTypeOptions] = useState<PrivateProjectTypeOption[]>([]);
@@ -818,6 +825,14 @@ export function PrivateProjectEditClient({ projectId }: { projectId: string }) {
         >
           Cancel
         </Link>
+        {canDelete ? (
+          <PrivateDeleteProjectButton
+            projectId={projectId}
+            projectName={form.projectName || "this project"}
+            variant="danger"
+            onDeleted={() => router.push("/dashboard/private/projects")}
+          />
+        ) : null}
       </div>
     </form>
   );

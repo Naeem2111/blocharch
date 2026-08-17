@@ -7,6 +7,8 @@ import { canAccessModule } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { ensureLinkedAthleteProfile } from "@/lib/ops-athlete-profile";
 import { isStaffAdmin } from "@/lib/admin-only-accounts";
+import { actsAsManager } from "@/lib/effective-roles";
+import type { UserRole } from "@/lib/users-store";
 
 export async function requirePrivateOpsSession(
   request: NextRequest,
@@ -43,6 +45,10 @@ export async function requirePrivateAthleteSession(
   }
 
   return { user: session.user, athlete };
+}
+
+export function canDeletePrivateProject(role: UserRole): boolean {
+  return actsAsManager(role);
 }
 
 export function slugifyPrivateClient(name: string): string {

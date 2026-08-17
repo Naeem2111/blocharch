@@ -56,6 +56,10 @@ export async function removePrivateDocumentFile(fileUrl: string): Promise<void> 
   await fs.unlink(abs).catch(() => {});
 }
 
+export async function removePrivateProjectUploads(projectId: string): Promise<void> {
+  await fs.rm(uploadsDir(projectId), { recursive: true, force: true }).catch(() => {});
+}
+
 export function newDocumentId(): string {
   return crypto.randomUUID();
 }

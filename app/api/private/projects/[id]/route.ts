@@ -1,7 +1,9 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requirePrivateOpsSession } from "@/lib/private-access";
+import { canDeletePrivateProject, requirePrivateOpsSession } from "@/lib/private-access";
+import { removePrivateProjectUploads } from "@/lib/private-document-storage";
 import { isPrivateDesignStage } from "@/lib/private-constants";
 import { PRIVATE_STAGE_LABELS } from "@/lib/private-constants";
 import { serializePrivateProject } from "@/lib/private-serialize";
@@ -330,5 +332,44 @@ export async function PATCH(
   } catch (e) {
     console.error(e);
     return NextResponse.json({ error: "Could not update project" }, { status: 500 });
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } },
+) {
+  const gate = await requirePrivateOpsSession(request);
+  if (gate instanceof NextResponse) return gate;
+  if (!canDeletePrivateProject(gate.user.role)) {
+    return NextResponse.json(
+      { error: "Only managers and admins can delete private projects" },
+      { status: 403 },
+    );
+  }
+
+  const project = await prisma.privateProject.findUnique({
+    where: { id: params.id },
+    select: {
+      id: true,
+      client: { select: { slug: true, portalEnabled: true } },
+    },
+  });
+  if (!project) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  try {
+    await prisma.privateProject.delete({ where: { id: project.id } });
+    await removePrivateProjectUploads(project.id);
+    revalidatePath("/dashboard/private");
+    revalidatePath("/dashboard/private/projects");
+    if (project.client.slug) {
+      revalidatePath(`/private/${project.client.slug}`);
+    }
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    return NextResponse.json({ error: "Could not delete project" }, { status: 500 });
   }
 }

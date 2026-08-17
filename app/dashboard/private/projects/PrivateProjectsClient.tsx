@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { PrivateDeleteProjectButton } from "@/components/private/PrivateDeleteProjectButton";
 import { PRIVATE_STAGE_LABELS, PRIVATE_STAGE_ORDER } from "@/lib/private-constants";
 
 type ProjectRow = {
@@ -20,7 +21,7 @@ function zar(n: number) {
   return `R ${Math.round(n).toLocaleString("en-ZA")}`;
 }
 
-export function PrivateProjectsClient() {
+export function PrivateProjectsClient({ canDelete = false }: { canDelete?: boolean }) {
   const [projects, setProjects] = useState<ProjectRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -166,6 +167,13 @@ export function PrivateProjectsClient() {
                       >
                         Expenses
                       </Link>
+                      {canDelete ? (
+                        <PrivateDeleteProjectButton
+                          projectId={p.id}
+                          projectName={p.name}
+                          onDeleted={() => void load()}
+                        />
+                      ) : null}
                     </div>
                   </td>
                 </tr>

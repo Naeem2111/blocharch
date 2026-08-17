@@ -1,11 +1,16 @@
 import { PageHeader } from "@/components/PageHeader";
+import { getSession } from "@/lib/auth";
+import { canDeletePrivateProject } from "@/lib/private-access";
 import { PrivateProjectDetailClient } from "./PrivateProjectDetailClient";
 
-export default function PrivateProjectDetailPage({
+export default async function PrivateProjectDetailPage({
   params,
 }: {
   params: { id: string };
 }) {
+  const session = await getSession();
+  const canDelete = !!session && canDeletePrivateProject(session.user.role);
+
   return (
     <>
       <PageHeader
@@ -14,7 +19,7 @@ export default function PrivateProjectDetailPage({
         description="Duration-weighted progress. Phase 8 is honest about what done means."
         className="mb-8"
       />
-      <PrivateProjectDetailClient projectId={params.id} />
+      <PrivateProjectDetailClient projectId={params.id} canDelete={canDelete} />
     </>
   );
 }

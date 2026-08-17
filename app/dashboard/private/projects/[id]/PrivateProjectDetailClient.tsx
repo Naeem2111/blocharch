@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { PrivateDeleteProjectButton } from "@/components/private/PrivateDeleteProjectButton";
 import { PRIVATE_STAGE_LABELS, PRIVATE_STAGE_ORDER, PRIVATE_STAGE_DONE_COPY } from "@/lib/private-constants";
 
 type Detail = {
@@ -78,7 +80,14 @@ function zar(n: number) {
   return `R ${Math.round(n).toLocaleString("en-ZA")}`;
 }
 
-export function PrivateProjectDetailClient({ projectId }: { projectId: string }) {
+export function PrivateProjectDetailClient({
+  projectId,
+  canDelete = false,
+}: {
+  projectId: string;
+  canDelete?: boolean;
+}) {
+  const router = useRouter();
   const [data, setData] = useState<Detail | null>(null);
   const [error, setError] = useState("");
   const [notes, setNotes] = useState("");
@@ -347,6 +356,13 @@ export function PrivateProjectDetailClient({ projectId }: { projectId: string })
         >
           Edit project
         </Link>
+        {canDelete ? (
+          <PrivateDeleteProjectButton
+            projectId={projectId}
+            projectName={p.name}
+            onDeleted={() => router.push("/dashboard/private/projects")}
+          />
+        ) : null}
       </div>
       <p className="text-xs text-slate-500">
         The client portal only shows what you publish: description, dates, documents, updates, and
