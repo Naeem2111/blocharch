@@ -4,7 +4,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { PrivateDeleteProjectButton } from "@/components/private/PrivateDeleteProjectButton";
-import { PRIVATE_STAGE_LABELS, PRIVATE_STAGE_ORDER, PRIVATE_STAGE_DONE_COPY } from "@/lib/private-constants";
+import {
+  PRIVATE_STAGE_LABELS,
+  PRIVATE_STAGE_ORDER,
+  PRIVATE_STAGE_DONE_COPY,
+  buildPrivateStageSteps,
+} from "@/lib/private-constants";
+import { ProjectStageStepper } from "@/components/private/ProjectStageStepper";
+import type { PrivateDesignStage } from "@prisma/client";
 
 type Detail = {
   project: {
@@ -27,6 +34,7 @@ type Detail = {
       stageCount: number;
       typicalDays: number;
       daysIntoStage: number;
+      overTypical: boolean;
     };
     athlete: { fullName: string; initials: string } | null;
     client: { id: string; name: string; slug: string | null };
@@ -437,8 +445,9 @@ export function PrivateProjectDetailClient({
             Overall progress
           </p>
           <p className="mt-1 text-sm text-slate-400">
-            Phase {p.stageMeta.stageNumber} of {p.stageMeta.stageCount} · {p.designStageLabel} ·{" "}
-            {p.stageMeta.daysIntoStage} days into a typical {p.stageMeta.typicalDays}
+            Currently in {p.designStageLabel.toLowerCase()}
+            {p.designStage === "council_review" ? " · typically 6–8 weeks" : ` · typically ${p.stageMeta.typicalDays} days`}
+            {` · ${p.stageMeta.daysIntoStage} days into this stage`}
           </p>
           <div className="mt-3 flex items-end gap-3">
             <p className="text-4xl font-semibold tabular-nums text-white">{p.progressPercent}%</p>
@@ -449,9 +458,26 @@ export function PrivateProjectDetailClient({
               />
             </div>
           </div>
+          {p.stageMeta.overTypical ? (
+            <p className="mt-2 text-sm text-slate-400">
+              This stage is running longer than typical — nothing&apos;s necessarily wrong.
+            </p>
+          ) : null}
           {p.designStage === "council_approved" ? (
             <p className="mt-2 text-sm text-slate-400">{PRIVATE_STAGE_DONE_COPY}</p>
           ) : null}
+        </div>
+
+        <div className="mt-6">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+            Where you are in the process
+          </p>
+          <div className="mt-3">
+            <ProjectStageStepper
+              stages={buildPrivateStageSteps(p.designStage as PrivateDesignStage)}
+              onSelect={(key) => void saveStage(key)}
+            />
+          </div>
         </div>
 
         <div className="mt-6 grid gap-4 sm:grid-cols-3">
@@ -616,6 +642,18 @@ export function PrivateProjectDetailClient({
               <dt className="text-slate-500">Council submitted</dt>
               <dd className="text-slate-300">{p.councilSubmittedAt ?? "—"}</dd>
             </div>
+            {p.designStage === "council_review" && p.councilSubmittedAt ? (
+              <div className="flex justify-between gap-3">
+                <dt className="text-slate-500">Est. council decision</dt>
+                <dd className="text-slate-300">
+                  {(() => {
+                    const d = new Date(`${p.councilSubmittedAt}T00:00:00Z`);
+                    d.setUTCDate(d.getUTCDate() + 45);
+                    return d.toLocaleString("en-GB", { month: "short", year: "numeric", timeZone: "UTC" });
+                  })()}
+                </dd>
+              </div>
+            ) : null}
           </dl>
         </section>
       </div>

@@ -22,8 +22,6 @@ import {
 	clientPortalProjectBeatDeadline,
 } from "@/lib/client-portal-projects";
 import {
-	formatDeadlineBeat,
-	formatEarlyFromDueAndCompleted,
 	formatProjectDueAt,
 	dueAtFallbackForDateOnly,
 } from "@/lib/project-deadline";
@@ -34,18 +32,17 @@ import type {
 	PublicClientPortalProject,
 } from "@/lib/public-client-portal";
 
-type Tab = "tracker" | "pipeline" | "completed" | "notifications";
+type Tab = "tracker" | "pipeline" | "completed" | "overtime" | "notifications";
 
-function formatDateTime(iso: string | null): string {
-	if (!iso) return "";
-	const d = new Date(iso);
+function formatDateOnly(iso: string | null): string {
+	if (!iso) return "—";
+	const day = iso.slice(0, 10);
+	const d = new Date(`${day}T12:00:00`);
 	if (Number.isNaN(d.getTime())) return iso;
-	return d.toLocaleString("en-GB", {
+	return d.toLocaleDateString("en-GB", {
 		day: "numeric",
 		month: "short",
 		year: "numeric",
-		hour: "2-digit",
-		minute: "2-digit",
 	});
 }
 
@@ -144,6 +141,9 @@ const NOTIFICATION_ICON: Record<
 	{ glyph: string; bg: string; color: string }
 > = {
 	deadline_beaten: { glyph: "★", bg: "rgba(234,179,8,0.15)", color: "#facc15" },
+	hours_warning: { glyph: "⏱", bg: "rgba(245,158,11,0.15)", color: "#fbbf24" },
+	hours_cap: { glyph: "●", bg: "rgba(239,68,68,0.15)", color: "#f87171" },
+	overtime: { glyph: "£", bg: "rgba(6,182,212,0.15)", color: "#22d3ee" },
 };
 
 function ProjectCard({ project }: { project: PublicClientPortalProject }) {
@@ -198,7 +198,7 @@ function ProjectCard({ project }: { project: PublicClientPortalProject }) {
 
 			<div className="mt-4 flex flex-wrap items-center justify-between gap-3">
 				{project.leadName ? (
-					<div className="flex items-center gap-2.5">
+					<div className="flex min-w-0 items-center gap-2.5">
 						{project.leadPhotoUrl ? (
 							<AthleteAvatar
 								name={project.leadName}
@@ -212,7 +212,7 @@ function ProjectCard({ project }: { project: PublicClientPortalProject }) {
 								{leadInitials(project.leadName)}
 							</span>
 						)}
-						<span className="text-sm text-slate-300">{project.leadName}</span>
+						<span className="min-w-0 break-words text-sm text-slate-300">{project.leadName}</span>
 					</div>
 				) : (
 					<span className="text-xs text-slate-500">Lead assigned soon</span>
@@ -261,65 +261,13 @@ function PipelineCard({ project }: { project: PublicClientPortalPipelineProject 
 }
 
 function CompletedTableRow({ project }: { project: PublicClientPortalProject }) {
-	const earlyLabel =
-		formatEarlyFromDueAndCompleted({
-			dueAt: project.dueAt,
-			dueDate: project.dueDate,
-			completedAt: project.completedAt,
-		}) ??
-		(project.deadlineBeatenMinutes != null && project.deadlineBeatenMinutes > 0
-			? formatDeadlineBeat(project.deadlineBeatenMinutes)
-			: project.deadlineBeatenDays != null && project.deadlineBeatenDays > 0
-				? `${project.deadlineBeatenDays} day${project.deadlineBeatenDays === 1 ? "" : "s"} early`
-				: null);
-
-	const outcome = earlyLabel
-		? { label: earlyLabel, early: true }
-		: project.completedAt && (project.dueAt || project.dueDate)
-			? { label: "On time", early: false }
-			: null;
-
 	return (
 		<tr className="client-portal-completed-row border-b border-white/[0.06] bg-white/[0.02] last:border-b-0">
 			<td className="px-4 py-4 align-top">
 				<p className="font-semibold text-white">{project.name}</p>
-				{project.currentStageLabel ? (
-					<p className="mt-0.5 text-xs font-medium text-slate-400">
-						{project.currentStageLabel}
-					</p>
-				) : null}
 				{project.address ? (
-					<p className="mt-0.5 truncate text-xs text-slate-500">{project.address}</p>
+					<p className="mt-0.5 text-xs text-slate-500">{project.address}</p>
 				) : null}
-				{project.clientDescription ? (
-					<p className="mt-2 text-xs leading-snug text-slate-400">{project.clientDescription}</p>
-				) : null}
-				<ProjectDeliverables deliverables={project.clientDeliverables} />
-				<div className="mt-2.5 max-w-[220px]">
-					<ProjectProgressBar percent={100} />
-				</div>
-			</td>
-			<td className="px-4 py-4 align-middle">
-				{project.leadName ? (
-					<div className="flex items-center gap-2.5">
-						<span className="client-portal-lead-avatar inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.08] text-[11px] font-semibold text-slate-300">
-							{leadInitials(project.leadName)}
-						</span>
-						<div className="min-w-0">
-							<p className="truncate text-sm text-slate-200">{project.leadName}</p>
-							<p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-								Lane lead
-							</p>
-						</div>
-					</div>
-				) : (
-					<span className="text-xs text-slate-600">—</span>
-				)}
-			</td>
-			<td className="px-4 py-4 align-middle whitespace-nowrap">
-				<span className="client-portal-lane-pill inline-flex rounded-md border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">
-					Lane {project.laneNumber}
-				</span>
 			</td>
 			<td className="px-4 py-4 align-middle whitespace-nowrap">
 				{project.dueDate || project.dueAt ? (
@@ -329,22 +277,7 @@ function CompletedTableRow({ project }: { project: PublicClientPortalProject }) 
 				)}
 			</td>
 			<td className="px-4 py-4 align-middle whitespace-nowrap text-sm text-slate-300">
-				{project.completedAt ? formatDateTime(project.completedAt) : "—"}
-			</td>
-			<td className="px-4 py-4 align-middle whitespace-nowrap">
-				{outcome ? (
-					<span
-						className={`client-portal-outcome-badge inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase ${
-							outcome.early
-								? "bg-emerald-500/15 text-emerald-300"
-								: "border border-sky-500/30 bg-sky-500/10 text-sky-300"
-						}`}
-					>
-						{outcome.early ? `▲ ${outcome.label}` : outcome.label}
-					</span>
-				) : (
-					<span className="text-xs text-slate-600">—</span>
-				)}
+				{formatDateOnly(project.completedAt)}
 			</td>
 		</tr>
 	);
@@ -407,8 +340,9 @@ export function ClientPortalClient({
 			buildClientPortalNotifications(
 				data.activeProjects,
 				data.completedProjects,
+				data.hours,
 			),
-		[data.activeProjects, data.completedProjects],
+		[data.activeProjects, data.completedProjects, data.hours],
 	);
 
 	const unreadCount = notifications.filter(
@@ -455,6 +389,7 @@ export function ClientPortalClient({
 		{ id: "tracker", label: "Project tracker" },
 		{ id: "pipeline", label: "Pipeline tracker" },
 		{ id: "completed", label: "Completed projects" },
+		{ id: "overtime", label: "Overtime" },
 		{
 			id: "notifications",
 			label: "Notifications",
@@ -468,8 +403,10 @@ export function ClientPortalClient({
 			: tab === "pipeline"
 				? "Upcoming work scheduled before projects go live."
 				: tab === "completed"
-					? "Completed projects · full delivery record"
-					: "Beat deadline updates across your projects";
+					? "Completed projects · due and completed dates"
+					: tab === "overtime"
+						? "Hours used this month and overtime at the agreed rate."
+					: "Beat deadline and hours updates across your projects";
 
 	return (
 		<div className="flex min-h-screen">
@@ -692,23 +629,17 @@ export function ClientPortalClient({
 
 							{data.completedProjects.length > 0 ? (
 								<div className="client-portal-card overflow-x-auto rounded-xl ring-1 ring-white/[0.06]">
-									<table className="client-portal-completed-table w-full min-w-[44rem] table-fixed text-left text-sm">
+									<table className="client-portal-completed-table w-full min-w-[28rem] table-fixed text-left text-sm">
 										<colgroup>
-											<col style={{ width: "32%" }} />
-											<col style={{ width: "14%" }} />
-											<col style={{ width: "10%" }} />
-											<col style={{ width: "16%" }} />
-											<col style={{ width: "14%" }} />
-											<col style={{ width: "14%" }} />
+											<col style={{ width: "52%" }} />
+											<col style={{ width: "24%" }} />
+											<col style={{ width: "24%" }} />
 										</colgroup>
 										<thead className="bg-white/[0.03] text-[10px] uppercase tracking-wider text-slate-500">
 											<tr>
 												<th className="px-4 py-3 text-left font-semibold">Project</th>
-												<th className="px-4 py-3 text-left font-semibold">Lead</th>
-												<th className="px-4 py-3 text-left font-semibold">Lane</th>
-												<th className="px-4 py-3 text-left font-semibold">Due</th>
-												<th className="px-4 py-3 text-left font-semibold">Completed</th>
-												<th className="px-4 py-3 text-left font-semibold">Outcome</th>
+												<th className="px-4 py-3 text-left font-semibold">Due date</th>
+												<th className="px-4 py-3 text-left font-semibold">Completed date</th>
 											</tr>
 										</thead>
 										<tbody>
@@ -719,6 +650,60 @@ export function ClientPortalClient({
 									</table>
 								</div>
 							) : null}
+						</section>
+					) : null}
+
+					{tab === "overtime" ? (
+						<section className="space-y-5">
+							<div>
+								<h2 className="text-2xl font-semibold text-white">Overtime</h2>
+								<p className="mt-1 text-sm text-slate-500">
+									{data.hours.monthLabel} · included hours {data.hours.includedHours}h at the
+									lane allocation, then £{data.hours.overtimeRateGbp}/hr.
+								</p>
+							</div>
+							<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+								<div className="client-portal-card rounded-xl border border-white/[0.08] bg-white/[0.03] p-5">
+									<p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+										Hours used
+									</p>
+									<p className="mt-2 text-2xl font-semibold tabular-nums text-white">
+										{data.hours.hoursUsed}h
+									</p>
+								</div>
+								<div className="client-portal-card rounded-xl border border-white/[0.08] bg-white/[0.03] p-5">
+									<p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+										Hours remaining
+									</p>
+									<p className="mt-2 text-2xl font-semibold tabular-nums text-white">
+										{data.hours.hoursRemaining}h
+									</p>
+								</div>
+								<div className="client-portal-card rounded-xl border border-white/[0.08] bg-white/[0.03] p-5">
+									<p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+										Overtime hours
+									</p>
+									<p className="mt-2 text-2xl font-semibold tabular-nums text-white">
+										{data.hours.overtimeHours}h
+									</p>
+								</div>
+								<div className="client-portal-card rounded-xl border border-white/[0.08] bg-white/[0.03] p-5">
+									<p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+										Overtime at £{data.hours.overtimeRateGbp}/hr
+									</p>
+									<p className="mt-2 text-2xl font-semibold tabular-nums text-white">
+										£{data.hours.overtimeCostGbp.toLocaleString("en-GB")}
+									</p>
+								</div>
+							</div>
+							<div className="client-portal-card rounded-xl border border-white/[0.08] bg-white/[0.03] p-5">
+								<p className="text-sm text-slate-400">
+									Each lane includes {data.hours.includedHours > 0 ? 160 : 0} hours per month.
+									You&apos;ll see a notification at 10 hours remaining, and again when the included
+									hours are used. Extra time is tracked here at £{data.hours.overtimeRateGbp} per
+									hour.
+								</p>
+							</div>
 						</section>
 					) : null}
 
@@ -745,7 +730,7 @@ export function ClientPortalClient({
 							<div className="client-portal-card mt-4 rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 sm:px-5">
 								{notifications.length === 0 ? (
 									<p className="py-8 text-center text-sm text-slate-500">
-										No beaten deadlines yet.
+										No notifications yet.
 									</p>
 								) : (
 									notifications.map((n) => (

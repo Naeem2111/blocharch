@@ -1,10 +1,15 @@
 import type { PublicClientPortalProject } from "@/lib/public-client-portal";
+import type { ClientPortalHours } from "@/lib/client-portal-hours";
 import {
   clientPortalDeadlineBeatDescription,
   clientPortalProjectBeatDeadline,
 } from "@/lib/client-portal-projects";
 
-export type ClientPortalNotificationKind = "deadline_beaten";
+export type ClientPortalNotificationKind =
+  | "deadline_beaten"
+  | "hours_warning"
+  | "hours_cap"
+  | "overtime";
 
 export type ClientPortalNotification = {
   id: string;
@@ -31,9 +36,50 @@ function relativeLabelFromIso(iso: string | null, fallback = "Recently"): string
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
+export function buildHoursNotifications(hours: ClientPortalHours): ClientPortalNotification[] {
+  const items: ClientPortalNotification[] = [];
+  if (hours.includedHours <= 0) return items;
+
+  if (hours.hoursRemaining > 0 && hours.hoursRemaining <= 10) {
+    items.push({
+      id: `hours-warning-${hours.monthLabel}`,
+      kind: "hours_warning",
+      title: `${hours.hoursRemaining} hour${hours.hoursRemaining === 1 ? "" : "s"} remaining this month`,
+      description: `${hours.hoursUsed}h of ${hours.includedHours} included hours used in ${hours.monthLabel}.`,
+      timeLabel: "This month",
+      projectId: "hours",
+    });
+  }
+
+  if (hours.hoursUsed >= hours.includedHours) {
+    items.push({
+      id: `hours-cap-${hours.monthLabel}`,
+      kind: "hours_cap",
+      title: `${hours.includedHours} included hours reached`,
+      description: `Included hours for ${hours.monthLabel} are used. Further time is overtime at £${hours.overtimeRateGbp}/hr.`,
+      timeLabel: "This month",
+      projectId: "hours",
+    });
+  }
+
+  if (hours.overtimeHours > 0) {
+    items.push({
+      id: `overtime-${hours.monthLabel}`,
+      kind: "overtime",
+      title: `${hours.overtimeHours} overtime hour${hours.overtimeHours === 1 ? "" : "s"} this month`,
+      description: `Billed at £${hours.overtimeRateGbp}/hr · £${hours.overtimeCostGbp.toLocaleString("en-GB")} estimated.`,
+      timeLabel: "This month",
+      projectId: "hours",
+    });
+  }
+
+  return items;
+}
+
 export function buildClientPortalNotifications(
   _activeProjects: PublicClientPortalProject[],
-  completedProjects: PublicClientPortalProject[]
+  completedProjects: PublicClientPortalProject[],
+  hours?: ClientPortalHours
 ): ClientPortalNotification[] {
   const beaten = completedProjects
     .filter((p) => clientPortalProjectBeatDeadline(p))
@@ -43,16 +89,18 @@ export function buildClientPortalNotifications(
       return bTime - aTime;
     });
 
-  return beaten.map((p) => {
+  const deadlineItems = beaten.map((p) => {
     const copy = clientPortalDeadlineBeatDescription(p);
     const completedDay = p.completedAt ? p.completedAt.slice(0, 10) : null;
     return {
       id: `${p.id}-beaten`,
-      kind: "deadline_beaten",
+      kind: "deadline_beaten" as const,
       title: copy.title,
       description: copy.description,
       timeLabel: relativeLabelFromIso(completedDay, "Recently"),
       projectId: p.id,
     };
   });
+
+  return [...(hours ? buildHoursNotifications(hours) : []), ...deadlineItems];
 }

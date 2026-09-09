@@ -118,6 +118,12 @@ enum OpsTaskType {
   sections
   elevations
   joinery_drawings
+  bathroom_drawings
+  construction_detailing
+  window_door_schedules
+  area_schedules
+  drainage
+  setting_out_drawings
   electrical_drawings
   modelling_3d
   rendering

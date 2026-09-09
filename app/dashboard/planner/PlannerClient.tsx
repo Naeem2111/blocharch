@@ -557,15 +557,11 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
     if (ids.length === 0) return;
     setBoardsLoading(true);
     try {
-      const results = await Promise.all(
-        ids.map(async (id) => {
-          const r = await fetch(`/api/planner/boards/${encodeURIComponent(id)}`);
-          const j = await r.json();
-          return r.ok ? (j as BoardDetail) : null;
-        })
-      );
+      const r = await fetch(`/api/planner/board-details?ids=${ids.map(encodeURIComponent).join(",")}`);
+      const j = await r.json();
+      const list = (r.ok ? (j.boards as BoardDetail[]) : []) || [];
       const map: Record<string, BoardDetail> = {};
-      for (const bd of results) {
+      for (const bd of list) {
         if (bd?.id) map[bd.id] = bd;
       }
       setBoardDetailsById(map);
@@ -644,8 +640,10 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
     const inGroup = filteredBoards.some((b) => b.id === boardId);
     if ((!boardId || !inGroup) && filteredBoards.length > 0) {
       const preferred =
-        filteredBoards.find((b) => b.kind === "project") ??
+        filteredBoards.find((b) => b.kind === "custom" && /blocharch/i.test(b.title)) ??
+        filteredBoards.find((b) => b.kind === "custom") ??
         filteredBoards.find((b) => b.kind === "blocharch_outbox") ??
+        filteredBoards.find((b) => b.kind === "project") ??
         filteredBoards[0]!;
       setBoardId(preferred.id);
     } else if (filteredBoards.length === 0) {

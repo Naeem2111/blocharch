@@ -200,7 +200,17 @@ export async function ensureAthleteSystemBoards(
   });
 
   const personal = await ensureAthletePersonalBoard(athleteId, athleteUserId, tx);
-  await consolidateLegacyOntoPersonal(athleteId, athleteUserId, personal.id, tx);
+  const legacy = await tx.plannerBoard.findFirst({
+    where: {
+      athleteId,
+      ownerId: athleteUserId,
+      OR: [{ kind: "my_tasks" }, { kind: "blocharch_inbox" }],
+    },
+    select: { id: true },
+  });
+  if (legacy) {
+    await consolidateLegacyOntoPersonal(athleteId, athleteUserId, personal.id, tx);
+  }
   return personal;
 }
 

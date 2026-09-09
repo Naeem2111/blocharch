@@ -11,6 +11,7 @@ import { parseClientDeliverables, type ClientPortalDeliverable } from "@/lib/cli
 import { ensureOpsProjectDueDates } from "@/lib/project-due-sources";
 import { serializePublicPipelineRow } from "@/lib/ops-pipeline-serialize";
 import { PROJECT_STATUS_LABELS, displayProjectStageLabel } from "@/lib/ops-constants";
+import { getClientPortalHours, type ClientPortalHours } from "@/lib/client-portal-hours";
 
 export type PublicClientPortalTask = {
   id: string;
@@ -71,6 +72,7 @@ export type PublicClientPortalData = {
   pipelineProjects: PublicClientPortalPipelineProject[];
   activeProjects: PublicClientPortalProject[];
   completedProjects: PublicClientPortalProject[];
+  hours: ClientPortalHours;
 };
 
 function clientStatusBadge(
@@ -94,7 +96,7 @@ function clientStatusBadge(
     case "completed":
       return { label: "Completed", color: "#22c55e" };
     case "handed_over":
-      return { label: "Handed over", color: "#64748b" };
+      return { label: "Completed", color: "#22c55e" };
     default:
       return { label: PROJECT_STATUS_LABELS[status], color: "#64748b" };
   }
@@ -177,7 +179,7 @@ export async function getPublicClientPortal(clientSlug: string): Promise<PublicC
       status: "active",
     },
     include: {
-      commercial: { select: { activeLaneCount: true } },
+      commercial: { select: { activeLaneCount: true, overtimeBillingGbp: true } },
     },
   });
   if (!client) return null;
@@ -270,6 +272,12 @@ export async function getPublicClientPortal(clientSlug: string): Promise<PublicC
     });
   })();
 
+  const hours = await getClientPortalHours({
+    clientId: client.id,
+    activeLaneCount,
+    overtimeRateGbp: Number(client.commercial?.overtimeBillingGbp ?? 20),
+  });
+
   return {
     client: {
       name: client.name,
@@ -282,5 +290,6 @@ export async function getPublicClientPortal(clientSlug: string): Promise<PublicC
     pipelineProjects: pipelineRows.map(serializePublicPipelineRow),
     activeProjects: mapped.filter(isClientPortalActiveProject),
     completedProjects: mapped.filter(isClientPortalCompletedProject),
+    hours,
   };
 }

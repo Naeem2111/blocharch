@@ -4,8 +4,9 @@ import { useRef, useState } from "react";
 import { ClientPortalBrandMark } from "@/components/client-portal/ClientPortalBrandMark";
 import { PublicThemeToggle } from "@/components/client-portal/PublicThemeToggle";
 import { ProjectProgressBar } from "@/components/ProjectProgressBar";
-import { PRIVATE_STAGE_DONE_COPY } from "@/lib/private-constants";
+import { ProjectStageStepper } from "@/components/private/ProjectStageStepper";
 import { PlannerDoneToggle } from "@/components/planner/PlannerDoneToggle";
+import { buildPrivateStageSteps } from "@/lib/private-constants";
 
 type PortalData = NonNullable<
   Awaited<ReturnType<typeof import("@/lib/private-public-portal").getPublicPrivateProjectBySlug>>
@@ -26,6 +27,19 @@ function formatDate(iso: string | null) {
   });
 }
 
+function currentStageLine(project: PortalData["project"]): string {
+  const parts = [`Currently in ${project.designStageLabel.toLowerCase()}`];
+  if (project.councilSubmittedAt) {
+    parts.push(`submitted ${formatDate(project.councilSubmittedAt)}`);
+  }
+  if (project.designStage === "council_review") {
+    parts.push("typically 6–8 weeks");
+  } else if (project.stageMeta.typicalDays) {
+    parts.push(`typically ${project.stageMeta.typicalDays} days`);
+  }
+  return `${parts.join(" · ")}.`;
+}
+
 export function PrivateClientPortalClient({
   slug,
   data,
@@ -33,7 +47,7 @@ export function PrivateClientPortalClient({
   slug: string;
   data: PortalData;
 }) {
-  const { project, stages, phaseGroups, updates, documents = [] } = data;
+  const { project, updates, documents = [] } = data;
   const [actionItems, setActionItems] = useState<ActionItem[]>(data.actionItems);
   const [completedActionItems, setCompletedActionItems] = useState<CompletedActionItem[]>(
     data.completedActionItems,
@@ -41,7 +55,7 @@ export function PrivateClientPortalClient({
   const [completing, setCompleting] = useState<string | null>(null);
   const [recentlyCompleted, setRecentlyCompleted] = useState<Set<string>>(new Set());
   const completedDetailsRef = useRef<HTMLDetailsElement>(null);
-  const current = stages.find((s) => s.state === "current");
+  const stages = buildPrivateStageSteps(project.designStage);
 
   function markRecentlyCompleted(id: string) {
     setRecentlyCompleted((prev) => new Set(prev).add(id));
@@ -82,82 +96,25 @@ export function PrivateClientPortalClient({
     }
   }
 
-  function phaseStateClass(state: "done" | "current" | "upcoming") {
-    if (state === "done") return "bg-emerald-500/20 text-emerald-300 ring-emerald-500/30";
-    if (state === "current") return "bg-brand-500/20 text-brand-200 ring-brand-500/40";
-    return "bg-white/[0.04] text-slate-500 ring-white/[0.08]";
-  }
+  const timeline = [
+    { label: "Brief received", value: formatDate(project.briefReceivedAt) },
+    { label: "Council submitted", value: formatDate(project.councilSubmittedAt) },
+    ...(project.estCouncilDecision
+      ? [{ label: "Est. council decision", value: project.estCouncilDecision }]
+      : []),
+  ];
 
   return (
     <div className="min-h-screen bg-[var(--bg-page)] text-slate-100">
       <header className="client-portal-header border-b border-white/[0.06] px-4 py-5 sm:px-6 lg:px-10">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
           <ClientPortalBrandMark />
           <PublicThemeToggle />
         </div>
       </header>
 
-      <div className="app-main min-h-screen px-4 py-8 sm:px-6 lg:px-10">
-        <div className="mx-auto flex max-w-6xl gap-8 lg:gap-10">
-          {/* Stage progress — left margin on desktop */}
-          <aside className="hidden w-44 shrink-0 lg:block">
-            <div className="sticky top-8">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                Project stages
-              </p>
-              <ol className="relative mt-4 space-y-0">
-                <div
-                  className="absolute bottom-3 left-[11px] top-3 w-px bg-white/[0.08]"
-                  aria-hidden
-                />
-                {phaseGroups.map((phase) => (
-                  <li key={phase.id} className="relative flex gap-3 pb-5 last:pb-0">
-                    <span
-                      className={`relative z-[1] flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ring-1 ${phaseStateClass(phase.state)}`}
-                    >
-                      {phase.state === "done" ? "✓" : phase.number}
-                    </span>
-                    <div className="min-w-0 pt-0.5">
-                      <p
-                        className={`text-xs font-semibold leading-tight ${
-                          phase.state === "current"
-                            ? "text-brand-100"
-                            : phase.state === "done"
-                              ? "text-slate-300"
-                              : "text-slate-500"
-                        }`}
-                      >
-                        {phase.name}
-                      </p>
-                      {phase.state === "current" ? (
-                        <p className="mt-1 text-[10px] font-medium text-brand-300">You are here</p>
-                      ) : null}
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            </div>
-          </aside>
-
-          <div className="min-w-0 flex-1 max-w-3xl">
-          {/* Mobile stage strip */}
-          <div className="mb-6 lg:hidden">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-              Project stages
-            </p>
-            <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
-              {phaseGroups.map((phase) => (
-                <div
-                  key={phase.id}
-                  className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium ring-1 ${phaseStateClass(phase.state)}`}
-                >
-                  {phase.name}
-                  {phase.state === "current" ? " · here" : ""}
-                </div>
-              ))}
-            </div>
-          </div>
-
+      <div className="client-portal-main min-h-screen px-4 py-8 sm:px-6 lg:px-10">
+        <div className="mx-auto max-w-5xl">
           <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-400">
             Your project
           </p>
@@ -202,39 +159,24 @@ export function PrivateClientPortalClient({
             </dl>
           ) : null}
 
-          <section className="mt-8 card-tool rounded-2xl p-6 sm:p-8">
+          <section className="client-portal-card mt-8 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-6 sm:p-8">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
               Overall progress
             </p>
-            <p className="mt-3 text-5xl font-semibold tabular-nums text-white">
-              {project.progressPercent}%
-            </p>
+            <p className="mt-3 text-5xl font-semibold tabular-nums text-white">{project.progressPercent}%</p>
             <ProjectProgressBar
               percent={project.progressPercent}
               showLabel={false}
               className="mt-4 max-w-md"
             />
-            <p className="mt-2 text-sm text-slate-400">
-              Currently in phase: {project.designStageLabel}
-              {project.councilSubmittedAt
-                ? ` · submitted ${formatDate(project.councilSubmittedAt)}`
-                : ""}
-              {project.stageMeta.typicalDays
-                ? ` · typically ${
-                    project.designStage === "council_review" ? "6–8 weeks" : `${project.stageMeta.typicalDays} days`
-                  }`
-                : ""}
-              .
-            </p>
+            <p className="mt-3 text-sm text-slate-400">{currentStageLine(project)}</p>
 
             {project.quietExplanation ? (
               <div className="mt-5 rounded-xl bg-white/[0.03] p-4 ring-1 ring-white/[0.06]">
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
                   Why this hasn&apos;t moved much this week
                 </p>
-                <p className="mt-2 text-sm leading-relaxed text-slate-300">
-                  {project.quietExplanation}
-                </p>
+                <p className="mt-2 text-sm leading-relaxed text-slate-300">{project.quietExplanation}</p>
               </div>
             ) : null}
 
@@ -270,9 +212,7 @@ export function PrivateClientPortalClient({
                           <span className="block text-[10px] font-medium uppercase tracking-wider text-amber-200/60">
                             Item {index + 1}
                           </span>
-                          <span className="mt-0.5 block text-sm leading-snug text-amber-50">
-                            {item.title}
-                          </span>
+                          <span className="mt-0.5 block text-sm leading-snug text-amber-50">{item.title}</span>
                         </span>
                       </label>
                     </li>
@@ -309,11 +249,7 @@ export function PrivateClientPortalClient({
                             }`}
                             aria-hidden
                           >
-                            <svg
-                              viewBox="0 0 12 12"
-                              className="planner-done-check planner-done-check-visible"
-                              aria-hidden
-                            >
+                            <svg viewBox="0 0 12 12" className="planner-done-check planner-done-check-visible" aria-hidden>
                               <path
                                 className="planner-done-check-path"
                                 d="M2 6l3 3 5-5"
@@ -327,9 +263,7 @@ export function PrivateClientPortalClient({
                           </span>
                           <span className="line-through decoration-slate-600">{item.title}</span>
                         </span>
-                        <span className="shrink-0 text-xs text-slate-500">
-                          {formatDate(item.completedAt)}
-                        </span>
+                        <span className="shrink-0 text-xs text-slate-500">{formatDate(item.completedAt)}</span>
                       </li>
                     );
                   })}
@@ -340,122 +274,66 @@ export function PrivateClientPortalClient({
             {project.outOfScopeFlag ? (
               <div className="mt-5 rounded-xl bg-rose-500/10 p-4 ring-1 ring-rose-500/25">
                 <p className="text-sm text-rose-100">
-                  Out-of-scope work has been flagged on this project. Blocharch will confirm details
-                  with you separately.
+                  Out-of-scope work has been flagged on this project. Blocharch will confirm details with you
+                  separately.
                 </p>
               </div>
             ) : null}
+
+            <div className="mt-6 border-t border-white/[0.06] pt-5">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Timeline</p>
+              <dl className="mt-3 space-y-2 text-sm">
+                {timeline.map((row) => (
+                  <div key={row.label} className="flex items-baseline justify-between gap-4">
+                    <dt className="text-slate-500">{row.label}</dt>
+                    <dd className="shrink-0 tabular-nums text-slate-200">{row.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
           </section>
 
-          <section className="mt-8">
-            <h2 className="text-sm font-semibold text-white">Where you are in the process</h2>
-            <div className="mt-4 space-y-5">
-              {phaseGroups.map((phase) => (
-                <div key={phase.id}>
-                  <p
-                    className={`text-[10px] font-semibold uppercase tracking-wider ${
-                      phase.state === "current"
-                        ? "text-brand-300"
-                        : phase.state === "done"
-                          ? "text-slate-400"
-                          : "text-slate-600"
-                    }`}
-                  >
-                    {phase.name}
-                  </p>
-                  <ol className="mt-2 space-y-2">
-                    {phase.stages.map((s) => (
-                      <li
-                        key={s.key}
-                        className={`flex items-start gap-3 rounded-lg px-3 py-2 text-sm ${
-                          s.state === "current" ? "bg-brand-500/10 ring-1 ring-brand-500/25" : ""
-                        }`}
-                      >
-                        <span
-                          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
-                            s.state === "done"
-                              ? "bg-emerald-500/20 text-emerald-300"
-                              : s.state === "current"
-                                ? "bg-brand-500/30 text-brand-200"
-                                : "bg-white/[0.06] text-slate-500"
-                          }`}
-                        >
-                          {s.state === "done"
-                            ? "✓"
-                            : stages.find((x) => x.key === s.key)?.number ?? "·"}
-                        </span>
-                        <div>
-                          <p
-                            className={
-                              s.state === "upcoming"
-                                ? "text-slate-500"
-                                : s.state === "current"
-                                  ? "font-medium text-brand-100"
-                                  : "text-slate-300"
-                            }
-                          >
-                            {s.label}
-                            {s.state === "current" ? (
-                              <span className="ml-2 text-xs font-normal text-brand-300">
-                                You are here
-                              </span>
-                            ) : null}
-                          </p>
-                          {s.state === "current" && s.key === "council_approved" ? (
-                            <p className="mt-1 text-xs text-slate-400">{PRIVATE_STAGE_DONE_COPY}</p>
-                          ) : null}
-                          {s.key === "council_approved" && current?.key === "council_review" ? (
-                            <p className="mt-1 text-xs text-slate-500">
-                              Design approved — construction is the next, separate phase
-                            </p>
-                          ) : null}
-                        </div>
-                      </li>
-                    ))}
-                  </ol>
-                </div>
-              ))}
-            </div>
-            {project.doneCopy ? (
-              <p className="mt-3 text-sm text-slate-400">{project.doneCopy}</p>
-            ) : project.designStage !== "council_approved" ? (
-              <p className="mt-3 text-xs text-slate-500">
-                Design approved — construction is the next, separate phase
-              </p>
-            ) : null}
-          </section>
+          <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:items-start">
+            <section>
+              <h2 className="text-sm font-semibold text-white">Where you are in the process</h2>
+              <p className="mt-1 text-xs text-slate-500 lg:hidden">Full process</p>
+              <div className="mt-4">
+                <ProjectStageStepper stages={stages} />
+              </div>
+            </section>
 
-          <section className="mt-10">
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-semibold text-white">Recent updates</h2>
-              {updates.length > 0 ? (
-                <span className="rounded bg-brand-500/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-brand-300">
-                  New
-                </span>
-              ) : null}
-            </div>
-            <ul className="mt-4 space-y-3">
-              {updates.length === 0 ? (
-                <li className="text-sm text-slate-500">No updates yet.</li>
-              ) : (
-                updates.map((u, i) => (
-                  <li
-                    key={`${u.occurredAt}-${i}`}
-                    className="flex justify-between gap-4 border-b border-white/[0.05] pb-3 text-sm"
-                  >
-                    <div>
-                      <p className="text-slate-200">{u.title}</p>
-                      {u.body ? <p className="mt-1 text-xs leading-relaxed text-slate-500">{u.body}</p> : null}
-                    </div>
-                    <span className="shrink-0 text-slate-500">{formatDate(u.occurredAt)}</span>
-                  </li>
-                ))
-              )}
-            </ul>
-            <p className="mt-4 text-xs text-slate-600">
-              Last updated {formatDate(project.updatedAt)}
-            </p>
-          </section>
+            <section>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-semibold text-white">Recent updates</h2>
+                {updates.length > 0 ? (
+                  <span className="rounded bg-brand-500/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-brand-300">
+                    New
+                  </span>
+                ) : null}
+              </div>
+              <ul className="mt-4 space-y-3">
+                {updates.length === 0 ? (
+                  <li className="text-sm text-slate-500">No updates yet.</li>
+                ) : (
+                  updates.map((u, i) => (
+                    <li
+                      key={`${u.occurredAt}-${i}`}
+                      className="flex justify-between gap-4 border-b border-white/[0.05] pb-3 text-sm"
+                    >
+                      <div>
+                        <p className="text-slate-200">{u.title}</p>
+                        {u.body ? (
+                          <p className="mt-1 text-xs leading-relaxed text-slate-500">{u.body}</p>
+                        ) : null}
+                      </div>
+                      <span className="shrink-0 text-slate-500">{formatDate(u.occurredAt)}</span>
+                    </li>
+                  ))
+                )}
+              </ul>
+              <p className="mt-4 text-xs text-slate-600">Last updated {formatDate(project.updatedAt)}</p>
+            </section>
+          </div>
 
           {documents.length > 0 ? (
             <section className="mt-10">
@@ -477,7 +355,6 @@ export function PrivateClientPortalClient({
               </ul>
             </section>
           ) : null}
-          </div>
         </div>
       </div>
     </div>

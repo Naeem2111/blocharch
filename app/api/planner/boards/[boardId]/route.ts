@@ -7,20 +7,12 @@ import {
   resolveBoardAccess,
 } from "@/lib/planner-access";
 import { isProtectedSystemBoard } from "@/lib/planner-system-boards";
+import {
+  PLANNER_BOARD_DETAIL_INCLUDE,
+  serializePlannerBoardDetail,
+} from "@/lib/planner-board-payload";
 
 type Ctx = { params: Promise<{ boardId: string }> };
-
-const boardTaskListSelect = {
-  id: true,
-  title: true,
-  summary: true,
-  sortOrder: true,
-  assigneeId: true,
-  dueAt: true,
-  linkedFromTaskId: true,
-  assignee: { select: { id: true, username: true } },
-  labels: { include: { label: true } },
-} as const;
 
 export async function GET(request: NextRequest, context: Ctx) {
   const gate = await requirePlannerSession(request);
@@ -35,45 +27,12 @@ export async function GET(request: NextRequest, context: Ctx) {
 
   const board = await prisma.plannerBoard.findUnique({
     where: { id: boardId },
-    include: {
-      owner: { select: { id: true, username: true } },
-      columns: {
-        orderBy: { sortOrder: "asc" },
-        include: {
-          tasks: {
-            orderBy: { sortOrder: "asc" },
-            select: boardTaskListSelect,
-          },
-        },
-      },
-      labels: { orderBy: { name: "asc" } },
-      members: {
-        include: { user: { select: { id: true, username: true, role: true } } },
-      },
-    },
+    include: PLANNER_BOARD_DETAIL_INCLUDE,
   });
 
   if (!board) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const payload = {
-    ...board,
-    kind: board.kind,
-    athleteId: board.athleteId,
-    isSystem: board.isSystem,
-    opsProjectId: board.opsProjectId,
-    columns: board.columns.map((col) => ({
-      ...col,
-      tasks: col.tasks.map((t) => ({
-        ...t,
-        description: null,
-        customFields: null,
-      })),
-    })),
-    editable: resolved.access.canEdit,
-    canManageMembers: resolved.access.canManageMembers,
-  };
-
-  return NextResponse.json(payload);
+  return NextResponse.json(serializePlannerBoardDetail(board as never, resolved.access));
 }
 
 export async function PATCH(request: NextRequest, context: Ctx) {

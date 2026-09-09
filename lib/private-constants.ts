@@ -69,6 +69,23 @@ export function stageIndex(stage: PrivateDesignStage): number {
   return PRIVATE_STAGE_ORDER.indexOf(stage);
 }
 
+export type PrivateStageStep = {
+  key: PrivateDesignStage;
+  label: string;
+  number: number;
+  state: "done" | "current" | "upcoming";
+};
+
+export function buildPrivateStageSteps(current: PrivateDesignStage): PrivateStageStep[] {
+  const currentIdx = stageIndex(current);
+  return PRIVATE_STAGE_ORDER.map((key, i) => ({
+    key,
+    label: PRIVATE_STAGE_LABELS[key],
+    number: i + 1,
+    state: (i < currentIdx ? "done" : i === currentIdx ? "current" : "upcoming") as PrivateStageStep["state"],
+  }));
+}
+
 export function athleteInitials(fullName: string): string {
   const parts = fullName.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "?";

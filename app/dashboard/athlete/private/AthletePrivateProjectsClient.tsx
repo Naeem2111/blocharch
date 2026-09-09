@@ -9,7 +9,6 @@ type ProjectRow = {
   progressPercent: number;
   status: string;
   completedAt: string | null;
-  handoverOutcome: string | null;
 };
 
 export function AthletePrivateProjectsClient({ scope }: { scope: "active" | "completed" }) {
@@ -33,23 +32,20 @@ export function AthletePrivateProjectsClient({ scope }: { scope: "active" | "com
         <thead>
           <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-wider text-slate-500">
             <th className="px-4 py-3 font-semibold">Project</th>
-            {scope === "active" ? (
-              <>
-                <th className="px-4 py-3 font-semibold">Stage</th>
-                <th className="px-4 py-3 font-semibold">Progress</th>
-              </>
-            ) : (
-              <>
-                <th className="px-4 py-3 font-semibold">Completed</th>
-                <th className="px-4 py-3 font-semibold">Outcome</th>
-              </>
-            )}
+                {scope === "active" ? (
+                  <>
+                    <th className="px-4 py-3 font-semibold">Stage</th>
+                    <th className="px-4 py-3 font-semibold">Progress</th>
+                  </>
+                ) : (
+                  <th className="px-4 py-3 font-semibold">Completed</th>
+                )}
           </tr>
         </thead>
         <tbody>
           {projects.length === 0 ? (
             <tr>
-              <td colSpan={3} className="px-4 py-8 text-slate-500">
+              <td colSpan={scope === "active" ? 3 : 2} className="px-4 py-8 text-slate-500">
                 No {scope === "active" ? "active" : "completed"} private projects assigned to you.
               </td>
             </tr>
@@ -73,10 +69,7 @@ export function AthletePrivateProjectsClient({ scope }: { scope: "active" | "com
                     </td>
                   </>
                 ) : (
-                  <>
-                    <td className="px-4 py-3 text-slate-300">{p.completedAt ?? "—"}</td>
-                    <td className="px-4 py-3 text-slate-300">{p.handoverOutcome ?? "—"}</td>
-                  </>
+                  <td className="px-4 py-3 text-slate-300">{p.completedAt ?? "—"}</td>
                 )}
               </tr>
             ))
