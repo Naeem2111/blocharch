@@ -90,7 +90,13 @@ function LanePill({ n }: { n: number }) {
 	);
 }
 
-function LeadBlock({ name }: { name: string | null }) {
+function LeadBlock({
+	name,
+	showLabel = true,
+}: {
+	name: string | null;
+	showLabel?: boolean;
+}) {
 	if (!name) {
 		return <span className="text-xs text-slate-500">Lead assigned soon</span>;
 	}
@@ -100,10 +106,30 @@ function LeadBlock({ name }: { name: string | null }) {
 				{leadInitials(name)}
 			</span>
 			<div className="min-w-0">
-				<p className="text-[9px] font-semibold uppercase tracking-wider text-slate-500">Your lead</p>
+				{showLabel ? (
+					<p className="text-[9px] font-semibold uppercase tracking-wider text-slate-500">Your lead</p>
+				) : null}
 				<p className="truncate text-sm text-slate-200">{name}</p>
 			</div>
 		</div>
+	);
+}
+
+const COMPLEXITY_TONE: Record<string, { background: string; border: string; color: string }> = {
+	high: { background: "rgba(139, 92, 246, 0.22)", border: "rgba(167, 139, 250, 0.55)", color: "#ddd6fe" },
+	medium: { background: "rgba(245, 158, 11, 0.2)", border: "rgba(251, 191, 36, 0.55)", color: "#fbbf24" },
+	low: { background: "rgba(148, 163, 184, 0.16)", border: "rgba(148, 163, 184, 0.45)", color: "#cbd5e1" },
+};
+
+function ComplexityBadge({ value, label }: { value: string; label: string }) {
+	const tone = COMPLEXITY_TONE[value] ?? COMPLEXITY_TONE.low;
+	return (
+		<span
+			className="inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold"
+			style={{ backgroundColor: tone.background, borderColor: tone.border, color: tone.color }}
+		>
+			{label}
+		</span>
 	);
 }
 
@@ -120,7 +146,7 @@ function DateRange({
 		return <span className="text-xs text-slate-500">Dates to be confirmed</span>;
 	}
 	return (
-		<p className="text-right text-xs tabular-nums text-slate-400">
+		<p className="text-center text-xs tabular-nums text-slate-400">
 			{start ? formatShortDate(start) : "TBC"}
 			{" → "}
 			<span className="font-semibold" style={end && endColor ? { color: endColor } : undefined}>
@@ -164,8 +190,8 @@ function ProjectCard({
 				</div>
 				<StatusBadge label={project.statusBadge.label} color={project.statusBadge.color} />
 			</div>
-			<div className="mt-3 flex flex-wrap items-center justify-between gap-2 pl-1">
-				<div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+			<div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2 pl-1">
+				<div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-slate-400">
 					<span>
 						Stage <span className="text-slate-300">{project.currentStageLabel}</span>
 					</span>
@@ -173,6 +199,7 @@ function ProjectCard({
 					<LanePill n={project.laneNumber} />
 				</div>
 				<DateRange start={project.startDate} end={project.dueDate} endColor={accent} />
+				<span aria-hidden />
 			</div>
 			{!compact ? (
 				<div className="mt-3 flex items-center gap-3 pl-1">
@@ -205,8 +232,8 @@ function PipelineCard({ project }: { project: PublicClientPortalPipelineProject 
 				</div>
 				<StatusBadge label="Planned" color={PIPELINE_PURPLE} />
 			</div>
-			<div className="mt-3 flex flex-wrap items-center justify-between gap-2 pl-1">
-				<div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+			<div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2 pl-1">
+				<div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-slate-400">
 					{project.expectedStageLabel ? (
 						<span>
 							Stage <span className="text-slate-300">{project.expectedStageLabel}</span>
@@ -216,6 +243,7 @@ function PipelineCard({ project }: { project: PublicClientPortalPipelineProject 
 					)}
 				</div>
 				<DateRange start={project.targetStartDate} end={project.targetDueDate} endColor={PIPELINE_PURPLE} />
+				<span aria-hidden />
 			</div>
 			<div className="mt-4 flex flex-wrap items-center justify-between gap-3 pl-1">
 				<span className="text-xs text-slate-500">Lead assigned soon</span>
@@ -243,18 +271,12 @@ function CompletedPreviewCard({ project }: { project: PublicClientPortalProject 
 					<StatusBadge label="Completed" color="#22c55e" />
 				</div>
 			</div>
-			<div className="mt-4">
+			<div className="mt-4 flex flex-wrap items-center justify-between gap-3">
 				<LeadBlock name={project.leadName} />
+				<ComplexityBadge value={project.complexity} label={project.complexityLabel} />
 			</div>
 		</article>
 	);
-}
-
-function complexityClass(label: string): string {
-	const v = label.toLowerCase();
-	if (v === "high") return "border-violet-500/40 bg-violet-500/15 text-violet-200";
-	if (v === "medium") return "border-amber-500/40 bg-amber-500/15 text-amber-200";
-	return "border-white/10 bg-white/[0.04] text-slate-300";
 }
 
 function SectionLink({
@@ -430,31 +452,6 @@ export function ClientPortalClient({
 		});
 	}
 
-	const dueLegend = (
-		<div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500">
-			<span className="inline-flex items-center gap-2">
-				<span className="h-2.5 w-2.5 rounded-sm bg-[#ef4444]" />
-				Overdue
-			</span>
-			<span className="inline-flex items-center gap-2">
-				<span className="h-2.5 w-2.5 rounded-sm bg-[#f97316]" />
-				1–3 days
-			</span>
-			<span className="inline-flex items-center gap-2">
-				<span className="h-2.5 w-2.5 rounded-sm bg-[#eab308]" />
-				4–7 days
-			</span>
-			<span className="inline-flex items-center gap-2">
-				<span className="h-2.5 w-2.5 rounded-sm bg-[#3b82f6]" />
-				8–14 days
-			</span>
-			<span className="inline-flex items-center gap-2">
-				<span className="h-2.5 w-2.5 rounded-sm bg-[#22c55e]" />
-				14+ days
-			</span>
-		</div>
-	);
-
 	const calendarPanel = (
 		<section>
 			<h2 className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Project due dates</h2>
@@ -467,11 +464,7 @@ export function ClientPortalClient({
 					onMonthChange={setCalendarMonth}
 					onSelectDate={(date) => setCalendarMonth(date.slice(0, 7))}
 				/>
-				{page === "pipeline" ? (
-					<p className="mt-4 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Upcoming deadlines</p>
-				) : (
-					<p className="mt-4 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Upcoming deadlines</p>
-				)}
+				<p className="mt-4 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Upcoming deadlines</p>
 				<ul className="mt-3 space-y-2">
 					{upcoming.length === 0 ? (
 						<li className="text-xs text-slate-500">No dates in this view.</li>
@@ -485,14 +478,6 @@ export function ClientPortalClient({
 						))
 					)}
 				</ul>
-				{page !== "pipeline" ? dueLegend : (
-					<div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500">
-						<span className="inline-flex items-center gap-2">
-							<span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: PIPELINE_PURPLE }} />
-							Planned date
-						</span>
-					</div>
-				)}
 			</div>
 		</section>
 	);
@@ -861,13 +846,11 @@ export function ClientPortalClient({
 													</td>
 													<td className="px-4 py-4 text-slate-300">{project.currentStageLabel}</td>
 													<td className="px-4 py-4 whitespace-nowrap text-slate-300">{formatDateOnly(project.completedAt)}</td>
-													<td className="px-4 py-4 text-slate-300">{project.leadName ?? "—"}</td>
-													<td className="px-4 py-4">
-														<span
-															className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${complexityClass(project.complexityLabel)}`}
-														>
-															{project.complexityLabel}
-														</span>
+													<td className="px-4 py-4" style={{ overflow: "visible" }}>
+														<LeadBlock name={project.leadName} showLabel={false} />
+													</td>
+													<td className="px-4 py-4" style={{ overflow: "visible" }}>
+														<ComplexityBadge value={project.complexity} label={project.complexityLabel} />
 													</td>
 												</tr>
 											))}

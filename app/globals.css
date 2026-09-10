@@ -732,7 +732,6 @@ input.progress-slider::-moz-range-thumb {
 
 .client-portal-completed-table th,
 .client-portal-completed-table td {
-  overflow: hidden;
   vertical-align: middle;
 }
 
