@@ -17,6 +17,7 @@ import { daysUntilDueFromIso, projectDueColor } from "@/lib/project-color-scale"
 import { computeProjectTimeline } from "@/lib/project-timeline";
 import { formatProjectFullTitle } from "@/lib/project-display";
 import { parseClientDeliverables, type ClientPortalDeliverable } from "@/lib/client-portal-deliverables";
+import { formatHoursCompact } from "@/lib/ops-project-hours";
 import { formatProjectDueAt, dueAtFallbackForDateOnly, splitProjectDueAtWallClock } from "@/lib/project-deadline";
 import {
   emptyProjectDueFields,
@@ -67,6 +68,8 @@ type ProjectRow = {
   dueAt: string | null;
   notes: string | null;
   progressPercent: number | null;
+  hoursLogged?: number;
+  quotedHours?: number | null;
   clientDescription: string | null;
   clientDeliverables: unknown;
 };
@@ -81,6 +84,7 @@ const emptyCreate = {
   projectLeadContactId: "",
   currentStage: "survey_conversion",
   complexity: "medium",
+  quotedHours: "",
   ...emptyProjectDueFields(),
 };
 
@@ -104,6 +108,28 @@ function formatAssignedAthletes(p: ProjectRow) {
   return rows
     .map((a) => (a.isPrimary ? `${a.fullName} (primary)` : a.fullName))
     .join(", ");
+}
+
+function ProjectHoursCorner({
+  hoursLogged,
+  quotedHours,
+}: {
+  hoursLogged: number;
+  quotedHours: number | null | undefined;
+}) {
+  const logged = formatHoursCompact(hoursLogged);
+  const quoted = quotedHours != null && quotedHours > 0 ? formatHoursCompact(quotedHours) : null;
+  const over = quoted != null && hoursLogged > Number(quotedHours);
+  return (
+    <div className="shrink-0 text-right">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+        Hours to date / total
+      </p>
+      <p className={`mt-0.5 text-sm font-semibold tabular-nums ${over ? "text-amber-300" : "text-white"}`}>
+        {quoted ? `${logged} / ${quoted}h` : `${logged}h`}
+      </p>
+    </div>
+  );
 }
 
 function AthleteAssignmentsEditor({
@@ -201,6 +227,7 @@ export function OpsProjectsClient() {
     ...emptyProjectDueFields(),
     notes: "",
     clientDescription: "",
+    quotedHours: "",
     deliverables: [] as ClientPortalDeliverable[],
   });
 
@@ -271,6 +298,7 @@ export function OpsProjectsClient() {
         dueDate: form.dueDate || null,
         dueTime: form.dueTime || null,
         dueAmPm: form.dueAmPm,
+        quotedHours: form.quotedHours.trim() === "" ? null : Number(form.quotedHours),
       }),
     });
     const j = await r.json();
@@ -314,6 +342,7 @@ export function OpsProjectsClient() {
       dueAmPm: due.ampm,
       notes: p.notes ?? "",
       clientDescription: p.clientDescription ?? "",
+      quotedHours: p.quotedHours != null ? String(p.quotedHours) : "",
       deliverables: parseClientDeliverables(p.clientDeliverables),
     });
     setError("");
@@ -341,6 +370,7 @@ export function OpsProjectsClient() {
         dueTime: editForm.dueTime || null,
         dueAmPm: editForm.dueAmPm,
         notes: editForm.notes || null,
+        quotedHours: editForm.quotedHours.trim() === "" ? null : Number(editForm.quotedHours),
         clientDescription: editForm.clientDescription.trim() || null,
         clientDeliverables: editForm.deliverables.filter((d) => d.label.trim()),
       }),
@@ -607,6 +637,21 @@ export function OpsProjectsClient() {
               }}
               onChange={(due) => setEditForm((f) => ({ ...f, ...due }))}
             />
+            <label className="text-xs text-slate-400">
+              Total hours (quoted)
+              <input
+                type="number"
+                min={0}
+                step="0.5"
+                value={editForm.quotedHours}
+                onChange={(e) => setEditForm((f) => ({ ...f, quotedHours: e.target.value }))}
+                placeholder="Optional"
+                className={inputClass}
+              />
+              <span className="mt-1 block text-[10px] text-slate-500">
+                Hours to date {formatHoursCompact(p.hoursLogged ?? 0)}h from daily logs
+              </span>
+            </label>
             {editForm.name || editForm.address ? (
               <p className="text-xs text-slate-500 md:col-span-2">
                 Full title preview:{" "}
@@ -709,6 +754,7 @@ export function OpsProjectsClient() {
             </div>
           </div>
         ) : (
+          <>
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0">
               <h2 className="font-semibold text-white">
@@ -738,9 +784,6 @@ export function OpsProjectsClient() {
                 {timeline.daysActive != null ? ` · ${timeline.daysActive} days active` : ""}
                 {dueLabel ? ` · Due ${dueLabel}` : timeline.label ? ` · ${timeline.label}` : ""}
               </p>
-              <div className="mt-3 max-w-md">
-                <ProjectProgressBar percent={p.progressPercent ?? 0} />
-              </div>
             </div>
             <div className="flex items-center gap-2">
               <span className="rounded-md bg-white/[0.06] px-2 py-1 text-[10px] uppercase text-slate-400">
@@ -749,6 +792,13 @@ export function OpsProjectsClient() {
               <button type="button" onClick={() => startEdit(p)} className="text-xs text-brand-300 hover:text-brand-200">Edit</button>
             </div>
           </div>
+          <div className="mt-3 flex items-end justify-between gap-4">
+            <div className="min-w-0 max-w-md flex-1">
+              <ProjectProgressBar percent={p.progressPercent ?? 0} />
+            </div>
+            <ProjectHoursCorner hoursLogged={p.hoursLogged ?? 0} quotedHours={p.quotedHours} />
+          </div>
+          </>
         )}
       </article>
     );
@@ -931,6 +981,18 @@ export function OpsProjectsClient() {
             />
           </label>
           <label className="text-xs text-slate-400 md:col-span-2">Address<input value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
+          <label className="text-xs text-slate-400">
+            Total hours (quoted)
+            <input
+              type="number"
+              min={0}
+              step="0.5"
+              value={form.quotedHours}
+              onChange={(e) => setForm((f) => ({ ...f, quotedHours: e.target.value }))}
+              placeholder="Optional"
+              className={inputClass}
+            />
+          </label>
           <ProjectDueDateTimeFields
             className="md:col-span-2"
             value={{

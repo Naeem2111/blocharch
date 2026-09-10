@@ -18,6 +18,12 @@ import { deleteProjectAndSyncSubmissions } from "@/lib/sync-submission-totals";
 import { parseProjectDueInput } from "@/lib/project-deadline";
 import { ensureOpsProjectDueDate } from "@/lib/project-due-sources";
 import { serializeOpsProjectRow } from "@/lib/ops-project-serialize";
+import {
+  hoursLoggedByProjectIds,
+  parseOptionalQuotedHours,
+  quotedHoursByProjectIds,
+  setQuotedHours,
+} from "@/lib/ops-project-hours";
 import { normalizeClientDeliverablesForSave } from "@/lib/client-portal-deliverables";
 import { clientPortalPath } from "@/lib/client-slug";
 import {
@@ -83,10 +89,12 @@ export async function GET(_request: NextRequest, context: RouteContext) {
   });
   if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
 
-  const hoursAgg = await prisma.opsSubmissionLineItem.aggregate({
-    where: { projectId },
-    _sum: { hoursWorked: true },
-  });
+  const [hoursByProject, quotedByProject] = await Promise.all([
+    hoursLoggedByProjectIds([projectId]),
+    quotedHoursByProjectIds([projectId]),
+  ]);
+  const hoursLogged = hoursByProject.get(projectId) ?? 0;
+  const quotedHours = quotedByProject.get(projectId) ?? null;
 
   const submissions = await prisma.opsDailySubmission.findMany({
     where: { lineItems: { some: { projectId } } },
@@ -105,7 +113,8 @@ export async function GET(_request: NextRequest, context: RouteContext) {
 
   return NextResponse.json({
     project: {
-      ...serializeOpsProject(project, Number(hoursAgg._sum.hoursWorked ?? 0)),
+      ...serializeOpsProject(project, hoursLogged),
+      quotedHours,
       clientSlug: project.client.slug,
       clientPortalEnabled: project.client.publicPortalEnabled,
       clientContacts: project.client.contacts,
@@ -207,6 +216,12 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       const pct = body.progressPercent == null ? null : Math.max(0, Math.min(100, Math.round(Number(body.progressPercent))));
       data.progressPercent = pct;
     }
+    let quotedHoursUpdate: number | null | undefined = undefined;
+    if (body.quotedHours !== undefined) {
+      const parsed = parseOptionalQuotedHours(body.quotedHours);
+      if ("error" in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
+      quotedHoursUpdate = parsed.hours;
+    }
 
     if (body.complexity != null) {
       const c = String(body.complexity);
@@ -286,7 +301,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (body.blockerFlag !== undefined) data.blockerFlag = Boolean(body.blockerFlag);
     if (body.checkInRequested !== undefined) data.checkInRequested = Boolean(body.checkInRequested);
 
-    if (Object.keys(data).length === 0 && !assignmentUpdate) {
+    if (Object.keys(data).length === 0 && !assignmentUpdate && quotedHoursUpdate === undefined) {
       return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
     }
 
@@ -346,6 +361,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
           });
     if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
 
+    if (quotedHoursUpdate !== undefined) {
+      await setQuotedHours(projectId, quotedHoursUpdate);
+    }
+
     await syncProjectAfterOpsUpdate(
       projectId,
       {
@@ -380,14 +399,15 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       revalidatePath(clientPortalPath(existing.client.slug));
     }
 
-    const hoursAgg = await prisma.opsSubmissionLineItem.aggregate({
-      where: { projectId },
-      _sum: { hoursWorked: true },
-    });
+    const [hoursByProject, quotedByProject] = await Promise.all([
+      hoursLoggedByProjectIds([projectId]),
+      quotedHoursByProjectIds([projectId]),
+    ]);
 
     return NextResponse.json({
       project: {
-        ...serializeOpsProject(project, Number(hoursAgg._sum.hoursWorked ?? 0)),
+        ...serializeOpsProject(project, hoursByProject.get(projectId) ?? 0),
+        quotedHours: quotedByProject.get(projectId) ?? null,
         clientSlug: project.client.slug,
         clientPortalEnabled: project.client.publicPortalEnabled,
         clientContacts: project.client.contacts,

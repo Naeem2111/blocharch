@@ -513,6 +513,8 @@ model OpsProject {
   currentStatus     OpsProjectStatus    @default(not_started) @map("current_status")
   /** Latest progress % from daily log (0–100). */
   progressPercent   Int?                @map("progress_percent")
+  /** Quoted / allocated hours for the job — “total hours” on tracker cards. */
+  quotedHours       Decimal?            @map("quoted_hours") @db.Decimal(8, 2)
   /** When the project was marked complete (from daily log or handover). */
   completedAt       DateTime?           @map("completed_at")
   /** Days finished before due (legacy display; 0 when only hours/minutes early). */

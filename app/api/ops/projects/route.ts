@@ -10,6 +10,12 @@ import { requireOpsSession } from "@/lib/ops-access";
 import { parseDateOnly } from "@/lib/ops-hours";
 import { parseProjectDueInput } from "@/lib/project-deadline";
 import { serializeOpsProjectRow } from "@/lib/ops-project-serialize";
+import {
+  hoursLoggedByProjectIds,
+  parseOptionalQuotedHours,
+  quotedHoursByProjectIds,
+  setQuotedHours,
+} from "@/lib/ops-project-hours";
 import { syncProjectBoardOnAssign } from "@/lib/planner-project-sync";
 import { normalizeAthleteProjectCode } from "@/lib/ops-project-code";
 import { projectDisplayFields } from "@/lib/project-display";
@@ -46,6 +52,12 @@ export async function GET(request: NextRequest) {
     },
   });
 
+  const projectIds = projects.map((p) => p.id);
+  const [hoursByProject, quotedByProject] = await Promise.all([
+    hoursLoggedByProjectIds(projectIds),
+    quotedHoursByProjectIds(projectIds),
+  ]);
+
   return NextResponse.json({
     projects: projects.map((p) =>
       serializeOpsProjectRow(p, {
@@ -58,6 +70,8 @@ export async function GET(request: NextRequest) {
         projectLeadContactEmail: p.projectLeadContact?.email ?? null,
         athleteCode: p.assignedAthlete?.athleteCode ?? null,
         assignedAthletes: serializeProjectAssignments(p.athleteAssignments),
+        hoursLogged: hoursByProject.get(p.id) ?? 0,
+        quotedHours: quotedByProject.get(p.id) ?? null,
         updatedAt: p.updatedAt.toISOString(),
       })
     ),
@@ -138,6 +152,13 @@ export async function POST(request: NextRequest) {
     const leadError = await validateProjectLeadContactDb(prisma, clientId, projectLeadContactId);
     if (leadError) return NextResponse.json({ error: leadError }, { status: 400 });
 
+    let quotedHours: number | null = null;
+    if (body.quotedHours !== undefined) {
+      const parsed = parseOptionalQuotedHours(body.quotedHours);
+      if ("error" in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
+      quotedHours = parsed.hours;
+    }
+
     const project = await prisma.opsProject.create({
       data: {
         clientId,
@@ -157,6 +178,10 @@ export async function POST(request: NextRequest) {
         notes: body.notes ? String(body.notes).trim() : null,
       },
     });
+
+    if (body.quotedHours !== undefined) {
+      await setQuotedHours(project.id, quotedHours);
+    }
 
     const idsToAssign = athleteIds.length > 0 ? athleteIds : [];
     if (idsToAssign.length > 0) {

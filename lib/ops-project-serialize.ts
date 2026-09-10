@@ -17,6 +17,7 @@ type ProjectLike = {
   currentStage: OpsProjectPhase;
   currentStatus: OpsProjectStatus | string;
   progressPercent: number | null;
+  quotedHours?: { toNumber?: () => number } | number | string | null;
   completedAt: Date | null;
   deadlineBeatenDays: number | null;
   deadlineBeatenMinutes: number | null;
@@ -52,6 +53,14 @@ export function serializeOpsProjectRow<T extends ProjectLike>(
     currentStage: project.currentStage,
     currentStatus: project.currentStatus,
     progressPercent: project.progressPercent,
+    quotedHours:
+      project.quotedHours == null || project.quotedHours === ""
+        ? null
+        : Number(
+            typeof project.quotedHours === "object" && "toNumber" in project.quotedHours
+              ? project.quotedHours.toNumber?.()
+              : project.quotedHours
+          ),
     completedAt: project.completedAt?.toISOString() ?? null,
     deadlineBeatenDays: project.deadlineBeatenDays,
     deadlineBeatenMinutes: project.deadlineBeatenMinutes,
