@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { PrivateDeleteProjectButton } from "@/components/private/PrivateDeleteProjectButton";
 import { PRIVATE_STAGE_LABELS, PRIVATE_STAGE_ORDER } from "@/lib/private-constants";
 
@@ -27,6 +27,7 @@ export function PrivateProjectsClient({ canDelete = false }: { canDelete?: boole
   const [error, setError] = useState("");
   const [stageOpenId, setStageOpenId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const stageMenuRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     const r = await fetch("/api/private/projects?scope=active");
@@ -43,6 +44,23 @@ export function PrivateProjectsClient({ canDelete = false }: { canDelete?: boole
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!stageOpenId) return;
+    function onPointerDown(event: PointerEvent) {
+      if (stageMenuRef.current?.contains(event.target as Node)) return;
+      setStageOpenId(null);
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setStageOpenId(null);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [stageOpenId]);
 
   async function setStage(projectId: string, designStage: string) {
     setSaving(true);
@@ -111,32 +129,34 @@ export function PrivateProjectsClient({ canDelete = false }: { canDelete?: boole
                       {p.athlete?.initials ?? "—"}
                     </span>
                   </td>
-                  <td className="relative px-4 py-3">
-                    <button
-                      type="button"
-                      disabled={saving}
-                      onClick={() => setStageOpenId(stageOpenId === p.id ? null : p.id)}
-                      className="rounded-lg bg-white/[0.04] px-2.5 py-1.5 text-left text-xs text-slate-200 ring-1 ring-white/[0.08] hover:bg-white/[0.07]"
-                    >
-                      {p.designStageLabel} ▾
-                    </button>
-                    {stageOpenId === p.id ? (
-                      <div className="absolute left-4 z-20 mt-1 max-h-64 w-64 overflow-y-auto rounded-lg border border-white/[0.1] bg-[#0f131a] py-1 shadow-xl">
-                        {PRIVATE_STAGE_ORDER.map((key) => (
-                          <button
-                            key={key}
-                            type="button"
-                            className={`block w-full px-3 py-2 text-left text-xs hover:bg-white/[0.06] ${
-                              key === p.designStage ? "text-brand-300" : "text-slate-300"
-                            }`}
-                            onClick={() => void setStage(p.id, key)}
-                          >
-                            {key === p.designStage ? "✓ " : ""}
-                            {PRIVATE_STAGE_LABELS[key]}
-                          </button>
-                        ))}
-                      </div>
-                    ) : null}
+                  <td className="px-4 py-3">
+                    <div ref={stageOpenId === p.id ? stageMenuRef : undefined} className="inline-flex flex-col items-start">
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() => setStageOpenId(stageOpenId === p.id ? null : p.id)}
+                        className="rounded-lg bg-white/[0.04] px-2.5 py-1.5 text-left text-xs text-slate-200 ring-1 ring-white/[0.08] hover:bg-white/[0.07]"
+                      >
+                        {p.designStageLabel} ▾
+                      </button>
+                      {stageOpenId === p.id ? (
+                        <div className="mt-1 w-64 rounded-lg border border-white/[0.1] bg-[#0f131a] py-1">
+                          {PRIVATE_STAGE_ORDER.map((key) => (
+                            <button
+                              key={key}
+                              type="button"
+                              className={`block w-full px-3 py-2 text-left text-xs hover:bg-white/[0.06] ${
+                                key === p.designStage ? "text-brand-300" : "text-slate-300"
+                              }`}
+                              onClick={() => void setStage(p.id, key)}
+                            >
+                              {key === p.designStage ? "✓ " : ""}
+                              {PRIVATE_STAGE_LABELS[key]}
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">

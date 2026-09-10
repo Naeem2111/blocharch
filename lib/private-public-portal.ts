@@ -33,14 +33,21 @@ export async function getPublicPrivateProjectBySlug(slug: string) {
         orderBy: [{ completedAt: "desc" }, { createdAt: "desc" }],
         take: 40,
       },
-      documents: {
-        where: { clientVisible: true },
-        orderBy: { createdAt: "desc" },
-        take: 40,
-      },
     },
   });
   if (!project) return null;
+
+  let documents: Array<{ id: string; title: string; fileUrl: string }> = [];
+  try {
+    documents = await prisma.privateProjectDocument.findMany({
+      where: { projectId: project.id, clientVisible: true },
+      orderBy: { createdAt: "desc" },
+      take: 40,
+      select: { id: true, title: true, fileUrl: true },
+    });
+  } catch {
+    documents = [];
+  }
 
   const progressPercent = resolvePrivateProgressPercent({
     designStage: project.designStage,
@@ -88,6 +95,7 @@ export async function getPublicPrivateProjectBySlug(slug: string) {
       briefReceivedAt: project.briefReceivedAt?.toISOString().slice(0, 10) ?? null,
       councilSubmittedAt: project.councilSubmittedAt?.toISOString().slice(0, 10) ?? null,
       dueDate: project.dueDate?.toISOString().slice(0, 10) ?? null,
+      stageStartedAt: project.stageStartedAt.toISOString().slice(0, 10),
       clientDescription: project.clientDescription,
       estCouncilDecision,
       updatedAt: project.updatedAt.toISOString().slice(0, 10),
@@ -110,10 +118,6 @@ export async function getPublicPrivateProjectBySlug(slug: string) {
       body: u.body,
       occurredAt: u.occurredAt.toISOString().slice(0, 10),
     })),
-    documents: project.documents.map((d) => ({
-      id: d.id,
-      title: d.title,
-      fileUrl: d.fileUrl,
-    })),
+    documents,
   };
 }
