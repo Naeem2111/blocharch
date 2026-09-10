@@ -1,30 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ClientPortalBrandMark } from "@/components/client-portal/ClientPortalBrandMark";
+import { ClientPortalAthleteMark } from "@/components/client-portal/ClientPortalAthleteMark";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
-import { AthleteAvatar } from "@/components/ops/AthleteAvatar";
 import { MiniMonthCalendar } from "@/components/MiniMonthCalendar";
 import { ProjectProgressBar } from "@/components/ProjectProgressBar";
 import { asAvatarTextTone } from "@/lib/avatar-text-tone";
 import { clientPortalPath } from "@/lib/client-slug";
 import {
 	buildClientPortalNotifications,
+	laneHoursCaption,
 	type ClientPortalNotification,
 	type ClientPortalNotificationKind,
 } from "@/lib/client-portal-notifications";
-import {
-	daysUntilDueFromIso,
-	projectDueColor,
-} from "@/lib/project-color-scale";
-import {
-	clientPortalProjectBeatDeadline,
-} from "@/lib/client-portal-projects";
-import {
-	formatProjectDueAt,
-	dueAtFallbackForDateOnly,
-} from "@/lib/project-deadline";
+import { formatPortalHours } from "@/lib/client-portal-hours";
+import { daysUntilDueFromIso, projectDueColor } from "@/lib/project-color-scale";
 import { PublicThemeToggle } from "@/components/client-portal/PublicThemeToggle";
 import type {
 	PublicClientPortalData,
@@ -32,7 +24,9 @@ import type {
 	PublicClientPortalProject,
 } from "@/lib/public-client-portal";
 
-type Tab = "tracker" | "pipeline" | "completed" | "overtime" | "notifications";
+type PortalPage = "overview" | "tracker" | "pipeline" | "completed";
+
+const PIPELINE_PURPLE = "#a855f7";
 
 function formatDateOnly(iso: string | null): string {
 	if (!iso) return "—";
@@ -46,34 +40,6 @@ function formatDateOnly(iso: string | null): string {
 	});
 }
 
-function ProjectDeliverables({
-	deliverables,
-}: {
-	deliverables: PublicClientPortalProject["clientDeliverables"];
-}) {
-	if (!deliverables.length) return null;
-	return (
-		<ul className="mt-2 space-y-1">
-			{deliverables.map((d, i) => (
-				<li key={`${d.label}-${i}`} className="text-xs">
-					{d.url ? (
-						<a
-							href={d.url}
-							target="_blank"
-							rel="noopener noreferrer"
-							className="text-brand-400 hover:underline"
-						>
-							{d.label}
-						</a>
-					) : (
-						<span className="text-slate-400">{d.label}</span>
-					)}
-				</li>
-			))}
-		</ul>
-	);
-}
-
 function formatShortDate(iso: string | null): string {
 	if (!iso) return "";
 	const d = new Date(`${iso}T12:00:00`);
@@ -81,50 +47,8 @@ function formatShortDate(iso: string | null): string {
 	return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
-function formatDateRange(start: string | null): string | null {
-	if (!start) return null;
-	return `From ${formatShortDate(start)}`;
-}
-
-function DueDateHighlight({
-	project,
-	className = "",
-	block = false,
-}: {
-	project: PublicClientPortalProject;
-	className?: string;
-	/** Fill table cell width; default is compact inline for cards */
-	block?: boolean;
-}) {
-	const dueIso = project.dueAt ?? (project.dueDate ? dueAtFallbackForDateOnly(project.dueDate) : null);
-	if (!dueIso) {
-		return <span className={`text-sm text-slate-600 ${className}`}>—</span>;
-	}
-
-	const accent = projectDueColor(daysUntilDueFromIso(project.dueDate));
-	const label = formatProjectDueAt(dueIso);
-
-	return (
-		<div
-			className={`client-portal-due-block flex flex-col items-center justify-center rounded-lg px-2.5 py-2 text-center ${
-				block ? "w-full" : "inline-flex min-w-[7.5rem]"
-			} ${className}`}
-			style={{
-				backgroundColor: `${accent}24`,
-				boxShadow: `inset 0 0 0 1.5px ${accent}55`,
-			}}
-		>
-			<span
-				className="text-[10px] font-bold uppercase tracking-wider"
-				style={{ color: accent }}
-			>
-				Due
-			</span>
-			<span className="client-portal-due-date-value mt-0.5 text-sm font-semibold leading-tight">
-				{label}
-			</span>
-		</div>
-	);
+function dueAccent(project: PublicClientPortalProject): string {
+	return projectDueColor(daysUntilDueFromIso(project.dueDate ?? project.dueAt));
 }
 
 function leadInitials(name: string): string {
@@ -136,183 +60,265 @@ function leadInitials(name: string): string {
 		.join("");
 }
 
-const NOTIFICATION_ICON: Record<
-	ClientPortalNotificationKind,
-	{ glyph: string; bg: string; color: string }
-> = {
-	deadline_beaten: { glyph: "★", bg: "rgba(234,179,8,0.15)", color: "#facc15" },
-	hours_warning: { glyph: "⏱", bg: "rgba(245,158,11,0.15)", color: "#fbbf24" },
-	hours_cap: { glyph: "●", bg: "rgba(239,68,68,0.15)", color: "#f87171" },
-	overtime: { glyph: "£", bg: "rgba(6,182,212,0.15)", color: "#22d3ee" },
-};
-
-function ProjectCard({ project }: { project: PublicClientPortalProject }) {
-	const accent = projectDueColor(daysUntilDueFromIso(project.dueDate));
-	const startLabel = formatDateRange(project.startDate);
-	const metaParts = [project.currentStageLabel, `Lane ${project.laneNumber}`, startLabel].filter(
-		Boolean,
-	);
-
+function StatusBadge({
+	label,
+	color,
+}: {
+	label: string;
+	color: string;
+}) {
 	return (
-		<article className="client-portal-card relative rounded-xl border border-white/[0.08] bg-white/[0.03] p-4 sm:p-5">
-			<div className="flex items-start justify-between gap-3">
-				<div className="min-w-0 flex-1">
-					<h3 className="text-base font-semibold text-white sm:text-[17px]">
-						{project.name}
-					</h3>
-					{project.address ? (
-						<p className="mt-0.5 text-xs text-slate-500">{project.address}</p>
-					) : null}
-					{project.clientDescription ? (
-						<p className="mt-2 text-sm leading-snug text-slate-400">{project.clientDescription}</p>
-					) : null}
-					<ProjectDeliverables deliverables={project.clientDeliverables} />
-				</div>
-				<span
-					className="client-portal-status-badge inline-flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide"
-					style={{
-						backgroundColor: `${project.statusBadge.color}22`,
-						color: project.statusBadge.color,
-						borderColor: `${project.statusBadge.color}44`,
-					}}
-				>
-					<span
-						className="h-1.5 w-1.5 rounded-full"
-						style={{ backgroundColor: project.statusBadge.color }}
-					/>
-					{project.statusBadge.label}
-				</span>
+		<span
+			className="client-portal-status-badge inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide"
+			style={{
+				backgroundColor: `${color}22`,
+				color,
+				borderColor: `${color}44`,
+			}}
+		>
+			<span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
+			{label}
+		</span>
+	);
+}
+
+function LanePill({ n }: { n: number }) {
+	return (
+		<span className="client-portal-lane-pill rounded border border-white/[0.1] bg-white/[0.04] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+			Lane {n}
+		</span>
+	);
+}
+
+function LeadBlock({ name }: { name: string | null }) {
+	if (!name) {
+		return <span className="text-xs text-slate-500">Lead assigned soon</span>;
+	}
+	return (
+		<div className="flex min-w-0 items-center gap-2.5">
+			<span className="client-portal-lead-avatar inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.08] text-[11px] font-semibold text-slate-300">
+				{leadInitials(name)}
+			</span>
+			<div className="min-w-0">
+				<p className="text-[9px] font-semibold uppercase tracking-wider text-slate-500">Your lead</p>
+				<p className="truncate text-sm text-slate-200">{name}</p>
 			</div>
+		</div>
+	);
+}
 
-			<p className="mt-2.5 text-xs text-slate-400">{metaParts.join(" · ")}</p>
+function DateRange({
+	start,
+	end,
+	endColor,
+}: {
+	start: string | null;
+	end: string | null;
+	endColor?: string;
+}) {
+	if (!start && !end) {
+		return <span className="text-xs text-slate-500">Dates to be confirmed</span>;
+	}
+	return (
+		<p className="text-right text-xs tabular-nums text-slate-400">
+			{start ? formatShortDate(start) : "TBC"}
+			{" → "}
+			<span className="font-semibold" style={end && endColor ? { color: endColor } : undefined}>
+				{end ? formatShortDate(end) : "TBC"}
+			</span>
+		</p>
+	);
+}
 
-			{project.dueDate || project.dueAt ? (
-				<div className="mt-3">
-					<DueDateHighlight project={project} />
-				</div>
-			) : null}
+function AthleteAssigned({ assigned }: { assigned: boolean }) {
+	if (assigned) {
+		return (
+			<span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-400">
+				<ClientPortalAthleteMark />
+				Athlete assigned
+			</span>
+		);
+	}
+	return <span className="text-[11px] font-medium text-slate-500">Athlete to be assigned</span>;
+}
 
-			<div className="mt-4">
-				<ProjectProgressBar percent={project.progressPercent} />
-			</div>
-
-			<div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-				{project.leadName ? (
-					<div className="flex min-w-0 items-center gap-2.5">
-						{project.leadPhotoUrl ? (
-							<AthleteAvatar
-								name={project.leadName}
-								photoUrl={project.leadPhotoUrl}
-								backgroundColor={project.leadPhotoBgColor}
-								textTone={asAvatarTextTone(project.leadPhotoTextTone)}
-								size={32}
-							/>
-						) : (
-							<span className="client-portal-lead-avatar inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.08] text-[11px] font-semibold text-slate-300">
-								{leadInitials(project.leadName)}
-							</span>
-						)}
-						<span className="min-w-0 break-words text-sm text-slate-300">{project.leadName}</span>
-					</div>
-				) : (
-					<span className="text-xs text-slate-500">Lead assigned soon</span>
-				)}
-				{project.assignedAthleteName ? (
-					<span className="text-[11px] font-medium text-slate-500">
-						Athlete assigned
-					</span>
-				) : null}
-			</div>
+function ProjectCard({
+	project,
+	compact = false,
+}: {
+	project: PublicClientPortalProject;
+	compact?: boolean;
+}) {
+	const accent = dueAccent(project);
+	return (
+		<article className="client-portal-card relative overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.03] p-4">
 			<span
 				className="pointer-events-none absolute bottom-0 left-0 top-0 w-[3px] rounded-l-xl"
 				style={{ backgroundColor: accent }}
 				aria-hidden
 			/>
+			<div className="flex items-start justify-between gap-3 pl-1">
+				<div className="min-w-0">
+					<h3 className="font-semibold text-white">{project.name}</h3>
+					{project.address ? <p className="mt-0.5 text-xs text-slate-500">{project.address}</p> : null}
+				</div>
+				<StatusBadge label={project.statusBadge.label} color={project.statusBadge.color} />
+			</div>
+			<div className="mt-3 flex flex-wrap items-center justify-between gap-2 pl-1">
+				<div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+					<span>
+						Stage <span className="text-slate-300">{project.currentStageLabel}</span>
+					</span>
+					<span className="text-slate-600">·</span>
+					<LanePill n={project.laneNumber} />
+				</div>
+				<DateRange start={project.startDate} end={project.dueDate} endColor={accent} />
+			</div>
+			{!compact ? (
+				<div className="mt-3 flex items-center gap-3 pl-1">
+					<div className="min-w-0 flex-1">
+						<ProjectProgressBar percent={project.progressPercent} showLabel={false} />
+					</div>
+					<span className="shrink-0 text-xs tabular-nums text-slate-400">{project.progressPercent}%</span>
+				</div>
+			) : null}
+			<div className="mt-4 flex flex-wrap items-center justify-between gap-3 pl-1">
+				<LeadBlock name={project.leadName} />
+				<AthleteAssigned assigned={!!project.assignedAthleteName} />
+			</div>
 		</article>
 	);
 }
 
 function PipelineCard({ project }: { project: PublicClientPortalPipelineProject }) {
 	return (
-		<article className="client-portal-card relative overflow-hidden rounded-xl border border-violet-500/25 bg-violet-500/[0.06] p-4">
-			<p className="text-[10px] font-bold uppercase tracking-wider text-violet-300">
-				Upcoming · Pipeline
-			</p>
-			<h3 className="mt-1 font-semibold text-white">{project.name}</h3>
-			{project.address ? (
-				<p className="mt-0.5 text-xs text-slate-500">{project.address}</p>
-			) : null}
-			{project.description ? (
-				<p className="mt-2 text-sm leading-snug text-slate-400">{project.description}</p>
-			) : null}
-			<p className="mt-2 text-xs text-slate-500">
-				{project.expectedStageLabel ? `${project.expectedStageLabel} · ` : ""}
-				{project.targetStartDate ? `From ${formatShortDate(project.targetStartDate)} · ` : ""}
-				{project.targetDueDate
-					? `Target ${formatShortDate(project.targetDueDate)}`
-					: "Dates to be confirmed"}
-			</p>
+		<article className="client-portal-card relative overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.03] p-4">
 			<span
-				className="pointer-events-none absolute bottom-0 left-0 top-0 w-[3px] rounded-l-xl bg-violet-500/70"
+				className="pointer-events-none absolute bottom-0 left-0 top-0 w-[3px] rounded-l-xl"
+				style={{ backgroundColor: PIPELINE_PURPLE }}
 				aria-hidden
 			/>
+			<div className="flex items-start justify-between gap-3 pl-1">
+				<div className="min-w-0">
+					<h3 className="font-semibold text-white">{project.name}</h3>
+					{project.address ? <p className="mt-0.5 text-xs text-slate-500">{project.address}</p> : null}
+				</div>
+				<StatusBadge label="Planned" color={PIPELINE_PURPLE} />
+			</div>
+			<div className="mt-3 flex flex-wrap items-center justify-between gap-2 pl-1">
+				<div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+					{project.expectedStageLabel ? (
+						<span>
+							Stage <span className="text-slate-300">{project.expectedStageLabel}</span>
+						</span>
+					) : (
+						<span>Stage to be confirmed</span>
+					)}
+				</div>
+				<DateRange start={project.targetStartDate} end={project.targetDueDate} endColor={PIPELINE_PURPLE} />
+			</div>
+			<div className="mt-4 flex flex-wrap items-center justify-between gap-3 pl-1">
+				<span className="text-xs text-slate-500">Lead assigned soon</span>
+				<AthleteAssigned assigned={false} />
+			</div>
 		</article>
 	);
 }
 
-function CompletedTableRow({ project }: { project: PublicClientPortalProject }) {
+function CompletedPreviewCard({ project }: { project: PublicClientPortalProject }) {
 	return (
-		<tr className="client-portal-completed-row border-b border-white/[0.06] bg-white/[0.02] last:border-b-0">
-			<td className="px-4 py-4 align-top">
-				<p className="font-semibold text-white">{project.name}</p>
-				{project.address ? (
-					<p className="mt-0.5 text-xs text-slate-500">{project.address}</p>
-				) : null}
-			</td>
-			<td className="px-4 py-4 align-middle whitespace-nowrap">
-				{project.dueDate || project.dueAt ? (
-					<DueDateHighlight project={project} block />
-				) : (
-					<span className="text-xs text-slate-600">—</span>
-				)}
-			</td>
-			<td className="px-4 py-4 align-middle whitespace-nowrap text-sm text-slate-300">
-				{formatDateOnly(project.completedAt)}
-			</td>
-		</tr>
+		<article className="client-portal-card relative overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.03] p-4">
+			<div className="flex items-start justify-between gap-3">
+				<div className="min-w-0">
+					<h3 className="font-semibold text-white">{project.name}</h3>
+					{project.address ? <p className="mt-0.5 text-xs text-slate-500">{project.address}</p> : null}
+					<p className="mt-2 text-xs text-slate-400">
+						Stage <span className="text-slate-300">{project.currentStageLabel}</span>
+						<span className="mx-2 text-slate-600">·</span>
+						<LanePill n={project.laneNumber} />
+					</p>
+				</div>
+				<div className="flex flex-col items-end gap-2">
+					<span className="text-xs tabular-nums text-slate-400">{formatDateOnly(project.completedAt)}</span>
+					<StatusBadge label="Completed" color="#22c55e" />
+				</div>
+			</div>
+			<div className="mt-4">
+				<LeadBlock name={project.leadName} />
+			</div>
+		</article>
 	);
 }
+
+function complexityClass(label: string): string {
+	const v = label.toLowerCase();
+	if (v === "high") return "border-violet-500/40 bg-violet-500/15 text-violet-200";
+	if (v === "medium") return "border-amber-500/40 bg-amber-500/15 text-amber-200";
+	return "border-white/10 bg-white/[0.04] text-slate-300";
+}
+
+function SectionLink({
+	label,
+	onClick,
+}: {
+	label: string;
+	onClick: () => void;
+}) {
+	return (
+		<button
+			type="button"
+			onClick={onClick}
+			className="text-sm font-medium text-brand-300 hover:text-brand-200"
+		>
+			{label} →
+		</button>
+	);
+}
+
+const NOTIFICATION_ICON: Record<
+	ClientPortalNotificationKind,
+	{ glyph: string; bg: string; color: string }
+> = {
+	deadline_beaten: { glyph: "★", bg: "rgba(234,179,8,0.15)", color: "#facc15" },
+	hours_warning: { glyph: "!", bg: "rgba(245,158,11,0.18)", color: "#fbbf24" },
+	hours_cap: { glyph: "!", bg: "rgba(239,68,68,0.18)", color: "#f87171" },
+	overtime: { glyph: "£", bg: "rgba(6,182,212,0.15)", color: "#22d3ee" },
+};
 
 function NotificationRow({
 	notification,
 	unread,
+	onOvertime,
 }: {
 	notification: ClientPortalNotification;
 	unread: boolean;
+	onOvertime?: () => void;
 }) {
 	const icon = NOTIFICATION_ICON[notification.kind];
 	return (
-		<div className="client-portal-notification flex gap-4 border-b border-white/[0.06] py-4 last:border-b-0">
+		<div className="client-portal-notification flex gap-3 border-b border-white/[0.06] py-3 last:border-b-0">
 			<span
-				className="client-portal-notification-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm"
+				className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold"
 				style={{ backgroundColor: icon.bg, color: icon.color }}
 			>
 				{icon.glyph}
 			</span>
 			<div className="min-w-0 flex-1">
-				<p className="font-semibold text-white">{notification.title}</p>
-				<p className="mt-0.5 text-sm text-slate-500">{notification.description}</p>
+				<p className="text-sm font-semibold text-white">{notification.title}</p>
+				<p className="mt-0.5 text-xs leading-snug text-slate-400">{notification.description}</p>
+				{notification.action === "overtime" && onOvertime ? (
+					<button
+						type="button"
+						onClick={onOvertime}
+						className="mt-1.5 text-xs font-medium text-brand-300 hover:text-brand-200"
+					>
+						View overtime breakdown →
+					</button>
+				) : null}
 			</div>
-			<div className="flex shrink-0 items-start gap-2 pt-0.5">
-				<span className="text-xs text-slate-500">{notification.timeLabel}</span>
-				{unread ? (
-					<span
-						className="client-portal-unread-dot mt-1.5 h-2 w-2 rounded-full bg-brand-400"
-						aria-label="Unread"
-					/>
-				) : (
-					<span className="h-2 w-2" aria-hidden />
-				)}
+			<div className="flex shrink-0 flex-col items-end gap-1 pt-0.5">
+				<span className="text-[11px] text-slate-500">{notification.timeLabel}</span>
+				{unread ? <span className="h-2 w-2 rounded-full bg-red-500" aria-label="Unread" /> : null}
 			</div>
 		</div>
 	);
@@ -321,119 +327,262 @@ function NotificationRow({
 export function ClientPortalClient({
 	data,
 	slug,
-	initialTab = "tracker",
+	initialPage = "overview",
 }: {
 	data: PublicClientPortalData;
 	slug: string;
-	initialTab?: Tab;
+	initialPage?: PortalPage;
 }) {
-	const [tab, setTab] = useState<Tab>(initialTab);
-	const [calendarMonth, setCalendarMonth] = useState(() =>
-		new Date().toISOString().slice(0, 7),
-	);
-	const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(
-		() => new Set(),
-	);
+	const [page, setPage] = useState<PortalPage>(initialPage);
+	const [calendarMonth, setCalendarMonth] = useState(() => new Date().toISOString().slice(0, 7));
+	const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(() => new Set());
+	const [bellOpen, setBellOpen] = useState(false);
+	const [overtimeOpen, setOvertimeOpen] = useState(data.hours.overtimeHours > 0);
+	const bellRef = useRef<HTMLDivElement>(null);
 
 	const notifications = useMemo(
-		() =>
-			buildClientPortalNotifications(
-				data.activeProjects,
-				data.completedProjects,
-				data.hours,
-			),
+		() => buildClientPortalNotifications(data.activeProjects, data.completedProjects, data.hours),
 		[data.activeProjects, data.completedProjects, data.hours],
 	);
+	const unreadCount = notifications.filter((n) => !readNotificationIds.has(n.id)).length;
+	const laneCaptions = useMemo(() => laneHoursCaption(data.hours), [data.hours]);
 
-	const unreadCount = notifications.filter(
-		(n) => !readNotificationIds.has(n.id),
-	).length;
+	useEffect(() => {
+		if (!bellOpen) return;
+		function onDoc(e: MouseEvent) {
+			if (bellRef.current && !bellRef.current.contains(e.target as Node)) setBellOpen(false);
+		}
+		function onKey(e: KeyboardEvent) {
+			if (e.key === "Escape") setBellOpen(false);
+		}
+		document.addEventListener("mousedown", onDoc);
+		document.addEventListener("keydown", onKey);
+		return () => {
+			document.removeEventListener("mousedown", onDoc);
+			document.removeEventListener("keydown", onKey);
+		};
+	}, [bellOpen]);
 
-	const calendarProjects =
-		tab === "tracker"
-			? data.activeProjects
-			: tab === "completed"
-				? data.completedProjects
-				: [];
+	const trackerMarks = useMemo(
+		() =>
+			data.activeProjects
+				.filter((p) => p.dueDate)
+				.map((p) => ({
+					date: p.dueDate!,
+					label: `${p.name} due`,
+					color: dueAccent(p),
+				})),
+		[data.activeProjects],
+	);
 
-	const dueMarks = useMemo(() => {
-		if (tab === "pipeline") {
-			return data.pipelineProjects
+	const pipelineMarks = useMemo(
+		() =>
+			data.pipelineProjects
 				.filter((p) => p.targetDueDate)
 				.map((p) => ({
 					date: p.targetDueDate!,
 					label: `${p.name} target`,
-					color: "#a855f7",
-				}));
-		}
-		return calendarProjects
-			.filter((p) => p.dueDate)
-			.map((p) => ({
-				date: p.dueDate!,
-				label: `${p.name} due`,
-				color: projectDueColor(daysUntilDueFromIso(p.dueDate)),
-			}));
-	}, [calendarProjects, data.pipelineProjects, tab]);
+					color: PIPELINE_PURPLE,
+				})),
+		[data.pipelineProjects],
+	);
 
-	const beatenSummary = useMemo(() => {
-		const total = data.completedProjects.length;
-		if (total === 0) return null;
-		const beaten = data.completedProjects.filter((p) =>
-			clientPortalProjectBeatDeadline(p),
-		).length;
-		const pct = Math.round((beaten / total) * 100);
-		return { beaten, total, pct };
-	}, [data.completedProjects]);
+	const calendarMarks = page === "pipeline" ? pipelineMarks : trackerMarks;
+	const upcoming =
+		page === "pipeline"
+			? data.pipelineProjects
+					.filter((p) => p.targetDueDate)
+					.map((p) => ({
+						id: p.id,
+						date: p.targetDueDate!,
+						name: p.name,
+						color: PIPELINE_PURPLE,
+					}))
+			: data.activeProjects
+					.filter((p) => p.dueDate)
+					.map((p) => ({
+						id: p.id,
+						date: p.dueDate!,
+						name: p.name,
+						color: dueAccent(p),
+					}));
+	upcoming.sort((a, b) => a.date.localeCompare(b.date));
 
-	const navItems: { id: Tab; label: string; badge?: number }[] = [
-		{ id: "tracker", label: "Project tracker" },
-		{ id: "pipeline", label: "Pipeline tracker" },
-		{ id: "completed", label: "Completed projects" },
-		{ id: "overtime", label: "Overtime" },
-		{
-			id: "notifications",
-			label: "Notifications",
-			badge: unreadCount > 0 ? unreadCount : undefined,
-		},
+	const maxAverage = Math.max(1, ...data.phaseAverages.map((p) => p.averageHours));
+	const navItems: { id: PortalPage; label: string }[] = [
+		{ id: "overview", label: "Ops Overview" },
+		{ id: "tracker", label: "Project Tracker" },
+		{ id: "pipeline", label: "Pipeline Tracker" },
+		{ id: "completed", label: "Completed Projects" },
 	];
 
-	const headerSubtitle =
-		tab === "tracker"
-			? "Live view of active project status and deadlines."
-			: tab === "pipeline"
-				? "Upcoming work scheduled before projects go live."
-				: tab === "completed"
-					? "Completed projects · due and completed dates"
-					: tab === "overtime"
-						? "Hours used this month and overtime at the agreed rate."
-					: "Beat deadline and hours updates across your projects";
+	function go(next: PortalPage) {
+		setPage(next);
+		setBellOpen(false);
+	}
+
+	function openOvertime() {
+		setPage("overview");
+		setBellOpen(false);
+		setOvertimeOpen(true);
+		requestAnimationFrame(() => {
+			document.getElementById("portal-overtime")?.scrollIntoView({ behavior: "smooth", block: "start" });
+		});
+	}
+
+	const dueLegend = (
+		<div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500">
+			<span className="inline-flex items-center gap-2">
+				<span className="h-2.5 w-2.5 rounded-sm bg-[#ef4444]" />
+				Overdue
+			</span>
+			<span className="inline-flex items-center gap-2">
+				<span className="h-2.5 w-2.5 rounded-sm bg-[#f97316]" />
+				1–3 days
+			</span>
+			<span className="inline-flex items-center gap-2">
+				<span className="h-2.5 w-2.5 rounded-sm bg-[#eab308]" />
+				4–7 days
+			</span>
+			<span className="inline-flex items-center gap-2">
+				<span className="h-2.5 w-2.5 rounded-sm bg-[#3b82f6]" />
+				8–14 days
+			</span>
+			<span className="inline-flex items-center gap-2">
+				<span className="h-2.5 w-2.5 rounded-sm bg-[#22c55e]" />
+				14+ days
+			</span>
+		</div>
+	);
+
+	const calendarPanel = (
+		<section>
+			<h2 className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Project due dates</h2>
+			<div className="client-portal-card mt-3 rounded-xl border border-white/[0.08] bg-white/[0.03] p-4">
+				<MiniMonthCalendar
+					size="lg"
+					markStyle="fill"
+					month={calendarMonth}
+					marks={calendarMarks}
+					onMonthChange={setCalendarMonth}
+					onSelectDate={(date) => setCalendarMonth(date.slice(0, 7))}
+				/>
+				{page === "pipeline" ? (
+					<p className="mt-4 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Upcoming deadlines</p>
+				) : (
+					<p className="mt-4 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Upcoming deadlines</p>
+				)}
+				<ul className="mt-3 space-y-2">
+					{upcoming.length === 0 ? (
+						<li className="text-xs text-slate-500">No dates in this view.</li>
+					) : (
+						upcoming.map((item) => (
+							<li key={item.id} className="flex items-center gap-2 text-xs">
+								<span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: item.color }} />
+								<span className="w-14 shrink-0 tabular-nums text-slate-400">{formatShortDate(item.date)}</span>
+								<span className="min-w-0 truncate text-slate-300">{item.name}</span>
+							</li>
+						))
+					)}
+				</ul>
+				{page !== "pipeline" ? dueLegend : (
+					<div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500">
+						<span className="inline-flex items-center gap-2">
+							<span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: PIPELINE_PURPLE }} />
+							Planned date
+						</span>
+					</div>
+				)}
+			</div>
+		</section>
+	);
+
+	const overtimePanel = (
+		<section id="portal-overtime" className="client-portal-card rounded-xl border border-white/[0.08] bg-white/[0.03] p-5">
+			<div className="flex items-start justify-between gap-3">
+				<div>
+					<p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Overtime this month</p>
+					{data.hours.overtimeHours > 0 ? (
+						<p className="mt-2 text-3xl font-semibold tabular-nums text-cyan-300">
+							£{data.hours.overtimeCostGbp.toLocaleString("en-GB")}
+						</p>
+					) : (
+						<p className="mt-2 text-lg font-semibold text-white">No overtime this month</p>
+					)}
+				</div>
+				{data.hours.overtimeHours > 0 ? (
+					<div className="text-right">
+						<p className="text-2xl font-semibold tabular-nums text-white">{formatPortalHours(data.hours.overtimeHours)}h</p>
+						<p className="text-[11px] text-slate-500">at £{data.hours.overtimeRateGbp}/hour</p>
+					</div>
+				) : (
+					<p className="text-[11px] text-slate-500">£{data.hours.overtimeRateGbp}/hour after 160h per lane</p>
+				)}
+			</div>
+			{laneCaptions.length > 0 ? (
+				<ul className="mt-4 space-y-1.5 text-xs text-slate-400">
+					{laneCaptions.map((row) => (
+						<li key={row.label} className="flex items-center gap-2">
+							<span
+								className="h-2 w-2 rounded-full"
+								style={{ backgroundColor: row.tone === "cap" ? "#f87171" : "#c084fc" }}
+							/>
+							{row.label}
+						</li>
+					))}
+				</ul>
+			) : null}
+			{data.hours.overtimeEntries.length > 0 ? (
+				<div className="mt-4 border-t border-white/[0.06] pt-3">
+					<button
+						type="button"
+						onClick={() => setOvertimeOpen((v) => !v)}
+						className="flex w-full items-center justify-between text-xs font-semibold uppercase tracking-wider text-slate-500"
+					>
+						Breakdown
+						<span>{overtimeOpen ? "▴" : "▾"}</span>
+					</button>
+					{overtimeOpen ? (
+						<ul className="mt-3 space-y-2">
+							{data.hours.overtimeEntries.map((entry) => (
+								<li key={entry.id} className="flex items-start justify-between gap-3 text-xs">
+									<div className="min-w-0">
+										<p className="text-slate-400">{formatShortDate(entry.date)}</p>
+										<p className="truncate font-medium text-slate-200">{entry.projectName}</p>
+										<p className="text-slate-500">{entry.taskLabel}</p>
+									</div>
+									<div className="shrink-0 text-right tabular-nums">
+										<p className="text-slate-200">{formatPortalHours(entry.hours)}h</p>
+										<p className="text-slate-500">£{entry.costGbp.toLocaleString("en-GB")}</p>
+									</div>
+								</li>
+							))}
+						</ul>
+					) : null}
+				</div>
+			) : null}
+		</section>
+	);
 
 	return (
 		<div className="flex min-h-screen">
 			<aside className="client-portal-sidebar sticky top-0 hidden h-screen w-56 shrink-0 flex-col overflow-hidden border-r border-white/[0.06] bg-[var(--bg-sidebar)] lg:flex">
 				<div className="client-portal-sidebar-scroll flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain px-4 pb-4 pt-8">
 					<ClientPortalBrandMark />
-					<p className="mt-6 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-						Your account
-					</p>
+					<p className="mt-6 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Your account</p>
 					<nav className="mt-3 space-y-1">
 						{navItems.map((item) => (
 							<button
 								key={item.id}
 								type="button"
-								onClick={() => setTab(item.id)}
+								onClick={() => setPage(item.id)}
 								className={`client-portal-nav flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm ${
-									tab === item.id
+									page === item.id
 										? "client-portal-nav-active bg-white/[0.08] text-white"
 										: "text-slate-400 hover:bg-white/[0.04]"
 								}`}
 							>
-								<span>{item.label}</span>
-								{item.badge != null ? (
-									<span className="client-portal-nav-badge rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
-										{item.badge}
-									</span>
-								) : null}
+								{item.label}
 							</button>
 						))}
 					</nav>
@@ -455,13 +604,68 @@ export function ClientPortalClient({
 								size={48}
 							/>
 							<div>
-								<h1 className="text-xl font-semibold text-white sm:text-2xl">
-									{data.client.name}
-								</h1>
-								<p className="mt-0.5 text-sm text-slate-400">{headerSubtitle}</p>
+								<h1 className="text-xl font-semibold text-white sm:text-2xl">{data.client.name}</h1>
+								<p className="mt-0.5 text-sm text-slate-400">Live view of active project status and deadlines.</p>
 							</div>
 						</div>
 						<div className="flex flex-wrap items-center gap-2">
+							<div className="relative" ref={bellRef}>
+								<button
+									type="button"
+									aria-label="Notifications"
+									onClick={() => setBellOpen((v) => !v)}
+									className="relative rounded-lg border border-white/[0.1] bg-white/[0.04] px-2.5 py-1.5 text-slate-300 hover:bg-white/[0.08]"
+								>
+									<span aria-hidden>🔔</span>
+									{unreadCount > 0 ? (
+										<span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
+											{unreadCount}
+										</span>
+									) : null}
+								</button>
+								{bellOpen ? (
+									<div className="absolute right-0 z-30 mt-2 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-white/[0.1] bg-[#0b1220] shadow-2xl">
+										<div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
+											<div className="flex items-center gap-2">
+												<p className="text-sm font-semibold text-white">Notifications</p>
+												{unreadCount > 0 ? (
+													<span className="rounded-full bg-red-500/20 px-2 py-0.5 text-[10px] font-bold text-red-300">
+														{unreadCount} new
+													</span>
+												) : null}
+											</div>
+											<button type="button" onClick={() => setBellOpen(false)} className="text-slate-500 hover:text-white">
+												×
+											</button>
+										</div>
+										<div className="max-h-80 overflow-y-auto px-4">
+											{notifications.length === 0 ? (
+												<p className="py-8 text-center text-sm text-slate-500">No notifications yet.</p>
+											) : (
+												notifications.map((n) => (
+													<NotificationRow
+														key={n.id}
+														notification={n}
+														unread={!readNotificationIds.has(n.id)}
+														onOvertime={openOvertime}
+													/>
+												))
+											)}
+										</div>
+										{unreadCount > 0 ? (
+											<div className="border-t border-white/[0.06] p-3">
+												<button
+													type="button"
+													onClick={() => setReadNotificationIds(new Set(notifications.map((n) => n.id)))}
+													className="w-full rounded-lg border border-white/[0.1] py-2 text-xs font-semibold text-slate-300 hover:bg-white/[0.04]"
+												>
+													Mark all as read
+												</button>
+											</div>
+										) : null}
+									</div>
+								) : null}
+							</div>
 							<span className="client-portal-badge rounded-lg border border-white/[0.1] bg-white/[0.04] px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-300">
 								Active lanes {data.client.activeLaneCount}
 							</span>
@@ -473,83 +677,127 @@ export function ClientPortalClient({
 							</div>
 						</div>
 					</div>
-
 					<div className="mt-4 flex flex-wrap gap-2 lg:hidden">
 						{navItems.map((item) => (
 							<button
 								key={item.id}
 								type="button"
-								onClick={() => setTab(item.id)}
-								className={`client-portal-nav inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs ${
-									tab === item.id
-										? "client-portal-nav-active bg-white/10 text-white"
-										: "text-slate-500"
+								onClick={() => setPage(item.id)}
+								className={`client-portal-nav inline-flex items-center rounded-lg px-3 py-1.5 text-xs ${
+									page === item.id ? "client-portal-nav-active bg-white/10 text-white" : "text-slate-500"
 								}`}
 							>
 								{item.label}
-								{item.badge != null ? (
-									<span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[9px] font-bold text-white">
-										{item.badge}
-									</span>
-								) : null}
 							</button>
 						))}
 					</div>
 				</header>
 
 				<main className="flex-1 px-4 py-6 sm:px-8">
-					{tab === "tracker" ? (
-						<div className="grid gap-6 xl:grid-cols-[minmax(0,360px)_1fr]">
-							<section>
-								<h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-									Project due dates
-								</h2>
-								<div className="client-portal-card mt-3 rounded-xl border border-white/[0.08] bg-white/[0.03] p-5">
-									<MiniMonthCalendar
-										size="lg"
-										markStyle="fill"
-										month={calendarMonth}
-										marks={dueMarks}
-										onSelectDate={(date) => setCalendarMonth(date.slice(0, 7))}
-									/>
-									<div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500">
-										<span className="inline-flex items-center gap-2">
-											<span className="h-2.5 w-2.5 rounded-sm bg-[#ef4444] shadow-[inset_0_0_0_1px_rgba(15,23,42,0.14)]" />
-											Overdue
-										</span>
-										<span className="inline-flex items-center gap-2">
-											<span className="h-2.5 w-2.5 rounded-sm bg-[#f97316] shadow-[inset_0_0_0_1px_rgba(15,23,42,0.14)]" />
-											1–3 days
-										</span>
-										<span className="inline-flex items-center gap-2">
-											<span className="h-2.5 w-2.5 rounded-sm bg-[#eab308] shadow-[inset_0_0_0_1px_rgba(15,23,42,0.14)]" />
-											4–7 days
-										</span>
-										<span className="inline-flex items-center gap-2">
-											<span className="h-2.5 w-2.5 rounded-sm bg-[#3b82f6] shadow-[inset_0_0_0_1px_rgba(15,23,42,0.14)]" />
-											8–14 days
-										</span>
-										<span className="inline-flex items-center gap-2">
-											<span className="h-2.5 w-2.5 rounded-sm bg-[#22c55e] shadow-[inset_0_0_0_1px_rgba(15,23,42,0.14)]" />
-											14+ days
-										</span>
+					{page === "overview" ? (
+						<div className="grid gap-6 xl:grid-cols-[minmax(0,280px)_minmax(0,1fr)_minmax(0,300px)]">
+							{calendarPanel}
+							<div className="space-y-6">
+								<section>
+									<div className="flex items-center justify-between gap-3">
+										<h2 className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+											Active projects · {data.activeProjects.length}
+										</h2>
 									</div>
-								</div>
-							</section>
-
-							<section>
-								<div className="flex items-center justify-between gap-3">
-									<h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-										Active projects
+									{data.activeProjects.length === 0 ? (
+										<p className="mt-3 text-sm text-slate-500">No active projects right now.</p>
+									) : (
+										<div className="mt-3 space-y-3">
+											{data.activeProjects.map((project) => (
+												<ProjectCard key={project.id} project={project} />
+											))}
+										</div>
+									)}
+									<div className="mt-3 flex justify-end">
+										<SectionLink label="Project Tracker" onClick={() => go("tracker")} />
+									</div>
+								</section>
+								<section>
+									<h2 className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+										Pipeline · {data.pipelineProjects.length}
 									</h2>
-									<span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-										{data.activeProjects.length} active
-									</span>
-								</div>
+									{data.pipelineProjects.length === 0 ? (
+										<p className="mt-3 text-sm text-slate-500">No upcoming pipeline projects right now.</p>
+									) : (
+										<div className="mt-3 space-y-3">
+											{data.pipelineProjects.map((project) => (
+												<PipelineCard key={project.id} project={project} />
+											))}
+										</div>
+									)}
+									<div className="mt-3 flex justify-end">
+										<SectionLink label="Pipeline Tracker" onClick={() => go("pipeline")} />
+									</div>
+								</section>
+								<section>
+									<h2 className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+										Completed projects · {data.completedProjects.length} records
+									</h2>
+									{data.completedProjects.length === 0 ? (
+										<p className="mt-3 text-sm text-slate-500">No completed packs yet.</p>
+									) : (
+										<div className="mt-3 space-y-3">
+											{data.completedProjects.slice(0, 3).map((project) => (
+												<CompletedPreviewCard key={project.id} project={project} />
+											))}
+										</div>
+									)}
+									<div className="mt-3 flex justify-end">
+										<SectionLink label="Completed Projects" onClick={() => go("completed")} />
+									</div>
+								</section>
+							</div>
+							<div className="space-y-4">
+								<section className="client-portal-card rounded-xl border border-white/[0.08] bg-white/[0.03] p-5">
+									<p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Completed packs</p>
+									<p className="mt-2 text-4xl font-semibold tabular-nums text-white">{data.completedProjects.length}</p>
+									<p className="mt-1 text-xs text-slate-500">All-time for this firm</p>
+								</section>
+								<section className="client-portal-card rounded-xl border border-white/[0.08] bg-white/[0.03] p-5">
+									<p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Average hours by phase</p>
+									{data.phaseAverages.length === 0 ? (
+										<p className="mt-3 text-sm text-slate-500">No completed-pack history to average yet.</p>
+									) : (
+										<ul className="mt-4 space-y-3">
+											{data.phaseAverages.map((row) => (
+												<li key={row.phase}>
+													<div className="flex items-center justify-between gap-2 text-xs">
+														<span className="text-slate-300">{row.label}</span>
+														<span className="tabular-nums text-slate-200">{formatPortalHours(row.averageHours)}h</span>
+													</div>
+													<div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+														<div
+															className="h-full rounded-full bg-cyan-400"
+															style={{ width: `${Math.max(6, (row.averageHours / maxAverage) * 100)}%` }}
+														/>
+													</div>
+													<p className="mt-1 text-[10px] text-slate-500">
+														{row.packCount === 1 ? "1 pack" : `${row.packCount} packs`}
+													</p>
+												</li>
+											))}
+										</ul>
+									)}
+								</section>
+								{overtimePanel}
+							</div>
+						</div>
+					) : null}
+
+					{page === "tracker" ? (
+						<div className="grid gap-6 xl:grid-cols-[minmax(0,280px)_1fr]">
+							{calendarPanel}
+							<section>
+								<h2 className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+									Active projects · {data.activeProjects.length}
+								</h2>
 								{data.activeProjects.length === 0 ? (
-									<p className="mt-3 text-sm text-slate-500">
-										No active projects right now.
-									</p>
+									<p className="mt-3 text-sm text-slate-500">No active projects right now.</p>
 								) : (
 									<div className="mt-3 space-y-3">
 										{data.activeProjects.map((project) => (
@@ -561,42 +809,18 @@ export function ClientPortalClient({
 						</div>
 					) : null}
 
-					{tab === "pipeline" ? (
-						<div className="grid gap-6 xl:grid-cols-[minmax(0,360px)_1fr]">
+					{page === "pipeline" ? (
+						<div className="grid gap-6 xl:grid-cols-[minmax(0,280px)_1fr]">
+							{calendarPanel}
 							<section>
-								<h2 className="text-xs font-semibold uppercase tracking-wider text-violet-300">
-									Pipeline target dates
-								</h2>
-								<div className="client-portal-card mt-3 rounded-xl border border-violet-500/20 bg-violet-500/[0.04] p-5">
-									<MiniMonthCalendar
-										size="lg"
-										markStyle="fill"
-										month={calendarMonth}
-										marks={dueMarks}
-										onSelectDate={(date) => setCalendarMonth(date.slice(0, 7))}
-									/>
-									<div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500">
-										<span className="inline-flex items-center gap-2">
-											<span className="h-2.5 w-2.5 rounded-sm bg-[#a855f7] shadow-[inset_0_0_0_1px_rgba(15,23,42,0.14)]" />
-											Target due date
-										</span>
-									</div>
-								</div>
-							</section>
-
-							<section>
-								<div className="flex items-center justify-between gap-3">
-									<h2 className="text-xs font-semibold uppercase tracking-wider text-violet-300">
-										Upcoming pipeline
+								<div className="flex flex-wrap items-end justify-between gap-2">
+									<h2 className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+										Upcoming pipeline · {data.pipelineProjects.length}
 									</h2>
-									<span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-										{data.pipelineProjects.length} scheduled
-									</span>
+									<p className="text-xs text-slate-500">Planned dates · Subject to confirmation</p>
 								</div>
 								{data.pipelineProjects.length === 0 ? (
-									<p className="mt-3 text-sm text-slate-500">
-										No upcoming pipeline projects right now.
-									</p>
+									<p className="mt-3 text-sm text-slate-500">No upcoming pipeline projects right now.</p>
 								) : (
 									<div className="mt-3 space-y-3">
 										{data.pipelineProjects.map((project) => (
@@ -608,150 +832,58 @@ export function ClientPortalClient({
 						</div>
 					) : null}
 
-					{tab === "completed" ? (
-						<section className="space-y-5">
-							<div>
-								<h2 className="text-2xl font-semibold text-white">
-									Completed projects
-								</h2>
-								{beatenSummary ? (
-									<p className="mt-1 text-sm text-emerald-400 client-portal-accent-emerald">
-										Beaten deadlines {beatenSummary.beaten} of{" "}
-										{beatenSummary.total} · {beatenSummary.pct}% delivered on
-										or ahead of deadline
-									</p>
-								) : (
-									<p className="mt-1 text-sm text-slate-500">
-										No completed projects yet.
-									</p>
-								)}
-							</div>
-
+					{page === "completed" ? (
+						<section>
+							<h2 className="text-2xl font-semibold text-white">Completed Projects</h2>
+							<p className="mt-1 text-sm text-slate-500">
+								{data.completedProjects.length === 1
+									? "1 completed pack"
+									: `${data.completedProjects.length} completed packs`}
+							</p>
 							{data.completedProjects.length > 0 ? (
-								<div className="client-portal-card overflow-x-auto rounded-xl ring-1 ring-white/[0.06]">
-									<table className="client-portal-completed-table w-full min-w-[28rem] table-fixed text-left text-sm">
-										<colgroup>
-											<col style={{ width: "52%" }} />
-											<col style={{ width: "24%" }} />
-											<col style={{ width: "24%" }} />
-										</colgroup>
+								<div className="client-portal-card mt-5 overflow-x-auto rounded-xl ring-1 ring-white/[0.06]">
+									<table className="client-portal-completed-table w-full min-w-[44rem] text-left text-sm">
 										<thead className="bg-white/[0.03] text-[10px] uppercase tracking-wider text-slate-500">
 											<tr>
-												<th className="px-4 py-3 text-left font-semibold">Project</th>
-												<th className="px-4 py-3 text-left font-semibold">Due date</th>
-												<th className="px-4 py-3 text-left font-semibold">Completed date</th>
+												<th className="px-4 py-3 font-semibold">Project</th>
+												<th className="px-4 py-3 font-semibold">Drawing pack / phase</th>
+												<th className="px-4 py-3 font-semibold">Completed date</th>
+												<th className="px-4 py-3 font-semibold">Your lead</th>
+												<th className="px-4 py-3 font-semibold">Complexity</th>
 											</tr>
 										</thead>
 										<tbody>
 											{data.completedProjects.map((project) => (
-												<CompletedTableRow key={project.id} project={project} />
+												<tr key={project.id} className="client-portal-completed-row border-b border-white/[0.06] last:border-b-0">
+													<td className="px-4 py-4">
+														<p className="font-semibold text-white">{project.name}</p>
+														{project.address ? <p className="mt-0.5 text-xs text-slate-500">{project.address}</p> : null}
+													</td>
+													<td className="px-4 py-4 text-slate-300">{project.currentStageLabel}</td>
+													<td className="px-4 py-4 whitespace-nowrap text-slate-300">{formatDateOnly(project.completedAt)}</td>
+													<td className="px-4 py-4 text-slate-300">{project.leadName ?? "—"}</td>
+													<td className="px-4 py-4">
+														<span
+															className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${complexityClass(project.complexityLabel)}`}
+														>
+															{project.complexityLabel}
+														</span>
+													</td>
+												</tr>
 											))}
 										</tbody>
 									</table>
 								</div>
-							) : null}
-						</section>
-					) : null}
-
-					{tab === "overtime" ? (
-						<section className="space-y-5">
-							<div>
-								<h2 className="text-2xl font-semibold text-white">Overtime</h2>
-								<p className="mt-1 text-sm text-slate-500">
-									{data.hours.monthLabel} · included hours {data.hours.includedHours}h at the
-									lane allocation, then £{data.hours.overtimeRateGbp}/hr.
-								</p>
-							</div>
-							<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-								<div className="client-portal-card rounded-xl border border-white/[0.08] bg-white/[0.03] p-5">
-									<p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-										Hours used
-									</p>
-									<p className="mt-2 text-2xl font-semibold tabular-nums text-white">
-										{data.hours.hoursUsed}h
-									</p>
-								</div>
-								<div className="client-portal-card rounded-xl border border-white/[0.08] bg-white/[0.03] p-5">
-									<p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-										Hours remaining
-									</p>
-									<p className="mt-2 text-2xl font-semibold tabular-nums text-white">
-										{data.hours.hoursRemaining}h
-									</p>
-								</div>
-								<div className="client-portal-card rounded-xl border border-white/[0.08] bg-white/[0.03] p-5">
-									<p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-										Overtime hours
-									</p>
-									<p className="mt-2 text-2xl font-semibold tabular-nums text-white">
-										{data.hours.overtimeHours}h
-									</p>
-								</div>
-								<div className="client-portal-card rounded-xl border border-white/[0.08] bg-white/[0.03] p-5">
-									<p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-										Overtime at £{data.hours.overtimeRateGbp}/hr
-									</p>
-									<p className="mt-2 text-2xl font-semibold tabular-nums text-white">
-										£{data.hours.overtimeCostGbp.toLocaleString("en-GB")}
-									</p>
-								</div>
-							</div>
-							<div className="client-portal-card rounded-xl border border-white/[0.08] bg-white/[0.03] p-5">
-								<p className="text-sm text-slate-400">
-									Each lane includes {data.hours.includedHours > 0 ? 160 : 0} hours per month.
-									You&apos;ll see a notification at 10 hours remaining, and again when the included
-									hours are used. Extra time is tracked here at £{data.hours.overtimeRateGbp} per
-									hour.
-								</p>
-							</div>
-						</section>
-					) : null}
-
-					{tab === "notifications" ? (
-						<section>
-							<div className="flex items-center justify-between gap-3">
-								<h2 className="text-2xl font-semibold text-white">
-									Notifications
-								</h2>
-								{unreadCount > 0 ? (
-									<button
-										type="button"
-										onClick={() =>
-											setReadNotificationIds(
-												new Set(notifications.map((n) => n.id)),
-											)
-										}
-										className="text-sm font-medium text-brand-300 hover:text-brand-200"
-									>
-										Mark all read
-									</button>
-								) : null}
-							</div>
-							<div className="client-portal-card mt-4 rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 sm:px-5">
-								{notifications.length === 0 ? (
-									<p className="py-8 text-center text-sm text-slate-500">
-										No notifications yet.
-									</p>
-								) : (
-									notifications.map((n) => (
-										<NotificationRow
-											key={n.id}
-											notification={n}
-											unread={!readNotificationIds.has(n.id)}
-										/>
-									))
-								)}
-							</div>
+							) : (
+								<p className="mt-6 text-sm text-slate-500">No completed packs yet.</p>
+							)}
 						</section>
 					) : null}
 				</main>
 
 				<footer className="client-portal-footer border-t border-white/[0.06] px-4 py-4 text-center text-[11px] text-slate-500 sm:px-8">
 					Powered by Blocharch ·{" "}
-					<Link
-						href={clientPortalPath(slug)}
-						className="text-slate-500 hover:text-slate-400"
-					>
+					<Link href={clientPortalPath(slug)} className="text-slate-500 hover:text-slate-400">
 						Client portal
 					</Link>
 				</footer>

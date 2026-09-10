@@ -15,10 +15,12 @@ export function ProjectProgressBar({
   percent,
   showLabel = true,
   className = "",
+  barClassName = "",
 }: {
   percent: number | null | undefined;
   showLabel?: boolean;
   className?: string;
+  barClassName?: string;
 }) {
   const p = percent == null ? 0 : Math.max(0, Math.min(100, percent));
   const fill = progressBarColor(p);
@@ -39,7 +41,7 @@ export function ProjectProgressBar({
         aria-valuemax={100}
       >
         <div
-          className="h-full rounded-full transition-all duration-300"
+          className={`h-full rounded-full transition-all duration-300 ${barClassName}`}
           style={{ width: `${p}%`, backgroundColor: fill }}
         />
       </div>

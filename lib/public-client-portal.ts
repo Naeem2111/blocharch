@@ -1,4 +1,4 @@
-import type { OpsProjectPhase, OpsProjectStatus } from "@prisma/client";
+import type { OpsProjectComplexity, OpsProjectPhase, OpsProjectStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { findDoneColumnId } from "@/lib/planner-completed";
 import {
@@ -10,8 +10,8 @@ import {
 import { parseClientDeliverables, type ClientPortalDeliverable } from "@/lib/client-portal-deliverables";
 import { ensureOpsProjectDueDates } from "@/lib/project-due-sources";
 import { serializePublicPipelineRow } from "@/lib/ops-pipeline-serialize";
-import { PROJECT_STATUS_LABELS, displayProjectStageLabel } from "@/lib/ops-constants";
-import { getClientPortalHours, type ClientPortalHours } from "@/lib/client-portal-hours";
+import { PROJECT_STATUS_LABELS, COMPLEXITY_LABELS, displayProjectStageLabel } from "@/lib/ops-constants";
+import { getClientPortalHours, getClientPortalPhaseAverages, type ClientPortalHours, type ClientPortalPhaseAverage } from "@/lib/client-portal-hours";
 
 export type PublicClientPortalTask = {
   id: string;
@@ -44,10 +44,13 @@ export type PublicClientPortalProject = {
   deadlineBeatenDays: number | null;
   deadlineBeatenMinutes: number | null;
   laneNumber: number;
+  assignedAthleteId: string | null;
   assignedAthleteName: string | null;
   completedAt: string | null;
   clientDescription: string | null;
   clientDeliverables: ClientPortalDeliverable[];
+  complexity: OpsProjectComplexity;
+  complexityLabel: string;
 };
 
 export type PublicClientPortalPipelineProject = {
@@ -73,6 +76,7 @@ export type PublicClientPortalData = {
   activeProjects: PublicClientPortalProject[];
   completedProjects: PublicClientPortalProject[];
   hours: ClientPortalHours;
+  phaseAverages: ClientPortalPhaseAverage[];
 };
 
 function clientStatusBadge(
@@ -88,9 +92,9 @@ function clientStatusBadge(
     case "zoom_required":
       return { label: "Zoom required", color: "#a855f7" };
     case "in_progress":
-      return { label: "On track", color: "#22c55e" };
+      return { label: "In progress", color: "#3b82f6" };
     case "not_started":
-      return { label: "Scheduled", color: "#94a3b8" };
+      return { label: "On track", color: "#22c55e" };
     case "blocked":
       return { label: "Blocked", color: "#ef4444" };
     case "completed":
@@ -133,7 +137,8 @@ function mapProject(
       profilePhotoBgColor: string | null;
       profilePhotoTextTone: string | null;
     } | null;
-    assignedAthlete: { fullName: string } | null;
+    complexity: OpsProjectComplexity;
+    assignedAthlete: { id: string; fullName: string } | null;
   },
   openTasks: PublicClientPortalTask[],
   laneNumber: number
@@ -163,10 +168,13 @@ function mapProject(
     deadlineBeatenDays: p.deadlineBeatenDays,
     deadlineBeatenMinutes: p.deadlineBeatenMinutes,
     laneNumber,
+    assignedAthleteId: p.assignedAthlete?.id ?? null,
     assignedAthleteName: p.assignedAthlete?.fullName ?? null,
     completedAt: p.completedAt?.toISOString() ?? null,
     clientDescription: p.clientDescription?.trim() || null,
     clientDeliverables: parseClientDeliverables(p.clientDeliverables),
+    complexity: p.complexity,
+    complexityLabel: COMPLEXITY_LABELS[p.complexity],
   };
 }
 
@@ -197,7 +205,7 @@ export async function getPublicClientPortal(clientSlug: string): Promise<PublicC
           profilePhotoTextTone: true,
         },
       },
-      assignedAthlete: { select: { fullName: true } },
+      assignedAthlete: { select: { id: true, fullName: true } },
     },
   });
 
@@ -272,11 +280,13 @@ export async function getPublicClientPortal(clientSlug: string): Promise<PublicC
     });
   })();
 
+  const completedProjects = mapped.filter(isClientPortalCompletedProject);
   const hours = await getClientPortalHours({
     clientId: client.id,
     activeLaneCount,
     overtimeRateGbp: Number(client.commercial?.overtimeBillingGbp ?? 20),
   });
+  const phaseAverages = await getClientPortalPhaseAverages(completedProjects);
 
   return {
     client: {
@@ -289,7 +299,8 @@ export async function getPublicClientPortal(clientSlug: string): Promise<PublicC
     },
     pipelineProjects: pipelineRows.map(serializePublicPipelineRow),
     activeProjects: mapped.filter(isClientPortalActiveProject),
-    completedProjects: mapped.filter(isClientPortalCompletedProject),
+    completedProjects,
     hours,
+    phaseAverages,
   };
 }

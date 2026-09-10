@@ -25,6 +25,7 @@ export function MiniMonthCalendar({
   marks = [],
   selectedDate,
   onSelectDate,
+  onMonthChange,
   className = "",
   size = "sm",
   markStyle = "dot",
@@ -34,6 +35,7 @@ export function MiniMonthCalendar({
   marks?: CalendarMark[];
   selectedDate?: string;
   onSelectDate?: (date: string) => void;
+  onMonthChange?: (month: string) => void;
   className?: string;
   /** sm = compact (dashboard); lg = client portal */
   size?: "sm" | "lg";
@@ -75,19 +77,52 @@ export function MiniMonthCalendar({
         squareLg ? "mini-month-calendar-square" : ""
       } ${className}`}
     >
-      <p
-        className={`mini-calendar-title font-medium text-slate-400 ${
-          isLg ? "text-sm" : "text-xs"
-        }`}
-      >
-        {monthLabel}
-      </p>
+      <div className="flex items-center justify-between gap-2">
+        <p
+          className={`mini-calendar-title font-medium text-slate-200 ${
+            isLg ? "text-sm" : "text-xs"
+          }`}
+        >
+          {monthLabel}
+        </p>
+        {onMonthChange ? (
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              aria-label="Previous month"
+              onClick={() => {
+                const { year, monthIndex } = parseMonth(month);
+                const prev = new Date(year, monthIndex - 1, 1);
+                onMonthChange(`${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}`);
+              }}
+              className="rounded-md px-1.5 py-0.5 text-slate-500 hover:bg-white/[0.06] hover:text-slate-300"
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              aria-label="Next month"
+              onClick={() => {
+                const { year, monthIndex } = parseMonth(month);
+                const next = new Date(year, monthIndex + 1, 1);
+                onMonthChange(`${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`);
+              }}
+              className="rounded-md px-1.5 py-0.5 text-slate-500 hover:bg-white/[0.06] hover:text-slate-300"
+            >
+              ›
+            </button>
+          </div>
+        ) : null}
+      </div>
       <div
         className={`mt-2 grid grid-cols-7 text-center ${
           isLg ? "gap-1.5 text-sm" : "gap-1 text-[10px]"
         }`}
       >
-        {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => (
+        {(isLg
+          ? ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+          : ["M", "T", "W", "T", "F", "S", "S"]
+        ).map((d, i) => (
           <span
             key={`${d}-${i}`}
             className={`mini-calendar-weekday font-medium text-slate-600 ${

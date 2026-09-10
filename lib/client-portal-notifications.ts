@@ -18,6 +18,7 @@ export type ClientPortalNotification = {
   description: string;
   timeLabel: string;
   projectId: string;
+  action?: "overtime";
 };
 
 function relativeLabelFromIso(iso: string | null, fallback = "Recently"): string {
@@ -38,39 +39,32 @@ function relativeLabelFromIso(iso: string | null, fallback = "Recently"): string
 
 export function buildHoursNotifications(hours: ClientPortalHours): ClientPortalNotification[] {
   const items: ClientPortalNotification[] = [];
-  if (hours.includedHours <= 0) return items;
+  const rate = hours.overtimeRateGbp;
 
-  if (hours.hoursRemaining > 0 && hours.hoursRemaining <= 10) {
-    items.push({
-      id: `hours-warning-${hours.monthLabel}`,
-      kind: "hours_warning",
-      title: `${hours.hoursRemaining} hour${hours.hoursRemaining === 1 ? "" : "s"} remaining this month`,
-      description: `${hours.hoursUsed}h of ${hours.includedHours} included hours used in ${hours.monthLabel}.`,
-      timeLabel: "This month",
-      projectId: "hours",
-    });
-  }
-
-  if (hours.hoursUsed >= hours.includedHours) {
-    items.push({
-      id: `hours-cap-${hours.monthLabel}`,
-      kind: "hours_cap",
-      title: `${hours.includedHours} included hours reached`,
-      description: `Included hours for ${hours.monthLabel} are used. Further time is overtime at £${hours.overtimeRateGbp}/hr.`,
-      timeLabel: "This month",
-      projectId: "hours",
-    });
-  }
-
-  if (hours.overtimeHours > 0) {
-    items.push({
-      id: `overtime-${hours.monthLabel}`,
-      kind: "overtime",
-      title: `${hours.overtimeHours} overtime hour${hours.overtimeHours === 1 ? "" : "s"} this month`,
-      description: `Billed at £${hours.overtimeRateGbp}/hr · £${hours.overtimeCostGbp.toLocaleString("en-GB")} estimated.`,
-      timeLabel: "This month",
-      projectId: "hours",
-    });
+  for (const lane of hours.lanes) {
+    if (lane.allowanceReached) {
+      items.push({
+        id: `hours-cap-${hours.monthLabel}-${lane.laneNumber}`,
+        kind: "hours_cap",
+        title: `${lane.laneLabel} · Allowance reached`,
+        description: `Your included allowance has been reached. Additional time is now logged at £${rate}/hour.`,
+        timeLabel: "This month",
+        projectId: `lane-${lane.laneNumber}`,
+        action: "overtime",
+      });
+      continue;
+    }
+    if (lane.warning) {
+      const remaining = lane.hoursRemaining;
+      items.push({
+        id: `hours-warning-${hours.monthLabel}-${lane.laneNumber}`,
+        kind: "hours_warning",
+        title: `${lane.laneLabel} · ${remaining} hour${remaining === 1 ? "" : "s"} remaining`,
+        description: `You have ${remaining} included hour${remaining === 1 ? "" : "s"} remaining this month. Additional time is billed at £${rate}/hour once your allowance is reached.`,
+        timeLabel: "This month",
+        projectId: `lane-${lane.laneNumber}`,
+      });
+    }
   }
 
   return items;
@@ -104,3 +98,16 @@ export function buildClientPortalNotifications(
 
   return [...(hours ? buildHoursNotifications(hours) : []), ...deadlineItems];
 }
+
+export function laneHoursCaption(
+  hours: ClientPortalHours
+): { label: string; tone: "cap" | "warn" }[] {
+  return hours.lanes
+    .filter((lane) => lane.allowanceReached || lane.warning)
+    .map((lane) =>
+      lane.allowanceReached
+        ? { label: `${lane.laneLabel} · allowance reached`, tone: "cap" as const }
+        : { label: `${lane.laneLabel} · ${lane.hoursRemaining}h remaining`, tone: "warn" as const }
+    );
+}
+

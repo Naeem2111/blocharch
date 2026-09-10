@@ -4,8 +4,8 @@ import { brandAssets } from "@/lib/blocharch-brand";
 import { DEFAULT_THEME, THEME_COOKIE, normalizeTheme } from "@/lib/theme";
 
 export const metadata: Metadata = {
-  title: "Project tracker — Blocharch",
-  description: "Live view of your active projects and open tasks.",
+  title: "Client portal — Blocharch",
+  description: "Live view of your active projects, pipeline and completed packs.",
   icons: {
     icon: [{ url: brandAssets.favicon, type: "image/png" }],
   },

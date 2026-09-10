@@ -105,6 +105,8 @@ export function laneCostForTier(tier: OpsPricingTier): number {
 
 /** Included production hours per lane per month (lane billing is fixed; hours track utilization). */
 export const LANE_MONTHLY_HOURS = 160;
+/** First client-portal warning when a lane reaches this many hours in the month. */
+export const LANE_HOURS_WARNING = 150;
 
 export function monthlyLaneRevenueGbp(laneCostGbp: number, activeLaneCount: number): number {
   return laneCostGbp * Math.max(0, activeLaneCount);
