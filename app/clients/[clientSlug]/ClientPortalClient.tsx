@@ -26,6 +26,24 @@ import type {
 
 type PortalPage = "overview" | "tracker" | "pipeline" | "completed";
 
+type UpcomingDeadline =
+	| {
+			key: string;
+			kind: "active";
+			date: string;
+			name: string;
+			color: string;
+			project: PublicClientPortalProject;
+	  }
+	| {
+			key: string;
+			kind: "pipeline";
+			date: string;
+			name: string;
+			color: string;
+			project: PublicClientPortalPipelineProject;
+	  };
+
 const PIPELINE_PURPLE = "#a855f7";
 
 function formatDateOnly(iso: string | null): string {
@@ -45,6 +63,14 @@ function formatShortDate(iso: string | null): string {
 	const d = new Date(`${iso}T12:00:00`);
 	if (Number.isNaN(d.getTime())) return iso;
 	return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+}
+
+function dueInLabel(iso: string): string {
+	const days = daysUntilDueFromIso(iso);
+	if (days == null) return "";
+	if (days < 0) return `${Math.abs(days)} day${Math.abs(days) === 1 ? "" : "s"} overdue`;
+	if (days === 0) return "Due today";
+	return `Due in ${days} day${days === 1 ? "" : "s"}`;
 }
 
 function dueAccent(project: PublicClientPortalProject): string {
@@ -253,6 +279,67 @@ function PipelineCard({ project }: { project: PublicClientPortalPipelineProject 
 	);
 }
 
+function DeadlineDetailModal({
+	item,
+	onClose,
+}: {
+	item: UpcomingDeadline;
+	onClose: () => void;
+}) {
+	const relative = dueInLabel(item.date);
+	return (
+		<div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+			<button
+				type="button"
+				className="absolute inset-0 bg-black/70"
+				aria-label="Close deadline details"
+				onClick={onClose}
+			/>
+			<div
+				role="dialog"
+				aria-modal="true"
+				aria-labelledby="deadline-dialog-title"
+				className="client-portal-card modal-panel relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-white/[0.08] bg-[var(--bg-page)] p-5"
+			>
+				<div className="flex items-start justify-between gap-3">
+					<div className="min-w-0">
+						<p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+							Upcoming deadline
+						</p>
+						<h2 id="deadline-dialog-title" className="mt-1 text-lg font-semibold leading-snug text-white">
+							{item.name}
+						</h2>
+						<p className="mt-1 text-sm tabular-nums text-slate-200">
+							{formatDateOnly(item.date)}
+							{relative ? <span className="text-slate-300"> · {relative}</span> : null}
+						</p>
+					</div>
+					<button
+						type="button"
+						onClick={onClose}
+						className="shrink-0 rounded-lg px-2 py-1 text-sm text-slate-300 hover:bg-white/[0.06] hover:text-white"
+					>
+						Close
+					</button>
+				</div>
+				<div className="mt-4">
+					{item.kind === "active" ? (
+						<ProjectCard project={item.project} />
+					) : (
+						<PipelineCard project={item.project} />
+					)}
+				</div>
+				{item.kind === "pipeline" && item.project.description ? (
+					<p className="mt-4 text-sm leading-relaxed text-slate-200">{item.project.description}</p>
+				) : null}
+				{item.kind === "active" && item.project.clientDescription ? (
+					<p className="mt-4 text-sm leading-relaxed text-slate-200">{item.project.clientDescription}</p>
+				) : null}
+			</div>
+		</div>
+	);
+}
+
 function CompletedPreviewCard({ project }: { project: PublicClientPortalProject }) {
 	return (
 		<article className="client-portal-card relative overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.03] p-4">
@@ -360,6 +447,7 @@ export function ClientPortalClient({
 	const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(() => new Set());
 	const [bellOpen, setBellOpen] = useState(false);
 	const [overtimeOpen, setOvertimeOpen] = useState(data.hours.overtimeHours > 0);
+	const [deadlineItem, setDeadlineItem] = useState<UpcomingDeadline | null>(null);
 	const bellRef = useRef<HTMLDivElement>(null);
 
 	const notifications = useMemo(
@@ -370,12 +458,17 @@ export function ClientPortalClient({
 	const laneCaptions = useMemo(() => laneHoursCaption(data.hours), [data.hours]);
 
 	useEffect(() => {
-		if (!bellOpen) return;
+		if (!bellOpen && !deadlineItem) return;
 		function onDoc(e: MouseEvent) {
-			if (bellRef.current && !bellRef.current.contains(e.target as Node)) setBellOpen(false);
+			if (bellOpen && bellRef.current && !bellRef.current.contains(e.target as Node)) setBellOpen(false);
 		}
 		function onKey(e: KeyboardEvent) {
-			if (e.key === "Escape") setBellOpen(false);
+			if (e.key !== "Escape") return;
+			if (deadlineItem) {
+				setDeadlineItem(null);
+				return;
+			}
+			setBellOpen(false);
 		}
 		document.addEventListener("mousedown", onDoc);
 		document.addEventListener("keydown", onKey);
@@ -383,7 +476,7 @@ export function ClientPortalClient({
 			document.removeEventListener("mousedown", onDoc);
 			document.removeEventListener("keydown", onKey);
 		};
-	}, [bellOpen]);
+	}, [bellOpen, deadlineItem]);
 
 	const trackerMarks = useMemo(
 		() =>
@@ -410,23 +503,27 @@ export function ClientPortalClient({
 	);
 
 	const calendarMarks = page === "pipeline" ? pipelineMarks : trackerMarks;
-	const upcoming =
+	const upcoming: UpcomingDeadline[] =
 		page === "pipeline"
 			? data.pipelineProjects
 					.filter((p) => p.targetDueDate)
 					.map((p) => ({
-						id: p.id,
+						key: `pipeline-${p.id}`,
+						kind: "pipeline" as const,
 						date: p.targetDueDate!,
 						name: p.name,
 						color: PIPELINE_PURPLE,
+						project: p,
 					}))
 			: data.activeProjects
 					.filter((p) => p.dueDate)
 					.map((p) => ({
-						id: p.id,
+						key: `active-${p.id}`,
+						kind: "active" as const,
 						date: p.dueDate!,
 						name: p.name,
 						color: dueAccent(p),
+						project: p,
 					}));
 	upcoming.sort((a, b) => a.date.localeCompare(b.date));
 
@@ -459,6 +556,8 @@ export function ClientPortalClient({
 				<MiniMonthCalendar
 					size="lg"
 					markStyle="fill"
+					squareCells
+					className="w-full max-w-[17.5rem]"
 					month={calendarMonth}
 					marks={calendarMarks}
 					onMonthChange={setCalendarMonth}
@@ -470,10 +569,16 @@ export function ClientPortalClient({
 						<li className="text-xs text-slate-500">No dates in this view.</li>
 					) : (
 						upcoming.map((item) => (
-							<li key={item.id} className="flex items-center gap-2 text-xs">
-								<span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: item.color }} />
-								<span className="w-14 shrink-0 tabular-nums text-slate-400">{formatShortDate(item.date)}</span>
-								<span className="min-w-0 truncate text-slate-300">{item.name}</span>
+							<li key={item.key}>
+								<button
+									type="button"
+									onClick={() => setDeadlineItem(item)}
+									className="flex w-full items-center gap-2 rounded-md px-1 py-1 text-left text-xs hover:bg-white/[0.05]"
+								>
+									<span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: item.color }} />
+									<span className="w-14 shrink-0 tabular-nums text-slate-400">{formatShortDate(item.date)}</span>
+									<span className="min-w-0 truncate text-slate-200">{item.name}</span>
+								</button>
 							</li>
 						))
 					)}
@@ -871,6 +976,7 @@ export function ClientPortalClient({
 					</Link>
 				</footer>
 			</div>
+			{deadlineItem ? <DeadlineDetailModal item={deadlineItem} onClose={() => setDeadlineItem(null)} /> : null}
 		</div>
 	);
 }

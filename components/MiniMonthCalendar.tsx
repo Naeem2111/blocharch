@@ -41,7 +41,7 @@ export function MiniMonthCalendar({
   size?: "sm" | "lg";
   /** dot = indicator under day; fill = highlight entire day cell */
   markStyle?: "dot" | "fill";
-  /** lg only — 1:1 day cells instead of wide rectangles */
+  /** 1:1 day cells instead of wide rectangles */
   squareCells?: boolean;
 }) {
   const { year, monthIndex } = parseMonth(month);
@@ -69,7 +69,7 @@ export function MiniMonthCalendar({
   const monthLabel = firstDay.toLocaleString("en-GB", { month: "long", year: "numeric" });
   const pad = (n: number) => String(n).padStart(2, "0");
   const isLg = size === "lg";
-  const squareLg = isLg && squareCells;
+  const squareLg = squareCells;
 
   return (
     <div
@@ -134,7 +134,12 @@ export function MiniMonthCalendar({
         ))}
         {cells.map((day, i) => {
           if (day == null) {
-            return <span key={`e-${i}`} className={squareLg ? "aspect-square" : undefined} />;
+            return (
+              <span
+                key={`e-${i}`}
+                className={squareLg ? "mini-month-calendar-square-cell aspect-square" : undefined}
+              />
+            );
           }
           const iso = `${year}-${pad(monthIndex + 1)}-${pad(day)}`;
           const dayMarks = markByDay.get(day) ?? [];

@@ -5,11 +5,11 @@ import { brandAssets } from "@/lib/blocharch-brand";
 export function ClientPortalAthleteMark({ className = "" }: { className?: string }) {
   return (
     <Image
-      src={brandAssets.favicon}
+      src={brandAssets.athleteAssigned}
       alt=""
-      width={16}
-      height={16}
-      className={`inline-block h-4 w-4 shrink-0 ${className}`}
+      width={20}
+      height={20}
+      className={`inline-block h-5 w-5 shrink-0 object-contain ${className}`}
     />
   );
 }

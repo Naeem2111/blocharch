@@ -10,6 +10,8 @@ export const brandAssets = {
   clientLogoDark: "/brand/blocharch-logo-dark.png",
   /** Isometric cube favicon */
   favicon: "/brand/favicon-192.png",
+  /** Client portal “Athlete assigned” cube mark */
+  athleteAssigned: "/brand/athlete-assigned.png",
   /** @deprecated use `logo` — kept for imports expecting `wordmark` */
   wordmark: "/brand/blocharch-logo.png",
 } as const;
