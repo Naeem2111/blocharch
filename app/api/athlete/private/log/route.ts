@@ -5,6 +5,7 @@ import { requirePrivateAthleteSession } from "@/lib/private-access";
 import { parseDateOnly } from "@/lib/ops-hours";
 import { privateAthleteHourlyRateZar } from "@/lib/private-athlete-earnings";
 import { resolvePrivateProgressPercent } from "@/lib/private-progress";
+import { whereAthletePrivateProjects } from "@/lib/private-project-assignments";
 
 export async function GET(request: NextRequest) {
   const gate = await requirePrivateAthleteSession(request);
@@ -21,8 +22,10 @@ export async function GET(request: NextRequest) {
 
   const projects = await prisma.privateProject.findMany({
     where: {
-      assignedAthleteId: gate.athlete.id,
-      status: { in: ["active", "on_hold"] },
+      AND: [
+        whereAthletePrivateProjects(gate.athlete.id),
+        { status: { in: ["active", "on_hold"] } },
+      ],
     },
     orderBy: { name: "asc" },
     select: {
@@ -83,8 +86,10 @@ export async function POST(request: NextRequest) {
     const project = await prisma.privateProject.findFirst({
       where: {
         id: projectId,
-        assignedAthleteId: gate.athlete.id,
-        status: { in: ["active", "on_hold"] },
+        AND: [
+          whereAthletePrivateProjects(gate.athlete.id),
+          { status: { in: ["active", "on_hold"] } },
+        ],
       },
     });
     if (!project) {

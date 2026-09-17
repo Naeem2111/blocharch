@@ -3,9 +3,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { whereAthleteProjectAccess, whereProjectHoursByAthlete } from "@/lib/ops-project-assignments";
 import {
-  isOpsProjectPhase,
   isOpsProjectStatus,
 } from "@/lib/ops-constants";
+import { resolveOpsStageInput } from "@/lib/ops-catalog";
 import {
   athleteProjectSelect,
   requireAthletePortalSession,
@@ -96,6 +96,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const body = await request.json();
     const data: {
       currentStage?: typeof project.currentStage;
+      customStageId?: string | null;
       currentStatus?: typeof project.currentStatus;
       progressPercent?: number;
       completedAt?: null;
@@ -105,11 +106,12 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     } = {};
 
     if (body.currentStage != null) {
-      const stage = String(body.currentStage);
-      if (!isOpsProjectPhase(stage)) {
-        return NextResponse.json({ error: "Invalid project stage" }, { status: 400 });
+      const resolved = await resolveOpsStageInput(String(body.currentStage));
+      if (!resolved.ok) {
+        return NextResponse.json({ error: resolved.error }, { status: 400 });
       }
-      data.currentStage = stage;
+      data.currentStage = resolved.currentStage;
+      data.customStageId = resolved.customStageId;
     }
 
     if (body.currentStatus != null) {

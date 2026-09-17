@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import {
   COMPLEXITY_LABELS,
-  PROJECT_PHASE_LABELS,
   PROJECT_STATUS_LABELS,
   projectStageSelectValue,
 } from "@/lib/ops-constants";
@@ -16,6 +15,8 @@ import {
 import { composeDueAtIso, splitDueAtIso } from "@/lib/planner-due-datetime";
 import { formatEarlyFromDueAndCompleted } from "@/lib/project-deadline";
 import type { OpsProjectPhase } from "@prisma/client";
+import { catalogValueFromId } from "@/lib/ops-catalog-types";
+import { useOpsCatalog } from "@/lib/use-ops-catalog";
 
 type ClientContact = { id: string; name: string; email: string | null };
 
@@ -33,7 +34,8 @@ type ProjectDetail = {
   assignedAthleteName: string | null;
   assignedAthleteCode: string | null;
   projectLeadContactId: string | null;
-  currentStage: keyof typeof PROJECT_PHASE_LABELS;
+  currentStage: string;
+  customStageId?: string | null;
   currentStatus: string;
   complexity: keyof typeof COMPLEXITY_LABELS;
   progressPercent: number | null;
@@ -93,6 +95,7 @@ export function ArchiveProjectDetailPanel({
   onReactivate?: () => void;
   reactivating?: boolean;
 }) {
+  const { phases } = useOpsCatalog();
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [submissions, setSubmissions] = useState<SubmissionRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -124,7 +127,7 @@ export function ArchiveProjectDetailPanel({
       name: p.name,
       address: p.address ?? "",
       projectLeadContactId: p.projectLeadContactId ?? "",
-      currentStage: p.currentStage,
+      currentStage: p.customStageId ? catalogValueFromId(p.customStageId) : p.currentStage,
       currentStatus: p.currentStatus,
       progressPercent: p.progressPercent != null ? String(p.progressPercent) : "",
       startDate: p.startDate ?? "",
@@ -284,13 +287,17 @@ export function ArchiveProjectDetailPanel({
                 <label className="text-xs text-slate-400">
                   Stage
                   <select
-                    value={projectStageSelectValue(form.currentStage as OpsProjectPhase)}
+                    value={
+                      form.currentStage.startsWith("custom:")
+                        ? form.currentStage
+                        : projectStageSelectValue(form.currentStage as OpsProjectPhase)
+                    }
                     onChange={(e) => setForm((f) => ({ ...f, currentStage: e.target.value }))}
                     className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
                   >
-                    {Object.entries(PROJECT_PHASE_LABELS).map(([k, l]) => (
-                      <option key={k} value={k}>
-                        {l}
+                    {phases.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
                       </option>
                     ))}
                   </select>

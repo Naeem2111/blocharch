@@ -8,6 +8,7 @@ import { parseDateOnly } from "@/lib/ops-hours";
 import { parseSubmissionLineItems } from "@/lib/ops-submission-mutate";
 import { syncProjectProgressForProjects } from "@/lib/sync-project-progress";
 import { projectDisplayFields } from "@/lib/project-display";
+import { linePhaseSelectValue } from "@/lib/ops-catalog-types";
 
 export async function GET(request: NextRequest) {
   const gate = await requireOpsSession(request);
@@ -37,7 +38,7 @@ export async function GET(request: NextRequest) {
       },
       lineItems: {
         include: {
-          project: { select: { id: true, name: true, currentStage: true, projectNumber: true } },
+          project: { select: { id: true, name: true, currentStage: true, projectNumber: true, customStage: { select: { label: true } } } },
           client: { select: { id: true, name: true, logoUrl: true, logoBgColor: true, logoTextTone: true } },
         },
       },
@@ -77,7 +78,7 @@ export async function GET(request: NextRequest) {
             clientLogoUrl: li.client.logoUrl,
             clientLogoBgColor: li.client.logoBgColor,
             clientLogoTextTone: li.client.logoTextTone,
-            projectPhase: li.projectPhase,
+            projectPhase: linePhaseSelectValue(li.projectPhase, li.customPhaseId),
             taskType: li.taskType,
             taskTypes: li.taskTypes?.length ? li.taskTypes : [li.taskType],
             hoursWorked: Number(li.hoursWorked),
@@ -99,7 +100,7 @@ export async function GET(request: NextRequest) {
           clientLogoUrl: li.client.logoUrl,
           clientLogoBgColor: li.client.logoBgColor,
           clientLogoTextTone: li.client.logoTextTone,
-          projectPhase: li.projectPhase,
+          projectPhase: linePhaseSelectValue(li.projectPhase, li.customPhaseId),
           taskType: li.taskType,
           taskTypes: li.taskTypes?.length ? li.taskTypes : [li.taskType],
           hoursWorked: Number(li.hoursWorked),

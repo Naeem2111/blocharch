@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
 import { asAvatarTextTone } from "@/lib/avatar-text-tone";
 import { OPS_PROJECT_STAGE_OPTIONS } from "@/lib/ops-constants";
+import { useOpsCatalog } from "@/lib/use-ops-catalog";
 
 type ClientOption = {
   id: string;
@@ -53,6 +54,8 @@ const inputClass =
   "mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white";
 
 export function OpsPipelineClient() {
+  const { phases } = useOpsCatalog();
+  const builtInPhases = phases.filter((p) => p.isBuiltIn);
   const [rows, setRows] = useState<PipelineRow[]>([]);
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [athletes, setAthletes] = useState<AthleteOption[]>([]);
@@ -324,7 +327,7 @@ export function OpsPipelineClient() {
               onChange={(e) => setForm((f) => ({ ...f, expectedStage: e.target.value }))}
               className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
             >
-              {OPS_PROJECT_STAGE_OPTIONS.map((o) => (
+              {(builtInPhases.length > 0 ? builtInPhases : OPS_PROJECT_STAGE_OPTIONS).map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
                 </option>

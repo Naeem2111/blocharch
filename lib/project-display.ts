@@ -1,13 +1,21 @@
 import type { OpsProjectPhase } from "@prisma/client";
 import { displayProjectStageLabel } from "@/lib/ops-constants";
 
-export function projectStageDisplayLabel(stage: OpsProjectPhase): string {
+export function projectStageDisplayLabel(
+  stage: OpsProjectPhase,
+  customLabel?: string | null,
+): string {
+  if (customLabel) return customLabel;
   return displayProjectStageLabel(stage);
 }
 
 /** Full title with stage/package — consistent across athlete, admin, archives, and daily logs. */
-export function formatProjectFullTitle(name: string, currentStage: OpsProjectPhase): string {
-  const stageLabel = displayProjectStageLabel(currentStage);
+export function formatProjectFullTitle(
+  name: string,
+  currentStage: OpsProjectPhase,
+  customLabel?: string | null,
+): string {
+  const stageLabel = projectStageDisplayLabel(currentStage, customLabel);
   const trimmed = name.trim();
   if (!trimmed) return stageLabel;
 
@@ -23,8 +31,13 @@ export function formatProjectFullTitle(name: string, currentStage: OpsProjectPha
   return `${trimmed} (${stageLabel})`;
 }
 
-export function projectDisplayFields(project: { name: string; currentStage: OpsProjectPhase }) {
-  const stageLabel = projectStageDisplayLabel(project.currentStage);
-  const displayTitle = formatProjectFullTitle(project.name, project.currentStage);
+export function projectDisplayFields(project: {
+  name: string;
+  currentStage: OpsProjectPhase;
+  customStage?: { label: string } | null;
+}) {
+  const customLabel = project.customStage?.label ?? null;
+  const stageLabel = projectStageDisplayLabel(project.currentStage, customLabel);
+  const displayTitle = formatProjectFullTitle(project.name, project.currentStage, customLabel);
   return { stageLabel, displayTitle };
 }

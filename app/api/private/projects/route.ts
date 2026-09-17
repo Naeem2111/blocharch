@@ -8,6 +8,12 @@ import { serializePrivateProject } from "@/lib/private-serialize";
 import { parseDateOnly } from "@/lib/ops-hours";
 import { defaultPhaseSplits } from "@/lib/private-phase-splits";
 import { defaultPhaseStructure } from "@/lib/private-phase-structure";
+import {
+  activePrivateAthleteAssignmentsInclude,
+  applyPrivateProjectAthleteAssignments,
+  parseOptionalPrivateAssignment,
+  privateAssignedAthleteSelect,
+} from "@/lib/private-project-assignments";
 
 const projectInclude = {
   client: {
@@ -20,13 +26,9 @@ const projectInclude = {
     },
   },
   assignedAthlete: {
-    select: {
-      id: true,
-      fullName: true,
-      athleteCode: true,
-      privateWeeklyCapHours: true,
-    },
+    select: privateAssignedAthleteSelect,
   },
+  athleteAssignments: activePrivateAthleteAssignmentsInclude,
   customProjectType: {
     select: { id: true, label: true },
   },
@@ -69,9 +71,11 @@ export async function POST(request: NextRequest) {
     const address = String(body.address || body.projectAddress || "").trim();
     const name = String(body.name || address || "").trim();
     const feeZar = Number(body.feeZar ?? body.fee ?? 0);
-    const assignedAthleteId = body.assignedAthleteId
-      ? String(body.assignedAthleteId).trim()
-      : null;
+    const assignment = parseOptionalPrivateAssignment(body);
+    if ("error" in assignment) {
+      return NextResponse.json({ error: assignment.error }, { status: 400 });
+    }
+    const assignedAthleteId = assignment.primaryAthleteId;
     const designStage = isPrivateDesignStage(String(body.designStage || ""))
       ? body.designStage
       : "site_measure_up";
@@ -90,9 +94,12 @@ export async function POST(request: NextRequest) {
     if (!Number.isFinite(feeZar) || feeZar < 0) {
       return NextResponse.json({ error: "Fee must be a non-negative number" }, { status: 400 });
     }
-    if (assignedAthleteId) {
-      const athlete = await prisma.opsAthlete.findUnique({ where: { id: assignedAthleteId } });
-      if (!athlete) {
+    if (assignment.athleteIds.length > 0) {
+      const found = await prisma.opsAthlete.findMany({
+        where: { id: { in: assignment.athleteIds } },
+        select: { id: true },
+      });
+      if (found.length !== assignment.athleteIds.length) {
         return NextResponse.json({ error: "Assigned athlete not found" }, { status: 400 });
       }
     }
@@ -150,8 +157,9 @@ export async function POST(request: NextRequest) {
           stageStartedAt: new Date(),
           stageNotes: body.stageNotes ? String(body.stageNotes) : null,
         },
-        include: projectInclude,
       });
+
+      await applyPrivateProjectAthleteAssignments(project.id, assignment, tx);
 
       await tx.privateProjectUpdate.create({
         data: {
@@ -163,7 +171,10 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      return project;
+      return tx.privateProject.findUniqueOrThrow({
+        where: { id: project.id },
+        include: projectInclude,
+      });
     });
 
     return NextResponse.json({ project: serializePrivateProject(created) }, { status: 201 });

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { MiniMonthCalendar } from "@/components/MiniMonthCalendar";
 import { ProgressSlider } from "@/components/ProgressSlider";
 import { CheckInRequestModal } from "@/components/athlete/CheckInRequestModal";
-import { DAILY_PROJECT_PHASE_OPTIONS, DAILY_TASK_TYPE_OPTIONS } from "@/lib/ops-daily-form";
+import { useOpsCatalog } from "@/lib/use-ops-catalog";
 
 type AssignedProject = {
   id: string;
@@ -212,6 +212,7 @@ function lineItemToPayload(li: LineItemForm, projects: AssignedProject[]) {
 }
 
 export function AthleteSubmissionsClient() {
+  const { phases, workTypes } = useOpsCatalog();
   const [projects, setProjects] = useState<AssignedProject[]>([]);
   const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
   const [pastSubmissions, setPastSubmissions] = useState<PastSubmission[]>([]);
@@ -800,7 +801,7 @@ export function AthleteSubmissionsClient() {
                   onChange={(e) => updateLine(li.key, { projectPhase: e.target.value })}
                   className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
                 >
-                  {DAILY_PROJECT_PHASE_OPTIONS.map((opt) => (
+                  {phases.map((opt) => (
                     <option key={opt.value} value={opt.value}>
                       {opt.label}
                     </option>
@@ -810,7 +811,7 @@ export function AthleteSubmissionsClient() {
               <div className="text-xs text-slate-400 md:col-span-2">
                 <p className="mb-2">Task types (select all that apply)</p>
                 <div className="flex flex-wrap gap-2">
-                  {DAILY_TASK_TYPE_OPTIONS.map((opt) => {
+                  {workTypes.map((opt) => {
                     const checked = li.taskTypes.includes(opt.value);
                     return (
                       <label

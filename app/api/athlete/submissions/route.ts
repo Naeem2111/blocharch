@@ -14,6 +14,8 @@ import { computeMonthlyHoursSummary, dateOnlyUtc, parseDateOnly } from "@/lib/op
 import { buildDailyHourAlerts, isSubmissionEditable } from "@/lib/ops-alerts";
 import { lockStaleSubmissions } from "@/lib/ops-commercial";
 import { parseSubmissionLineItems } from "@/lib/ops-submission-mutate";
+import { assertCustomWorkTypeIds } from "@/lib/ops-catalog";
+import { linePhaseSelectValue } from "@/lib/ops-catalog-types";
 import { syncProjectProgressForProjects } from "@/lib/sync-project-progress";
 import { projectDisplayFields } from "@/lib/project-display";
 
@@ -37,7 +39,14 @@ export async function GET(request: NextRequest) {
     include: {
       lineItems: {
         include: {
-          project: { select: { name: true, projectNumber: true, currentStage: true } },
+          project: {
+            select: {
+              name: true,
+              projectNumber: true,
+              currentStage: true,
+              customStage: { select: { label: true } },
+            },
+          },
           client: { select: { name: true } },
         },
       },
@@ -67,7 +76,7 @@ export async function GET(request: NextRequest) {
             projectName: "Client housekeeping",
             projectDisplayTitle: "Client housekeeping",
             projectNumber: "—",
-            projectPhase: li.projectPhase,
+            projectPhase: linePhaseSelectValue(li.projectPhase, li.customPhaseId),
             taskType: li.taskType,
             taskTypes: li.taskTypes?.length ? li.taskTypes : [li.taskType],
             hoursWorked: Number(li.hoursWorked),
@@ -86,7 +95,7 @@ export async function GET(request: NextRequest) {
           projectName: li.project.name,
           projectDisplayTitle: displayTitle,
           projectNumber: li.project.projectNumber,
-          projectPhase: li.projectPhase,
+          projectPhase: linePhaseSelectValue(li.projectPhase, li.customPhaseId),
           taskType: li.taskType,
           taskTypes: li.taskTypes?.length ? li.taskTypes : [li.taskType],
           hoursWorked: Number(li.hoursWorked),
@@ -113,6 +122,22 @@ export async function POST(request: NextRequest) {
 
     if (!lineItems) {
       return NextResponse.json({ error: "At least one valid project entry is required" }, { status: 400 });
+    }
+
+    const customWorkTypeError = await assertCustomWorkTypeIds(lineItems.flatMap((li) => li.taskTypes));
+    if (customWorkTypeError) {
+      return NextResponse.json({ error: customWorkTypeError }, { status: 400 });
+    }
+    const customPhaseIds = Array.from(
+      new Set(lineItems.map((li) => li.customPhaseId).filter((id): id is string => Boolean(id))),
+    );
+    if (customPhaseIds.length > 0) {
+      const found = await prisma.opsCatalogPhase.count({
+        where: { id: { in: customPhaseIds }, builtInKey: null },
+      });
+      if (found !== customPhaseIds.length) {
+        return NextResponse.json({ error: "Unknown project phase / package" }, { status: 400 });
+      }
     }
 
     for (const li of lineItems) {
@@ -181,6 +206,7 @@ export async function POST(request: NextRequest) {
             projectId: li.projectId,
             isHousekeeping: li.isHousekeeping,
             projectPhase: li.projectPhase,
+            customPhaseId: li.customPhaseId,
             taskType: li.taskType,
             taskTypes: li.taskTypes,
             hoursWorked: li.hoursWorked,
@@ -210,6 +236,7 @@ export async function POST(request: NextRequest) {
               projectId: li.projectId,
               isHousekeeping: li.isHousekeeping,
               projectPhase: li.projectPhase,
+              customPhaseId: li.customPhaseId,
               taskType: li.taskType,
               taskTypes: li.taskTypes,
               hoursWorked: li.hoursWorked,

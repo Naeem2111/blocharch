@@ -37,6 +37,7 @@ type Detail = {
       overTypical: boolean;
     };
     athlete: { fullName: string; initials: string } | null;
+    athletes?: Array<{ fullName: string; initials: string; isPrimary: boolean }>;
     client: { id: string; name: string; slug: string | null };
     hoursLifeToDate: number | null;
     phaseGroups: Array<{
@@ -615,13 +616,25 @@ export function PrivateProjectDetailClient({
         <section className="card-tool rounded-xl p-5">
           <h3 className="text-sm font-semibold text-white">Athlete & dates</h3>
           <p className="mt-3 text-sm text-slate-300">
-            {p.athlete ? (
-              <>
-                <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-brand-500/20 text-[10px] font-bold text-brand-200">
-                  {p.athlete.initials}
-                </span>
-                {p.athlete.fullName}
-              </>
+            {(p.athletes && p.athletes.length > 0 ? p.athletes : p.athlete ? [p.athlete] : []).length > 0 ? (
+              <span className="flex flex-col gap-2">
+                {(p.athletes && p.athletes.length > 0
+                  ? p.athletes
+                  : p.athlete
+                    ? [{ ...p.athlete, isPrimary: true }]
+                    : []
+                ).map((a) => (
+                  <span key={a.fullName} className="flex items-center gap-2">
+                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-brand-500/20 text-[10px] font-bold text-brand-200">
+                      {a.initials}
+                    </span>
+                    {a.fullName}
+                    {"isPrimary" in a && a.isPrimary ? (
+                      <span className="text-[10px] uppercase tracking-wider text-slate-500">Primary</span>
+                    ) : null}
+                  </span>
+                ))}
+              </span>
             ) : (
               "Unassigned"
             )}

@@ -4,12 +4,14 @@ import {
   isOpsTaskType,
   isOpsUrgencyStatus,
 } from "@/lib/ops-constants";
+import { catalogIdFromValue, isCustomCatalogValue } from "@/lib/ops-catalog-types";
 
 export type SubmissionLineItemInput = {
   clientId: string;
   projectId: string | null;
   isHousekeeping: boolean;
   projectPhase: OpsProjectPhase;
+  customPhaseId: string | null;
   taskType: OpsTaskType;
   taskTypes: string[];
   hoursWorked: number;
@@ -39,6 +41,7 @@ export function parseSubmissionLineItems(raw: unknown): SubmissionLineItemInput[
         projectId: null,
         isHousekeeping: true,
         projectPhase: "housekeeping_internal",
+        customPhaseId: null,
         taskType: "admin_housekeeping",
         taskTypes: ["admin_housekeeping"],
         hoursWorked,
@@ -52,12 +55,19 @@ export function parseSubmissionLineItems(raw: unknown): SubmissionLineItemInput[
 
     const projectId = String(o.projectId || "").trim();
     if (!projectId) return null;
-    const projectPhase = String(o.projectPhase || "");
-    if (!isOpsProjectPhase(projectPhase)) return null;
+    const projectPhaseRaw = String(o.projectPhase || "");
+    const customPhaseId = catalogIdFromValue(projectPhaseRaw);
+    const projectPhase: OpsProjectPhase | "" = customPhaseId
+      ? "custom"
+      : isOpsProjectPhase(projectPhaseRaw) && projectPhaseRaw !== "custom"
+        ? projectPhaseRaw
+        : "";
+    if (!projectPhase) return null;
     const rawTypes = Array.isArray(o.taskTypes)
-      ? o.taskTypes.map((t) => String(t)).filter((t) => isOpsTaskType(t))
+      ? o.taskTypes.map((t) => String(t)).filter((t) => isOpsTaskType(t) || isCustomCatalogValue(t))
       : [];
-    const taskType = rawTypes[0] ?? (isOpsTaskType(String(o.taskType || "")) ? String(o.taskType) : "");
+    const taskType = (rawTypes.find((t) => isOpsTaskType(t)) as OpsTaskType | undefined)
+      ?? (isOpsTaskType(String(o.taskType || "")) ? (String(o.taskType) as OpsTaskType) : rawTypes.length > 0 ? "other" : "");
     if (!isOpsTaskType(taskType)) return null;
     const taskTypes = rawTypes.length > 0 ? rawTypes : [taskType];
     const urgency = String(o.urgencyStatus || "normal");
@@ -66,6 +76,7 @@ export function parseSubmissionLineItems(raw: unknown): SubmissionLineItemInput[
       projectId,
       isHousekeeping: false,
       projectPhase,
+      customPhaseId,
       taskType,
       taskTypes,
       hoursWorked,

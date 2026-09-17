@@ -10,10 +10,10 @@ import { AthleteAvatar } from "@/components/ops/AthleteAvatar";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
 import { asAvatarTextTone } from "@/lib/avatar-text-tone";
 import { actsAsManager } from "@/lib/effective-roles";
-import {
-  PROJECT_PHASE_LABELS,
-  TASK_TYPE_LABELS,
-} from "@/lib/ops-constants";
+import { PROJECT_PHASE_LABELS } from "@/lib/ops-constants";
+import { formatTaskTypesDisplay } from "@/lib/ops-daily-form";
+import { useOpsCatalog } from "@/lib/use-ops-catalog";
+import { catalogOptionLabel } from "@/lib/ops-catalog-types";
 import type { UserRole } from "@/lib/users-store";
 
 type FilterOption = {
@@ -65,7 +65,7 @@ type LoggedCompletion = {
   clientLogoTextTone: string | null;
   projectName: string;
   projectNumber: string;
-  projectPhase: keyof typeof PROJECT_PHASE_LABELS;
+  projectPhase: string;
   taskType: keyof typeof TASK_TYPE_LABELS;
   taskTypes: string[];
   hoursWorked: number;
@@ -100,14 +100,15 @@ function formatDateTime(iso: string): string {
   });
 }
 
-function taskTypesLabel(row: LoggedCompletion): string {
-  const types = row.taskTypes?.length ? row.taskTypes : [row.taskType];
-  return types
-    .map((t) => TASK_TYPE_LABELS[t as keyof typeof TASK_TYPE_LABELS] ?? t)
-    .join(", ");
+function taskTypesLabel(
+  row: LoggedCompletion,
+  workTypes: { value: string; label: string }[],
+): string {
+  return formatTaskTypesDisplay(row.taskType, row.taskTypes, workTypes);
 }
 
 export function OpsArchivesClient() {
+  const { phases, workTypes } = useOpsCatalog();
   const [data, setData] = useState<ArchivesData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -462,9 +463,14 @@ export function OpsArchivesClient() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-slate-300">
-                      <p>{taskTypesLabel(row)}</p>
+                      <p>{taskTypesLabel(row, workTypes)}</p>
                       <p className="text-xs text-slate-500">
-                        {PROJECT_PHASE_LABELS[row.projectPhase]} · {row.hoursWorked}h ·{" "}
+                        {catalogOptionLabel(
+                          row.projectPhase,
+                          phases,
+                          PROJECT_PHASE_LABELS[row.projectPhase as keyof typeof PROJECT_PHASE_LABELS],
+                        )}{" "}
+                        · {row.hoursWorked}h ·{" "}
                         {row.completionPercent ?? 100}%
                       </p>
                     </td>

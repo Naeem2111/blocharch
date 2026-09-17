@@ -22,6 +22,12 @@ import {
   defaultPhaseStructure,
   resolvePhaseStructure,
 } from "@/lib/private-phase-structure";
+import {
+  activePrivateAthleteAssignmentsInclude,
+  applyPrivateProjectAthleteAssignments,
+  parseOptionalPrivateAssignment,
+  privateAssignedAthleteSelect,
+} from "@/lib/private-project-assignments";
 
 const projectInclude = {
   client: {
@@ -34,13 +40,9 @@ const projectInclude = {
     },
   },
   assignedAthlete: {
-    select: {
-      id: true,
-      fullName: true,
-      athleteCode: true,
-      privateWeeklyCapHours: true,
-    },
+    select: privateAssignedAthleteSelect,
   },
+  athleteAssignments: activePrivateAthleteAssignmentsInclude,
   customProjectType: {
     select: { id: true, label: true },
   },
@@ -156,15 +158,18 @@ export async function PATCH(
     if (body.dueDate !== undefined) {
       data.dueDate = body.dueDate ? parseDateOnly(String(body.dueDate)) : null;
     }
-    if (body.assignedAthleteId !== undefined) {
-      const athleteId = body.assignedAthleteId ? String(body.assignedAthleteId) : null;
-      if (athleteId) {
-        const athlete = await prisma.opsAthlete.findUnique({ where: { id: athleteId } });
-        if (!athlete) {
-          return NextResponse.json({ error: "Assigned athlete not found" }, { status: 400 });
-        }
+    const hasAssignmentFields =
+      body.assignedAthleteId !== undefined ||
+      body.assignedAthleteIds !== undefined ||
+      body.primaryAthleteId !== undefined;
+    let assignment: { athleteIds: string[]; primaryAthleteId: string | null } | null = null;
+    if (hasAssignmentFields) {
+      const parsed = parseOptionalPrivateAssignment(body);
+      if ("error" in parsed) {
+        return NextResponse.json({ error: parsed.error }, { status: 400 });
       }
-      data.assignedAthleteId = athleteId;
+      assignment = parsed;
+      data.assignedAthleteId = parsed.primaryAthleteId;
     }
     if (body.feeZar !== undefined) data.feeZar = Number(body.feeZar);
     if (body.costZar !== undefined) data.costZar = Number(body.costZar);
@@ -286,27 +291,18 @@ export async function PATCH(
       const project = await tx.privateProject.update({
         where: { id: params.id },
         data,
-        include: {
-          client: {
-            select: {
-              id: true,
-              name: true,
-              contactEmail: true,
-              contactPhone: true,
-              slug: true,
-            },
-          },
-          assignedAthlete: {
-            select: {
-              id: true,
-              fullName: true,
-              athleteCode: true,
-              privateWeeklyCapHours: true,
-            },
-          },
-          customProjectType: { select: { id: true, label: true } },
-        },
       });
+
+      if (assignment) {
+        try {
+          await applyPrivateProjectAthleteAssignments(project.id, assignment, tx);
+        } catch (e) {
+          if (e instanceof Error && e.message === "Athlete not found") {
+            throw new Error("ATHLETE_NOT_FOUND");
+          }
+          throw e;
+        }
+      }
 
       if (data.designStage && data.designStage !== existing.designStage) {
         const label =
@@ -325,11 +321,32 @@ export async function PATCH(
         });
       }
 
-      return project;
+      return tx.privateProject.findUniqueOrThrow({
+        where: { id: project.id },
+        include: {
+          client: {
+            select: {
+              id: true,
+              name: true,
+              contactEmail: true,
+              contactPhone: true,
+              slug: true,
+            },
+          },
+          assignedAthlete: {
+            select: privateAssignedAthleteSelect,
+          },
+          athleteAssignments: activePrivateAthleteAssignmentsInclude,
+          customProjectType: { select: { id: true, label: true } },
+        },
+      });
     });
 
     return NextResponse.json({ project: serializePrivateProject(updated) });
   } catch (e) {
+    if (e instanceof Error && e.message === "ATHLETE_NOT_FOUND") {
+      return NextResponse.json({ error: "Assigned athlete not found" }, { status: 400 });
+    }
     console.error(e);
     return NextResponse.json({ error: "Could not update project" }, { status: 500 });
   }

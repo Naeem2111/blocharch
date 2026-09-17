@@ -1,9 +1,9 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { resolveOpsStageInput } from "@/lib/ops-catalog";
 import {
   isOpsProjectComplexity,
-  isOpsProjectPhase,
   isOpsProjectStatus,
 } from "@/lib/ops-constants";
 import { requireOpsPipelineSession } from "@/lib/ops-access";
@@ -58,11 +58,14 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
 
     const complexity = isOpsProjectComplexity(String(body.complexity || "")) ? body.complexity : "medium";
-    const stageFromBody = String(body.currentStage || "").trim();
-    const currentStage =
-      (stageFromBody && isOpsProjectPhase(stageFromBody) ? stageFromBody : null) ??
-      pipeline.expectedStage ??
-      "survey_conversion";
+    const stageResolved = await resolveOpsStageInput(
+      String(body.currentStage || pipeline.expectedStage || "survey_conversion"),
+    );
+    if (!stageResolved.ok) {
+      return NextResponse.json({ error: stageResolved.error }, { status: 400 });
+    }
+    const currentStage = stageResolved.currentStage;
+    const customStageId = stageResolved.customStageId;
     const currentStatus = isOpsProjectStatus(String(body.currentStatus || ""))
       ? body.currentStatus
       : "not_started";
@@ -85,6 +88,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
           address: pipeline.address,
           complexity,
           currentStage,
+          customStageId,
           currentStatus,
           startDate,
           dueDate,

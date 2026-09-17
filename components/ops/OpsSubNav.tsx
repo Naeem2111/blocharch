@@ -16,6 +16,7 @@ export const OPS_NAV: OpsNavItem[] = [
   { href: "/dashboard/ops/submissions", label: "Daily submissions", badgeKey: "submissionCheckIns" },
   { href: "/dashboard/ops/pipeline", label: "Pipeline" },
   { href: "/dashboard/ops/projects", label: "Projects" },
+  { href: "/dashboard/ops/catalog", label: "Phases & work types" },
   { href: "/dashboard/ops/archives", label: "Project archives" },
   { href: "/dashboard/ops/commercial", label: "Commercial" },
   { href: "/dashboard/ops/check-ins", label: "Check-in requests", badgeKey: "checkIns" },

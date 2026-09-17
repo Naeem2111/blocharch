@@ -5,6 +5,7 @@ import type { OpsUrgencyStatus } from "@prisma/client";
 import { requireOpsSession } from "@/lib/ops-access";
 import { parseDateOnly } from "@/lib/ops-hours";
 import { parseSubmissionLineItems } from "@/lib/ops-submission-mutate";
+import { assertCustomWorkTypeIds } from "@/lib/ops-catalog";
 import { syncProjectProgressForProjects } from "@/lib/sync-project-progress";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -48,6 +49,12 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (body.lineItems != null && !lineItems) {
       return NextResponse.json({ error: "Invalid line items" }, { status: 400 });
     }
+    if (lineItems) {
+      const customWorkTypeError = await assertCustomWorkTypeIds(lineItems.flatMap((li) => li.taskTypes));
+      if (customWorkTypeError) {
+        return NextResponse.json({ error: customWorkTypeError }, { status: 400 });
+      }
+    }
 
     const submissionDate =
       body.submissionDate != null
@@ -73,6 +80,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       projectId: li.projectId,
       isHousekeeping: li.isHousekeeping,
       projectPhase: li.projectPhase,
+      customPhaseId: li.customPhaseId,
       taskType: li.taskType,
       taskTypes: li.taskTypes?.length ? li.taskTypes : [li.taskType],
       hoursWorked: Number(li.hoursWorked),
@@ -132,6 +140,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
           projectId: li.projectId,
           isHousekeeping: li.isHousekeeping,
           projectPhase: li.projectPhase,
+          customPhaseId: "customPhaseId" in li ? li.customPhaseId : null,
           taskType: li.taskType,
           taskTypes: li.taskTypes,
           hoursWorked: li.hoursWorked,

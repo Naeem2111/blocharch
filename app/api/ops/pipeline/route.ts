@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { isOpsProjectPhase } from "@/lib/ops-constants";
+import { parsePipelineExpectedStage } from "@/lib/ops-catalog";
 import { requireOpsPipelineSession } from "@/lib/ops-access";
 import { parseDateOnly } from "@/lib/ops-hours";
 import { serializePipelineRow } from "@/lib/ops-pipeline-serialize";
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     if (!client) return NextResponse.json({ error: "Client not found" }, { status: 404 });
 
     const expectedStageRaw = String(body.expectedStage || "").trim();
-    const expectedStage = isOpsProjectPhase(expectedStageRaw) ? expectedStageRaw : null;
+    const expectedStage = parsePipelineExpectedStage(expectedStageRaw);
 
     const maxOrder = await prisma.opsPipelineProject.aggregate({
       where: { clientId, convertedAt: null },

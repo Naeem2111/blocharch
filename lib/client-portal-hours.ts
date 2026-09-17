@@ -8,6 +8,8 @@ import {
 } from "@/lib/ops-constants";
 import { monthEndUtc, monthStartUtc } from "@/lib/ops-hours";
 import type { OpsProjectPhase, OpsTaskType } from "@prisma/client";
+import { listOpsWorkTypeOptions } from "@/lib/ops-catalog";
+import { catalogOptionLabel } from "@/lib/ops-catalog-types";
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -59,10 +61,14 @@ export type ClientPortalHours = {
   overtimeEntries: ClientPortalOvertimeEntry[];
 };
 
-function taskLabel(taskType: OpsTaskType, taskTypes: string[]): string {
+function taskLabel(
+  taskType: OpsTaskType,
+  taskTypes: string[],
+  options: { value: string; label: string }[],
+): string {
   const types = taskTypes.length > 0 ? taskTypes : [taskType];
   return types
-    .map((t) => (t in TASK_TYPE_LABELS ? TASK_TYPE_LABELS[t as OpsTaskType] : t))
+    .map((t) => catalogOptionLabel(t, options, t in TASK_TYPE_LABELS ? TASK_TYPE_LABELS[t as OpsTaskType] : t))
     .join(", ");
 }
 
@@ -78,7 +84,8 @@ export async function getClientPortalHours(input: {
   const overtimeRateGbp = Math.max(0, Number(input.overtimeRateGbp) || 0);
   const includedHours = laneIncludedHours(input.activeLaneCount);
 
-  const items = await prisma.opsSubmissionLineItem.findMany({
+  const [items, workTypes] = await Promise.all([
+    prisma.opsSubmissionLineItem.findMany({
     where: {
       clientId: input.clientId,
       isHousekeeping: false,
@@ -94,7 +101,9 @@ export async function getClientPortalHours(input: {
       project: { select: { name: true } },
     },
     orderBy: [{ createdAt: "asc" }],
-  });
+    }),
+    listOpsWorkTypeOptions(),
+  ]);
 
   items.sort((a, b) => {
     const da = a.submission.submissionDate.getTime();
@@ -165,7 +174,7 @@ export async function getClientPortalHours(input: {
         id: item.id,
         date: item.submission.submissionDate.toISOString().slice(0, 10),
         projectName: item.project?.name ?? "Unassigned",
-        taskLabel: taskLabel(item.taskType, item.taskTypes),
+        taskLabel: taskLabel(item.taskType, item.taskTypes, workTypes),
         hours: overtimeOnItem,
         costGbp: round2(overtimeOnItem * overtimeRateGbp),
         laneNumber,

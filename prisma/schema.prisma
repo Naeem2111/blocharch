@@ -111,6 +111,7 @@ enum OpsProjectPhase {
   tender_construction_pack
   construction
   housekeeping_internal
+  custom
 }
 
 enum OpsTaskType {
@@ -461,6 +462,7 @@ model OpsAthlete {
   athleteNotifications OpsAthleteNotification[]
   checkInRequests OpsCheckInRequest[]
   privateProjects PrivateProject[]
+  privateProjectAssignments PrivateProjectAthleteAssignment[]
   privateHourLogs PrivateHourLog[]
   privateProjectExpenses PrivateProjectExpense[]
 
@@ -510,6 +512,8 @@ model OpsProject {
   dueDate           DateTime?           @map("due_date")
   handoverDate      DateTime?           @map("handover_date") @db.Date
   currentStage      OpsProjectPhase     @default(survey_conversion) @map("current_stage")
+  /** When currentStage is custom, this is the catalog phase/package. */
+  customStageId     String?             @map("custom_stage_id")
   currentStatus     OpsProjectStatus    @default(not_started) @map("current_status")
   /** Latest progress % from daily log (0–100). */
   progressPercent   Int?                @map("progress_percent")
@@ -543,6 +547,7 @@ model OpsProject {
   outboxTasks     OpsOutboxTask[]
   checkInRequests OpsCheckInRequest[]
   pipelineSource  OpsPipelineProject?
+  customStage     OpsCatalogPhase?      @relation("ProjectCustomStage", fields: [customStageId], references: [id], onDelete: SetNull)
 
   @@index([clientId, projectNumber])
   @@index([assignedAthleteId])
@@ -730,6 +735,7 @@ model OpsSubmissionLineItem {
   /** Internal client housekeeping — no project progress or client portal visibility. */
   isHousekeeping    Boolean          @default(false) @map("is_housekeeping")
   projectPhase      OpsProjectPhase  @map("project_phase")
+  customPhaseId     String?          @map("custom_phase_id")
   taskType          OpsTaskType      @map("task_type")
   taskTypes         String[]         @default([]) @map("task_types")
   hoursWorked       Decimal          @map("hours_worked") @db.Decimal(5, 2)
@@ -744,10 +750,36 @@ model OpsSubmissionLineItem {
   submission OpsDailySubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
   client     OpsClient          @relation(fields: [clientId], references: [id], onDelete: Cascade)
   project    OpsProject?        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  customPhase OpsCatalogPhase?  @relation("LineItemCustomPhase", fields: [customPhaseId], references: [id], onDelete: SetNull)
 
   @@index([submissionId])
   @@index([projectId])
   @@map("ops_submission_line_items")
+}
+
+/** Extra / renamed athlete-operations phases and packages. */
+model OpsCatalogPhase {
+  id         String           @id @default(uuid())
+  label      String
+  builtInKey OpsProjectPhase? @unique @map("built_in_key")
+  sortOrder  Int              @default(0) @map("sort_order")
+  createdAt  DateTime         @default(now()) @map("created_at")
+
+  projects  OpsProject[]            @relation("ProjectCustomStage")
+  lineItems OpsSubmissionLineItem[] @relation("LineItemCustomPhase")
+
+  @@map("ops_catalog_phases")
+}
+
+/** Extra / renamed daily-log work types. */
+model OpsCatalogWorkType {
+  id         String       @id @default(uuid())
+  label      String
+  builtInKey OpsTaskType? @unique @map("built_in_key")
+  sortOrder  Int          @default(0) @map("sort_order")
+  createdAt  DateTime     @default(now()) @map("created_at")
+
+  @@map("ops_catalog_work_types")
 }
 
 model OpsExchangeRate {
@@ -873,11 +905,30 @@ model PrivateProject {
   hourLogs        PrivateHourLog[]
   expenses        PrivateProjectExpense[]
   documents       PrivateProjectDocument[]
+  athleteAssignments PrivateProjectAthleteAssignment[]
 
   @@index([clientId])
   @@index([assignedAthleteId])
   @@index([status, designStage])
   @@map("private_projects")
+}
+
+/** Active and historical athlete assignments on a private project. Primary is mirrored on PrivateProject.assignedAthleteId. */
+model PrivateProjectAthleteAssignment {
+  id         String    @id @default(uuid())
+  projectId  String    @map("project_id")
+  athleteId  String    @map("athlete_id")
+  isPrimary  Boolean   @default(false) @map("is_primary")
+  assignedAt DateTime  @default(now()) @map("assigned_at")
+  removedAt  DateTime? @map("removed_at")
+
+  project PrivateProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  athlete OpsAthlete     @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, athleteId])
+  @@index([projectId, removedAt])
+  @@index([athleteId, removedAt])
+  @@map("private_project_athlete_assignments")
 }
 
 model PrivateProjectUpdate {

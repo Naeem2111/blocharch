@@ -1,9 +1,9 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { resolveOpsStageInput } from "@/lib/ops-catalog";
 import {
   isOpsProjectComplexity,
-  isOpsProjectPhase,
   isOpsProjectStatus,
 } from "@/lib/ops-constants";
 import { requireOpsSession } from "@/lib/ops-access";
@@ -49,6 +49,7 @@ export async function GET(request: NextRequest) {
       assignedAthlete: { select: { id: true, fullName: true, athleteCode: true } },
       athleteAssignments: activeAthleteAssignmentsInclude,
       projectLeadContact: { select: { id: true, name: true, email: true } },
+      customStage: { select: { id: true, label: true } },
     },
   });
 
@@ -113,9 +114,12 @@ export async function POST(request: NextRequest) {
     const complexity = isOpsProjectComplexity(String(body.complexity || ""))
       ? body.complexity
       : "medium";
-    const currentStage = isOpsProjectPhase(String(body.currentStage || ""))
-      ? body.currentStage
-      : "survey_conversion";
+    const stageResolved = await resolveOpsStageInput(String(body.currentStage || ""));
+    if (!stageResolved.ok) {
+      return NextResponse.json({ error: stageResolved.error }, { status: 400 });
+    }
+    const currentStage = stageResolved.currentStage;
+    const customStageId = stageResolved.customStageId;
     const currentStatus = isOpsProjectStatus(String(body.currentStatus || ""))
       ? body.currentStatus
       : "not_started";
@@ -171,6 +175,7 @@ export async function POST(request: NextRequest) {
         projectLead: body.projectLead ? String(body.projectLead).trim() : null,
         complexity,
         currentStage,
+        customStageId,
         currentStatus,
         startDate: body.startDate ? parseDateOnly(String(body.startDate)) : null,
         dueDate: parseProjectDueInput(body),

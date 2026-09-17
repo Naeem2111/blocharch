@@ -1,21 +1,21 @@
 import { PageHeader } from "@/components/PageHeader";
 import { getSession } from "@/lib/auth";
 import { canDeletePrivateProject } from "@/lib/private-access";
-import { PrivateClientsClient } from "./PrivateClientsClient";
+import { PrivateProjectsClient } from "../PrivateProjectsClient";
 
-export default async function PrivateClientsPage() {
+export default async function PrivateCompletedProjectsPage() {
   const session = await getSession();
   const canDelete = !!session && canDeletePrivateProject(session.user.role);
 
   return (
     <>
       <PageHeader
-        title="Clients"
+        title="Completed projects"
         badge="Private"
-        description="Private residential clients — each has a separate portal link. Production Lane clients live under Ops."
+        description="Finished private projects — athletes, fee, and margin on record."
         className="mb-8"
       />
-      <PrivateClientsClient canDelete={canDelete} />
+      <PrivateProjectsClient canDelete={canDelete} scope="completed" />
     </>
   );
 }

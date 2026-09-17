@@ -8,10 +8,11 @@ import { asAvatarTextTone } from "@/lib/avatar-text-tone";
 import {
   COMPLEXITY_LABELS,
   displayProjectStageLabel,
-  OPS_PROJECT_STAGE_OPTIONS,
   PROJECT_STATUS_LABELS,
   projectStageSelectValue,
 } from "@/lib/ops-constants";
+import { catalogValueFromId } from "@/lib/ops-catalog-types";
+import { useOpsCatalog } from "@/lib/use-ops-catalog";
 import type { OpsProjectPhase } from "@prisma/client";
 import { formatProjectFullTitle } from "@/lib/project-display";
 import { clientMetaFromNestedClient, groupProjectsByClient } from "@/lib/ops-project-groups";
@@ -43,6 +44,8 @@ type ProjectRow = {
   address: string | null;
   complexity: keyof typeof COMPLEXITY_LABELS;
   currentStage: OpsProjectPhase;
+  customStageId?: string | null;
+  stageLabel?: string;
   currentStatus: keyof typeof PROJECT_STATUS_LABELS;
   startDate: string | null;
   dueDate: string | null;
@@ -52,6 +55,7 @@ type ProjectRow = {
 };
 
 export function AthleteProjectsClient() {
+  const { phases } = useOpsCatalog();
   const [projects, setProjects] = useState<ProjectRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -111,7 +115,7 @@ export function AthleteProjectsClient() {
   function startEdit(p: ProjectRow) {
     setEditingId(p.id);
     setForm({
-      currentStage: p.currentStage,
+      currentStage: p.customStageId ? catalogValueFromId(p.customStageId) : p.currentStage,
       currentStatus: p.currentStatus,
       notes: p.notes ?? "",
     });
@@ -283,11 +287,15 @@ export function AthleteProjectsClient() {
               <label className="text-xs text-slate-400">
                 Stage
                 <select
-                  value={projectStageSelectValue(form.currentStage as OpsProjectPhase)}
+                  value={
+                    form.currentStage.startsWith("custom:")
+                      ? form.currentStage
+                      : projectStageSelectValue(form.currentStage as OpsProjectPhase)
+                  }
                   onChange={(e) => setForm((f) => ({ ...f, currentStage: e.target.value }))}
                   className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
                 >
-                  {OPS_PROJECT_STAGE_OPTIONS.map((opt) => (
+                  {phases.map((opt) => (
                     <option key={opt.value} value={opt.value}>
                       {opt.label}
                     </option>
@@ -340,7 +348,7 @@ export function AthleteProjectsClient() {
               <dl className="mt-4 grid grid-cols-2 gap-3 text-xs md:grid-cols-4">
                 <div>
                   <dt className="text-slate-500">Stage</dt>
-                  <dd className="text-slate-200">{displayProjectStageLabel(p.currentStage)}</dd>
+                  <dd className="text-slate-200">{p.stageLabel ?? displayProjectStageLabel(p.currentStage)}</dd>
                 </div>
                 <div>
                   <dt className="text-slate-500">Status</dt>

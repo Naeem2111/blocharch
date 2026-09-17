@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { isOpsProjectPhase } from "@/lib/ops-constants";
+import { parsePipelineExpectedStage } from "@/lib/ops-catalog";
 import { requireOpsPipelineSession } from "@/lib/ops-access";
 import { parseDateOnly } from "@/lib/ops-hours";
 import { serializePipelineRow } from "@/lib/ops-pipeline-serialize";
@@ -48,7 +48,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (body.visibleToClient !== undefined) data.visibleToClient = Boolean(body.visibleToClient);
     if (body.expectedStage !== undefined) {
       const stage = String(body.expectedStage || "").trim();
-      data.expectedStage = stage && isOpsProjectPhase(stage) ? stage : null;
+      data.expectedStage = parsePipelineExpectedStage(stage);
     }
     if (body.targetStartDate !== undefined) {
       data.targetStartDate = body.targetStartDate ? parseDateOnly(String(body.targetStartDate)) : null;

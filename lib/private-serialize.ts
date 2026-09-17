@@ -11,12 +11,50 @@ import {
 } from "@/lib/private-phase-splits";
 import { resolvePhaseStructure } from "@/lib/private-phase-structure";
 
+type SerializedAthlete = {
+  id: string;
+  fullName: string;
+  athleteCode: string;
+  initials: string;
+  isPrimary: boolean;
+  privateWeeklyCapHours: number;
+};
+
+type AssignmentRow = {
+  isPrimary: boolean;
+  athlete: Pick<OpsAthlete, "id" | "fullName" | "athleteCode" | "privateWeeklyCapHours">;
+};
+
 type ProjectWithRelations = PrivateProject & {
   client: Pick<PrivateClient, "id" | "name" | "contactEmail" | "contactPhone" | "slug">;
   assignedAthlete: Pick<OpsAthlete, "id" | "fullName" | "athleteCode" | "privateWeeklyCapHours"> | null;
+  athleteAssignments?: AssignmentRow[];
   customProjectType?: Pick<PrivateProjectCustomType, "id" | "label"> | null;
   expenses?: Array<{ designStage: string | null; amountZar: { toString(): string } | number }>;
 };
+
+function serializeAthlete(
+  athlete: Pick<OpsAthlete, "id" | "fullName" | "athleteCode" | "privateWeeklyCapHours">,
+  isPrimary: boolean,
+): SerializedAthlete {
+  return {
+    id: athlete.id,
+    fullName: athlete.fullName,
+    athleteCode: athlete.athleteCode,
+    initials: athleteInitials(athlete.fullName),
+    isPrimary,
+    privateWeeklyCapHours: athlete.privateWeeklyCapHours,
+  };
+}
+
+function serializePrivateAthletes(p: ProjectWithRelations): SerializedAthlete[] {
+  const fromAssignments = (p.athleteAssignments ?? []).map((row) =>
+    serializeAthlete(row.athlete, row.isPrimary),
+  );
+  if (fromAssignments.length > 0) return fromAssignments;
+  if (p.assignedAthlete) return [serializeAthlete(p.assignedAthlete, true)];
+  return [];
+}
 
 export function serializePrivateProject(
   p: ProjectWithRelations,
@@ -51,6 +89,7 @@ export function serializePrivateProject(
     phaseStructure,
     expenses: expenseRows,
   });
+  const athletes = serializePrivateAthletes(p);
 
   return {
     id: p.id,
@@ -101,15 +140,8 @@ export function serializePrivateProject(
       contactPhone: p.client.contactPhone,
       slug: p.client.slug,
     },
-    athlete: p.assignedAthlete
-      ? {
-          id: p.assignedAthlete.id,
-          fullName: p.assignedAthlete.fullName,
-          athleteCode: p.assignedAthlete.athleteCode,
-          initials: athleteInitials(p.assignedAthlete.fullName),
-          privateWeeklyCapHours: p.assignedAthlete.privateWeeklyCapHours,
-        }
-      : null,
+    athletes,
+    athlete: athletes.find((a) => a.isPrimary) ?? athletes[0] ?? null,
     hoursLifeToDate: extras?.hoursLifeToDate ?? null,
     openActionTitle: extras?.openActionTitle ?? null,
   };

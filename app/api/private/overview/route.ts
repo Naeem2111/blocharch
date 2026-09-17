@@ -4,6 +4,10 @@ import { prisma } from "@/lib/prisma";
 import { requirePrivateOpsSession } from "@/lib/private-access";
 import { serializePrivateProject } from "@/lib/private-serialize";
 import { PRIVATE_STAGE_LABELS } from "@/lib/private-constants";
+import {
+  activePrivateAthleteAssignmentsInclude,
+  privateAssignedAthleteSelect,
+} from "@/lib/private-project-assignments";
 
 function monthBounds(d = new Date()) {
   const start = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
@@ -22,8 +26,9 @@ export async function GET(request: NextRequest) {
     include: {
       client: { select: { id: true, name: true, contactEmail: true, contactPhone: true, slug: true } },
       assignedAthlete: {
-        select: { id: true, fullName: true, athleteCode: true, privateWeeklyCapHours: true },
+        select: privateAssignedAthleteSelect,
       },
+      athleteAssignments: activePrivateAthleteAssignmentsInclude,
       customProjectType: { select: { id: true, label: true } },
       actionItems: {
         where: { completedAt: null, clientFacing: true },
@@ -34,9 +39,11 @@ export async function GET(request: NextRequest) {
     orderBy: { updatedAt: "desc" },
   });
 
-  const athleteIds = Array.from(
-    new Set(activeProjects.map((p) => p.assignedAthleteId).filter(Boolean) as string[]),
-  );
+  const athleteIds = new Set<string>();
+  for (const p of activeProjects) {
+    if (p.assignedAthleteId) athleteIds.add(p.assignedAthleteId);
+    for (const row of p.athleteAssignments) athleteIds.add(row.athleteId);
+  }
 
   const feeSum = activeProjects.reduce((s, p) => s + Number(p.feeZar), 0);
   const costSum = activeProjects.reduce((s, p) => s + Number(p.costZar), 0);
@@ -94,7 +101,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     stats: {
       activePrivateProjects: activeProjects.length,
-      athletesOnPrivate: athleteIds.length,
+      athletesOnPrivate: athleteIds.size,
       revenueThisMonthZar: revenueThisMonth,
       blendedMarginPercent: blendedMargin,
       inCouncilReview,

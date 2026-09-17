@@ -5,13 +5,15 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import {
   isOpsProjectComplexity,
-  isOpsProjectPhase,
   isOpsProjectStatus,
 } from "@/lib/ops-constants";
+import { resolveOpsStageInput } from "@/lib/ops-catalog";
+import { linePhaseSelectValue } from "@/lib/ops-catalog-types";
 import { requireOpsSession } from "@/lib/ops-access";
 import { parseDateOnly } from "@/lib/ops-hours";
 import { syncProjectAfterOpsUpdate } from "@/lib/planner-project-sync";
 import { reactivateProjectOnAthleteReassign, syncProjectProgressForProjects } from "@/lib/sync-project-progress";
+import { computeDeadlineBeatMetrics } from "@/lib/project-completion";
 import { normalizeAthleteProjectCode } from "@/lib/ops-project-code";
 import { validateProjectLeadContactDb } from "@/lib/ops-project-lead";
 import { deleteProjectAndSyncSubmissions } from "@/lib/sync-submission-totals";
@@ -85,6 +87,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
       assignedAthlete: { select: { id: true, fullName: true, athleteCode: true } },
       athleteAssignments: activeAthleteAssignmentsInclude,
       projectLeadContact: { select: { id: true, name: true, email: true } },
+      customStage: { select: { id: true, label: true } },
     },
   });
   if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
@@ -129,7 +132,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
       dailyNote: s.dailyNote,
       lineItems: s.lineItems.map((li) => ({
         id: li.id,
-        projectPhase: li.projectPhase,
+        projectPhase: linePhaseSelectValue(li.projectPhase, li.customPhaseId),
         taskType: li.taskType,
         taskTypes: li.taskTypes,
         hoursWorked: Number(li.hoursWorked),
@@ -229,9 +232,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       data.complexity = c;
     }
     if (body.currentStage != null) {
-      const s = String(body.currentStage);
-      if (!isOpsProjectPhase(s)) return NextResponse.json({ error: "Invalid stage" }, { status: 400 });
-      data.currentStage = s;
+      const resolved = await resolveOpsStageInput(String(body.currentStage));
+      if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: 400 });
+      data.currentStage = resolved.currentStage;
+      data.customStageId = resolved.customStageId;
     }
     if (body.currentStatus != null) {
       const s = String(body.currentStatus);
@@ -250,8 +254,20 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
     if (body.handoverDate !== undefined) data.handoverDate = body.handoverDate ? parseDateOnly(String(body.handoverDate)) : null;
 
+    if (
+      typeof data.progressPercent === "number" &&
+      data.progressPercent >= 100 &&
+      ((data.currentStatus as string | undefined) ?? existing.currentStatus) !== "handed_over" &&
+      ((data.currentStatus as string | undefined) ?? existing.currentStatus) !== "completed"
+    ) {
+      data.currentStatus = "completed";
+    }
+
     // Entering archives without a project due — carry from pipeline / planner / outbox.
     const nextStatus = (data.currentStatus as string | undefined) ?? existing.currentStatus;
+    if (nextStatus === "completed" || nextStatus === "handed_over") {
+      data.progressPercent = 100;
+    }
     const enteringArchive =
       (nextStatus === "completed" || nextStatus === "handed_over") &&
       existing.currentStatus !== "completed" &&
@@ -259,6 +275,19 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (enteringArchive && data.dueDate === undefined && !existing.dueDate) {
       const carried = await ensureOpsProjectDueDate(projectId);
       if (carried) data.dueDate = carried;
+    }
+    if (enteringArchive && data.completedAt === undefined && !existing.completedAt) {
+      const completedAt = new Date();
+      data.completedAt = completedAt;
+      const dueForBeat =
+        data.dueDate !== undefined ? (data.dueDate as Date | null) : existing.dueDate;
+      if (dueForBeat) {
+        const beat = computeDeadlineBeatMetrics(dueForBeat, completedAt);
+        if (body.deadlineBeatenDays === undefined) data.deadlineBeatenDays = beat.deadlineBeatenDays;
+        if (body.deadlineBeatenMinutes === undefined) {
+          data.deadlineBeatenMinutes = beat.deadlineBeatenMinutes;
+        }
+      }
     }
 
     if (body.completedAt !== undefined) {
@@ -346,6 +375,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       assignedAthlete: { select: { id: true, fullName: true, athleteCode: true } },
       athleteAssignments: activeAthleteAssignmentsInclude,
       projectLeadContact: { select: { id: true, name: true, email: true } },
+      customStage: { select: { id: true, label: true } },
     } as const;
 
     const project =

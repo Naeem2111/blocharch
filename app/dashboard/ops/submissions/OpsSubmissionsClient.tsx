@@ -5,7 +5,10 @@ import Link from "next/link";
 import { AthleteAvatar } from "@/components/ops/AthleteAvatar";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
 import { asAvatarTextTone } from "@/lib/avatar-text-tone";
-import { PROJECT_PHASE_LABELS, TASK_TYPE_LABELS } from "@/lib/ops-constants";
+import { PROJECT_PHASE_LABELS } from "@/lib/ops-constants";
+import { formatTaskTypesDisplay } from "@/lib/ops-daily-form";
+import { useOpsCatalog } from "@/lib/use-ops-catalog";
+import { catalogOptionLabel } from "@/lib/ops-catalog-types";
 
 type LineItem = {
   projectName: string;
@@ -40,14 +43,15 @@ type Submission = {
   lineItems: LineItem[];
 };
 
-function taskTypeLabel(li: LineItem): string {
-  const types = li.taskTypes?.length ? li.taskTypes : [li.taskType];
-  return types
-    .map((t) => TASK_TYPE_LABELS[t as keyof typeof TASK_TYPE_LABELS] ?? t)
-    .join(", ");
+function taskTypeLabel(
+  li: LineItem,
+  workTypes: { value: string; label: string }[],
+): string {
+  return formatTaskTypesDisplay(li.taskType, li.taskTypes, workTypes);
 }
 
 export function OpsSubmissionsClient() {
+  const { phases, workTypes } = useOpsCatalog();
   const [rows, setRows] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -165,8 +169,12 @@ export function OpsSubmissionsClient() {
                     <span>{li.projectName}</span>
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
-                    {PROJECT_PHASE_LABELS[li.projectPhase as keyof typeof PROJECT_PHASE_LABELS] ?? li.projectPhase}{" "}
-                    · {taskTypeLabel(li)} · {li.hoursWorked}h
+                    {catalogOptionLabel(
+                      li.projectPhase,
+                      phases,
+                      PROJECT_PHASE_LABELS[li.projectPhase as keyof typeof PROJECT_PHASE_LABELS],
+                    )}{" "}
+                    · {taskTypeLabel(li, workTypes)} · {li.hoursWorked}h
                     {li.completionPercent != null ? ` · ${li.completionPercent}% progress` : ""}
                   </p>
                   {hasOther && li.notes ? (

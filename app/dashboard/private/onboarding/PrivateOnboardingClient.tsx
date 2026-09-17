@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { PRIVATE_STAGE_LABELS, PRIVATE_STAGE_ORDER } from "@/lib/private-constants";
+import { AthleteAssignmentsEditor } from "@/components/AthleteAssignmentsEditor";
 import type { PrivateProjectTypeOption } from "@/lib/private-project-types";
 import type { PrivateDesignStage } from "@prisma/client";
 
@@ -25,7 +26,8 @@ export function PrivateOnboardingClient({ initialClientId = "" }: { initialClien
     projectAddress: "",
     projectTypeSelect: "residential_extension",
     feeZar: "",
-    assignedAthleteId: "",
+    assignedAthleteIds: [] as string[],
+    primaryAthleteId: "",
     designStage: "site_measure_up" as PrivateDesignStage,
     clientDescription: "",
     dueDate: "",
@@ -69,7 +71,8 @@ export function PrivateOnboardingClient({ initialClientId = "" }: { initialClien
         name: form.projectAddress,
         projectType: form.projectTypeSelect,
         feeZar: Number(form.feeZar || 0),
-        assignedAthleteId: form.assignedAthleteId || null,
+        assignedAthleteIds: form.assignedAthleteIds,
+        primaryAthleteId: form.primaryAthleteId || null,
         designStage: form.designStage,
         clientDescription: form.clientDescription.trim() || null,
         dueDate: form.dueDate || null,
@@ -206,21 +209,21 @@ export function PrivateOnboardingClient({ initialClientId = "" }: { initialClien
               placeholder="420000"
             />
           </label>
-          <label className="block text-xs text-slate-400">
-            Assigned athlete
-            <select
-              className={field}
-              value={form.assignedAthleteId}
-              onChange={(e) => setForm({ ...form, assignedAthleteId: e.target.value })}
-            >
-              <option value="">Select athlete</option>
-              {athletes.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.fullName}
-                </option>
-              ))}
-            </select>
-          </label>
+          <AthleteAssignmentsEditor
+            className="block"
+            radioName="private-onboarding-primary-athlete"
+            athleteIds={form.assignedAthleteIds}
+            primaryAthleteId={form.primaryAthleteId}
+            athletes={athletes}
+            onChange={(next) =>
+              setForm({
+                ...form,
+                assignedAthleteIds: next.assignedAthleteIds,
+                primaryAthleteId: next.primaryAthleteId,
+              })
+            }
+            hint="Select one or more athletes. Leave empty to onboard unassigned."
+          />
           <label className="block text-xs text-slate-400">
             Target completion
             <input

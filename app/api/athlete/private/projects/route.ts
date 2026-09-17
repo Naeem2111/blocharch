@@ -3,22 +3,26 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requirePrivateAthleteSession } from "@/lib/private-access";
 import { serializePrivateProject } from "@/lib/private-serialize";
+import {
+  activePrivateAthleteAssignmentsInclude,
+  privateAssignedAthleteSelect,
+  whereAthletePrivateProjects,
+} from "@/lib/private-project-assignments";
 
 export async function GET(request: NextRequest) {
   const gate = await requirePrivateAthleteSession(request);
   if (gate instanceof NextResponse) return gate;
 
   const scope = request.nextUrl.searchParams.get("scope") || "active";
-  const where =
+  const statusWhere =
     scope === "completed"
-      ? { assignedAthleteId: gate.athlete.id, status: "completed" as const }
-      : {
-          assignedAthleteId: gate.athlete.id,
-          status: { in: ["active" as const, "on_hold" as const] },
-        };
+      ? { status: "completed" as const }
+      : { status: { in: ["active" as const, "on_hold" as const] } };
 
   const projects = await prisma.privateProject.findMany({
-    where,
+    where: {
+      AND: [whereAthletePrivateProjects(gate.athlete.id), statusWhere],
+    },
     include: {
       client: {
         select: {
@@ -30,13 +34,9 @@ export async function GET(request: NextRequest) {
         },
       },
       assignedAthlete: {
-        select: {
-          id: true,
-          fullName: true,
-          athleteCode: true,
-          privateWeeklyCapHours: true,
-        },
+        select: privateAssignedAthleteSelect,
       },
+      athleteAssignments: activePrivateAthleteAssignmentsInclude,
       customProjectType: { select: { id: true, label: true } },
     },
     orderBy: { updatedAt: "desc" },

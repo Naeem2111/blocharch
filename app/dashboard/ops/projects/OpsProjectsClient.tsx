@@ -9,10 +9,11 @@ import { asAvatarTextTone } from "@/lib/avatar-text-tone";
 import {
   COMPLEXITY_LABELS,
   displayProjectStageLabel,
-  OPS_PROJECT_STAGE_OPTIONS,
   PROJECT_STATUS_LABELS,
   projectStageSelectValue,
 } from "@/lib/ops-constants";
+import { catalogValueFromId } from "@/lib/ops-catalog-types";
+import { useOpsCatalog } from "@/lib/use-ops-catalog";
 import { daysUntilDueFromIso, projectDueColor } from "@/lib/project-color-scale";
 import { computeProjectTimeline } from "@/lib/project-timeline";
 import { formatProjectFullTitle } from "@/lib/project-display";
@@ -62,6 +63,8 @@ type ProjectRow = {
   projectLead: string | null;
   complexity: keyof typeof COMPLEXITY_LABELS;
   currentStage: OpsProjectPhase;
+  customStageId?: string | null;
+  stageLabel?: string;
   currentStatus: keyof typeof PROJECT_STATUS_LABELS;
   startDate: string | null;
   dueDate: string | null;
@@ -200,6 +203,7 @@ function AthleteAssignmentsEditor({
 }
 
 export function OpsProjectsClient() {
+  const { phases } = useOpsCatalog();
   const [projects, setProjects] = useState<ProjectRow[]>([]);
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [athletes, setAthletes] = useState<AthleteOption[]>([]);
@@ -334,7 +338,7 @@ export function OpsProjectsClient() {
       projectNumber: p.projectNumber,
       address: p.address ?? "",
       complexity: p.complexity,
-      currentStage: p.currentStage,
+      currentStage: p.customStageId ? catalogValueFromId(p.customStageId) : p.currentStage,
       currentStatus: p.currentStatus,
       startDate: p.startDate ?? "",
       dueDate: due.date,
@@ -565,11 +569,15 @@ export function OpsProjectsClient() {
             <label className="text-xs text-slate-400">
               Stage / package
               <select
-                value={projectStageSelectValue(editForm.currentStage as OpsProjectPhase)}
+                value={
+                  editForm.currentStage.startsWith("custom:")
+                    ? editForm.currentStage
+                    : projectStageSelectValue(editForm.currentStage as OpsProjectPhase)
+                }
                 onChange={(e) => setEditForm((f) => ({ ...f, currentStage: e.target.value }))}
                 className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
               >
-                {OPS_PROJECT_STAGE_OPTIONS.map((opt) => (
+                {phases.map((opt) => (
                   <option key={opt.value} value={opt.value}>
                     {opt.label}
                   </option>
@@ -780,7 +788,7 @@ export function OpsProjectsClient() {
                       : "text-slate-500"
                 }`}
               >
-                {displayProjectStageLabel(p.currentStage)} · {PROJECT_STATUS_LABELS[p.currentStatus]}
+                {p.stageLabel ?? displayProjectStageLabel(p.currentStage)} · {PROJECT_STATUS_LABELS[p.currentStatus]}
                 {timeline.daysActive != null ? ` · ${timeline.daysActive} days active` : ""}
                 {dueLabel ? ` · Due ${dueLabel}` : timeline.label ? ` · ${timeline.label}` : ""}
               </p>
@@ -963,7 +971,7 @@ export function OpsProjectsClient() {
               onChange={(e) => setForm((f) => ({ ...f, currentStage: e.target.value }))}
               className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
             >
-              {OPS_PROJECT_STAGE_OPTIONS.map((opt) => (
+              {phases.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
                 </option>

@@ -9,7 +9,11 @@ export const DAILY_TASK_TYPE_OPTIONS = Object.entries(TASK_TYPE_LABELS).map(([va
   label,
 }));
 
-export function formatTaskTypesDisplay(taskType: string, taskTypes?: string[] | null): string {
+export function formatTaskTypesDisplay(
+  taskType: string,
+  taskTypes?: string[] | null,
+  options?: { value: string; label: string }[],
+): string {
   const list =
     taskTypes && taskTypes.length > 0
       ? taskTypes
@@ -17,6 +21,9 @@ export function formatTaskTypesDisplay(taskType: string, taskTypes?: string[] | 
         ? [taskType]
         : [];
   return list
-    .map((t) => TASK_TYPE_LABELS[t as OpsTaskType] ?? t)
+    .map(
+      (t) =>
+        options?.find((o) => o.value === t)?.label ?? TASK_TYPE_LABELS[t as OpsTaskType] ?? t,
+    )
     .join(", ");
 }

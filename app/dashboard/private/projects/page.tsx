@@ -12,7 +12,7 @@ export default async function PrivateProjectsPage() {
       <PageHeader
         title="Projects"
         badge="Private"
-        description="Every running private project — progress as a duration-weighted bar."
+        description="Active private projects — progress as a duration-weighted bar. Completed work is on the Completed tab."
         className="mb-8"
       />
       <PrivateProjectsClient canDelete={canDelete} />

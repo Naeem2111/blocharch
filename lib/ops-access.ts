@@ -148,6 +148,8 @@ export const athleteProjectSelect = {
   startDate: true,
   dueDate: true,
   currentStage: true,
+  customStageId: true,
+  customStage: { select: { id: true, label: true } },
   currentStatus: true,
   progressPercent: true,
   notes: true,

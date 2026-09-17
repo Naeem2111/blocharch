@@ -22,6 +22,7 @@ export const PROJECT_PHASE_LABELS: Record<OpsProjectPhase, string> = {
   tender_construction_pack: "Tender / Construction Pack",
   construction: "Construction",
   housekeeping_internal: "Housekeeping / Internal",
+  custom: "Custom package",
 };
 
 /** Combined package label — survey conversion + existing drawings are one operational stage. */

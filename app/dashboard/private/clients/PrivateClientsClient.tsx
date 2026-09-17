@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { PRIVATE_STAGE_LABELS } from "@/lib/private-constants";
 import type { PrivateDesignStage } from "@prisma/client";
 
@@ -31,7 +32,7 @@ const emptyForm = {
   notes: "",
 };
 
-export function PrivateClientsClient() {
+export function PrivateClientsClient({ canDelete = false }: { canDelete?: boolean }) {
   const [clients, setClients] = useState<ClientRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -41,6 +42,8 @@ export function PrivateClientsClient() {
   const [edit, setEdit] = useState(emptyForm);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ClientRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -160,6 +163,35 @@ export function PrivateClientsClient() {
     window.setTimeout(() => setCopiedId(null), 1500);
   }
 
+  async function confirmDeleteClient() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setError("");
+    try {
+      const r = await fetch(`/api/private/clients/${deleteTarget.id}`, { method: "DELETE" });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setError((j as { error?: string }).error || "Could not delete client");
+        return;
+      }
+      setDeleteTarget(null);
+      setEditingId(null);
+      void load();
+    } catch {
+      setError("Could not delete client");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  const deleteConfirmBody = deleteTarget
+    ? deleteTarget.projectCount > 0
+      ? `“${deleteTarget.name}” and ${deleteTarget.projectCount} project${
+          deleteTarget.projectCount === 1 ? "" : "s"
+        } will be permanently removed, including updates, documents, expenses, and hour logs. This cannot be undone.`
+      : `“${deleteTarget.name}” will be permanently removed. This cannot be undone.`
+    : "";
+
   const field =
     "mt-1 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white";
 
@@ -269,10 +301,10 @@ export function PrivateClientsClient() {
                         onChange={(e) => setEdit({ ...edit, notes: e.target.value })}
                       />
                     </label>
-                    <div className="flex gap-2 sm:col-span-2">
+                    <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
                       <button
                         type="button"
-                        disabled={busy}
+                        disabled={busy || deleting}
                         onClick={() => void saveEdit(c.id)}
                         className="rounded-lg bg-brand-500/20 px-3 py-1.5 text-xs font-medium text-brand-200 ring-1 ring-brand-500/30"
                       >
@@ -285,6 +317,19 @@ export function PrivateClientsClient() {
                       >
                         Cancel
                       </button>
+                      {canDelete ? (
+                        <button
+                          type="button"
+                          disabled={busy || deleting}
+                          onClick={() => {
+                            setError("");
+                            setDeleteTarget(c);
+                          }}
+                          className="ml-auto rounded-lg px-3 py-1.5 text-xs font-medium text-red-300 ring-1 ring-red-500/30 hover:bg-red-500/10"
+                        >
+                          Delete client
+                        </button>
+                      ) : null}
                     </div>
                   </div>
                 ) : (
@@ -311,6 +356,19 @@ export function PrivateClientsClient() {
                         >
                           Add project
                         </Link>
+                        {canDelete ? (
+                          <button
+                            type="button"
+                            disabled={busy || deleting}
+                            onClick={() => {
+                              setError("");
+                              setDeleteTarget(c);
+                            }}
+                            className="rounded-lg px-2.5 py-1 text-[11px] text-red-300 ring-1 ring-red-500/30 hover:bg-red-500/10"
+                          >
+                            Delete
+                          </button>
+                        ) : null}
                       </div>
                     </div>
 
@@ -401,6 +459,19 @@ export function PrivateClientsClient() {
           })
         )}
       </section>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Delete this client?"
+        body={deleteConfirmBody}
+        confirmLabel="Delete client"
+        busy={deleting}
+        error={error && deleteTarget ? error : undefined}
+        onConfirm={() => void confirmDeleteClient()}
+        onClose={() => {
+          if (!deleting) setDeleteTarget(null);
+        }}
+      />
     </div>
   );
 }

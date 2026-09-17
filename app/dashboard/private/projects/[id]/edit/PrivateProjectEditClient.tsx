@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PrivateDeleteProjectButton } from "@/components/private/PrivateDeleteProjectButton";
 import { ProgressSlider } from "@/components/ProgressSlider";
+import { AthleteAssignmentsEditor } from "@/components/AthleteAssignmentsEditor";
 import { PRIVATE_FIXED_FEE_EXPENSE_LABEL, PRIVATE_STAGE_LABELS, PRIVATE_STAGE_ORDER } from "@/lib/private-constants";
 import {
   buildProjectPhaseBreakdown,
@@ -86,6 +87,7 @@ type ProjectPayload = {
     contactPhone: string | null;
   };
   athlete: { id: string; fullName: string } | null;
+  athletes?: Array<{ id: string; fullName: string; isPrimary: boolean }>;
 };
 
 function zar(n: number) {
@@ -133,7 +135,8 @@ export function PrivateProjectEditClient({
     projectName: "",
     projectTypeSelect: "residential_extension",
     feeZar: "",
-    assignedAthleteId: "",
+    assignedAthleteIds: [] as string[],
+    primaryAthleteId: "",
     designStage: "site_measure_up" as PrivateDesignStage,
     manualProgressPercent: "",
     stageNotes: "",
@@ -168,6 +171,12 @@ export function PrivateProjectEditClient({
     setPhaseFeePercents(p.phaseFeePercents);
     setPhaseStructure(p.phaseStructure);
     setExpenseRecords(p.expenseRecords ?? []);
+    const assigned =
+      p.athletes && p.athletes.length > 0
+        ? p.athletes
+        : p.athlete
+          ? [{ id: p.athlete.id, fullName: p.athlete.fullName, isPrimary: true }]
+          : [];
     setForm({
       clientName: p.client.name,
       contactEmail: p.client.contactEmail ?? "",
@@ -175,7 +184,8 @@ export function PrivateProjectEditClient({
       projectName: p.name,
       projectTypeSelect: projectTypeSelectValue(p),
       feeZar: String(p.feeZar),
-      assignedAthleteId: p.athlete?.id ?? "",
+      assignedAthleteIds: assigned.map((a) => a.id),
+      primaryAthleteId: assigned.find((a) => a.isPrimary)?.id ?? assigned[0]?.id ?? "",
       designStage: p.designStage as PrivateDesignStage,
       manualProgressPercent:
         p.manualProgressPercent != null ? String(p.manualProgressPercent) : String(p.calculatedProgressPercent),
@@ -312,7 +322,8 @@ export function PrivateProjectEditClient({
         name: form.projectName.trim(),
         projectType: form.projectTypeSelect,
         feeZar: Number(form.feeZar || 0),
-        assignedAthleteId: form.assignedAthleteId || null,
+        assignedAthleteIds: form.assignedAthleteIds,
+        primaryAthleteId: form.primaryAthleteId || null,
         designStage: form.designStage,
         manualProgressPercent: useManualProgress ? Number(form.manualProgressPercent) : null,
         stageNotes: form.stageNotes.trim() || null,
@@ -750,21 +761,19 @@ export function PrivateProjectEditClient({
               </p>
             )}
           </div>
-          <label className="block text-xs text-slate-400">
-            Assigned athlete
-            <select
-              className={field}
-              value={form.assignedAthleteId}
-              onChange={(e) => setForm({ ...form, assignedAthleteId: e.target.value })}
-            >
-              <option value="">Unassigned</option>
-              {athletes.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.fullName}
-                </option>
-              ))}
-            </select>
-          </label>
+          <AthleteAssignmentsEditor
+            radioName="private-edit-primary-athlete"
+            athleteIds={form.assignedAthleteIds}
+            primaryAthleteId={form.primaryAthleteId}
+            athletes={athletes}
+            onChange={(next) =>
+              setForm({
+                ...form,
+                assignedAthleteIds: next.assignedAthleteIds,
+                primaryAthleteId: next.primaryAthleteId,
+              })
+            }
+          />
         </div>
       </section>
 

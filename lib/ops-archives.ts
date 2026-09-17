@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { athleteProfileVisual } from "@/lib/athlete-profile-visual";
 import { findDoneColumnId } from "@/lib/planner-completed";
 import { projectDisplayFields } from "@/lib/project-display";
+import { linePhaseSelectValue } from "@/lib/ops-catalog-types";
 import { ensureOpsProjectDueDates } from "@/lib/project-due-sources";
 import { listReportingAthletes } from "@/lib/reporting-athletes";
 
@@ -56,6 +57,7 @@ export async function buildOpsArchives(filters: OpsArchivesFilters = {}) {
         },
         projectLeadContact: { select: { name: true } },
         projectLeadAthlete: { select: { fullName: true } },
+        customStage: { select: { id: true, label: true } },
       },
     }),
     prisma.plannerBoard.findMany({
@@ -289,6 +291,7 @@ export async function buildOpsArchives(filters: OpsArchivesFilters = {}) {
             p.projectLeadContact?.name ?? p.projectLeadAthlete?.fullName ?? p.projectLead ?? null,
           currentStatus: p.currentStatus,
           currentStage: p.currentStage,
+          customStageId: p.customStageId ?? null,
           complexity: p.complexity,
           progressPercent: p.progressPercent,
           dueDate: dueDate?.toISOString().slice(0, 10) ?? null,
@@ -315,7 +318,7 @@ export async function buildOpsArchives(filters: OpsArchivesFilters = {}) {
       isHousekeeping: li.isHousekeeping,
       projectName: li.isHousekeeping || !li.project ? "Client housekeeping" : li.project.name,
       projectNumber: li.isHousekeeping || !li.project ? "—" : li.project.projectNumber,
-      projectPhase: li.projectPhase,
+      projectPhase: linePhaseSelectValue(li.projectPhase, li.customPhaseId),
       taskType: li.taskType,
       taskTypes: li.taskTypes,
       hoursWorked: Number(li.hoursWorked),

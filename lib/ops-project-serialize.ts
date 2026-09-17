@@ -15,6 +15,8 @@ type ProjectLike = {
   startDate: Date | null;
   dueDate: Date | null;
   currentStage: OpsProjectPhase;
+  customStageId?: string | null;
+  customStage?: { label: string } | null;
   currentStatus: OpsProjectStatus | string;
   progressPercent: number | null;
   quotedHours?: { toNumber?: () => number } | number | string | null;
@@ -51,6 +53,7 @@ export function serializeOpsProjectRow<T extends ProjectLike>(
     dueDate: due.dueDate,
     dueAt: due.dueAt,
     currentStage: project.currentStage,
+    customStageId: project.customStageId ?? null,
     currentStatus: project.currentStatus,
     progressPercent: project.progressPercent,
     quotedHours:
