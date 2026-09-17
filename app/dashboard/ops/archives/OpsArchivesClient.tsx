@@ -26,10 +26,8 @@ type FilterOption = {
 type FilterOptionAthlete = { id: string; fullName: string; athleteCode: string };
 
 type ArchiveProject = ArchivedProjectRow & {
-  stageLabel?: string;
   assignedAthleteId: string | null;
   currentStage: keyof typeof PROJECT_PHASE_LABELS;
-  dueDate: string | null;
 };
 
 type ArchiveTask = {

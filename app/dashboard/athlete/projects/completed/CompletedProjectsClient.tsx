@@ -14,6 +14,9 @@ export function CompletedProjectsClient() {
   const [loading, setLoading] = useState(true);
   const [clientFilterId, setClientFilterId] = useState("");
   const [detailProjectId, setDetailProjectId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [msg, setMsg] = useState("");
+  const [error, setError] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -58,6 +61,35 @@ export function CompletedProjectsClient() {
   }, [projects, clientFilterId]);
 
   const selectedFilterClient = clientOptions.find((c) => c.id === clientFilterId) ?? null;
+
+  async function reactivate(project: { id: string; name: string; displayTitle?: string }) {
+    const label = project.displayTitle ?? project.name;
+    if (
+      !window.confirm(
+        `Bring "${label}" back to active work at 85%? It will leave Completed projects and appear on My Projects.`,
+      )
+    ) {
+      return;
+    }
+    setBusyId(project.id);
+    setMsg("");
+    setError("");
+    try {
+      const r = await fetch(`/api/athlete/projects/${encodeURIComponent(project.id)}/reactivate`, {
+        method: "POST",
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setError((j as { error?: string }).error || "Could not bring project back to active");
+        return;
+      }
+      setMsg(`"${label}" is active again at 85%.`);
+      if (detailProjectId === project.id) setDetailProjectId(null);
+      await load();
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   if (loading && projects.length === 0) {
     return <p className="text-sm text-slate-500">Loading completed projects…</p>;
@@ -105,10 +137,15 @@ export function CompletedProjectsClient() {
         {loading ? <p className="pb-2 text-xs text-slate-500">Refreshing…</p> : null}
       </div>
 
+      {error ? <p className="text-sm text-red-400">{error}</p> : null}
+      {msg ? <p className="text-sm text-emerald-300">{msg}</p> : null}
+
       <ArchivedProjectsByClient
         projects={filteredProjects}
         showAssignedAthlete={false}
         onOpen={setDetailProjectId}
+        onReactivate={reactivate}
+        reactivatingId={busyId}
         emptyMessage={
           clientFilterId
             ? "No completed projects for this client."
@@ -123,6 +160,11 @@ export function CompletedProjectsClient() {
           detailPath="/api/athlete/projects"
           showOpsEditHint={false}
           onClose={() => setDetailProjectId(null)}
+          onReactivate={() => {
+            const project = projects.find((p) => p.id === detailProjectId);
+            if (project) void reactivate(project);
+          }}
+          reactivating={busyId === detailProjectId}
         />
       ) : null}
     </div>

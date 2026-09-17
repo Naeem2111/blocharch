@@ -2,18 +2,19 @@
 
 import { AthleteAvatar } from "@/components/ops/AthleteAvatar";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
+import { ComplexityBadge } from "@/components/ops/ComplexityBadge";
 import { asAvatarTextTone } from "@/lib/avatar-text-tone";
 import {
   COMPLEXITY_LABELS,
   PROJECT_STATUS_LABELS,
 } from "@/lib/ops-constants";
 import { groupProjectsByClient } from "@/lib/ops-project-groups";
-import { formatEarlyFromDueAndCompleted } from "@/lib/project-deadline";
 
 export type ArchivedProjectRow = {
   id: string;
   name: string;
   displayTitle?: string;
+  stageLabel?: string;
   address: string | null;
   projectNumber: string;
   clientId: string;
@@ -26,17 +27,42 @@ export type ArchivedProjectRow = {
   profilePhotoUrl: string | null;
   profilePhotoBgColor: string | null;
   profilePhotoTextTone: string | null;
+  leadName: string | null;
   currentStatus: keyof typeof PROJECT_STATUS_LABELS;
   complexity: keyof typeof COMPLEXITY_LABELS;
   progressPercent: number | null;
-  dueDate: string | null;
-  dueAt?: string | null;
   completedAt: string | null;
 };
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
-  return iso.slice(0, 10);
+  const day = iso.slice(0, 10);
+  const d = new Date(`${day}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return day;
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function leadInitials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
+function LeadAssigned({ name }: { name: string | null }) {
+  if (!name) {
+    return <span className="text-xs text-slate-500">Lead assigned soon</span>;
+  }
+  return (
+    <span className="inline-flex min-w-0 items-center gap-2">
+      <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.08] text-[11px] font-semibold text-slate-300">
+        {leadInitials(name)}
+      </span>
+      <span className="min-w-0 text-sm text-slate-200">{name}</span>
+    </span>
+  );
 }
 
 export function ArchivedProjectsByClient({
@@ -93,98 +119,83 @@ export function ArchivedProjectsByClient({
               <thead className="bg-white/[0.03] text-xs uppercase text-slate-500">
                 <tr>
                   <th className="px-4 py-3 font-medium">Project</th>
+                  <th className="px-4 py-3 font-medium">Drawing pack / phase</th>
+                  <th className="px-4 py-3 font-medium">Completed</th>
+                  <th className="px-4 py-3 font-medium">Lead assigned</th>
+                  <th className="px-4 py-3 font-medium">Complexity</th>
                   {showAssignedAthlete ? (
                     <th className="px-4 py-3 font-medium">Completed by</th>
                   ) : null}
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Due</th>
-                  <th className="px-4 py-3 font-medium">Completed</th>
-                  <th className="px-4 py-3 font-medium">Progress</th>
                   <th className="px-4 py-3 font-medium" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/[0.06]">
-                {group.projects.map((p) => {
-                  const earlyLabel = formatEarlyFromDueAndCompleted({
-                    dueAt: p.dueAt,
-                    dueDate: p.dueDate,
-                    completedAt: p.completedAt,
-                  });
-                  return (
-                    <tr key={p.id} className="bg-white/[0.02]">
-                      <td className="px-4 py-3">
-                        <p className="font-medium text-white">{p.displayTitle ?? p.name}</p>
-                        <p className="text-xs text-slate-500">
-                          {p.projectNumber}
-                          {p.address ? ` · ${p.address}` : ""} · {COMPLEXITY_LABELS[p.complexity]}
-                        </p>
-                      </td>
-                      {showAssignedAthlete ? (
-                        <td className="px-4 py-3 text-slate-300">
-                          {p.assignedAthleteName ? (
-                            <span className="inline-flex items-center gap-2">
-                              <AthleteAvatar
-                                name={p.assignedAthleteName}
-                                photoUrl={p.profilePhotoUrl}
-                                backgroundColor={p.profilePhotoBgColor}
-                                textTone={asAvatarTextTone(p.profilePhotoTextTone)}
-                                size={24}
-                              />
-                              <span>
-                                {p.assignedAthleteName}
-                                {p.assignedAthleteCode ? (
-                                  <span className="block text-xs text-slate-500">
-                                    {p.assignedAthleteCode}
-                                  </span>
-                                ) : null}
-                              </span>
+                {group.projects.map((p) => (
+                  <tr key={p.id} className="bg-white/[0.02]">
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-white">{p.displayTitle ?? p.name}</p>
+                      {p.address ? <p className="text-xs text-slate-500">{p.address}</p> : null}
+                    </td>
+                    <td className="px-4 py-3 text-slate-300">{p.stageLabel ?? "—"}</td>
+                    <td className="px-4 py-3 whitespace-nowrap text-slate-300">{formatDate(p.completedAt)}</td>
+                    <td className="px-4 py-3">
+                      <LeadAssigned name={p.leadName} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <ComplexityBadge value={p.complexity} label={COMPLEXITY_LABELS[p.complexity]} />
+                    </td>
+                    {showAssignedAthlete ? (
+                      <td className="px-4 py-3 text-slate-300">
+                        {p.assignedAthleteName ? (
+                          <span className="inline-flex items-center gap-2">
+                            <AthleteAvatar
+                              name={p.assignedAthleteName}
+                              photoUrl={p.profilePhotoUrl}
+                              backgroundColor={p.profilePhotoBgColor}
+                              textTone={asAvatarTextTone(p.profilePhotoTextTone)}
+                              size={24}
+                            />
+                            <span>
+                              {p.assignedAthleteName}
+                              {p.assignedAthleteCode ? (
+                                <span className="block text-xs text-slate-500">{p.assignedAthleteCode}</span>
+                              ) : null}
                             </span>
-                          ) : (
-                            "Unassigned"
-                          )}
-                        </td>
-                      ) : null}
-                      <td className="px-4 py-3 text-slate-300">
-                        {PROJECT_STATUS_LABELS[p.currentStatus]}
+                          </span>
+                        ) : (
+                          "Unassigned"
+                        )}
                       </td>
-                      <td className="px-4 py-3 text-slate-300">{formatDate(p.dueDate)}</td>
-                      <td className="px-4 py-3 text-slate-300">
-                        {formatDate(p.completedAt)}
-                        {earlyLabel ? (
-                          <span className="block text-xs text-brand-300">{earlyLabel}</span>
-                        ) : null}
-                      </td>
-                      <td className="px-4 py-3 text-slate-300">{p.progressPercent ?? "—"}%</td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-col items-start gap-1.5">
+                    ) : null}
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col items-start gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => onOpen(p.id)}
+                          className="text-xs text-brand-300 hover:text-brand-200"
+                        >
+                          Open
+                        </button>
+                        {onReactivate ? (
                           <button
                             type="button"
-                            onClick={() => onOpen(p.id)}
-                            className="text-xs text-brand-300 hover:text-brand-200"
+                            disabled={reactivatingId === p.id}
+                            onClick={() =>
+                              onReactivate({
+                                id: p.id,
+                                name: p.name,
+                                displayTitle: p.displayTitle,
+                              })
+                            }
+                            className="text-xs text-brand-300 hover:text-brand-200 disabled:opacity-40"
                           >
-                            Open
+                            {reactivatingId === p.id ? "Moving…" : "Bring back to active"}
                           </button>
-                          {onReactivate ? (
-                            <button
-                              type="button"
-                              disabled={reactivatingId === p.id}
-                              onClick={() =>
-                                onReactivate({
-                                  id: p.id,
-                                  name: p.name,
-                                  displayTitle: p.displayTitle,
-                                })
-                              }
-                              className="text-xs text-brand-300 hover:text-brand-200 disabled:opacity-40"
-                            >
-                              {reactivatingId === p.id ? "Moving…" : "Bring back to active"}
-                            </button>
-                          ) : null}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

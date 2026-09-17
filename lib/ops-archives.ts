@@ -54,6 +54,8 @@ export async function buildOpsArchives(filters: OpsArchivesFilters = {}) {
             profilePhotoTextTone: true,
           },
         },
+        projectLeadContact: { select: { name: true } },
+        projectLeadAthlete: { select: { fullName: true } },
       },
     }),
     prisma.plannerBoard.findMany({
@@ -283,6 +285,8 @@ export async function buildOpsArchives(filters: OpsArchivesFilters = {}) {
           assignedAthleteName: p.assignedAthlete?.fullName ?? null,
           assignedAthleteCode: p.assignedAthlete?.athleteCode ?? null,
           ...athleteProfileVisual(p.assignedAthlete),
+          leadName:
+            p.projectLeadContact?.name ?? p.projectLeadAthlete?.fullName ?? p.projectLead ?? null,
           currentStatus: p.currentStatus,
           currentStage: p.currentStage,
           complexity: p.complexity,
