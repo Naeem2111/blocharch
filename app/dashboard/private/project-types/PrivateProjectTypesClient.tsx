@@ -75,14 +75,25 @@ export function PrivateProjectTypesClient() {
   }
 
   async function removeType(type: PrivateProjectTypeOption) {
-    if (!type.id || type.isBuiltIn) return;
-    if (!confirm(`Remove “${type.label}” from the project type list?`)) return;
+    const verb = type.isBuiltIn ? "Hide" : "Remove";
+    if (
+      !confirm(
+        `${verb} “${type.label}”?${
+          type.isBuiltIn ? " It will no longer appear when creating or editing projects." : ""
+        }`,
+      )
+    ) {
+      return;
+    }
     setBusy(type.value);
     setError("");
     const r = await fetch("/api/private/project-types", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: type.id }),
+      body: JSON.stringify({
+        id: type.id ?? undefined,
+        builtInKey: type.builtInKey ?? undefined,
+      }),
     });
     const j = await r.json();
     setBusy(null);
@@ -105,7 +116,7 @@ export function PrivateProjectTypesClient() {
       <section className="card-tool rounded-xl p-5">
         <h2 className="text-sm font-semibold text-white">Type list</h2>
         <p className="mt-1 text-xs text-slate-500">
-          Built-in types can be renamed. Custom types can be added or removed when not in use.
+          Rename, add custom types, or remove any option (built-ins are hidden from pickers).
         </p>
         <ul className="mt-4 space-y-3">
           {types.map((type) => {
@@ -138,16 +149,14 @@ export function PrivateProjectTypesClient() {
                     Save
                   </button>
                 ) : null}
-                {!type.isBuiltIn ? (
-                  <button
-                    type="button"
-                    disabled={loadingRow}
-                    onClick={() => void removeType(type)}
-                    className="rounded px-2 py-1 text-[10px] font-medium text-red-300/80 ring-1 ring-red-500/20 hover:bg-red-500/10 disabled:opacity-50"
-                  >
-                    Remove
-                  </button>
-                ) : null}
+                <button
+                  type="button"
+                  disabled={loadingRow}
+                  onClick={() => void removeType(type)}
+                  className="rounded px-2 py-1 text-[10px] font-medium text-red-300/80 ring-1 ring-red-500/20 hover:bg-red-500/10 disabled:opacity-50"
+                >
+                  Remove
+                </button>
               </li>
             );
           })}

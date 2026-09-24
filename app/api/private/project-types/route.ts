@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
   if (!label) return NextResponse.json({ error: "Label required" }, { status: 400 });
 
   const existing = await prisma.privateProjectCustomType.findFirst({
-    where: { label: { equals: label, mode: "insensitive" } },
+    where: { label: { equals: label, mode: "insensitive" }, hidden: false },
   });
   if (existing) {
     return NextResponse.json({ error: "A project type with this label already exists" }, { status: 400 });
@@ -75,6 +75,7 @@ export async function PATCH(request: NextRequest) {
   const duplicate = await prisma.privateProjectCustomType.findFirst({
     where: {
       label: { equals: label, mode: "insensitive" },
+      hidden: false,
       NOT: builtInKey ? { builtInKey } : id ? { id } : undefined,
     },
   });
@@ -119,17 +120,35 @@ export async function DELETE(request: NextRequest) {
 
   const body = await request.json().catch(() => ({}));
   const id = String(body.id || request.nextUrl.searchParams.get("id") || "").trim();
-  if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
+  const builtInKeyRaw = body.builtInKey ? String(body.builtInKey).trim() : "";
+
+  const builtInKey =
+    builtInKeyRaw === "residential_extension" || builtInKeyRaw === "commercial"
+      ? (builtInKeyRaw as PrivateProjectType)
+      : null;
+
+  if (builtInKey) {
+    const row = await prisma.privateProjectCustomType.upsert({
+      where: { builtInKey },
+      create: {
+        label: PRIVATE_PROJECT_TYPE_LABELS[builtInKey],
+        builtInKey,
+        hidden: true,
+        sortOrder: builtInKey === "residential_extension" ? 0 : 1,
+      },
+      update: { hidden: true },
+    });
+    return NextResponse.json({ ok: true, hidden: true, id: row.id });
+  }
+
+  if (!id) return NextResponse.json({ error: "id or builtInKey required" }, { status: 400 });
 
   const row = await prisma.privateProjectCustomType.findUnique({ where: { id } });
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
   if (row.builtInKey) {
-    return NextResponse.json(
-      {
-        error: `Built-in types cannot be deleted. Reset the label to "${PRIVATE_PROJECT_TYPE_LABELS[row.builtInKey]}".`,
-      },
-      { status: 400 },
-    );
+    await prisma.privateProjectCustomType.update({ where: { id }, data: { hidden: true } });
+    return NextResponse.json({ ok: true, hidden: true });
   }
 
   const inUse = await prisma.privateProject.count({

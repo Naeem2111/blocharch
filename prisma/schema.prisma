@@ -757,11 +757,13 @@ model OpsSubmissionLineItem {
   @@map("ops_submission_line_items")
 }
 
-/** Extra / renamed athlete-operations phases and packages. */
+  /** Extra / renamed athlete-operations phases and packages. */
 model OpsCatalogPhase {
   id         String           @id @default(uuid())
   label      String
   builtInKey OpsProjectPhase? @unique @map("built_in_key")
+  /** Soft-hide built-in or custom options from pickers without deleting history. */
+  hidden     Boolean          @default(false)
   sortOrder  Int              @default(0) @map("sort_order")
   createdAt  DateTime         @default(now()) @map("created_at")
 
@@ -776,6 +778,8 @@ model OpsCatalogWorkType {
   id         String       @id @default(uuid())
   label      String
   builtInKey OpsTaskType? @unique @map("built_in_key")
+  /** Soft-hide built-in or custom options from pickers without deleting history. */
+  hidden     Boolean      @default(false)
   sortOrder  Int          @default(0) @map("sort_order")
   createdAt  DateTime     @default(now()) @map("created_at")
 
@@ -833,6 +837,8 @@ model PrivateProjectCustomType {
   label     String   @unique
   /** When set, overrides the display label for a built-in PrivateProjectType enum value. */
   builtInKey PrivateProjectType? @unique @map("built_in_key")
+  /** Soft-hide built-in or custom options from pickers without deleting history. */
+  hidden     Boolean @default(false)
   sortOrder Int      @default(0) @map("sort_order")
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -868,6 +874,8 @@ model PrivateProject {
   projectType     PrivateProjectType   @default(residential_extension) @map("project_type")
   customProjectTypeId String?            @map("custom_project_type_id")
   designStage     PrivateDesignStage   @default(site_measure_up) @map("design_stage")
+  /** Active design phase id from phaseStructure (supports custom phases). */
+  currentDesignPhaseId String?         @map("current_design_phase_id")
   status          PrivateProjectStatus @default(active)
   /** Fixed fee excl. VAT (ZAR). */
   feeZar          Decimal              @default(0) @map("fee_zar") @db.Decimal(12, 2)

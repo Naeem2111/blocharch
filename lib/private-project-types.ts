@@ -17,13 +17,18 @@ export async function listPrivateProjectTypeOptions(): Promise<{
 }> {
   const rows = await prisma.privateProjectCustomType.findMany({
     orderBy: [{ sortOrder: "asc" }, { label: "asc" }],
-    select: { id: true, label: true, builtInKey: true },
+    select: { id: true, label: true, builtInKey: true, hidden: true },
   });
+
+  const hiddenBuiltIns = new Set(
+    rows.filter((r) => r.builtInKey && r.hidden).map((r) => r.builtInKey as string),
+  );
 
   const types: PrivateProjectTypeOption[] = [];
 
   for (const key of BUILT_IN_TYPE_KEYS) {
-    const override = rows.find((r) => r.builtInKey === key);
+    if (hiddenBuiltIns.has(key)) continue;
+    const override = rows.find((r) => r.builtInKey === key && !r.hidden);
     types.push({
       id: override?.id ?? null,
       value: key,
@@ -33,7 +38,7 @@ export async function listPrivateProjectTypeOptions(): Promise<{
     });
   }
 
-  for (const row of rows.filter((r) => !r.builtInKey)) {
+  for (const row of rows.filter((r) => !r.builtInKey && !r.hidden)) {
     types.push({
       id: row.id,
       value: `custom:${row.id}`,
@@ -70,13 +75,18 @@ export async function resolveProjectTypeInput(body: {
     const id = raw.slice("custom:".length).trim();
     if (!id) return { ok: false, error: "Invalid project type" };
     const custom = await prisma.privateProjectCustomType.findFirst({
-      where: { id, builtInKey: null },
+      where: { id, builtInKey: null, hidden: false },
     });
     if (!custom) return { ok: false, error: "Project type not found" };
     return { ok: true, projectType: "other", customProjectTypeId: custom.id };
   }
 
   if (raw === "residential_extension" || raw === "commercial") {
+    const hidden = await prisma.privateProjectCustomType.findFirst({
+      where: { builtInKey: raw, hidden: true },
+      select: { id: true },
+    });
+    if (hidden) return { ok: false, error: "That project type is no longer available" };
     return { ok: true, projectType: raw, customProjectTypeId: null };
   }
 

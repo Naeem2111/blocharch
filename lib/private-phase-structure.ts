@@ -144,6 +144,54 @@ export function findDesignPhase(
   return null;
 }
 
+/** Resolve the active design phase from id (preferred) or built-in designStage. */
+export function resolveCurrentDesignPhase(
+  structure: PhaseStructure,
+  designStage: PrivateDesignStage,
+  currentDesignPhaseId?: string | null,
+): ProjectDesignPhase | null {
+  const phases = allDesignPhases(structure);
+  if (phases.length === 0) return null;
+  if (currentDesignPhaseId) {
+    const byId = phases.find((p) => p.id === currentDesignPhaseId);
+    if (byId) return byId;
+  }
+  const byKey = phases.find((p) => p.builtInKey === designStage || p.id === designStage);
+  if (byKey) return byKey;
+  return phases[0] ?? null;
+}
+
+export function designPhaseListStatus(
+  phases: ProjectDesignPhase[],
+  phaseId: string,
+  currentPhaseId: string,
+): "completed" | "current" | "upcoming" {
+  const idx = phases.findIndex((p) => p.id === phaseId);
+  const currentIdx = phases.findIndex((p) => p.id === currentPhaseId);
+  if (idx < 0 || currentIdx < 0) return "upcoming";
+  if (idx < currentIdx) return "completed";
+  if (idx === currentIdx) return "current";
+  return "upcoming";
+}
+
+/**
+ * Pick a built-in workflow key when selecting a (possibly custom) design phase.
+ * Prefers the phase's builtInKey; otherwise maps by position in the project list.
+ */
+export function inferBuiltInStageForPhase(
+  structure: PhaseStructure,
+  phaseId: string,
+): PrivateDesignStage {
+  const phases = allDesignPhases(structure);
+  const idx = phases.findIndex((p) => p.id === phaseId);
+  if (idx < 0) return "site_measure_up";
+  const phase = phases[idx];
+  if (phase.builtInKey) return phase.builtInKey;
+  if (phases.length === 1) return "site_measure_up";
+  const mapped = Math.round((idx / (phases.length - 1)) * (PRIVATE_STAGE_ORDER.length - 1));
+  return PRIVATE_STAGE_ORDER[Math.max(0, Math.min(PRIVATE_STAGE_ORDER.length - 1, mapped))];
+}
+
 export function validatePhaseStructure(structure: PhaseStructure): { ok: boolean; error?: string } {
   if (structure.phases.length === 0) {
     return { ok: false, error: "At least one stage is required." };
@@ -319,20 +367,35 @@ export type PortalPhaseGroup = {
 export function buildPortalPhaseGroups(
   structure: PhaseStructure,
   currentStage: PrivateDesignStage,
+  currentDesignPhaseId?: string | null,
 ): PortalPhaseGroup[] {
-  const currentIdx = stageIndex(currentStage);
+  const phases = allDesignPhases(structure);
+  const currentPhase = resolveCurrentDesignPhase(structure, currentStage, currentDesignPhaseId);
+  const currentPhaseId = currentPhase?.id ?? null;
+  const currentIdx = currentPhaseId
+    ? phases.findIndex((p) => p.id === currentPhaseId)
+    : stageIndex(currentStage);
 
   return structure.phases.map((group, groupIndex) => {
-    const builtInIndices = group.designPhases
-      .map((p) => (p.builtInKey ? stageIndex(p.builtInKey) : null))
-      .filter((idx): idx is number => idx != null);
-
     let state: PortalPhaseGroup["state"] = "upcoming";
-    if (builtInIndices.length > 0) {
-      const minIdx = Math.min(...builtInIndices);
-      const maxIdx = Math.max(...builtInIndices);
-      if (maxIdx < currentIdx) state = "done";
-      else if (minIdx <= currentIdx && currentIdx <= maxIdx) state = "current";
+    if (currentPhaseId && group.designPhases.length > 0) {
+      const statuses = group.designPhases.map((p) =>
+        designPhaseListStatus(phases, p.id, currentPhaseId),
+      );
+      if (statuses.every((s) => s === "completed")) state = "done";
+      else if (statuses.some((s) => s === "current")) state = "current";
+      else if (statuses.every((s) => s === "upcoming")) state = "upcoming";
+      else state = "current";
+    } else {
+      const builtInIndices = group.designPhases
+        .map((p) => (p.builtInKey ? stageIndex(p.builtInKey) : null))
+        .filter((idx): idx is number => idx != null);
+      if (builtInIndices.length > 0) {
+        const minIdx = Math.min(...builtInIndices);
+        const maxIdx = Math.max(...builtInIndices);
+        if (maxIdx < currentIdx) state = "done";
+        else if (minIdx <= currentIdx && currentIdx <= maxIdx) state = "current";
+      }
     }
 
     return {
@@ -341,6 +404,14 @@ export function buildPortalPhaseGroups(
       number: groupIndex + 1,
       state,
       stages: group.designPhases.map((phase) => {
+        if (currentPhaseId) {
+          const s = designPhaseListStatus(phases, phase.id, currentPhaseId);
+          return {
+            key: phase.id,
+            label: phase.name,
+            state: s === "completed" ? "done" : s,
+          };
+        }
         const idx = phase.builtInKey ? stageIndex(phase.builtInKey) : null;
         return {
           key: phase.id,

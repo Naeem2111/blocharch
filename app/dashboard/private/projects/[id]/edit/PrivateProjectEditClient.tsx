@@ -21,12 +21,14 @@ import {
   allDesignPhases,
   clearPhaseGroupFeePercent,
   defaultPhaseStructure,
+  inferBuiltInStageForPhase,
   moveDesignPhaseToGroup,
   phaseGroupFeeTotal,
   removeDesignPhase,
   removePhase,
   renameDesignPhase,
   renamePhase,
+  resolveCurrentDesignPhase,
   setPhaseGroupFeePercent,
   type PhaseStructure,
 } from "@/lib/private-phase-structure";
@@ -58,6 +60,7 @@ type ProjectPayload = {
   customProjectTypeId: string | null;
   designStage: string;
   designStageLabel: string;
+  currentDesignPhaseId?: string | null;
   progressPercent: number;
   calculatedProgressPercent: number;
   manualProgressPercent: number | null;
@@ -142,6 +145,7 @@ export function PrivateProjectEditClient({
     assignedAthleteIds: [] as string[],
     primaryAthleteId: "",
     designStage: "site_measure_up" as PrivateDesignStage,
+    currentDesignPhaseId: "",
     manualProgressPercent: "",
     stageNotes: "",
     clientDescription: "",
@@ -192,6 +196,10 @@ export function PrivateProjectEditClient({
       assignedAthleteIds: assigned.map((a) => a.id),
       primaryAthleteId: assigned.find((a) => a.isPrimary)?.id ?? assigned[0]?.id ?? "",
       designStage: p.designStage as PrivateDesignStage,
+      currentDesignPhaseId:
+        p.currentDesignPhaseId ??
+        resolveCurrentDesignPhase(p.phaseStructure, p.designStage as PrivateDesignStage, null)?.id ??
+        "",
       manualProgressPercent:
         p.manualProgressPercent != null ? String(p.manualProgressPercent) : String(p.calculatedProgressPercent),
       stageNotes: p.stageNotes ?? "",
@@ -215,9 +223,10 @@ export function PrivateProjectEditClient({
         feeZar: feeTotal,
         phaseFeePercents,
         phaseStructure,
+        currentDesignPhaseId: form.currentDesignPhaseId || null,
         expenses: expenseRecords,
       }),
-    [form.designStage, feeTotal, phaseFeePercents, phaseStructure, expenseRecords],
+    [form.designStage, form.currentDesignPhaseId, feeTotal, phaseFeePercents, phaseStructure, expenseRecords],
   );
 
   const effectiveFeePercents = useMemo(
@@ -225,18 +234,39 @@ export function PrivateProjectEditClient({
     [phaseFeePercents, phaseStructure],
   );
 
-  /** Progress tracking still uses built-in workflow keys — show custom phase names where linked. */
+  /** All design phases on this project — custom and built-in — for the current-phase picker. */
   const progressPhaseOptions = useMemo(() => {
-    const linked = allDesignPhases(phaseStructure).filter(
-      (p): p is typeof p & { builtInKey: PrivateDesignStage } => p.builtInKey != null,
-    );
-    if (linked.length > 0) return linked;
+    const phases = allDesignPhases(phaseStructure);
+    if (phases.length > 0) return phases;
     return PRIVATE_STAGE_ORDER.map((key) => ({
       id: key,
       name: PRIVATE_STAGE_LABELS[key],
       builtInKey: key,
     }));
   }, [phaseStructure]);
+
+  const selectedDesignPhaseId = useMemo(() => {
+    if (
+      form.currentDesignPhaseId &&
+      progressPhaseOptions.some((p) => p.id === form.currentDesignPhaseId)
+    ) {
+      return form.currentDesignPhaseId;
+    }
+    return (
+      resolveCurrentDesignPhase(phaseStructure, form.designStage, form.currentDesignPhaseId)?.id ??
+      progressPhaseOptions[0]?.id ??
+      ""
+    );
+  }, [form.currentDesignPhaseId, form.designStage, phaseStructure, progressPhaseOptions]);
+
+  function selectDesignPhase(phaseId: string) {
+    const inferred = inferBuiltInStageForPhase(phaseStructure, phaseId);
+    setForm({
+      ...form,
+      currentDesignPhaseId: phaseId,
+      designStage: inferred,
+    });
+  }
 
   const feeSplitSum = phaseSplitSum(effectiveFeePercents, phaseStructure);
   const feeSplitsValid = feeSplitSum === 100;
@@ -343,6 +373,7 @@ export function PrivateProjectEditClient({
         assignedAthleteIds: form.assignedAthleteIds,
         primaryAthleteId: form.primaryAthleteId || null,
         designStage: form.designStage,
+        currentDesignPhaseId: form.currentDesignPhaseId || selectedDesignPhaseId || null,
         manualProgressPercent: useManualProgress ? Number(form.manualProgressPercent) : null,
         stageNotes: form.stageNotes.trim() || null,
         clientDescription: form.clientDescription.trim() || null,
@@ -793,13 +824,11 @@ export function PrivateProjectEditClient({
             Current design phase
             <select
               className={field}
-              value={form.designStage}
-              onChange={(e) =>
-                setForm({ ...form, designStage: e.target.value as PrivateDesignStage })
-              }
+              value={selectedDesignPhaseId}
+              onChange={(e) => selectDesignPhase(e.target.value)}
             >
               {progressPhaseOptions.map((phase) => (
-                <option key={phase.id} value={phase.builtInKey}>
+                <option key={phase.id} value={phase.id}>
                   {phase.name}
                 </option>
               ))}
@@ -875,14 +904,15 @@ export function PrivateProjectEditClient({
               Optional. Add a from and/or to date only when that stage has a confirmed window.
             </p>
             <div className="mt-3 space-y-3">
-              {PRIVATE_STAGE_ORDER.map((key) => {
-                const range = stageDates[key];
+              {progressPhaseOptions.map((phase) => {
+                const key = stageDateStorageKey(phase);
+                const range = stageDates[key] ?? stageDates[phase.id];
                 return (
                   <div
-                    key={key}
+                    key={phase.id}
                     className="grid gap-2 rounded-lg bg-white/[0.03] p-3 ring-1 ring-white/[0.06] sm:grid-cols-[minmax(0,1fr)_auto_auto]"
                   >
-                    <p className="self-center text-xs text-slate-300">{PRIVATE_STAGE_LABELS[key]}</p>
+                    <p className="self-center text-xs text-slate-300">{phase.name}</p>
                     <label className="block text-[10px] uppercase tracking-wider text-slate-500">
                       From
                       <input

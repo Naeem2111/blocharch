@@ -192,19 +192,35 @@ export async function DELETE(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   const kind = parseKind(body.kind);
   const id = String(body.id || "").trim();
+  const builtInKeyRaw = body.builtInKey ? String(body.builtInKey).trim() : "";
   if (!kind) return NextResponse.json({ error: "kind must be phase or work_type" }, { status: 400 });
-  if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
 
   if (kind === "phase") {
+    const builtInKey =
+      builtInKeyRaw && isOpsProjectPhase(builtInKeyRaw) && builtInKeyRaw !== "custom"
+        ? (builtInKeyRaw as OpsProjectPhase)
+        : null;
+
+    if (builtInKey) {
+      const row = await prisma.opsCatalogPhase.upsert({
+        where: { builtInKey },
+        create: {
+          label: PROJECT_PHASE_LABELS[builtInKey],
+          builtInKey,
+          hidden: true,
+          sortOrder: 0,
+        },
+        update: { hidden: true },
+      });
+      return NextResponse.json({ ok: true, hidden: true, id: row.id });
+    }
+
+    if (!id) return NextResponse.json({ error: "id or builtInKey required" }, { status: 400 });
     const row = await prisma.opsCatalogPhase.findUnique({ where: { id } });
     if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
     if (row.builtInKey) {
-      return NextResponse.json(
-        {
-          error: `Built-in packages cannot be deleted. Reset the label to “${PROJECT_PHASE_LABELS[row.builtInKey]}”.`,
-        },
-        { status: 400 },
-      );
+      await prisma.opsCatalogPhase.update({ where: { id }, data: { hidden: true } });
+      return NextResponse.json({ ok: true, hidden: true });
     }
     const [projectCount, lineCount] = await Promise.all([
       prisma.opsProject.count({ where: { customStageId: id } }),
@@ -220,15 +236,29 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
+  const builtInKey =
+    builtInKeyRaw && isOpsTaskType(builtInKeyRaw) ? (builtInKeyRaw as OpsTaskType) : null;
+
+  if (builtInKey) {
+    const row = await prisma.opsCatalogWorkType.upsert({
+      where: { builtInKey },
+      create: {
+        label: TASK_TYPE_LABELS[builtInKey],
+        builtInKey,
+        hidden: true,
+        sortOrder: 0,
+      },
+      update: { hidden: true },
+    });
+    return NextResponse.json({ ok: true, hidden: true, id: row.id });
+  }
+
+  if (!id) return NextResponse.json({ error: "id or builtInKey required" }, { status: 400 });
   const row = await prisma.opsCatalogWorkType.findUnique({ where: { id } });
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (row.builtInKey) {
-    return NextResponse.json(
-      {
-        error: `Built-in work types cannot be deleted. Reset the label to “${TASK_TYPE_LABELS[row.builtInKey]}”.`,
-      },
-      { status: 400 },
-    );
+    await prisma.opsCatalogWorkType.update({ where: { id }, data: { hidden: true } });
+    return NextResponse.json({ ok: true, hidden: true });
   }
   const inUse = await prisma.opsSubmissionLineItem.count({
     where: { taskTypes: { has: catalogValueFromId(id) } },

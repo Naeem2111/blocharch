@@ -12,6 +12,7 @@ type ProjectRow = {
   name: string;
   designStage: string;
   designStageLabel: string;
+  currentDesignPhaseId?: string | null;
   progressPercent: number;
   completedAt: string | null;
   feeZar: number;
@@ -19,6 +20,7 @@ type ProjectRow = {
   client: { id: string; name: string };
   athlete: AssignedAthlete | null;
   athletes?: AssignedAthlete[];
+  phases?: Array<{ phaseId: string; label: string; stage?: string }>;
 };
 
 function zar(n: number) {
@@ -72,6 +74,7 @@ export function PrivateProjectsClient({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [stageOpenId, setStageOpenId] = useState<string | null>(null);
+  const [reactivatingId, setReactivatingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const stageMenuRef = useRef<HTMLDivElement>(null);
   const completed = scope === "completed";
@@ -109,13 +112,13 @@ export function PrivateProjectsClient({
     };
   }, [stageOpenId]);
 
-  async function setStage(projectId: string, designStage: string) {
+  async function setStage(projectId: string, phaseId: string) {
     setSaving(true);
     setError("");
     const r = await fetch(`/api/private/projects/${projectId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ designStage }),
+      body: JSON.stringify({ currentDesignPhaseId: phaseId }),
     });
     const j = await r.json();
     setSaving(false);
@@ -124,6 +127,28 @@ export function PrivateProjectsClient({
       return;
     }
     setStageOpenId(null);
+    void load();
+  }
+
+  async function reactivate(project: { id: string; name: string }) {
+    if (
+      !confirm(
+        `Bring “${project.name}” back to active projects? Progress will be set to 85%.`,
+      )
+    ) {
+      return;
+    }
+    setReactivatingId(project.id);
+    setError("");
+    const r = await fetch(`/api/private/projects/${project.id}/reactivate`, {
+      method: "POST",
+    });
+    const j = await r.json().catch(() => ({}));
+    setReactivatingId(null);
+    if (!r.ok) {
+      setError(j.error || "Could not reactivate");
+      return;
+    }
     void load();
   }
 
@@ -200,19 +225,31 @@ export function PrivateProjectsClient({
                         </button>
                         {stageOpenId === p.id ? (
                           <div className="mt-1 w-64 rounded-lg border border-white/[0.1] bg-[#0f131a] py-1">
-                            {PRIVATE_STAGE_ORDER.map((key) => (
-                              <button
-                                key={key}
-                                type="button"
-                                className={`block w-full px-3 py-2 text-left text-xs hover:bg-white/[0.06] ${
-                                  key === p.designStage ? "text-brand-300" : "text-slate-300"
-                                }`}
-                                onClick={() => void setStage(p.id, key)}
-                              >
-                                {key === p.designStage ? "✓ " : ""}
-                                {PRIVATE_STAGE_LABELS[key]}
-                              </button>
-                            ))}
+                            {(p.phases && p.phases.length > 0
+                              ? p.phases
+                              : PRIVATE_STAGE_ORDER.map((key) => ({
+                                  phaseId: key,
+                                  label: PRIVATE_STAGE_LABELS[key],
+                                }))
+                            ).map((row) => {
+                              const selected =
+                                row.phaseId === p.currentDesignPhaseId ||
+                                row.phaseId === p.designStage ||
+                                ("stage" in row && row.stage === p.designStage);
+                              return (
+                                <button
+                                  key={row.phaseId}
+                                  type="button"
+                                  className={`block w-full px-3 py-2 text-left text-xs hover:bg-white/[0.06] ${
+                                    selected ? "text-brand-300" : "text-slate-300"
+                                  }`}
+                                  onClick={() => void setStage(p.id, row.phaseId)}
+                                >
+                                  {selected ? "✓ " : ""}
+                                  {row.label}
+                                </button>
+                              );
+                            })}
                           </div>
                         ) : null}
                       </div>
@@ -249,6 +286,16 @@ export function PrivateProjectsClient({
                       >
                         Expenses
                       </Link>
+                      {completed && canDelete ? (
+                        <button
+                          type="button"
+                          disabled={reactivatingId === p.id}
+                          onClick={() => void reactivate(p)}
+                          className="text-left text-xs text-emerald-300/90 hover:text-emerald-200 disabled:opacity-50"
+                        >
+                          {reactivatingId === p.id ? "Moving…" : "Bring back to active"}
+                        </button>
+                      ) : null}
                       {canDelete ? (
                         <PrivateDeleteProjectButton
                           projectId={p.id}

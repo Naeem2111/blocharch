@@ -21,6 +21,9 @@ import {
   validatePhaseStructure,
   defaultPhaseStructure,
   resolvePhaseStructure,
+  findDesignPhase,
+  inferBuiltInStageForPhase,
+  allDesignPhases,
 } from "@/lib/private-phase-structure";
 import {
   activePrivateAthleteAssignmentsInclude,
@@ -136,10 +139,39 @@ export async function PATCH(
     const body = await request.json();
     const data: Record<string, unknown> = {};
 
-    if (body.designStage !== undefined) {
+    const nextStructurePreview =
+      body.phaseStructure !== undefined
+        ? parsePhaseStructure(body.phaseStructure)
+        : resolvePhaseStructure(existing.phaseStructure);
+
+    if (body.currentDesignPhaseId !== undefined || body.designPhaseId !== undefined) {
+      const phaseId = String(body.currentDesignPhaseId ?? body.designPhaseId ?? "").trim();
+      const structure = nextStructurePreview ?? resolvePhaseStructure(existing.phaseStructure);
+      if (!structure || !phaseId || !findDesignPhase(structure, phaseId)) {
+        return NextResponse.json({ error: "Invalid design phase" }, { status: 400 });
+      }
+      const inferred = inferBuiltInStageForPhase(structure, phaseId);
+      data.currentDesignPhaseId = phaseId;
+      if (inferred !== existing.designStage || phaseId !== existing.currentDesignPhaseId) {
+        data.designStage = inferred;
+        data.stageStartedAt = new Date();
+        if (inferred === "council_approved") {
+          data.status = "completed";
+          data.completedAt = new Date();
+          data.handoverOutcome = body.handoverOutcome
+            ? String(body.handoverOutcome)
+            : "Approved on schedule";
+        }
+      }
+    } else if (body.designStage !== undefined) {
       if (!isPrivateDesignStage(String(body.designStage))) {
         return NextResponse.json({ error: "Invalid design phase" }, { status: 400 });
       }
+      const structure = nextStructurePreview ?? resolvePhaseStructure(existing.phaseStructure);
+      const match = allDesignPhases(structure).find(
+        (p) => p.builtInKey === body.designStage || p.id === body.designStage,
+      );
+      data.currentDesignPhaseId = match?.id ?? null;
       if (body.designStage !== existing.designStage) {
         data.designStage = body.designStage;
         data.stageStartedAt = new Date();

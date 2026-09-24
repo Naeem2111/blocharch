@@ -71,16 +71,14 @@ function CatalogList({
                   Save
                 </button>
               ) : null}
-              {!option.isBuiltIn ? (
-                <button
-                  type="button"
-                  disabled={loadingRow}
-                  onClick={() => void onRemove(kind, option)}
-                  className="rounded px-2 py-1 text-[10px] font-medium text-red-300/80 ring-1 ring-red-500/20 hover:bg-red-500/10 disabled:opacity-50"
-                >
-                  Remove
-                </button>
-              ) : null}
+              <button
+                type="button"
+                disabled={loadingRow}
+                onClick={() => void onRemove(kind, option)}
+                className="rounded px-2 py-1 text-[10px] font-medium text-red-300/80 ring-1 ring-red-500/20 hover:bg-red-500/10 disabled:opacity-50"
+              >
+                Remove
+              </button>
             </li>
           );
         })}
@@ -178,14 +176,20 @@ export function OpsCatalogClient() {
   }
 
   async function removeItem(kind: Kind, option: OpsCatalogOption) {
-    if (!option.id || option.isBuiltIn) return;
-    if (!confirm(`Remove “${option.label}”?`)) return;
+    const verb = option.isBuiltIn ? "Hide" : "Remove";
+    if (!confirm(`${verb} “${option.label}”?${option.isBuiltIn ? " It will no longer appear in project and daily-log pickers." : ""}`)) {
+      return;
+    }
     setBusy(`${kind}:${option.value}`);
     setError("");
     const r = await fetch("/api/ops/catalog", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind, id: option.id }),
+      body: JSON.stringify({
+        kind,
+        id: option.id,
+        builtInKey: option.builtInKey,
+      }),
     });
     const j = await r.json();
     setBusy(null);
@@ -203,7 +207,7 @@ export function OpsCatalogClient() {
       {error ? <p className="text-sm text-red-300 lg:col-span-2">{error}</p> : null}
       <CatalogList
         title="Phases / packages"
-        description="Shown on the project tracker and daily log. Built-in packages can be renamed; custom ones can be added or removed when not in use."
+        description="Shown on the project tracker and daily log. Rename, add custom packages, or remove any option (built-ins are hidden from pickers)."
         addPlaceholder="e.g. Interior package, Measured survey"
         kind="phase"
         options={phases}
@@ -214,7 +218,7 @@ export function OpsCatalogClient() {
       />
       <CatalogList
         title="Work types"
-        description="Task types athletes pick on the daily log. Built-in types can be renamed; custom types can be added or removed when unused."
+        description="Task types athletes pick on the daily log. Rename, add custom types, or remove any option (built-ins are hidden from pickers)."
         addPlaceholder="e.g. BIM coordination, Site visit"
         kind="work_type"
         options={workTypes}

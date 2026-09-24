@@ -31,11 +31,17 @@ export function isCatalogWorkTypeValue(value: string): boolean {
 export async function listOpsPhaseOptions(): Promise<OpsCatalogOption[]> {
   const rows = await prisma.opsCatalogPhase.findMany({
     orderBy: [{ sortOrder: "asc" }, { label: "asc" }],
-    select: { id: true, label: true, builtInKey: true },
+    select: { id: true, label: true, builtInKey: true, hidden: true },
   });
 
-  const options: OpsCatalogOption[] = OPS_PROJECT_STAGE_OPTIONS.map((opt) => {
-    const override = rows.find((r) => r.builtInKey === opt.value);
+  const hiddenBuiltIns = new Set(
+    rows.filter((r) => r.builtInKey && r.hidden).map((r) => r.builtInKey as string),
+  );
+
+  const options: OpsCatalogOption[] = OPS_PROJECT_STAGE_OPTIONS.filter(
+    (opt) => !hiddenBuiltIns.has(opt.value),
+  ).map((opt) => {
+    const override = rows.find((r) => r.builtInKey === opt.value && !r.hidden);
     return {
       id: override?.id ?? null,
       value: opt.value,
@@ -45,7 +51,7 @@ export async function listOpsPhaseOptions(): Promise<OpsCatalogOption[]> {
     };
   });
 
-  for (const row of rows.filter((r) => !r.builtInKey)) {
+  for (const row of rows.filter((r) => !r.builtInKey && !r.hidden)) {
     options.push({
       id: row.id,
       value: catalogValueFromId(row.id),
@@ -61,21 +67,27 @@ export async function listOpsPhaseOptions(): Promise<OpsCatalogOption[]> {
 export async function listOpsWorkTypeOptions(): Promise<OpsCatalogOption[]> {
   const rows = await prisma.opsCatalogWorkType.findMany({
     orderBy: [{ sortOrder: "asc" }, { label: "asc" }],
-    select: { id: true, label: true, builtInKey: true },
+    select: { id: true, label: true, builtInKey: true, hidden: true },
   });
 
-  const options: OpsCatalogOption[] = Object.entries(TASK_TYPE_LABELS).map(([value, label]) => {
-    const override = rows.find((r) => r.builtInKey === value);
-    return {
-      id: override?.id ?? null,
-      value,
-      label: override?.label ?? label,
-      builtInKey: value,
-      isBuiltIn: true,
-    };
-  });
+  const hiddenBuiltIns = new Set(
+    rows.filter((r) => r.builtInKey && r.hidden).map((r) => r.builtInKey as string),
+  );
 
-  for (const row of rows.filter((r) => !r.builtInKey)) {
+  const options: OpsCatalogOption[] = Object.entries(TASK_TYPE_LABELS)
+    .filter(([value]) => !hiddenBuiltIns.has(value))
+    .map(([value, label]) => {
+      const override = rows.find((r) => r.builtInKey === value && !r.hidden);
+      return {
+        id: override?.id ?? null,
+        value,
+        label: override?.label ?? label,
+        builtInKey: value,
+        isBuiltIn: true,
+      };
+    });
+
+  for (const row of rows.filter((r) => !r.builtInKey && !r.hidden)) {
     options.push({
       id: row.id,
       value: catalogValueFromId(row.id),
@@ -123,7 +135,7 @@ export async function resolveOpsStageInput(raw: string): Promise<
   const customId = catalogIdFromValue(value);
   if (customId) {
     const row = await prisma.opsCatalogPhase.findFirst({
-      where: { id: customId, builtInKey: null },
+      where: { id: customId, builtInKey: null, hidden: false },
       select: { id: true },
     });
     if (!row) return { ok: false, error: "Unknown project phase / package" };
@@ -132,6 +144,11 @@ export async function resolveOpsStageInput(raw: string): Promise<
   if (!isOpsProjectPhase(value) || value === "custom") {
     return { ok: false, error: "Invalid stage" };
   }
+  const hidden = await prisma.opsCatalogPhase.findFirst({
+    where: { builtInKey: value, hidden: true },
+    select: { id: true },
+  });
+  if (hidden) return { ok: false, error: "That phase / package is no longer available" };
   return { ok: true, currentStage: value, customStageId: null };
 }
 
@@ -151,12 +168,23 @@ export async function resolveOpsLinePhaseInput(raw: string): Promise<
 
 export async function assertCustomWorkTypeIds(values: string[]): Promise<string | null> {
   const ids = values.map(catalogIdFromValue).filter((id): id is string => Boolean(id));
-  if (ids.length === 0) return null;
-  const found = await prisma.opsCatalogWorkType.findMany({
-    where: { id: { in: ids }, builtInKey: null },
-    select: { id: true },
-  });
-  if (found.length !== ids.length) return "Unknown work type";
+  if (ids.length > 0) {
+    const found = await prisma.opsCatalogWorkType.findMany({
+      where: { id: { in: ids }, builtInKey: null, hidden: false },
+      select: { id: true },
+    });
+    if (found.length !== ids.length) return "Unknown work type";
+  }
+
+  const builtIns = values.filter((v): v is OpsTaskType => isOpsTaskType(v));
+  if (builtIns.length > 0) {
+    const hidden = await prisma.opsCatalogWorkType.findMany({
+      where: { builtInKey: { in: builtIns }, hidden: true },
+      select: { builtInKey: true },
+    });
+    if (hidden.length > 0) return "Unknown work type";
+  }
+
   return null;
 }
 

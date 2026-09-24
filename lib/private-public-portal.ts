@@ -8,6 +8,9 @@ import { resolvePrivateProgressPercent, privateStageMeta } from "@/lib/private-p
 import {
   buildPortalPhaseGroups,
   resolvePhaseStructure,
+  resolveCurrentDesignPhase,
+  allDesignPhases,
+  designPhaseListStatus,
 } from "@/lib/private-phase-structure";
 import { isoDateOnly, parseStageDateMap, resolveStageDates } from "@/lib/private-stage-dates";
 
@@ -61,25 +64,72 @@ export async function getPublicPrivateProjectBySlug(slug: string) {
   });
 
   const phaseStructure = resolvePhaseStructure(project.phaseStructure);
-  const phaseGroups = buildPortalPhaseGroups(phaseStructure, project.designStage);
+  const currentPhase = resolveCurrentDesignPhase(
+    phaseStructure,
+    project.designStage,
+    project.currentDesignPhaseId,
+  );
+  const phaseGroups = buildPortalPhaseGroups(
+    phaseStructure,
+    project.designStage,
+    currentPhase?.id ?? project.currentDesignPhaseId,
+  );
   const stageDates = resolveStageDates(parseStageDateMap(project.stageDates) ?? {}, {
     briefReceivedAt: isoDateOnly(project.briefReceivedAt),
     councilSubmittedAt: isoDateOnly(project.councilSubmittedAt),
   });
 
-  const stages = PRIVATE_STAGE_ORDER.map((key, i) => {
-    const currentIdx = PRIVATE_STAGE_ORDER.indexOf(project.designStage);
-    const range = stageDates[key];
-    return {
-      key,
-      label: PRIVATE_STAGE_LABELS[key],
-      number: i + 1,
-      state: i < currentIdx ? "done" : i === currentIdx ? "current" : "upcoming",
-      dateFrom: range?.from ?? null,
-      dateTo: range?.to ?? null,
-      assignedDate: range?.from ?? null,
-    };
-  });
+  const allPhases = allDesignPhases(phaseStructure);
+  const currentPhaseId = currentPhase?.id ?? null;
+  const stages =
+    allPhases.length > 0
+      ? allPhases.map((phase, i) => {
+          const range = stageDates[phase.builtInKey ?? phase.id] ?? stageDates[phase.id];
+          const status = currentPhaseId
+            ? designPhaseListStatus(allPhases, phase.id, currentPhaseId)
+            : null;
+          const currentIdx = PRIVATE_STAGE_ORDER.indexOf(project.designStage);
+          const builtInIdx = phase.builtInKey ? PRIVATE_STAGE_ORDER.indexOf(phase.builtInKey) : -1;
+          const state =
+            status === "completed"
+              ? "done"
+              : status === "current"
+                ? "current"
+                : status === "upcoming"
+                  ? "upcoming"
+                  : builtInIdx < 0
+                    ? "upcoming"
+                    : builtInIdx < currentIdx
+                      ? "done"
+                      : builtInIdx === currentIdx
+                        ? "current"
+                        : "upcoming";
+          return {
+            key: phase.id,
+            label: phase.name,
+            number: i + 1,
+            state: state as "done" | "current" | "upcoming",
+            dateFrom: range?.from ?? null,
+            dateTo: range?.to ?? null,
+            assignedDate: range?.from ?? null,
+          };
+        })
+      : PRIVATE_STAGE_ORDER.map((key, i) => {
+          const currentIdx = PRIVATE_STAGE_ORDER.indexOf(project.designStage);
+          const range = stageDates[key];
+          return {
+            key,
+            label: PRIVATE_STAGE_LABELS[key],
+            number: i + 1,
+            state: (i < currentIdx ? "done" : i === currentIdx ? "current" : "upcoming") as
+              | "done"
+              | "current"
+              | "upcoming",
+            dateFrom: range?.from ?? null,
+            dateTo: range?.to ?? null,
+            assignedDate: range?.from ?? null,
+          };
+        });
 
   let estCouncilDecision: string | null = null;
   if (project.councilSubmittedAt && project.designStage === "council_review") {
@@ -95,7 +145,7 @@ export async function getPublicPrivateProjectBySlug(slug: string) {
       name: project.name,
       address: project.address ?? project.name,
       designStage: project.designStage,
-      designStageLabel: PRIVATE_STAGE_LABELS[project.designStage],
+      designStageLabel: currentPhase?.name ?? PRIVATE_STAGE_LABELS[project.designStage],
       progressPercent,
       stageMeta: meta,
       quietExplanation: meta.quietExplanation,

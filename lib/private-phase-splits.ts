@@ -7,7 +7,9 @@ import {
 import {
   allDesignPhases,
   defaultPhaseStructure,
+  designPhaseListStatus,
   resolvePhaseStructure,
+  resolveCurrentDesignPhase,
   type PhaseStructure,
   type ProjectDesignPhase,
   type ProjectPhaseGroup,
@@ -203,7 +205,12 @@ function designPhaseStatus(
   phase: ProjectDesignPhase,
   currentStage: PrivateDesignStage,
   groupState: "completed" | "current" | "upcoming",
+  phases: ProjectDesignPhase[],
+  currentPhaseId: string | null,
 ): "completed" | "current" | "upcoming" {
+  if (currentPhaseId) {
+    return designPhaseListStatus(phases, phase.id, currentPhaseId);
+  }
   if (phase.builtInKey) return phaseStatus(phase.builtInKey, currentStage);
   return groupState;
 }
@@ -212,6 +219,8 @@ function buildPhaseRow(input: {
   phase: ProjectDesignPhase;
   groupState: "completed" | "current" | "upcoming";
   designStage: PrivateDesignStage;
+  phases: ProjectDesignPhase[];
+  currentPhaseId: string | null;
   feeZar: number;
   phaseFeePercents: PhaseSplitMap;
   expenseZar: number;
@@ -223,7 +232,13 @@ function buildPhaseRow(input: {
     input.totalExpenseZar > 0
       ? Math.round((input.expenseZar / input.totalExpenseZar) * 100)
       : 0;
-  const status = designPhaseStatus(input.phase, input.designStage, input.groupState);
+  const status = designPhaseStatus(
+    input.phase,
+    input.designStage,
+    input.groupState,
+    input.phases,
+    input.currentPhaseId,
+  );
   return {
     phaseId: input.phase.id,
     stage: input.phase.builtInKey,
@@ -240,7 +255,18 @@ function buildPhaseRow(input: {
 function groupWorkflowState(
   group: ProjectPhaseGroup,
   currentStage: PrivateDesignStage,
+  phases: ProjectDesignPhase[],
+  currentPhaseId: string | null,
 ): "completed" | "current" | "upcoming" {
+  if (currentPhaseId && group.designPhases.length > 0) {
+    const statuses = group.designPhases.map((p) =>
+      designPhaseListStatus(phases, p.id, currentPhaseId),
+    );
+    if (statuses.every((s) => s === "completed")) return "completed";
+    if (statuses.some((s) => s === "current")) return "current";
+    if (statuses.every((s) => s === "upcoming")) return "upcoming";
+    return "current";
+  }
   const indices = group.designPhases
     .map((p) => (p.builtInKey ? stageIndex(p.builtInKey) : null))
     .filter((idx): idx is number => idx != null);
@@ -277,6 +303,7 @@ export function buildProjectPhaseBreakdown(input: {
   feeZar: number;
   phaseFeePercents: PhaseSplitMap;
   phaseStructure: PhaseStructure;
+  currentDesignPhaseId?: string | null;
   expenses?: Array<{ designStage: string | null; amountZar: number }>;
 }): {
   phaseGroups: PhaseGroupBreakdown[];
@@ -297,14 +324,25 @@ export function buildProjectPhaseBreakdown(input: {
     input.phaseStructure,
   );
 
+  const phases = allDesignPhases(input.phaseStructure);
+  const currentPhase =
+    resolveCurrentDesignPhase(
+      input.phaseStructure,
+      input.designStage,
+      input.currentDesignPhaseId,
+    ) ?? null;
+  const currentPhaseId = currentPhase?.id ?? null;
+
   const phaseGroups = input.phaseStructure.phases.map((group: ProjectPhaseGroup) => {
-    const groupState = groupWorkflowState(group, input.designStage);
+    const groupState = groupWorkflowState(group, input.designStage, phases, currentPhaseId);
     const phaseStages = group.designPhases.map((phase) => {
       const expenseZar = phase.builtInKey ? totals[phase.builtInKey] : 0;
       return buildPhaseRow({
         phase,
         groupState,
         designStage: input.designStage,
+        phases,
+        currentPhaseId,
         feeZar: input.feeZar,
         phaseFeePercents: effectiveFeePercents,
         expenseZar,

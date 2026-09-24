@@ -21,6 +21,8 @@ type Detail = {
     address: string | null;
     designStage: string;
     designStageLabel: string;
+    currentDesignPhaseId?: string | null;
+    status: string;
     progressPercent: number;
     feeZar: number;
     costZar: number;
@@ -103,6 +105,7 @@ export function PrivateProjectDetailClient({
   const [error, setError] = useState("");
   const [notes, setNotes] = useState("");
   const [actionTitle, setActionTitle] = useState("");
+  const [reactivating, setReactivating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [completingAction, setCompletingAction] = useState<string | null>(null);
   const [itemLoading, setItemLoading] = useState<string | null>(null);
@@ -140,12 +143,12 @@ export function PrivateProjectDetailClient({
     void load();
   }, [load]);
 
-  async function saveStage(designStage: string) {
+  async function saveStage(phaseId: string) {
     setSaving(true);
     await fetch(`/api/private/projects/${projectId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ designStage }),
+      body: JSON.stringify({ currentDesignPhaseId: phaseId }),
     });
     setSaving(false);
     void load();
@@ -164,6 +167,27 @@ export function PrivateProjectDetailClient({
       body: JSON.stringify({ stageDates }),
     });
     setSaving(false);
+    void load();
+  }
+
+  async function reactivate() {
+    if (!data) return;
+    if (
+      !confirm(
+        `Bring “${data.project.name}” back to active projects? Progress will be set to 85%.`,
+      )
+    ) {
+      return;
+    }
+    setReactivating(true);
+    setError("");
+    const r = await fetch(`/api/private/projects/${projectId}/reactivate`, { method: "POST" });
+    const j = await r.json().catch(() => ({}));
+    setReactivating(false);
+    if (!r.ok) {
+      setError(j.error || "Could not reactivate");
+      return;
+    }
     void load();
   }
 
@@ -383,6 +407,16 @@ export function PrivateProjectDetailClient({
         >
           Edit project
         </Link>
+        {canDelete && p.status === "completed" ? (
+          <button
+            type="button"
+            disabled={reactivating}
+            onClick={() => void reactivate()}
+            className="text-xs text-emerald-300/90 hover:text-emerald-200 disabled:opacity-50"
+          >
+            {reactivating ? "Moving…" : "Bring back to active"}
+          </button>
+        ) : null}
         {canDelete ? (
           <PrivateDeleteProjectButton
             projectId={projectId}
@@ -622,13 +656,25 @@ export function PrivateProjectDetailClient({
           <h3 className="text-sm font-semibold text-white">Design phase</h3>
           <select
             className="mt-3 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
-            value={p.designStage}
+            value={
+              p.currentDesignPhaseId && p.phases.some((row) => row.phaseId === p.currentDesignPhaseId)
+                ? p.currentDesignPhaseId
+                : p.phases.find((row) => row.status === "current")?.phaseId ??
+                  p.phases.find((row) => row.stage === p.designStage)?.phaseId ??
+                  p.designStage
+            }
             disabled={saving}
             onChange={(e) => void saveStage(e.target.value)}
           >
-            {PRIVATE_STAGE_ORDER.map((key) => (
-              <option key={key} value={key}>
-                {PRIVATE_STAGE_LABELS[key]}
+            {(p.phases.length > 0
+              ? p.phases
+              : PRIVATE_STAGE_ORDER.map((key) => ({
+                  phaseId: key,
+                  label: PRIVATE_STAGE_LABELS[key],
+                }))
+            ).map((row) => (
+              <option key={row.phaseId} value={row.phaseId}>
+                {row.label}
               </option>
             ))}
           </select>

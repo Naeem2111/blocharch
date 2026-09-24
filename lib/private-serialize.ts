@@ -9,7 +9,7 @@ import {
   buildProjectPhaseBreakdown,
   resolvePhaseSplits,
 } from "@/lib/private-phase-splits";
-import { resolvePhaseStructure } from "@/lib/private-phase-structure";
+import { resolvePhaseStructure, resolveCurrentDesignPhase } from "@/lib/private-phase-structure";
 import { isoDateOnly, parseStageDateMap, resolveStageDates } from "@/lib/private-stage-dates";
 
 type SerializedAthlete = {
@@ -78,6 +78,11 @@ export function serializePrivateProject(
   });
 
   const phaseStructure = resolvePhaseStructure(p.phaseStructure);
+  const currentPhase = resolveCurrentDesignPhase(
+    phaseStructure,
+    p.designStage,
+    p.currentDesignPhaseId,
+  );
   const { feePercents } = resolvePhaseSplits(p.phaseFeePercents, p.phaseCostPercents, phaseStructure);
   const expenseRows = (p.expenses ?? []).map((e) => ({
     designStage: e.designStage,
@@ -88,6 +93,7 @@ export function serializePrivateProject(
     feeZar: fee,
     phaseFeePercents: feePercents,
     phaseStructure,
+    currentDesignPhaseId: currentPhase?.id ?? p.currentDesignPhaseId,
     expenses: expenseRows,
   });
   const athletes = serializePrivateAthletes(p);
@@ -100,7 +106,8 @@ export function serializePrivateProject(
     projectTypeLabel: resolvePrivateProjectTypeLabel(p.projectType, p.customProjectType),
     customProjectTypeId: p.customProjectTypeId,
     designStage: p.designStage,
-    designStageLabel: PRIVATE_STAGE_LABELS[p.designStage],
+    designStageLabel: currentPhase?.name ?? PRIVATE_STAGE_LABELS[p.designStage],
+    currentDesignPhaseId: currentPhase?.id ?? null,
     status: p.status,
     feeZar: fee,
     costZar: cost,

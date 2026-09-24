@@ -19,7 +19,8 @@ import { computeProjectTimeline } from "@/lib/project-timeline";
 import { formatProjectFullTitle } from "@/lib/project-display";
 import { parseClientDeliverables, type ClientPortalDeliverable } from "@/lib/client-portal-deliverables";
 import { formatHoursCompact } from "@/lib/ops-project-hours";
-import { formatProjectDueAt, dueAtFallbackForDateOnly, splitProjectDueAtWallClock } from "@/lib/project-deadline";
+import { dueAtFallbackForDateOnly, splitProjectDueAtWallClock } from "@/lib/project-deadline";
+import { ClientPortalAthleteMark } from "@/components/client-portal/ClientPortalAthleteMark";
 import {
   emptyProjectDueFields,
   ProjectDueDateTimeFields,
@@ -111,6 +112,38 @@ function formatAssignedAthletes(p: ProjectRow) {
   return rows
     .map((a) => (a.isPrimary ? `${a.fullName} (primary)` : a.fullName))
     .join(", ");
+}
+
+function formatShortDate(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const day = iso.slice(0, 10);
+  const d = new Date(`${day}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return day;
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+}
+
+function statusBadgeColor(status: string): string {
+  if (status === "completed" || status === "handed_over") return "#22c55e";
+  if (status === "waiting_on_feedback" || status === "zoom_required") return "#eab308";
+  if (status === "blocked") return "#ef4444";
+  if (status === "not_started") return "#94a3b8";
+  return "#38bdf8";
+}
+
+function OpsStatusBadge({ label, color }: { label: string; color: string }) {
+  return (
+    <span
+      className="inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide"
+      style={{
+        backgroundColor: `${color}22`,
+        color,
+        borderColor: `${color}44`,
+      }}
+    >
+      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
+      {label}
+    </span>
+  );
 }
 
 function ProjectHoursCorner({
@@ -480,15 +513,18 @@ export function OpsProjectsClient() {
       dueDate: p.dueDate,
     });
     const daysUntil = daysUntilDueFromIso(p.dueAt ?? p.dueDate);
-    const dueLabel = formatProjectDueAt(p.dueAt ?? (p.dueDate ? dueAtFallbackForDateOnly(p.dueDate) : null));
     const accent = projectDueColor(daysUntil);
 
     return (
       <article
         key={p.id}
-        className="card-tool rounded-xl p-4"
-        style={{ borderLeftWidth: 4, borderLeftColor: accent }}
+        className="client-portal-card relative overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.03] p-4"
       >
+        <span
+          className="pointer-events-none absolute bottom-0 left-0 top-0 w-[3px] rounded-l-xl"
+          style={{ backgroundColor: accent }}
+          aria-hidden
+        />
         {editingId === p.id ? (
           <div className="grid gap-3 md:grid-cols-2">
             <label className="text-xs text-slate-400">
@@ -762,51 +798,109 @@ export function OpsProjectsClient() {
             </div>
           </div>
         ) : (
-          <>
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div className="min-w-0">
-              <h2 className="font-semibold text-white">
-                {p.displayTitle ?? formatProjectFullTitle(p.name, p.currentStage)}
-              </h2>
-              <p className="text-xs text-slate-500">
-                {p.projectNumber}
-                {p.address ? ` · ${p.address}` : ""}
-                {` · ${formatAssignedAthletes(p)}`}
-              </p>
-              {p.projectLeadContactName ? (
-                <p className="text-xs text-slate-400">
-                  Office lead: {p.projectLeadContactName}
-                  {p.projectLeadContactEmail ? ` · ${p.projectLeadContactEmail}` : ""}
+          <div className="pl-1">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="font-semibold text-white">
+                  {p.displayTitle ?? formatProjectFullTitle(p.name, p.currentStage)}
+                </h2>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  {p.projectNumber}
+                  {p.address ? ` · ${p.address}` : ""}
                 </p>
-              ) : null}
-              <p
-                className={`mt-2 text-xs ${
-                  timeline.isOverdue
-                    ? "text-red-300"
-                    : timeline.isDueSoon
-                      ? "text-amber-300"
-                      : "text-slate-500"
-                }`}
-              >
-                {p.stageLabel ?? displayProjectStageLabel(p.currentStage)} · {PROJECT_STATUS_LABELS[p.currentStatus]}
-                {timeline.daysActive != null ? ` · ${timeline.daysActive} days active` : ""}
-                {dueLabel ? ` · Due ${dueLabel}` : timeline.label ? ` · ${timeline.label}` : ""}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <OpsStatusBadge
+                  label={PROJECT_STATUS_LABELS[p.currentStatus]}
+                  color={statusBadgeColor(p.currentStatus)}
+                />
+                <span className="rounded-md bg-white/[0.06] px-2 py-1 text-[10px] uppercase text-slate-400">
+                  {COMPLEXITY_LABELS[p.complexity]}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => startEdit(p)}
+                  className="text-xs text-brand-300 hover:text-brand-200"
+                >
+                  Edit
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-3 grid grid-cols-1 items-center gap-2 sm:grid-cols-[1fr_auto_1fr]">
+              <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-slate-400">
+                <span>
+                  Stage{" "}
+                  <span className="text-slate-300">
+                    {p.stageLabel ?? displayProjectStageLabel(p.currentStage)}
+                  </span>
+                </span>
+                {timeline.daysActive != null ? (
+                  <>
+                    <span className="text-slate-600">·</span>
+                    <span>{timeline.daysActive} days active</span>
+                  </>
+                ) : null}
+              </div>
+              <p className="text-center text-xs tabular-nums text-slate-400">
+                {p.startDate || p.dueDate || p.dueAt ? (
+                  <>
+                    {p.startDate ? formatShortDate(p.startDate) : "TBC"}
+                    {" → "}
+                    <span className="font-semibold" style={{ color: accent }}>
+                      {p.dueDate || p.dueAt ? formatShortDate(p.dueAt ?? p.dueDate) : "TBC"}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-slate-500">Dates to be confirmed</span>
+                )}
               </p>
+              <span className="hidden sm:block" aria-hidden />
             </div>
-            <div className="flex items-center gap-2">
-              <span className="rounded-md bg-white/[0.06] px-2 py-1 text-[10px] uppercase text-slate-400">
-                {COMPLEXITY_LABELS[p.complexity]}
+
+            <div className="mt-3 flex items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <ProjectProgressBar percent={p.progressPercent ?? 0} showLabel={false} />
+              </div>
+              <span className="shrink-0 text-xs tabular-nums text-slate-400">
+                {p.progressPercent ?? 0}%
               </span>
-              <button type="button" onClick={() => startEdit(p)} className="text-xs text-brand-300 hover:text-brand-200">Edit</button>
+              <ProjectHoursCorner hoursLogged={p.hoursLogged ?? 0} quotedHours={p.quotedHours} />
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
+                {p.projectLeadContactName ? (
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.08] text-[11px] font-semibold text-slate-300">
+                      {p.projectLeadContactName
+                        .split(/\s+/)
+                        .filter(Boolean)
+                        .slice(0, 2)
+                        .map((w) => w[0]?.toUpperCase() ?? "")
+                        .join("")}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-500">
+                        Office lead
+                      </p>
+                      <p className="truncate text-sm text-slate-200">{p.projectLeadContactName}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500">{formatAssignedAthletes(p)}</p>
+                )}
+              </div>
+              {(p.assignedAthletes && p.assignedAthletes.length > 0) || p.assignedAthleteId ? (
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-400">
+                  <ClientPortalAthleteMark />
+                  {formatAssignedAthletes(p)}
+                </span>
+              ) : (
+                <span className="text-[11px] font-medium text-slate-500">Athlete to be assigned</span>
+              )}
             </div>
           </div>
-          <div className="mt-3 flex items-end justify-between gap-4">
-            <div className="min-w-0 max-w-md flex-1">
-              <ProjectProgressBar percent={p.progressPercent ?? 0} />
-            </div>
-            <ProjectHoursCorner hoursLogged={p.hoursLogged ?? 0} quotedHours={p.quotedHours} />
-          </div>
-          </>
         )}
       </article>
     );
