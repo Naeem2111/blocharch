@@ -66,7 +66,7 @@ type LoggedCompletion = {
   projectName: string;
   projectNumber: string;
   projectPhase: string;
-  taskType: keyof typeof TASK_TYPE_LABELS;
+  taskType: string;
   taskTypes: string[];
   hoursWorked: number;
   completionPercent: number | null;

@@ -39,7 +39,6 @@ type ProjectRow = {
   id: string;
   name: string;
   displayTitle?: string;
-  stageLabel?: string;
   projectNumber: string;
   address: string | null;
   complexity: keyof typeof COMPLEXITY_LABELS;
