@@ -10,6 +10,7 @@ import {
   buildPrivateStageSteps,
   type PrivateStageStep,
 } from "@/lib/private-constants";
+import { formatStageDateRange } from "@/lib/private-stage-dates";
 import type { PrivateDesignStage } from "@prisma/client";
 
 type PortalData = NonNullable<
@@ -35,6 +36,17 @@ function formatDate(iso: string | null) {
 
 function stageCopy(key: PrivateDesignStage) {
   return PRIVATE_STAGE_CLIENT_COPY[key];
+}
+
+function stageRangeLabel(s: {
+  dateFrom?: string | null;
+  dateTo?: string | null;
+  assignedDate?: string | null;
+}) {
+  return formatStageDateRange({
+    from: s.dateFrom ?? s.assignedDate ?? null,
+    to: s.dateTo ?? null,
+  });
 }
 
 function HorizontalStageRail({ stages }: { stages: PrivateStageStep[] }) {
@@ -245,7 +257,7 @@ export function PrivateClientPortalClient({
                     <p className="mt-3 text-sm text-slate-500">
                       Target date:{" "}
                       <span className="text-slate-300">
-                        {next.assignedDate ? formatDate(next.assignedDate) : "To be confirmed"}
+                        {stageRangeLabel(next) || "To be confirmed"}
                       </span>
                     </p>
                   </>
@@ -340,9 +352,9 @@ export function PrivateClientPortalClient({
                             )}
                             {hint ? <p className="mt-1 text-xs text-slate-500">{hint}</p> : null}
                           </div>
-                          {s.assignedDate ? (
+                          {stageRangeLabel(s) ? (
                             <p className="shrink-0 pt-0.5 text-xs text-slate-500">
-                              {formatDate(s.assignedDate)}
+                              {stageRangeLabel(s)}
                             </p>
                           ) : s.state === "current" && project.stageStartedAt ? (
                             <p className="shrink-0 pt-0.5 text-xs text-slate-500">

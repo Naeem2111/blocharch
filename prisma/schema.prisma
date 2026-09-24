@@ -891,7 +891,7 @@ model PrivateProject {
   phaseCostPercents Json? @map("phase_cost_percents")
   /** Custom phases grouping design stages. Billing splits remain per stage. */
   phaseStructure Json? @map("phase_structure")
-  /** Optional YYYY-MM-DD per design stage / custom phase id. */
+  /** Optional from/to (YYYY-MM-DD) per design stage / custom phase id. */
   stageDates      Json?                @map("stage_dates")
   stageStartedAt  DateTime             @default(now()) @map("stage_started_at") @db.Date
   completedAt     DateTime?            @map("completed_at") @db.Date

@@ -1,5 +1,6 @@
 import type { PrivateStageStep } from "@/lib/private-constants";
 import { PRIVATE_STAGE_DONE_COPY } from "@/lib/private-constants";
+import { formatStageDateRange } from "@/lib/private-stage-dates";
 
 function stepTone(state: PrivateStageStep["state"]) {
   if (state === "done") return "bg-emerald-500/20 text-emerald-300 ring-emerald-500/30";
@@ -13,17 +14,6 @@ function stepLabelClass(state: PrivateStageStep["state"]) {
   return "text-slate-500";
 }
 
-function formatAssignedDate(iso: string) {
-  const [y, m, d] = iso.split("-").map(Number);
-  if (!y || !m || !d) return iso;
-  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  });
-}
-
 export function ProjectStageStepper({
   stages,
   constructionNote = true,
@@ -34,7 +24,10 @@ export function ProjectStageStepper({
   stages: PrivateStageStep[];
   constructionNote?: boolean;
   onSelect?: (key: PrivateStageStep["key"]) => void;
-  onAssignedDateChange?: (key: PrivateStageStep["key"], date: string | null) => void;
+  onAssignedDateChange?: (
+    key: PrivateStageStep["key"],
+    patch: { from?: string | null; to?: string | null },
+  ) => void;
   datesDisabled?: boolean;
 }) {
   const current = stages.find((s) => s.state === "current");
@@ -43,6 +36,10 @@ export function ProjectStageStepper({
     <ol className="space-y-1">
       {stages.map((s) => {
         const interactive = Boolean(onSelect);
+        const rangeLabel = formatStageDateRange({
+          from: s.dateFrom ?? s.assignedDate ?? null,
+          to: s.dateTo ?? null,
+        });
         const inner = (
           <>
             <span
@@ -70,19 +67,36 @@ export function ProjectStageStepper({
         );
 
         const dateField = onAssignedDateChange ? (
-          <label className="mt-0.5 shrink-0 text-right">
-            <span className="sr-only">Assigned date for {s.label}</span>
-            <input
-              type="date"
-              disabled={datesDisabled}
-              value={s.assignedDate ?? ""}
-              onChange={(e) => onAssignedDateChange(s.key, e.target.value || null)}
-              title="Assigned date — leave blank if not needed"
-              className="w-[9.5rem] rounded-md border border-white/[0.08] bg-white/[0.04] px-2 py-1 text-[11px] text-slate-200 disabled:opacity-50"
-            />
-          </label>
-        ) : s.assignedDate ? (
-          <p className="mt-1 shrink-0 text-xs text-slate-500">{formatAssignedDate(s.assignedDate)}</p>
+          <div className="mt-0.5 flex shrink-0 flex-col gap-1 text-right">
+            <label className="flex items-center justify-end gap-1.5">
+              <span className="text-[9px] uppercase tracking-wider text-slate-500">From</span>
+              <input
+                type="date"
+                disabled={datesDisabled}
+                value={s.dateFrom ?? s.assignedDate ?? ""}
+                onChange={(e) =>
+                  onAssignedDateChange(s.key, { from: e.target.value || null })
+                }
+                title="From date — leave blank if not needed"
+                className="w-[9.5rem] rounded-md border border-white/[0.08] bg-white/[0.04] px-2 py-1 text-[11px] text-slate-200 disabled:opacity-50"
+              />
+            </label>
+            <label className="flex items-center justify-end gap-1.5">
+              <span className="text-[9px] uppercase tracking-wider text-slate-500">To</span>
+              <input
+                type="date"
+                disabled={datesDisabled}
+                value={s.dateTo ?? ""}
+                onChange={(e) =>
+                  onAssignedDateChange(s.key, { to: e.target.value || null })
+                }
+                title="To date — leave blank if not needed"
+                className="w-[9.5rem] rounded-md border border-white/[0.08] bg-white/[0.04] px-2 py-1 text-[11px] text-slate-200 disabled:opacity-50"
+              />
+            </label>
+          </div>
+        ) : rangeLabel ? (
+          <p className="mt-1 shrink-0 text-xs text-slate-500">{rangeLabel}</p>
         ) : null;
 
         return (

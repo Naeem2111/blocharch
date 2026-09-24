@@ -35,7 +35,7 @@ import {
   type PrivateProjectTypeOption,
 } from "@/lib/private-project-types";
 import type { PrivateDesignStage } from "@prisma/client";
-import { setStageDate, stageDateFor, stageDateStorageKey, type StageDateMap } from "@/lib/private-stage-dates";
+import { setStageDateRange, stageDateRangeFor, formatStageDateRange, stageDateStorageKey, type StageDateMap } from "@/lib/private-stage-dates";
 
 type Athlete = { id: string; fullName: string; athleteCode: string };
 
@@ -82,7 +82,7 @@ type ProjectPayload = {
   dueDate: string | null;
   briefReceivedAt: string | null;
   councilSubmittedAt: string | null;
-  stageDates?: Record<string, string>;
+  stageDates?: StageDateMap;
   client: {
     id: string;
     name: string;
@@ -266,13 +266,16 @@ export function PrivateProjectEditClient({
     }));
   }
 
-  function applyAssignedDate(key: string, date: string) {
-    setStageDates((prev) => setStageDate(prev, key, date || null));
-    if (key === "site_measure_up") {
-      setForm((f) => ({ ...f, briefReceivedAt: date }));
+  function applyAssignedDate(
+    key: string,
+    patch: { from?: string | null; to?: string | null },
+  ) {
+    setStageDates((prev) => setStageDateRange(prev, key, patch));
+    if (key === "site_measure_up" && patch.from !== undefined) {
+      setForm((f) => ({ ...f, briefReceivedAt: patch.from ?? "" }));
     }
-    if (key === "council_review") {
-      setForm((f) => ({ ...f, councilSubmittedAt: date }));
+    if (key === "council_review" && patch.from !== undefined) {
+      setForm((f) => ({ ...f, councilSubmittedAt: patch.from ?? "" }));
     }
   }
 
@@ -567,13 +570,14 @@ export function PrivateProjectEditClient({
               </div>
 
               <div className="mt-3 overflow-x-auto">
-                <table className="w-full min-w-[48rem] text-left text-sm">
+                <table className="w-full min-w-[52rem] text-left text-sm">
                   <thead>
                     <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-wider text-slate-500">
                       <th className="pb-2 pr-3 font-semibold">Phase</th>
                       <th className="pb-2 pr-3 font-semibold">Move to stage</th>
                       <th className="pb-2 pr-3 font-semibold">Status</th>
-                      <th className="pb-2 pr-3 font-semibold">Assigned date</th>
+                          <th className="pb-2 pr-3 font-semibold">From</th>
+                          <th className="pb-2 pr-3 font-semibold">To</th>
                       <th className="pb-2 pr-3 font-semibold">Fee %</th>
                       <th className="pb-2 pr-3 font-semibold">Cost %</th>
                       <th className="pb-2 pr-3 font-semibold text-right">Fee</th>
@@ -584,7 +588,7 @@ export function PrivateProjectEditClient({
                   <tbody>
                     {group.stages.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="py-3 text-slate-500">
+                        <td colSpan={10} className="py-3 text-slate-500">
                           No phases yet — add one below.
                         </td>
                       </tr>
@@ -634,7 +638,7 @@ export function PrivateProjectEditClient({
                               type="date"
                               className="rounded border border-white/[0.08] bg-white/[0.04] px-2 py-1 text-xs text-white"
                               value={
-                                stageDateFor(
+                                stageDateRangeFor(
                                   stageDates,
                                   stageDateStorageKey({
                                     id: row.phaseId,
@@ -642,7 +646,7 @@ export function PrivateProjectEditClient({
                                   }),
                                   row.phaseId,
                                   row.stage,
-                                ) ?? ""
+                                )?.from ?? ""
                               }
                               onChange={(e) =>
                                 applyAssignedDate(
@@ -650,7 +654,33 @@ export function PrivateProjectEditClient({
                                     id: row.phaseId,
                                     builtInKey: row.stage,
                                   }),
-                                  e.target.value,
+                                  { from: e.target.value || null },
+                                )
+                              }
+                            />
+                          </td>
+                          <td className="py-3 pr-3">
+                            <input
+                              type="date"
+                              className="rounded border border-white/[0.08] bg-white/[0.04] px-2 py-1 text-xs text-white"
+                              value={
+                                stageDateRangeFor(
+                                  stageDates,
+                                  stageDateStorageKey({
+                                    id: row.phaseId,
+                                    builtInKey: row.stage,
+                                  }),
+                                  row.phaseId,
+                                  row.stage,
+                                )?.to ?? ""
+                              }
+                              onChange={(e) =>
+                                applyAssignedDate(
+                                  stageDateStorageKey({
+                                    id: row.phaseId,
+                                    builtInKey: row.stage,
+                                  }),
+                                  { to: e.target.value || null },
                                 )
                               }
                             />
@@ -695,7 +725,7 @@ export function PrivateProjectEditClient({
                       ))
                     )}
                     <tr className="border-b border-white/[0.04]">
-                      <td colSpan={9} className="py-3">
+                      <td colSpan={10} className="py-3">
                         <div className="flex flex-wrap items-center gap-2">
                           <input
                             placeholder="New phase name"
@@ -842,20 +872,42 @@ export function PrivateProjectEditClient({
           <div>
             <p className="text-xs text-slate-400">Assigned stage dates</p>
             <p className="mt-1 text-[11px] text-slate-500">
-              Optional. Set a date only when that stage has a confirmed start or target.
+              Optional. Add a from and/or to date only when that stage has a confirmed window.
             </p>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              {PRIVATE_STAGE_ORDER.map((key) => (
-                <label key={key} className="block text-xs text-slate-400">
-                  {PRIVATE_STAGE_LABELS[key]}
-                  <input
-                    type="date"
-                    className={field}
-                    value={stageDates[key] ?? ""}
-                    onChange={(e) => applyAssignedDate(key, e.target.value)}
-                  />
-                </label>
-              ))}
+            <div className="mt-3 space-y-3">
+              {PRIVATE_STAGE_ORDER.map((key) => {
+                const range = stageDates[key];
+                return (
+                  <div
+                    key={key}
+                    className="grid gap-2 rounded-lg bg-white/[0.03] p-3 ring-1 ring-white/[0.06] sm:grid-cols-[minmax(0,1fr)_auto_auto]"
+                  >
+                    <p className="self-center text-xs text-slate-300">{PRIVATE_STAGE_LABELS[key]}</p>
+                    <label className="block text-[10px] uppercase tracking-wider text-slate-500">
+                      From
+                      <input
+                        type="date"
+                        className={field}
+                        value={range?.from ?? ""}
+                        onChange={(e) =>
+                          applyAssignedDate(key, { from: e.target.value || null })
+                        }
+                      />
+                    </label>
+                    <label className="block text-[10px] uppercase tracking-wider text-slate-500">
+                      To
+                      <input
+                        type="date"
+                        className={field}
+                        value={range?.to ?? ""}
+                        onChange={(e) =>
+                          applyAssignedDate(key, { to: e.target.value || null })
+                        }
+                      />
+                    </label>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>

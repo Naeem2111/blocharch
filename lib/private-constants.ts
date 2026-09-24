@@ -113,21 +113,39 @@ export type PrivateStageStep = {
   label: string;
   number: number;
   state: "done" | "current" | "upcoming";
+  /** Optional start (from) date YYYY-MM-DD */
+  dateFrom?: string | null;
+  /** Optional end (to) date YYYY-MM-DD */
+  dateTo?: string | null;
+  /** @deprecated Use dateFrom — kept for older call sites */
   assignedDate?: string | null;
 };
 
 export function buildPrivateStageSteps(
   current: PrivateDesignStage,
-  stageDates?: Record<string, string | null | undefined> | null,
+  stageDates?: Record<string, { from?: string | null; to?: string | null } | string | null | undefined> | null,
 ): PrivateStageStep[] {
   const currentIdx = stageIndex(current);
-  return PRIVATE_STAGE_ORDER.map((key, i) => ({
-    key,
-    label: PRIVATE_STAGE_LABELS[key],
-    number: i + 1,
-    state: (i < currentIdx ? "done" : i === currentIdx ? "current" : "upcoming") as PrivateStageStep["state"],
-    assignedDate: stageDates?.[key] || null,
-  }));
+  return PRIVATE_STAGE_ORDER.map((key, i) => {
+    const raw = stageDates?.[key];
+    let dateFrom: string | null = null;
+    let dateTo: string | null = null;
+    if (typeof raw === "string") {
+      dateFrom = raw || null;
+    } else if (raw && typeof raw === "object") {
+      dateFrom = raw.from || null;
+      dateTo = raw.to || null;
+    }
+    return {
+      key,
+      label: PRIVATE_STAGE_LABELS[key],
+      number: i + 1,
+      state: (i < currentIdx ? "done" : i === currentIdx ? "current" : "upcoming") as PrivateStageStep["state"],
+      dateFrom,
+      dateTo,
+      assignedDate: dateFrom,
+    };
+  });
 }
 
 export function athleteInitials(fullName: string): string {

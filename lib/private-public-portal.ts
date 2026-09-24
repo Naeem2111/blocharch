@@ -69,12 +69,15 @@ export async function getPublicPrivateProjectBySlug(slug: string) {
 
   const stages = PRIVATE_STAGE_ORDER.map((key, i) => {
     const currentIdx = PRIVATE_STAGE_ORDER.indexOf(project.designStage);
+    const range = stageDates[key];
     return {
       key,
       label: PRIVATE_STAGE_LABELS[key],
       number: i + 1,
       state: i < currentIdx ? "done" : i === currentIdx ? "current" : "upcoming",
-      assignedDate: stageDates[key] ?? null,
+      dateFrom: range?.from ?? null,
+      dateTo: range?.to ?? null,
+      assignedDate: range?.from ?? null,
     };
   });
 

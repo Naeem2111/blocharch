@@ -28,7 +28,7 @@ import {
   parseOptionalPrivateAssignment,
   privateAssignedAthleteSelect,
 } from "@/lib/private-project-assignments";
-import { parseStageDateMap } from "@/lib/private-stage-dates";
+import { parseStageDateMap, serializeStageDateMap, setStageDateRange } from "@/lib/private-stage-dates";
 
 const projectInclude = {
   client: {
@@ -193,26 +193,24 @@ export async function PATCH(
       if (!parsed) {
         return NextResponse.json({ error: "Invalid stage dates" }, { status: 400 });
       }
-      data.stageDates = parsed;
-      data.briefReceivedAt = parsed.site_measure_up
-        ? parseDateOnly(parsed.site_measure_up)
+      data.stageDates = serializeStageDateMap(parsed);
+      data.briefReceivedAt = parsed.site_measure_up?.from
+        ? parseDateOnly(parsed.site_measure_up.from)
         : null;
-      data.councilSubmittedAt = parsed.council_review
-        ? parseDateOnly(parsed.council_review)
+      data.councilSubmittedAt = parsed.council_review?.from
+        ? parseDateOnly(parsed.council_review.from)
         : null;
     } else if (body.briefReceivedAt !== undefined || body.councilSubmittedAt !== undefined) {
-      const nextDates = parseStageDateMap(existing.stageDates) ?? {};
+      let nextDates = parseStageDateMap(existing.stageDates) ?? {};
       if (body.briefReceivedAt !== undefined) {
-        const date = body.briefReceivedAt ? String(body.briefReceivedAt).slice(0, 10) : "";
-        if (date) nextDates.site_measure_up = date;
-        else delete nextDates.site_measure_up;
+        const date = body.briefReceivedAt ? String(body.briefReceivedAt).slice(0, 10) : null;
+        nextDates = setStageDateRange(nextDates, "site_measure_up", { from: date });
       }
       if (body.councilSubmittedAt !== undefined) {
-        const date = body.councilSubmittedAt ? String(body.councilSubmittedAt).slice(0, 10) : "";
-        if (date) nextDates.council_review = date;
-        else delete nextDates.council_review;
+        const date = body.councilSubmittedAt ? String(body.councilSubmittedAt).slice(0, 10) : null;
+        nextDates = setStageDateRange(nextDates, "council_review", { from: date });
       }
-      data.stageDates = nextDates;
+      data.stageDates = serializeStageDateMap(nextDates);
     }
     if (body.manualProgressPercent !== undefined) {
       if (body.manualProgressPercent === null || body.manualProgressPercent === "") {
