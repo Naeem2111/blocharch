@@ -13,14 +13,29 @@ function stepLabelClass(state: PrivateStageStep["state"]) {
   return "text-slate-500";
 }
 
+function formatAssignedDate(iso: string) {
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return iso;
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
 export function ProjectStageStepper({
   stages,
   constructionNote = true,
   onSelect,
+  onAssignedDateChange,
+  datesDisabled = false,
 }: {
   stages: PrivateStageStep[];
   constructionNote?: boolean;
   onSelect?: (key: PrivateStageStep["key"]) => void;
+  onAssignedDateChange?: (key: PrivateStageStep["key"], date: string | null) => void;
+  datesDisabled?: boolean;
 }) {
   const current = stages.find((s) => s.state === "current");
 
@@ -54,13 +69,29 @@ export function ProjectStageStepper({
           </>
         );
 
+        const dateField = onAssignedDateChange ? (
+          <label className="mt-0.5 shrink-0 text-right">
+            <span className="sr-only">Assigned date for {s.label}</span>
+            <input
+              type="date"
+              disabled={datesDisabled}
+              value={s.assignedDate ?? ""}
+              onChange={(e) => onAssignedDateChange(s.key, e.target.value || null)}
+              title="Assigned date — leave blank if not needed"
+              className="w-[9.5rem] rounded-md border border-white/[0.08] bg-white/[0.04] px-2 py-1 text-[11px] text-slate-200 disabled:opacity-50"
+            />
+          </label>
+        ) : s.assignedDate ? (
+          <p className="mt-1 shrink-0 text-xs text-slate-500">{formatAssignedDate(s.assignedDate)}</p>
+        ) : null;
+
         return (
-          <li key={s.key}>
+          <li key={s.key} className="flex items-start gap-2">
             {interactive ? (
               <button
                 type="button"
                 onClick={() => onSelect?.(s.key)}
-                className={`flex w-full items-start gap-3 rounded-lg px-2.5 py-2 text-left ${
+                className={`flex min-w-0 flex-1 items-start gap-3 rounded-lg px-2.5 py-2 text-left ${
                   s.state === "current" ? "bg-brand-500/10 ring-1 ring-brand-500/25" : "hover:bg-white/[0.04]"
                 }`}
               >
@@ -68,13 +99,14 @@ export function ProjectStageStepper({
               </button>
             ) : (
               <div
-                className={`flex items-start gap-3 rounded-lg px-2.5 py-2 ${
+                className={`flex min-w-0 flex-1 items-start gap-3 rounded-lg px-2.5 py-2 ${
                   s.state === "current" ? "bg-brand-500/10 ring-1 ring-brand-500/25" : ""
                 }`}
               >
                 {inner}
               </div>
             )}
+            {dateField}
           </li>
         );
       })}

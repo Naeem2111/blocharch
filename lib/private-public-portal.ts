@@ -9,6 +9,7 @@ import {
   buildPortalPhaseGroups,
   resolvePhaseStructure,
 } from "@/lib/private-phase-structure";
+import { isoDateOnly, parseStageDateMap, resolveStageDates } from "@/lib/private-stage-dates";
 
 export async function getPublicPrivateProjectBySlug(slug: string) {
   const client = await prisma.privateClient.findFirst({
@@ -61,6 +62,10 @@ export async function getPublicPrivateProjectBySlug(slug: string) {
 
   const phaseStructure = resolvePhaseStructure(project.phaseStructure);
   const phaseGroups = buildPortalPhaseGroups(phaseStructure, project.designStage);
+  const stageDates = resolveStageDates(parseStageDateMap(project.stageDates) ?? {}, {
+    briefReceivedAt: isoDateOnly(project.briefReceivedAt),
+    councilSubmittedAt: isoDateOnly(project.councilSubmittedAt),
+  });
 
   const stages = PRIVATE_STAGE_ORDER.map((key, i) => {
     const currentIdx = PRIVATE_STAGE_ORDER.indexOf(project.designStage);
@@ -69,6 +74,7 @@ export async function getPublicPrivateProjectBySlug(slug: string) {
       label: PRIVATE_STAGE_LABELS[key],
       number: i + 1,
       state: i < currentIdx ? "done" : i === currentIdx ? "current" : "upcoming",
+      assignedDate: stageDates[key] ?? null,
     };
   });
 
@@ -96,6 +102,7 @@ export async function getPublicPrivateProjectBySlug(slug: string) {
       councilSubmittedAt: project.councilSubmittedAt?.toISOString().slice(0, 10) ?? null,
       dueDate: project.dueDate?.toISOString().slice(0, 10) ?? null,
       stageStartedAt: project.stageStartedAt.toISOString().slice(0, 10),
+      stageDates,
       clientDescription: project.clientDescription,
       estCouncilDecision,
       updatedAt: project.updatedAt.toISOString().slice(0, 10),

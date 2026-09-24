@@ -28,6 +28,7 @@ import {
   parseOptionalPrivateAssignment,
   privateAssignedAthleteSelect,
 } from "@/lib/private-project-assignments";
+import { parseStageDateMap } from "@/lib/private-stage-dates";
 
 const projectInclude = {
   client: {
@@ -187,6 +188,32 @@ export async function PATCH(
         ? parseDateOnly(String(body.briefReceivedAt))
         : null;
     }
+    if (body.stageDates !== undefined) {
+      const parsed = parseStageDateMap(body.stageDates);
+      if (!parsed) {
+        return NextResponse.json({ error: "Invalid stage dates" }, { status: 400 });
+      }
+      data.stageDates = parsed;
+      data.briefReceivedAt = parsed.site_measure_up
+        ? parseDateOnly(parsed.site_measure_up)
+        : null;
+      data.councilSubmittedAt = parsed.council_review
+        ? parseDateOnly(parsed.council_review)
+        : null;
+    } else if (body.briefReceivedAt !== undefined || body.councilSubmittedAt !== undefined) {
+      const nextDates = parseStageDateMap(existing.stageDates) ?? {};
+      if (body.briefReceivedAt !== undefined) {
+        const date = body.briefReceivedAt ? String(body.briefReceivedAt).slice(0, 10) : "";
+        if (date) nextDates.site_measure_up = date;
+        else delete nextDates.site_measure_up;
+      }
+      if (body.councilSubmittedAt !== undefined) {
+        const date = body.councilSubmittedAt ? String(body.councilSubmittedAt).slice(0, 10) : "";
+        if (date) nextDates.council_review = date;
+        else delete nextDates.council_review;
+      }
+      data.stageDates = nextDates;
+    }
     if (body.manualProgressPercent !== undefined) {
       if (body.manualProgressPercent === null || body.manualProgressPercent === "") {
         data.manualProgressPercent = null;
@@ -341,6 +368,10 @@ export async function PATCH(
         },
       });
     });
+
+    if (updated.client.slug) {
+      revalidatePath(`/private/${updated.client.slug}`);
+    }
 
     return NextResponse.json({ project: serializePrivateProject(updated) });
   } catch (e) {

@@ -97,7 +97,7 @@ export function PrivateClientPortalClient({
   const [completing, setCompleting] = useState<string | null>(null);
   const [recentlyCompleted, setRecentlyCompleted] = useState<Set<string>>(new Set());
   const completedDetailsRef = useRef<HTMLDetailsElement>(null);
-  const stages = buildPrivateStageSteps(project.designStage);
+  const stages = buildPrivateStageSteps(project.designStage, project.stageDates);
   const current = stages.find((s) => s.state === "current") ?? stages[0]!;
   const next = stages.find((s) => s.number === current.number + 1) ?? null;
   const doneCount = stages.filter((s) => s.state === "done").length;
@@ -245,7 +245,7 @@ export function PrivateClientPortalClient({
                     <p className="mt-3 text-sm text-slate-500">
                       Target date:{" "}
                       <span className="text-slate-300">
-                        {project.dueDate ? formatDate(project.dueDate) : "To be confirmed"}
+                        {next.assignedDate ? formatDate(next.assignedDate) : "To be confirmed"}
                       </span>
                     </p>
                   </>
@@ -340,13 +340,17 @@ export function PrivateClientPortalClient({
                             )}
                             {hint ? <p className="mt-1 text-xs text-slate-500">{hint}</p> : null}
                           </div>
-                          {s.state === "current" && project.stageStartedAt ? (
+                          {s.assignedDate ? (
+                            <p className="shrink-0 pt-0.5 text-xs text-slate-500">
+                              {formatDate(s.assignedDate)}
+                            </p>
+                          ) : s.state === "current" && project.stageStartedAt ? (
                             <p className="shrink-0 pt-0.5 text-xs text-slate-500">
                               Started {formatDate(project.stageStartedAt)}
                             </p>
                           ) : isNext ? (
                             <p className="shrink-0 pt-0.5 text-xs text-slate-500">
-                              {project.dueDate ? formatDate(project.dueDate) : "Date to be confirmed"}
+                              Date to be confirmed
                             </p>
                           ) : null}
                         </div>

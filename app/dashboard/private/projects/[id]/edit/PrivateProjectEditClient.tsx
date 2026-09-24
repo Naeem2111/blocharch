@@ -35,11 +35,13 @@ import {
   type PrivateProjectTypeOption,
 } from "@/lib/private-project-types";
 import type { PrivateDesignStage } from "@prisma/client";
+import { setStageDate, stageDateFor, stageDateStorageKey, type StageDateMap } from "@/lib/private-stage-dates";
 
 type Athlete = { id: string; fullName: string; athleteCode: string };
 
 type PhaseRow = {
   phaseId: string;
+  stage?: string;
   label: string;
   status: "completed" | "current" | "upcoming";
   feePercent: number;
@@ -80,6 +82,7 @@ type ProjectPayload = {
   dueDate: string | null;
   briefReceivedAt: string | null;
   councilSubmittedAt: string | null;
+  stageDates?: Record<string, string>;
   client: {
     id: string;
     name: string;
@@ -128,6 +131,7 @@ export function PrivateProjectEditClient({
   const [expenseRecords, setExpenseRecords] = useState<
     Array<{ designStage: string | null; amountZar: number }>
   >([]);
+  const [stageDates, setStageDates] = useState<StageDateMap>({});
   const [form, setForm] = useState({
     clientName: "",
     contactEmail: "",
@@ -171,6 +175,7 @@ export function PrivateProjectEditClient({
     setPhaseFeePercents(p.phaseFeePercents);
     setPhaseStructure(p.phaseStructure);
     setExpenseRecords(p.expenseRecords ?? []);
+    setStageDates(p.stageDates ?? {});
     const assigned =
       p.athletes && p.athletes.length > 0
         ? p.athletes
@@ -261,6 +266,16 @@ export function PrivateProjectEditClient({
     }));
   }
 
+  function applyAssignedDate(key: string, date: string) {
+    setStageDates((prev) => setStageDate(prev, key, date || null));
+    if (key === "site_measure_up") {
+      setForm((f) => ({ ...f, briefReceivedAt: date }));
+    }
+    if (key === "council_review") {
+      setForm((f) => ({ ...f, councilSubmittedAt: date }));
+    }
+  }
+
   function createDesignPhase(groupId: string, name: string) {
     const trimmed = name.trim();
     if (!trimmed) return;
@@ -329,8 +344,7 @@ export function PrivateProjectEditClient({
         stageNotes: form.stageNotes.trim() || null,
         clientDescription: form.clientDescription.trim() || null,
         dueDate: form.dueDate || null,
-        briefReceivedAt: form.briefReceivedAt || null,
-        councilSubmittedAt: form.councilSubmittedAt || null,
+        stageDates,
         phaseFeePercents: syncedFeePercents,
         phaseStructure,
       }),
@@ -553,12 +567,13 @@ export function PrivateProjectEditClient({
               </div>
 
               <div className="mt-3 overflow-x-auto">
-                <table className="w-full min-w-[40rem] text-left text-sm">
+                <table className="w-full min-w-[48rem] text-left text-sm">
                   <thead>
                     <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-wider text-slate-500">
                       <th className="pb-2 pr-3 font-semibold">Phase</th>
                       <th className="pb-2 pr-3 font-semibold">Move to stage</th>
                       <th className="pb-2 pr-3 font-semibold">Status</th>
+                      <th className="pb-2 pr-3 font-semibold">Assigned date</th>
                       <th className="pb-2 pr-3 font-semibold">Fee %</th>
                       <th className="pb-2 pr-3 font-semibold">Cost %</th>
                       <th className="pb-2 pr-3 font-semibold text-right">Fee</th>
@@ -569,7 +584,7 @@ export function PrivateProjectEditClient({
                   <tbody>
                     {group.stages.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="py-3 text-slate-500">
+                        <td colSpan={9} className="py-3 text-slate-500">
                           No phases yet — add one below.
                         </td>
                       </tr>
@@ -616,6 +631,32 @@ export function PrivateProjectEditClient({
                           </td>
                           <td className="py-3 pr-3">
                             <input
+                              type="date"
+                              className="rounded border border-white/[0.08] bg-white/[0.04] px-2 py-1 text-xs text-white"
+                              value={
+                                stageDateFor(
+                                  stageDates,
+                                  stageDateStorageKey({
+                                    id: row.phaseId,
+                                    builtInKey: row.stage,
+                                  }),
+                                  row.phaseId,
+                                  row.stage,
+                                ) ?? ""
+                              }
+                              onChange={(e) =>
+                                applyAssignedDate(
+                                  stageDateStorageKey({
+                                    id: row.phaseId,
+                                    builtInKey: row.stage,
+                                  }),
+                                  e.target.value,
+                                )
+                              }
+                            />
+                          </td>
+                          <td className="py-3 pr-3">
+                            <input
                               type="number"
                               min={0}
                               max={100}
@@ -654,7 +695,7 @@ export function PrivateProjectEditClient({
                       ))
                     )}
                     <tr className="border-b border-white/[0.04]">
-                      <td colSpan={8} className="py-3">
+                      <td colSpan={9} className="py-3">
                         <div className="flex flex-wrap items-center gap-2">
                           <input
                             placeholder="New phase name"
@@ -798,24 +839,25 @@ export function PrivateProjectEditClient({
               onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
             />
           </label>
-          <label className="block text-xs text-slate-400">
-            Brief received
-            <input
-              type="date"
-              className={field}
-              value={form.briefReceivedAt}
-              onChange={(e) => setForm({ ...form, briefReceivedAt: e.target.value })}
-            />
-          </label>
-          <label className="block text-xs text-slate-400">
-            Council submitted
-            <input
-              type="date"
-              className={field}
-              value={form.councilSubmittedAt}
-              onChange={(e) => setForm({ ...form, councilSubmittedAt: e.target.value })}
-            />
-          </label>
+          <div>
+            <p className="text-xs text-slate-400">Assigned stage dates</p>
+            <p className="mt-1 text-[11px] text-slate-500">
+              Optional. Set a date only when that stage has a confirmed start or target.
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              {PRIVATE_STAGE_ORDER.map((key) => (
+                <label key={key} className="block text-xs text-slate-400">
+                  {PRIVATE_STAGE_LABELS[key]}
+                  <input
+                    type="date"
+                    className={field}
+                    value={stageDates[key] ?? ""}
+                    onChange={(e) => applyAssignedDate(key, e.target.value)}
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 

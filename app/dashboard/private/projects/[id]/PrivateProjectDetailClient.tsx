@@ -11,6 +11,7 @@ import {
   buildPrivateStageSteps,
 } from "@/lib/private-constants";
 import { ProjectStageStepper } from "@/components/private/ProjectStageStepper";
+import { setStageDate, stageDateFor } from "@/lib/private-stage-dates";
 import type { PrivateDesignStage } from "@prisma/client";
 
 type Detail = {
@@ -29,6 +30,7 @@ type Detail = {
     dueDate: string | null;
     briefReceivedAt: string | null;
     councilSubmittedAt: string | null;
+    stageDates?: Record<string, string>;
     stageMeta: {
       stageNumber: number;
       stageCount: number;
@@ -89,6 +91,18 @@ function zar(n: number) {
   return `R ${Math.round(n).toLocaleString("en-ZA")}`;
 }
 
+function formatIsoDate(iso: string | null | undefined) {
+  if (!iso) return "—";
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return iso;
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
 export function PrivateProjectDetailClient({
   projectId,
   canDelete = false,
@@ -144,6 +158,19 @@ export function PrivateProjectDetailClient({
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ designStage }),
+    });
+    setSaving(false);
+    void load();
+  }
+
+  async function saveStageDate(key: PrivateDesignStage, date: string | null) {
+    if (!data) return;
+    const stageDates = setStageDate(data.project.stageDates ?? {}, key, date);
+    setSaving(true);
+    await fetch(`/api/private/projects/${projectId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ stageDates }),
     });
     setSaving(false);
     void load();
@@ -475,9 +502,17 @@ export function PrivateProjectDetailClient({
           </p>
           <div className="mt-3">
             <ProjectStageStepper
-              stages={buildPrivateStageSteps(p.designStage as PrivateDesignStage)}
+              stages={buildPrivateStageSteps(
+                p.designStage as PrivateDesignStage,
+                p.stageDates,
+              )}
+              datesDisabled={saving}
               onSelect={(key) => void saveStage(key)}
+              onAssignedDateChange={(key, date) => void saveStageDate(key, date)}
             />
+            <p className="mt-2 text-[11px] text-slate-500">
+              Assigned dates are optional — set them when a stage has a confirmed date.
+            </p>
           </div>
         </div>
 
@@ -517,6 +552,7 @@ export function PrivateProjectDetailClient({
                       <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-wider text-slate-500">
                         <th className="pb-2 pr-3 font-semibold">Phase</th>
                         <th className="pb-2 pr-3 font-semibold">Status</th>
+                        <th className="pb-2 pr-3 font-semibold">Assigned date</th>
                         <th className="pb-2 pr-3 font-semibold">Fee</th>
                         <th className="pb-2 font-semibold">Expenses</th>
                       </tr>
@@ -526,6 +562,9 @@ export function PrivateProjectDetailClient({
                         <tr key={row.phaseId} className="border-b border-white/[0.04]">
                           <td className="py-2 pr-3 text-slate-200">{row.label}</td>
                           <td className="py-2 pr-3 capitalize text-slate-400">{row.status}</td>
+                          <td className="py-2 pr-3 text-slate-400">
+                            {formatIsoDate(stageDateFor(p.stageDates, row.phaseId, row.stage))}
+                          </td>
                           <td className="py-2 pr-3 tabular-nums text-slate-300">
                             {zar(row.feeZar)}{" "}
                             <span className="text-slate-500">({row.feePercent}%)</span>
@@ -553,6 +592,7 @@ export function PrivateProjectDetailClient({
                   <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-wider text-slate-500">
                     <th className="pb-2 pr-3 font-semibold">Phase</th>
                     <th className="pb-2 pr-3 font-semibold">Status</th>
+                    <th className="pb-2 pr-3 font-semibold">Assigned date</th>
                     <th className="pb-2 pr-3 font-semibold">Fee</th>
                     <th className="pb-2 font-semibold">Expenses</th>
                   </tr>
@@ -562,6 +602,9 @@ export function PrivateProjectDetailClient({
                     <tr key={row.phaseId} className="border-b border-white/[0.04]">
                       <td className="py-2 pr-3 text-slate-200">{row.label}</td>
                       <td className="py-2 pr-3 capitalize text-slate-400">{row.status}</td>
+                      <td className="py-2 pr-3 text-slate-400">
+                        {formatIsoDate(stageDateFor(p.stageDates, row.phaseId, row.stage))}
+                      </td>
                       <td className="py-2 pr-3 tabular-nums text-slate-300">
                         {zar(row.feeZar)}{" "}
                         <span className="text-slate-500">({row.feePercent}%)</span>

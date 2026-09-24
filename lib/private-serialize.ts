@@ -10,6 +10,7 @@ import {
   resolvePhaseSplits,
 } from "@/lib/private-phase-splits";
 import { resolvePhaseStructure } from "@/lib/private-phase-structure";
+import { isoDateOnly, parseStageDateMap, resolveStageDates } from "@/lib/private-stage-dates";
 
 type SerializedAthlete = {
   id: string;
@@ -112,6 +113,10 @@ export function serializePrivateProject(
     dueDate: p.dueDate?.toISOString().slice(0, 10) ?? null,
     briefReceivedAt: p.briefReceivedAt?.toISOString().slice(0, 10) ?? null,
     councilSubmittedAt: p.councilSubmittedAt?.toISOString().slice(0, 10) ?? null,
+    stageDates: resolveStageDates(parseStageDateMap(p.stageDates) ?? {}, {
+      briefReceivedAt: isoDateOnly(p.briefReceivedAt),
+      councilSubmittedAt: isoDateOnly(p.councilSubmittedAt),
+    }),
     stageStartedAt: p.stageStartedAt.toISOString().slice(0, 10),
     completedAt: p.completedAt?.toISOString().slice(0, 10) ?? null,
     handoverOutcome: p.handoverOutcome,
