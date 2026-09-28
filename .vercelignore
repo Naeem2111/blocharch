@@ -1,0 +1,15 @@
+# Keep CLI deploys under Vercel's upload limit (git deploys ignore these too if listed)
+.vercel
+.next
+node_modules
+demo-video
+docs/*.pdf
+public/brand/*.exe
+public/brand/*.torrent
+public/brand/*.zip
+public/brand/*.mp4
+public/brand/*.xlsx
+public/brand/*.csv
+public/brand/*.pdf
+scripts/tmp-*.mjs
+.env*

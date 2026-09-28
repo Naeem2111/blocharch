@@ -48,3 +48,7 @@ public/uploads/private/*
 
 # Vercel
 .vercel
+.neon
+.env.demo
+.env.local
+.env

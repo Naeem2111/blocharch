@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import { brandAssets } from "@/lib/blocharch-brand";
 import { cookies } from "next/headers";
+import { DemoModeBanner } from "@/components/DemoModeBanner";
 import { DEFAULT_THEME, THEME_COOKIE, normalizeTheme } from "@/lib/theme";
 import "./globals.css";
 import "leaflet/dist/leaflet.css";
@@ -46,7 +47,10 @@ export default async function RootLayout({
           }}
         />
       </head>
-      <body className="font-sans min-h-screen antialiased">{children}</body>
+      <body className="font-sans min-h-screen antialiased">
+        <DemoModeBanner />
+        {children}
+      </body>
     </html>
   );
 }

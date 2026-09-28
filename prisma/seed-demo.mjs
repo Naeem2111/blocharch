@@ -4,7 +4,16 @@
  * Fills empty product surfaces without wiping the directory or mutating
  * live clients such as Icon Architects / Simon & Meghan.
  *
+ * Prefer the isolated Neon `demo` branch (see docs/DEMO_DATABASE.md):
+ *
+ *   # PowerShell
+ *   Get-Content .env.demo | ForEach-Object { if ($_ -match '^([^#=]+)=(.*)$') { Set-Item "Env:$($Matches[1])" $Matches[2] } }
  *   npm run db:seed:demo
+ *
+ * Or:
+ *   BLOCHARCH_DEMO_MODE=1 DATABASE_URL=… npm run db:seed:demo
+ *
+ * Refuses to run unless BLOCHARCH_DEMO_MODE is set (or --force).
  *
  * Logins
  *   blocharch / blocharch   admin
@@ -21,6 +30,25 @@
 import { PrismaClient } from "@prisma/client";
 import crypto from "node:crypto";
 import { randomBytes, scryptSync } from "node:crypto";
+
+function assertDemoSeedAllowed() {
+  const flag = String(process.env.BLOCHARCH_DEMO_MODE || "").trim().toLowerCase();
+  const allowed = flag === "1" || flag === "true" || flag === "yes";
+  const forced = process.argv.includes("--force");
+  if (!allowed && !forced) {
+    console.error(
+      "Refusing to seed demo content: BLOCHARCH_DEMO_MODE is not set.\n" +
+        "Point DATABASE_URL at the Neon `demo` branch, set BLOCHARCH_DEMO_MODE=1\n" +
+        "(see .env.demo / docs/DEMO_DATABASE.md), or pass --force to override.",
+    );
+    process.exit(1);
+  }
+  if (forced && !allowed) {
+    console.warn("WARNING: seeding with --force while BLOCHARCH_DEMO_MODE is unset.");
+  }
+}
+
+assertDemoSeedAllowed();
 
 const prisma = new PrismaClient();
 
