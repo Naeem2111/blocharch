@@ -44,7 +44,10 @@ export async function reactivatePrivateProject(projectId: string): Promise<
 
   revalidatePath("/dashboard/private");
   revalidatePath("/dashboard/private/projects");
+  revalidatePath("/dashboard/private/archives");
   revalidatePath("/dashboard/private/projects/completed");
+  revalidatePath("/dashboard/athlete/private/archives");
+
   revalidatePath(`/dashboard/private/projects/${projectId}`);
   if (project.client.slug) {
     revalidatePath(`/private/${project.client.slug}`);

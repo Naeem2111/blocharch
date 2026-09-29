@@ -56,13 +56,6 @@ function AthleteAvatars({ athletes }: { athletes: AssignedAthlete[] }) {
   );
 }
 
-const tabClass = (active: boolean) =>
-  `rounded-lg px-3 py-1.5 text-xs font-medium ring-1 transition-colors ${
-    active
-      ? "bg-brand-500/20 text-brand-200 ring-brand-500/30"
-      : "bg-white/[0.04] text-slate-400 ring-white/[0.08] hover:bg-white/[0.07]"
-  }`;
-
 export function PrivateProjectsClient({
   canDelete = false,
   scope = "active",
@@ -133,7 +126,7 @@ export function PrivateProjectsClient({
   async function reactivate(project: { id: string; name: string }) {
     if (
       !confirm(
-        `Bring “${project.name}” back to active projects? Progress will be set to 85%.`,
+        `Bring “${project.name}” back to active projects from archives? Progress will be set to 85%.`,
       )
     ) {
       return;
@@ -156,14 +149,6 @@ export function PrivateProjectsClient({
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2">
-        <Link href="/dashboard/private/projects" className={tabClass(!completed)}>
-          Active
-        </Link>
-        <Link href="/dashboard/private/projects/completed" className={tabClass(completed)}>
-          Completed
-        </Link>
-      </div>
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
       <div className="card-tool overflow-x-auto rounded-xl">
         <table className="w-full min-w-[52rem] text-left text-sm">
@@ -184,7 +169,7 @@ export function PrivateProjectsClient({
               <tr>
                 <td colSpan={completed ? 7 : 8} className="px-4 py-8 text-slate-500">
                   {completed ? (
-                    "No completed private projects yet."
+                    "No archived private projects yet."
                   ) : (
                     <>
                       No active private projects.{" "}

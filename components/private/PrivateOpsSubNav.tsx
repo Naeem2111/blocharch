@@ -10,9 +10,11 @@ export const PRIVATE_OPS_NAV: PrivateNavItem[] = [
   { href: "/dashboard/private/clients", label: "Clients" },
   { href: "/dashboard/private/commercial", label: "Commercial & analytics" },
   { href: "/dashboard/private/projects", label: "Projects" },
+  { href: "/dashboard/private/archives", label: "Archives" },
   { href: "/dashboard/private/onboarding", label: "Onboarding" },
   { href: "/dashboard/private/project-types", label: "Project types" },
 ];
+
 
 function navActive(pathname: string, href: string): boolean {
   return href === "/dashboard/private"

@@ -46,7 +46,7 @@ export function AthletePrivateProjectsClient({ scope }: { scope: "active" | "com
           {projects.length === 0 ? (
             <tr>
               <td colSpan={scope === "active" ? 3 : 2} className="px-4 py-8 text-slate-500">
-                No {scope === "active" ? "active" : "completed"} private projects assigned to you.
+                No {scope === "active" ? "active" : "archived"} private projects assigned to you.
               </td>
             </tr>
           ) : (

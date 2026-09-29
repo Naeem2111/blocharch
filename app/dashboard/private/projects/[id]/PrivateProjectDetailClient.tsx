@@ -174,7 +174,7 @@ export function PrivateProjectDetailClient({
     if (!data) return;
     if (
       !confirm(
-        `Bring “${data.project.name}” back to active projects? Progress will be set to 85%.`,
+        `Bring “${data.project.name}” back to active projects from archives? Progress will be set to 85%.`,
       )
     ) {
       return;

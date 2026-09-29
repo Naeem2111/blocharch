@@ -1,22 +1,21 @@
 import { PageHeader } from "@/components/PageHeader";
 import { getSession } from "@/lib/auth";
 import { canDeletePrivateProject } from "@/lib/private-access";
-import { PrivateProjectsClient } from "./PrivateProjectsClient";
+import { PrivateProjectsClient } from "../projects/PrivateProjectsClient";
 
-export default async function PrivateProjectsPage() {
+export default async function PrivateArchivesPage() {
   const session = await getSession();
   const canDelete = !!session && canDeletePrivateProject(session.user.role);
 
   return (
     <>
       <PageHeader
-        title="Projects"
+        title="Project archives"
         badge="Private"
-        description="Active private projects — progress as a duration-weighted bar. Finished work lives in Archives."
-
+        description="Completed private projects — separate from ops archives. Bring one back to active if work resumes."
         className="mb-8"
       />
-      <PrivateProjectsClient canDelete={canDelete} />
+      <PrivateProjectsClient canDelete={canDelete} scope="completed" />
     </>
   );
 }
