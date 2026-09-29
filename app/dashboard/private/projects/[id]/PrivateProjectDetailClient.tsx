@@ -522,7 +522,7 @@ export function PrivateProjectDetailClient({
             <span className="text-[10px] text-slate-500">Shown on the client portal</span>
           </div>
           <textarea
-            rows={4}
+            rows={12}
             value={clientDescription}
             onChange={(e) => setClientDescription(e.target.value)}
             disabled={saving}

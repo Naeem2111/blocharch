@@ -173,7 +173,7 @@ export function PrivateOnboardingClient({ initialClientId = "" }: { initialClien
           <label className="block text-xs text-slate-400">
             Project description
             <textarea
-              rows={4}
+              rows={12}
               className={field}
               value={form.clientDescription}
               onChange={(e) => setForm({ ...form, clientDescription: e.target.value })}
