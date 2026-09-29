@@ -38,6 +38,10 @@ import {
 } from "@/lib/private-project-types";
 import type { PrivateDesignStage } from "@prisma/client";
 import { setStageDateRange, stageDateRangeFor, formatStageDateRange, stageDateStorageKey, type StageDateMap } from "@/lib/private-stage-dates";
+import {
+  parseClientDeliverables,
+  type ClientPortalDeliverable,
+} from "@/lib/client-portal-deliverables";
 
 type Athlete = { id: string; fullName: string; athleteCode: string };
 
@@ -82,6 +86,7 @@ type ProjectPayload = {
   phases: PhaseRow[];
   stageNotes: string | null;
   clientDescription: string | null;
+  clientLinks?: Array<{ label: string; url: string | null }>;
   dueDate: string | null;
   briefReceivedAt: string | null;
   councilSubmittedAt: string | null;
@@ -149,6 +154,7 @@ export function PrivateProjectEditClient({
     manualProgressPercent: "",
     stageNotes: "",
     clientDescription: "",
+    clientLinks: [] as ClientPortalDeliverable[],
     dueDate: "",
     briefReceivedAt: "",
     councilSubmittedAt: "",
@@ -204,6 +210,7 @@ export function PrivateProjectEditClient({
         p.manualProgressPercent != null ? String(p.manualProgressPercent) : String(p.calculatedProgressPercent),
       stageNotes: p.stageNotes ?? "",
       clientDescription: p.clientDescription ?? "",
+      clientLinks: parseClientDeliverables(p.clientLinks),
       dueDate: p.dueDate ?? "",
       briefReceivedAt: p.briefReceivedAt ?? "",
       councilSubmittedAt: p.councilSubmittedAt ?? "",
@@ -377,6 +384,7 @@ export function PrivateProjectEditClient({
         manualProgressPercent: useManualProgress ? Number(form.manualProgressPercent) : null,
         stageNotes: form.stageNotes.trim() || null,
         clientDescription: form.clientDescription.trim() || null,
+        clientLinks: form.clientLinks,
         dueDate: form.dueDate || null,
         stageDates,
         phaseFeePercents: syncedFeePercents,
@@ -471,6 +479,66 @@ export function PrivateProjectEditClient({
               placeholder="Short bio / brief for this project — shown on the client portal."
             />
           </label>
+          <div>
+            <p className="text-xs text-slate-400">Project links</p>
+            <p className="mt-1 text-[11px] text-slate-500">
+              Zoom, Pinterest boards, house keys — shown under the description on the portal.
+            </p>
+            <ul className="mt-2 space-y-2">
+              {form.clientLinks.map((link, i) => (
+                <li key={i} className="flex flex-wrap gap-2">
+                  <input
+                    value={link.label}
+                    onChange={(e) =>
+                      setForm((f) => {
+                        const next = [...f.clientLinks];
+                        next[i] = { ...next[i]!, label: e.target.value };
+                        return { ...f, clientLinks: next };
+                      })
+                    }
+                    placeholder="e.g. BLOCHARCH | Client Meetings — Dedicated Zoom Link"
+                    className="min-w-[10rem] flex-1 rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white placeholder:text-slate-600"
+                  />
+                  <input
+                    value={link.url ?? ""}
+                    onChange={(e) =>
+                      setForm((f) => {
+                        const next = [...f.clientLinks];
+                        next[i] = { ...next[i]!, url: e.target.value.trim() || null };
+                        return { ...f, clientLinks: next };
+                      })
+                    }
+                    placeholder="https://…"
+                    className="min-w-[12rem] flex-[2] rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white placeholder:text-slate-600"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setForm((f) => ({
+                        ...f,
+                        clientLinks: f.clientLinks.filter((_, j) => j !== i),
+                      }))
+                    }
+                    className="text-xs text-red-400 hover:underline"
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <button
+              type="button"
+              onClick={() =>
+                setForm((f) => ({
+                  ...f,
+                  clientLinks: [...f.clientLinks, { label: "", url: null }],
+                }))
+              }
+              className="mt-2 text-xs text-brand-300 hover:underline"
+            >
+              + Add link
+            </button>
+          </div>
           <label className="block text-xs text-slate-400">
             Project type
             <select

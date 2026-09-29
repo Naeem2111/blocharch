@@ -4,7 +4,8 @@ import {
   athleteInitials,
 } from "@/lib/private-constants";
 import { resolvePrivateProjectTypeLabel } from "@/lib/private-project-types";
-import { computePrivateProgressPercent, resolvePrivateProgressPercent, marginPercent, privateStageMeta } from "@/lib/private-progress";
+import { resolvePrivateProgressPercent, marginPercent, privateStageMeta, computePrivateProgressPercent } from "@/lib/private-progress";
+import { parseClientDeliverables } from "@/lib/client-portal-deliverables";
 import {
   buildProjectPhaseBreakdown,
   resolvePhaseSplits,
@@ -117,6 +118,7 @@ export function serializePrivateProject(
     outOfScopeFlag: p.outOfScopeFlag,
     stageNotes: p.stageNotes,
     clientDescription: p.clientDescription,
+    clientLinks: parseClientDeliverables(p.clientLinks),
     dueDate: p.dueDate?.toISOString().slice(0, 10) ?? null,
     briefReceivedAt: p.briefReceivedAt?.toISOString().slice(0, 10) ?? null,
     councilSubmittedAt: p.councilSubmittedAt?.toISOString().slice(0, 10) ?? null,

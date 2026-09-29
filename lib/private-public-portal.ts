@@ -13,6 +13,7 @@ import {
   designPhaseListStatus,
 } from "@/lib/private-phase-structure";
 import { isoDateOnly, parseStageDateMap, resolveStageDates } from "@/lib/private-stage-dates";
+import { parseClientDeliverables } from "@/lib/client-portal-deliverables";
 
 export async function getPublicPrivateProjectBySlug(slug: string) {
   const client = await prisma.privateClient.findFirst({
@@ -157,6 +158,7 @@ export async function getPublicPrivateProjectBySlug(slug: string) {
       stageStartedAt: project.stageStartedAt.toISOString().slice(0, 10),
       stageDates,
       clientDescription: project.clientDescription,
+      clientLinks: parseClientDeliverables(project.clientLinks),
       estCouncilDecision,
       updatedAt: project.updatedAt.toISOString().slice(0, 10),
       outOfScopeFlag: project.outOfScopeFlag,

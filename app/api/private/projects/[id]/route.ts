@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { canDeletePrivateProject, requirePrivateOpsSession } from "@/lib/private-access";
 import { removePrivateProjectUploads } from "@/lib/private-document-storage";
@@ -14,6 +15,7 @@ import {
   privateArchiveData,
   privateProjectShouldArchive,
 } from "@/lib/private-archive";
+import { normalizeClientDeliverablesForSave } from "@/lib/client-portal-deliverables";
 import {
   parsePhaseSplitMap,
   validatePhaseSplitMap,
@@ -192,6 +194,10 @@ export async function PATCH(
     if (body.stageNotes !== undefined) data.stageNotes = String(body.stageNotes || "") || null;
     if (body.clientDescription !== undefined) {
       data.clientDescription = String(body.clientDescription || "").trim() || null;
+    }
+    if (body.clientLinks !== undefined) {
+      const links = normalizeClientDeliverablesForSave(body.clientLinks);
+      data.clientLinks = links === null ? Prisma.JsonNull : (links as Prisma.InputJsonValue);
     }
     if (body.dueDate !== undefined) {
       data.dueDate = body.dueDate ? parseDateOnly(String(body.dueDate)) : null;

@@ -15,6 +15,7 @@ import {
   privateAssignedAthleteSelect,
 } from "@/lib/private-project-assignments";
 import { syncPrivateProjectsIntoArchives } from "@/lib/private-archive";
+import { normalizeClientDeliverablesForSave } from "@/lib/client-portal-deliverables";
 
 const projectInclude = {
   client: {
@@ -115,6 +116,7 @@ export async function POST(request: NextRequest) {
     const clientDescription = body.clientDescription
       ? String(body.clientDescription).trim()
       : null;
+    const clientLinks = normalizeClientDeliverablesForSave(body.clientLinks);
 
     const defaultStructure = defaultPhaseStructure();
     const defaultSplits = defaultPhaseSplits(defaultStructure);
@@ -153,6 +155,7 @@ export async function POST(request: NextRequest) {
           designStage,
           feeZar,
           clientDescription,
+          clientLinks: clientLinks ?? undefined,
           dueDate,
           phaseFeePercents: defaultSplits,
           phaseCostPercents: defaultSplits,

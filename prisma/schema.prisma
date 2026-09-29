@@ -887,6 +887,8 @@ model PrivateProject {
   stageNotes      String?              @map("stage_notes") @db.Text
   /** Client-facing project summary — only shown on the portal when set. */
   clientDescription String?            @map("client_description") @db.Text
+  /** Client-facing links (Zoom, Pinterest, etc.) — label + url, shown under description. */
+  clientLinks     Json?                @map("client_links")
   dueDate         DateTime?            @map("due_date") @db.Date
   briefReceivedAt DateTime?            @map("brief_received_at") @db.Date
   councilSubmittedAt DateTime?         @map("council_submitted_at") @db.Date

@@ -13,6 +13,10 @@ import {
 import { ProjectStageStepper } from "@/components/private/ProjectStageStepper";
 import { formatStageDateRange, setStageDateRange, stageDateRangeFor, type StageDateMap } from "@/lib/private-stage-dates";
 import type { PrivateDesignStage } from "@prisma/client";
+import {
+  parseClientDeliverables,
+  type ClientPortalDeliverable,
+} from "@/lib/client-portal-deliverables";
 
 type Detail = {
   project: {
@@ -29,6 +33,7 @@ type Detail = {
     marginPercent: number | null;
     stageNotes: string | null;
     clientDescription: string | null;
+    clientLinks?: ClientPortalDeliverable[];
     dueDate: string | null;
     briefReceivedAt: string | null;
     councilSubmittedAt: string | null;
@@ -119,6 +124,7 @@ export function PrivateProjectDetailClient({
   const [docFile, setDocFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [clientDescription, setClientDescription] = useState("");
+  const [clientLinks, setClientLinks] = useState<ClientPortalDeliverable[]>([]);
 
   const load = useCallback(async () => {
     const r = await fetch(`/api/private/projects/${projectId}`);
@@ -134,6 +140,7 @@ export function PrivateProjectDetailClient({
     });
     setNotes(j.project.stageNotes ?? "");
     setClientDescription(j.project.clientDescription ?? "");
+    setClientLinks(parseClientDeliverables(j.project.clientLinks));
     const titles: Record<string, string> = {};
     for (const a of (j.actionItems as Detail["actionItems"]).filter((x) => !x.completedAt)) {
       titles[a.id] = a.title;
@@ -210,7 +217,10 @@ export function PrivateProjectDetailClient({
     const r = await fetch(`/api/private/projects/${projectId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clientDescription: clientDescription.trim() || null }),
+      body: JSON.stringify({
+        clientDescription: clientDescription.trim() || null,
+        clientLinks,
+      }),
     });
     const j = await r.json().catch(() => ({}));
     setSaving(false);
@@ -519,14 +529,72 @@ export function PrivateProjectDetailClient({
             placeholder="Short bio / brief for this project — what the client is building, context, goals…"
             className="mt-2 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm leading-relaxed text-white placeholder:text-slate-600"
           />
-          <div className="mt-2 flex flex-wrap items-center gap-3">
+
+          <div className="mt-5">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+              Project links
+            </p>
+            <p className="mt-1 text-[11px] text-slate-500">
+              Zoom, Pinterest boards, house keys — shown under the description on the portal.
+            </p>
+            <ul className="mt-2 space-y-2">
+              {clientLinks.map((link, i) => (
+                <li key={i} className="flex flex-wrap gap-2">
+                  <input
+                    value={link.label}
+                    onChange={(e) =>
+                      setClientLinks((rows) => {
+                        const next = [...rows];
+                        next[i] = { ...next[i]!, label: e.target.value };
+                        return next;
+                      })
+                    }
+                    disabled={saving}
+                    placeholder="e.g. BLOCHARCH | Client Meetings — Dedicated Zoom Link"
+                    className="min-w-[10rem] flex-1 rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white placeholder:text-slate-600"
+                  />
+                  <input
+                    value={link.url ?? ""}
+                    onChange={(e) =>
+                      setClientLinks((rows) => {
+                        const next = [...rows];
+                        next[i] = { ...next[i]!, url: e.target.value.trim() || null };
+                        return next;
+                      })
+                    }
+                    disabled={saving}
+                    placeholder="https://…"
+                    className="min-w-[12rem] flex-[2] rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white placeholder:text-slate-600"
+                  />
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => setClientLinks((rows) => rows.filter((_, j) => j !== i))}
+                    className="text-xs text-red-400 hover:underline disabled:opacity-50"
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => setClientLinks((rows) => [...rows, { label: "", url: null }])}
+              className="mt-2 text-xs text-brand-300 hover:underline disabled:opacity-50"
+            >
+              + Add link
+            </button>
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center gap-3">
             <button
               type="button"
               disabled={saving}
               onClick={() => void saveClientDescription()}
               className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-brand-500 disabled:opacity-50"
             >
-              {saving ? "Saving…" : "Save description"}
+              {saving ? "Saving…" : "Save description & links"}
             </button>
             {p.client.slug ? (
               <Link

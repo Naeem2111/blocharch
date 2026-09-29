@@ -214,12 +214,37 @@ export function PrivateClientPortalClient({
             </div>
           </div>
 
-          {project.clientDescription?.trim() ? (
+          {project.clientDescription?.trim() || project.clientLinks?.length ? (
             <section className="client-portal-card mt-8 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5 sm:p-6">
-              <h2 className="private-portal-title text-lg font-semibold">Project description</h2>
-              <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-slate-300">
-                {project.clientDescription.trim()}
-              </p>
+              {project.clientDescription?.trim() ? (
+                <>
+                  <h2 className="private-portal-title text-lg font-semibold">Project description</h2>
+                  <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-slate-300">
+                    {project.clientDescription.trim()}
+                  </p>
+                </>
+              ) : null}
+              {project.clientLinks?.length ? (
+                <ul
+                  className={`space-y-4 ${project.clientDescription?.trim() ? "mt-5 border-t border-white/[0.06] pt-5" : ""}`}
+                >
+                  {project.clientLinks.map((link, i) => (
+                    <li key={`${link.label}-${i}`}>
+                      <p className="text-sm font-medium text-white">{link.label}</p>
+                      {link.url ? (
+                        <a
+                          href={link.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-1 block break-all text-sm text-brand-300 hover:underline"
+                        >
+                          {link.url}
+                        </a>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
             </section>
           ) : null}
 
