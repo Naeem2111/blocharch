@@ -15,7 +15,7 @@ export default async function MapPage() {
       <PageHeader title="Map" description={mapBlurb} />
       <MapClient practices={practices} initialGeocodes={initialGeocodes} focalAnchor={focalAnchor} />
       <p className="mt-4 text-xs text-slate-500">
-        Map tiles © OpenStreetMap contributors, © CARTO. Backfill coordinates with{" "}
+        Map tiles © OpenStreetMap contributors. Backfill coordinates with{" "}
         <code className="rounded bg-black/30 px-1 font-mono text-[10px] text-brand-300">npm run geocode:architects</code>{" "}
         (respects Nominatim rate limits).
       </p>
