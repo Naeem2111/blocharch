@@ -562,7 +562,8 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
 
   useEffect(() => {
     if (!isAthleteSelfView) return;
-    setAllBoardsView(athletePlannerMode === "planner");
+    // Outbox is a single board; planner lists Blocharch + Personal as separate tabs.
+    if (athletePlannerMode === "outbox") setAllBoardsView(false);
   }, [isAthleteSelfView, athletePlannerMode]);
 
   const loadAllBoardDetails = useCallback(async () => {
@@ -638,7 +639,7 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
     router.push(`/dashboard/planner?${p.toString()}`);
     setBoardId(null);
     setDetail(null);
-    setAllBoardsView(next === "planner");
+    setAllBoardsView(false);
   }
 
   useEffect(() => {
@@ -1419,14 +1420,12 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
         ) : dragTaskId ? (
           <p className="text-xs text-brand-300">Drop on another board column to move across boards</p>
         ) : null}
-        {!isAthleteSelfView ? (
+        {!isAthleteSelfView || athletePlannerMode === "planner" ? (
         <div className="flex flex-wrap items-center gap-2">
           {filteredBoards.map((b, boardIdx) => {
-            const showUnreadBadge =
-              isAthleteSelfView && inboxUnreadCount > 0 && boardIdx === 0;
             return (
             <div key={b.id} className="flex items-center gap-0.5">
-              {!FIXED_BOARD_KINDS.has(b.kind ?? "custom") && filteredBoards.length > 1 ? (
+              {!FIXED_BOARD_KINDS.has(b.kind ?? "custom") && filteredBoards.length > 1 && !isAthleteSelfView ? (
                 <div className="flex flex-col gap-0.5">
                   <button
                     type="button"
@@ -1451,7 +1450,10 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
             <button
               type="button"
               onClick={() => {
-                if (!dragTaskId) setBoardId(b.id);
+                if (!dragTaskId) {
+                  setAllBoardsView(false);
+                  setBoardId(b.id);
+                }
               }}
               onDragOver={(e) => {
                 if (!dragTaskId || b.id === boardId || b.kind === "blocharch_outbox") return;
@@ -1469,18 +1471,11 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
                   ? "planner-tab-selected border-brand-500/40 bg-brand-500/10 text-brand-100"
                   : dropTargetBoardId === b.id
                     ? "planner-tab-selected border-brand-500/50 bg-brand-500/15 text-brand-100 ring-2 ring-brand-500/30"
-                    : showUnreadBadge
-                      ? "planner-tab-alert animate-pulse border-red-500/40 bg-red-500/10 text-red-100 ring-1 ring-red-500/35"
-                      : "border-white/[0.08] bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]"
+                    : "border-white/[0.08] bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]"
               }`}
               style={{ borderLeftWidth: 4, borderLeftColor: b.color }}
             >
               <span className="font-medium">{b.title}</span>
-              {showUnreadBadge ? (
-                <span className="ml-2 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
-                  {inboxUnreadCount > 99 ? "99+" : inboxUnreadCount}
-                </span>
-              ) : null}
               {!b.isSystem ? (
                 <span className="ml-2 text-[10px] uppercase text-slate-500">{b.scope}</span>
               ) : null}
@@ -1490,14 +1485,14 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
           })}
           {filteredBoards.length === 0 ? (
             <p className="text-sm text-slate-500">
-              {boardGroup === "personal"
-                ? "No personal boards yet — create one to get started."
-                : "No project boards here yet — assign an ops project to open its kanban under Blocharch."}
+              {isAthleteSelfView
+                ? "No planner boards yet."
+                : boardGroup === "personal"
+                  ? "No personal boards yet — create one to get started."
+                  : "No project boards here yet — assign an ops project to open its kanban under Blocharch."}
             </p>
           ) : null}
         </div>
-        ) : athletePlannerMode === "planner" && filteredBoards.length === 0 ? (
-          <p className="text-sm text-slate-500">No planner boards yet.</p>
         ) : athletePlannerMode === "outbox" && filteredBoards.length === 0 ? (
           <p className="text-sm text-slate-500">Outbox is not available on this workspace yet.</p>
         ) : null}
