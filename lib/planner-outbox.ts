@@ -143,7 +143,7 @@ export async function deliverOutboxTaskToInbox(outboxTaskId: string) {
     message: row.project?.name
       ? `Project: ${row.project.name}`
       : "New task on your Personal board",
-    linkPath: `/dashboard/planner?area=team&athlete=me&group=${group}&board=${destBoard.id}&task=${task.id}`,
+    linkPath: `/dashboard/planner?area=team&athlete=me&view=planner&group=${group}&board=${destBoard.id}&task=${task.id}`,
   }).catch(() => {});
 
   return { taskId: task.id, alreadyDelivered: false };

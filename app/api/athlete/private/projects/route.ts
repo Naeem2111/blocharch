@@ -8,12 +8,16 @@ import {
   privateAssignedAthleteSelect,
   whereAthletePrivateProjects,
 } from "@/lib/private-project-assignments";
+import { syncPrivateProjectsIntoArchives } from "@/lib/private-archive";
 
 export async function GET(request: NextRequest) {
   const gate = await requirePrivateAthleteSession(request);
   if (gate instanceof NextResponse) return gate;
 
   const scope = request.nextUrl.searchParams.get("scope") || "active";
+  if (scope === "active") {
+    await syncPrivateProjectsIntoArchives();
+  }
   const statusWhere =
     scope === "completed"
       ? { status: "completed" as const }

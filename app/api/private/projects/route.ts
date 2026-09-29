@@ -14,6 +14,7 @@ import {
   parseOptionalPrivateAssignment,
   privateAssignedAthleteSelect,
 } from "@/lib/private-project-assignments";
+import { syncPrivateProjectsIntoArchives } from "@/lib/private-archive";
 
 const projectInclude = {
   client: {
@@ -39,6 +40,9 @@ export async function GET(request: NextRequest) {
   if (gate instanceof NextResponse) return gate;
 
   const scope = request.nextUrl.searchParams.get("scope") || "active";
+  if (scope === "active" || scope === "all") {
+    await syncPrivateProjectsIntoArchives();
+  }
   const where =
     scope === "all"
       ? {}

@@ -124,7 +124,7 @@ export async function deliverAssignedTaskToAthleteInbox(
     message: sourceBoard.title
       ? `From: ${sourceBoard.title}`
       : "New task assigned to you",
-    linkPath: `/dashboard/planner?area=team&athlete=me&group=${group}&board=${destBoard.id}&task=${task.id}`,
+    linkPath: `/dashboard/planner?area=team&athlete=me&view=planner&group=${group}&board=${destBoard.id}&task=${task.id}`,
   }).catch(() => {});
 
   return { taskId: task.id, skipped: false };

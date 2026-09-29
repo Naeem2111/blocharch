@@ -6,6 +6,7 @@ import { parseDateOnly } from "@/lib/ops-hours";
 import { privateAthleteHourlyRateZar } from "@/lib/private-athlete-earnings";
 import { resolvePrivateProgressPercent } from "@/lib/private-progress";
 import { whereAthletePrivateProjects } from "@/lib/private-project-assignments";
+import { archivePrivateProjectIfComplete } from "@/lib/private-archive";
 
 export async function GET(request: NextRequest) {
   const gate = await requirePrivateAthleteSession(request);
@@ -126,6 +127,10 @@ export async function POST(request: NextRequest) {
       });
       return created;
     });
+
+    if (manualProgressPercent !== undefined && manualProgressPercent >= 100) {
+      await archivePrivateProjectIfComplete(projectId);
+    }
 
     return NextResponse.json(
       {

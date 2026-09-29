@@ -539,7 +539,7 @@ const ATHLETE_PORTAL_NAV: NavItem[] = [
 		),
 	},
 	{
-		href: "/dashboard/planner?area=team&athlete=me",
+		href: "/dashboard/planner?area=team&athlete=me&view=planner",
 		label: "Project planner",
 		badgeKey: "inbox",
 		icon: (

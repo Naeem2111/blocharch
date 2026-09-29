@@ -26,6 +26,7 @@ import {
   parseProjectAssignmentInput,
   serializeProjectAssignments,
 } from "@/lib/ops-project-assignments";
+import { deriveClientPortalLaneNumber } from "@/lib/client-portal-projects";
 
 const ACTIVE_STATUSES = ["completed", "handed_over"] as const;
 
@@ -45,7 +46,16 @@ export async function GET(request: NextRequest) {
     where,
     orderBy: [{ dueDate: "asc" }, { name: "asc" }],
     include: {
-      client: { select: { id: true, name: true, logoUrl: true, logoBgColor: true, logoTextTone: true } },
+      client: {
+        select: {
+          id: true,
+          name: true,
+          logoUrl: true,
+          logoBgColor: true,
+          logoTextTone: true,
+          commercial: { select: { activeLaneCount: true } },
+        },
+      },
       assignedAthlete: { select: { id: true, fullName: true, athleteCode: true } },
       athleteAssignments: activeAthleteAssignmentsInclude,
       projectLeadContact: { select: { id: true, name: true, email: true } },
@@ -60,8 +70,9 @@ export async function GET(request: NextRequest) {
   ]);
 
   return NextResponse.json({
-    projects: projects.map((p) =>
-      serializeOpsProjectRow(p, {
+    projects: projects.map((p) => {
+      const activeLaneCount = p.client.commercial?.activeLaneCount ?? 1;
+      return serializeOpsProjectRow(p, {
         clientName: p.client.name,
         clientLogoUrl: p.client.logoUrl,
         clientLogoBgColor: p.client.logoBgColor,
@@ -73,9 +84,10 @@ export async function GET(request: NextRequest) {
         assignedAthletes: serializeProjectAssignments(p.athleteAssignments),
         hoursLogged: hoursByProject.get(p.id) ?? 0,
         quotedHours: quotedByProject.get(p.id) ?? null,
+        laneNumber: deriveClientPortalLaneNumber(p.projectNumber, activeLaneCount),
         updatedAt: p.updatedAt.toISOString(),
-      })
-    ),
+      });
+    }),
   });
 }
 

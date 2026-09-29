@@ -10,6 +10,11 @@ import { serializePrivateProject } from "@/lib/private-serialize";
 import { parseDateOnly } from "@/lib/ops-hours";
 import { resolveProjectTypeInput } from "@/lib/private-project-types";
 import {
+  archivePrivateProjectIfComplete,
+  privateArchiveData,
+  privateProjectShouldArchive,
+} from "@/lib/private-archive";
+import {
   parsePhaseSplitMap,
   validatePhaseSplitMap,
   defaultPhaseSplits,
@@ -255,6 +260,24 @@ export async function PATCH(
         data.manualProgressPercent = Math.round(n);
       }
     }
+
+    const nextDesignStage = (data.designStage as typeof existing.designStage | undefined) ?? existing.designStage;
+    const nextStageStartedAt =
+      (data.stageStartedAt as Date | undefined) ?? existing.stageStartedAt;
+    const nextManual =
+      data.manualProgressPercent !== undefined
+        ? (data.manualProgressPercent as number | null)
+        : existing.manualProgressPercent;
+    if (
+      privateProjectShouldArchive({
+        status: existing.status,
+        designStage: nextDesignStage,
+        stageStartedAt: nextStageStartedAt,
+        manualProgressPercent: nextManual,
+      })
+    ) {
+      Object.assign(data, privateArchiveData(existing.handoverOutcome));
+    }
     if (body.projectType !== undefined) {
       const typeResolved = await resolveProjectTypeInput(body);
       if (!typeResolved.ok) {
@@ -402,8 +425,35 @@ export async function PATCH(
     if (updated.client.slug) {
       revalidatePath(`/private/${updated.client.slug}`);
     }
+    revalidatePath("/dashboard/private/archives");
+    revalidatePath("/dashboard/private/projects");
 
-    return NextResponse.json({ project: serializePrivateProject(updated) });
+    // Safety net if status was not included in this patch payload.
+    await archivePrivateProjectIfComplete(updated.id);
+    const finalProject =
+      updated.status === "completed"
+        ? updated
+        : await prisma.privateProject.findUniqueOrThrow({
+            where: { id: updated.id },
+            include: {
+              client: {
+                select: {
+                  id: true,
+                  name: true,
+                  contactEmail: true,
+                  contactPhone: true,
+                  slug: true,
+                },
+              },
+              assignedAthlete: {
+                select: privateAssignedAthleteSelect,
+              },
+              athleteAssignments: activePrivateAthleteAssignmentsInclude,
+              customProjectType: { select: { id: true, label: true } },
+            },
+          });
+
+    return NextResponse.json({ project: serializePrivateProject(finalProject) });
   } catch (e) {
     if (e instanceof Error && e.message === "ATHLETE_NOT_FOUND") {
       return NextResponse.json({ error: "Assigned athlete not found" }, { status: 400 });

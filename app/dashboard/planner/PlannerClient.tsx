@@ -255,6 +255,7 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
   const area = searchParams.get("area");
   const athleteParam = searchParams.get("athlete");
   const groupParam = searchParams.get("group");
+  const viewParam = searchParams.get("view");
   const focusBoardId = searchParams.get("board");
   const focusTaskId = searchParams.get("task");
 
@@ -506,7 +507,7 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
 
   useEffect(() => {
     if (currentRole === "user" && !area) {
-      router.replace("/dashboard/planner?area=team&athlete=me&group=blocharch");
+      router.replace("/dashboard/planner?area=team&athlete=me&view=planner");
     }
   }, [currentRole, area, router]);
 
@@ -545,10 +546,24 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
     return defaultPlannerBoardGroup(areaBoards);
   }, [groupParam, availableGroups, areaBoards]);
 
-  const filteredBoards = useMemo(
-    () => filterBoardsByGroup(areaBoards, boardGroup),
-    [areaBoards, boardGroup]
-  );
+  /** Athletes use Project planner (all work boards) vs Blocharch outbox — not Blocharch/Personal stubs. */
+  const athletePlannerMode: "planner" | "outbox" =
+    isAthleteSelfView && viewParam === "outbox" ? "outbox" : "planner";
+
+  const filteredBoards = useMemo(() => {
+    if (isAthleteSelfView) {
+      if (athletePlannerMode === "outbox") {
+        return areaBoards.filter((b) => b.kind === "blocharch_outbox");
+      }
+      return areaBoards.filter((b) => b.kind !== "blocharch_outbox");
+    }
+    return filterBoardsByGroup(areaBoards, boardGroup);
+  }, [isAthleteSelfView, athletePlannerMode, areaBoards, boardGroup]);
+
+  useEffect(() => {
+    if (!isAthleteSelfView) return;
+    setAllBoardsView(athletePlannerMode === "planner");
+  }, [isAthleteSelfView, athletePlannerMode]);
 
   const loadAllBoardDetails = useCallback(async () => {
     const ids = filteredBoards
@@ -614,17 +629,39 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
     setAllBoardsView(false);
   }
 
+  function setAthletePlannerMode(next: "planner" | "outbox") {
+    const p = new URLSearchParams(searchParams.toString());
+    p.set("area", "team");
+    p.set("athlete", "me");
+    p.set("view", next);
+    p.delete("group");
+    router.push(`/dashboard/planner?${p.toString()}`);
+    setBoardId(null);
+    setDetail(null);
+    setAllBoardsView(next === "planner");
+  }
+
   useEffect(() => {
     if (!focusBoardId || areaBoards.length === 0) return;
     const hit = areaBoards.find((b) => b.id === focusBoardId);
     if (!hit) return;
+    if (isAthleteSelfView) {
+      const neededView = hit.kind === "blocharch_outbox" ? "outbox" : "planner";
+      if (viewParam !== neededView) {
+        const p = new URLSearchParams(searchParams.toString());
+        p.set("view", neededView);
+        p.delete("group");
+        router.replace(`/dashboard/planner?${p.toString()}`);
+      }
+      return;
+    }
     const neededGroup = plannerBoardGroup(hit.kind);
     if (groupParam !== neededGroup) {
       const p = new URLSearchParams(searchParams.toString());
       p.set("group", neededGroup);
       router.replace(`/dashboard/planner?${p.toString()}`);
     }
-  }, [focusBoardId, areaBoards, groupParam, searchParams, router]);
+  }, [focusBoardId, areaBoards, groupParam, viewParam, isAthleteSelfView, searchParams, router]);
 
   useEffect(() => {
     if (!focusTaskId || !focusBoardId || boards.length === 0) return;
@@ -639,18 +676,24 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
     }
     const inGroup = filteredBoards.some((b) => b.id === boardId);
     if ((!boardId || !inGroup) && filteredBoards.length > 0) {
-      const preferred =
-        filteredBoards.find((b) => b.kind === "custom" && /blocharch/i.test(b.title)) ??
-        filteredBoards.find((b) => b.kind === "custom") ??
-        filteredBoards.find((b) => b.kind === "blocharch_outbox") ??
-        filteredBoards.find((b) => b.kind === "project") ??
-        filteredBoards[0]!;
+      const preferred = isAthleteSelfView
+        ? athletePlannerMode === "outbox"
+          ? filteredBoards.find((b) => b.kind === "blocharch_outbox") ?? filteredBoards[0]!
+          : filteredBoards.find((b) => b.kind === "custom" && /blocharch/i.test(b.title)) ??
+            filteredBoards.find((b) => b.kind === "custom") ??
+            filteredBoards.find((b) => b.kind === "project") ??
+            filteredBoards[0]!
+        : filteredBoards.find((b) => b.kind === "custom" && /blocharch/i.test(b.title)) ??
+          filteredBoards.find((b) => b.kind === "custom") ??
+          filteredBoards.find((b) => b.kind === "blocharch_outbox") ??
+          filteredBoards.find((b) => b.kind === "project") ??
+          filteredBoards[0]!;
       setBoardId(preferred.id);
     } else if (filteredBoards.length === 0) {
       setBoardId(null);
       setDetail(null);
     }
-  }, [boards, boardId, showBoardPicker, filteredBoards]);
+  }, [boards, boardId, showBoardPicker, filteredBoards, isAthleteSelfView, athletePlannerMode]);
 
   useEffect(() => {
     if (boardId && showBoardPicker) loadDetail(boardId);
@@ -1300,7 +1343,39 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
 
       {showBoardPicker ? (
       <div className="flex flex-col gap-3">
-        {availableGroups.length > 1 ? (
+        {isAthleteSelfView ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setAthletePlannerMode("planner")}
+              className={`planner-tab rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                athletePlannerMode === "planner"
+                  ? "planner-tab-selected border-brand-500/40 bg-brand-500/10 text-brand-100"
+                  : "border-white/[0.08] bg-white/[0.03] text-slate-400 hover:bg-white/[0.06] hover:text-slate-200"
+              }`}
+            >
+              Project planner
+            </button>
+            <button
+              type="button"
+              onClick={() => setAthletePlannerMode("outbox")}
+              className={`planner-tab rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                athletePlannerMode === "outbox"
+                  ? "planner-tab-selected border-brand-500/40 bg-brand-500/10 text-brand-100"
+                  : inboxUnreadCount > 0
+                    ? "planner-tab-alert animate-pulse border-red-500/40 bg-red-500/10 text-red-100 ring-1 ring-red-500/35"
+                    : "border-white/[0.08] bg-white/[0.03] text-slate-400 hover:bg-white/[0.06] hover:text-slate-200"
+              }`}
+            >
+              Blocharch outbox
+              {inboxUnreadCount > 0 ? (
+                <span className="ml-2 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
+                  {inboxUnreadCount > 99 ? "99+" : inboxUnreadCount}
+                </span>
+              ) : null}
+            </button>
+          </div>
+        ) : availableGroups.length > 1 ? (
           <div className="flex flex-wrap items-center gap-2">
             {availableGroups.map((group) => (
               <button
@@ -1318,6 +1393,7 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
             ))}
           </div>
         ) : null}
+        {!isAthleteSelfView ? (
         <div className="flex flex-wrap items-center gap-2">
           {filteredBoards.length > 1 ? (
             <button
@@ -1340,6 +1416,10 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
             <p className="text-xs text-brand-300">Drop on another board tab or column to move across boards</p>
           ) : null}
         </div>
+        ) : dragTaskId ? (
+          <p className="text-xs text-brand-300">Drop on another board column to move across boards</p>
+        ) : null}
+        {!isAthleteSelfView ? (
         <div className="flex flex-wrap items-center gap-2">
           {filteredBoards.map((b, boardIdx) => {
             const showUnreadBadge =
@@ -1416,6 +1496,11 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
             </p>
           ) : null}
         </div>
+        ) : athletePlannerMode === "planner" && filteredBoards.length === 0 ? (
+          <p className="text-sm text-slate-500">No planner boards yet.</p>
+        ) : athletePlannerMode === "outbox" && filteredBoards.length === 0 ? (
+          <p className="text-sm text-slate-500">Outbox is not available on this workspace yet.</p>
+        ) : null}
       </div>
       ) : null}
 

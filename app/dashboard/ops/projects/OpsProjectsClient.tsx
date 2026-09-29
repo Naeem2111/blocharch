@@ -74,6 +74,7 @@ type ProjectRow = {
   progressPercent: number | null;
   hoursLogged?: number;
   quotedHours?: number | null;
+  laneNumber?: number;
   clientDescription: string | null;
   clientDeliverables: unknown;
 };
@@ -101,17 +102,36 @@ function assignmentPayload(athleteIds: string[], primaryAthleteId: string) {
   return { assignedAthleteIds: ids, primaryAthleteId: primary };
 }
 
+function assignedAthleteRows(p: ProjectRow): AssignedAthleteRow[] {
+  if (p.assignedAthletes && p.assignedAthletes.length > 0) return p.assignedAthletes;
+  if (p.assignedAthleteName && p.assignedAthleteId) {
+    return [
+      {
+        athleteId: p.assignedAthleteId,
+        fullName: p.assignedAthleteName,
+        athleteCode: p.athleteCode ?? "",
+        isPrimary: true,
+      },
+    ];
+  }
+  return [];
+}
+
 function formatAssignedAthletes(p: ProjectRow) {
-  const rows =
-    p.assignedAthletes && p.assignedAthletes.length > 0
-      ? p.assignedAthletes
-      : p.assignedAthleteName
-        ? [{ fullName: p.assignedAthleteName, isPrimary: true }]
-        : [];
+  const rows = assignedAthleteRows(p);
   if (rows.length === 0) return "Unassigned";
   return rows
     .map((a) => (a.isPrimary ? `${a.fullName} (primary)` : a.fullName))
     .join(", ");
+}
+
+function athleteInitials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("");
 }
 
 function formatShortDate(iso: string | null | undefined): string {
@@ -120,6 +140,14 @@ function formatShortDate(iso: string | null | undefined): string {
   const d = new Date(`${day}T12:00:00`);
   if (Number.isNaN(d.getTime())) return day;
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+}
+
+function LanePill({ n }: { n: number }) {
+  return (
+    <span className="client-portal-lane-pill rounded border border-white/[0.1] bg-white/[0.04] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+      Lane {n}
+    </span>
+  );
 }
 
 function statusBadgeColor(status: string): string {
@@ -804,23 +832,20 @@ export function OpsProjectsClient() {
                 <h2 className="font-semibold text-white">
                   {p.displayTitle ?? formatProjectFullTitle(p.name, p.currentStage)}
                 </h2>
-                <p className="mt-0.5 text-xs text-slate-500">
-                  {p.projectNumber}
-                  {p.address ? ` · ${p.address}` : ""}
-                </p>
+                {p.address ? <p className="mt-0.5 text-xs text-slate-500">{p.address}</p> : null}
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <OpsStatusBadge
                   label={PROJECT_STATUS_LABELS[p.currentStatus]}
                   color={statusBadgeColor(p.currentStatus)}
                 />
-                <span className="rounded-md bg-white/[0.06] px-2 py-1 text-[10px] uppercase text-slate-400">
+                <span className="rounded-md bg-white/[0.06] px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                   {COMPLEXITY_LABELS[p.complexity]}
                 </span>
                 <button
                   type="button"
                   onClick={() => startEdit(p)}
-                  className="text-xs text-brand-300 hover:text-brand-200"
+                  className="text-xs font-medium text-brand-300 hover:text-brand-200"
                 >
                   Edit
                 </button>
@@ -835,6 +860,12 @@ export function OpsProjectsClient() {
                     {p.stageLabel ?? displayProjectStageLabel(p.currentStage)}
                   </span>
                 </span>
+                {p.laneNumber != null ? (
+                  <>
+                    <span className="text-slate-600">·</span>
+                    <LanePill n={p.laneNumber} />
+                  </>
+                ) : null}
                 {timeline.daysActive != null ? (
                   <>
                     <span className="text-slate-600">·</span>
@@ -846,7 +877,7 @@ export function OpsProjectsClient() {
                 {p.startDate || p.dueDate || p.dueAt ? (
                   <>
                     {p.startDate ? formatShortDate(p.startDate) : "TBC"}
-                    {" → "}
+                    {" — "}
                     <span className="font-semibold" style={{ color: accent }}>
                       {p.dueDate || p.dueAt ? formatShortDate(p.dueAt ?? p.dueDate) : "TBC"}
                     </span>
@@ -865,40 +896,48 @@ export function OpsProjectsClient() {
               <span className="shrink-0 text-xs tabular-nums text-slate-400">
                 {p.progressPercent ?? 0}%
               </span>
-              <ProjectHoursCorner hoursLogged={p.hoursLogged ?? 0} quotedHours={p.quotedHours} />
             </div>
 
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-              <div className="min-w-0">
-                {p.projectLeadContactName ? (
-                  <div className="flex min-w-0 items-center gap-2.5">
-                    <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.08] text-[11px] font-semibold text-slate-300">
-                      {p.projectLeadContactName
-                        .split(/\s+/)
-                        .filter(Boolean)
-                        .slice(0, 2)
-                        .map((w) => w[0]?.toUpperCase() ?? "")
-                        .join("")}
+            <div className="mt-4 flex flex-wrap items-end justify-between gap-3">
+              {(() => {
+                const athletes = assignedAthleteRows(p);
+                if (athletes.length === 0) {
+                  return (
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
+                      Athlete to be assigned
                     </span>
-                    <div className="min-w-0">
-                      <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-500">
-                        Office lead
+                  );
+                }
+                return (
+                  <div className="min-w-0">
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-300">
+                      <ClientPortalAthleteMark />
+                      Athlete assigned
+                    </span>
+                    <div className="mt-1.5 flex min-w-0 items-center gap-2">
+                      <div className="flex shrink-0 -space-x-1.5">
+                        {athletes.slice(0, 4).map((a, i) => (
+                          <span
+                            key={a.athleteId}
+                            title={a.fullName}
+                            className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold ring-2 ring-[#0f131a] ${
+                              a.isPrimary || i === 0
+                                ? "bg-sky-500/25 text-sky-200"
+                                : "bg-white/[0.08] text-slate-300"
+                            }`}
+                          >
+                            {athleteInitials(a.fullName)}
+                          </span>
+                        ))}
+                      </div>
+                      <p className="min-w-0 truncate text-xs text-slate-400">
+                        {formatAssignedAthletes(p)}
                       </p>
-                      <p className="truncate text-sm text-slate-200">{p.projectLeadContactName}</p>
                     </div>
                   </div>
-                ) : (
-                  <p className="text-xs text-slate-500">{formatAssignedAthletes(p)}</p>
-                )}
-              </div>
-              {(p.assignedAthletes && p.assignedAthletes.length > 0) || p.assignedAthleteId ? (
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-400">
-                  <ClientPortalAthleteMark />
-                  {formatAssignedAthletes(p)}
-                </span>
-              ) : (
-                <span className="text-[11px] font-medium text-slate-500">Athlete to be assigned</span>
-              )}
+                );
+              })()}
+              <ProjectHoursCorner hoursLogged={p.hoursLogged ?? 0} quotedHours={p.quotedHours} />
             </div>
           </div>
         )}
