@@ -168,13 +168,13 @@ export function PrivateOnboardingClient({ initialClientId = "" }: { initialClien
             />
           </label>
           <label className="block text-xs text-slate-400">
-            Client-facing description
+            Project description
             <textarea
-              rows={3}
+              rows={4}
               className={field}
               value={form.clientDescription}
               onChange={(e) => setForm({ ...form, clientDescription: e.target.value })}
-              placeholder="Shown on the client portal only if you fill this in."
+              placeholder="Short bio / brief for this project — shown on the client portal."
             />
           </label>
           <label className="block text-xs text-slate-400">

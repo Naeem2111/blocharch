@@ -118,6 +118,7 @@ export function PrivateProjectDetailClient({
   const [docVisible, setDocVisible] = useState(false);
   const [docFile, setDocFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [clientDescription, setClientDescription] = useState("");
 
   const load = useCallback(async () => {
     const r = await fetch(`/api/private/projects/${projectId}`);
@@ -132,6 +133,7 @@ export function PrivateProjectDetailClient({
       updates: j.updates || [],
     });
     setNotes(j.project.stageNotes ?? "");
+    setClientDescription(j.project.clientDescription ?? "");
     const titles: Record<string, string> = {};
     for (const a of (j.actionItems as Detail["actionItems"]).filter((x) => !x.completedAt)) {
       titles[a.id] = a.title;
@@ -199,6 +201,23 @@ export function PrivateProjectDetailClient({
       body: JSON.stringify({ stageNotes: notes }),
     });
     setSaving(false);
+    void load();
+  }
+
+  async function saveClientDescription() {
+    setSaving(true);
+    setError("");
+    const r = await fetch(`/api/private/projects/${projectId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientDescription: clientDescription.trim() || null }),
+    });
+    const j = await r.json().catch(() => ({}));
+    setSaving(false);
+    if (!r.ok) {
+      setError(j.error || "Could not save description");
+      return;
+    }
     void load();
   }
 
@@ -483,14 +502,42 @@ export function PrivateProjectDetailClient({
             Project
           </p>
           <h2 className="mt-1 text-lg font-semibold text-white">{p.name}</h2>
-          {p.clientDescription ? (
-            <p className="mt-2 text-sm leading-relaxed text-slate-400">{p.clientDescription}</p>
-          ) : (
-            <p className="mt-2 text-xs text-slate-600">
-              No client-facing description yet — add one in Edit project before it appears on the
-              portal.
+        </div>
+
+        <div className="mt-6 border-t border-white/[0.06] pt-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+              Project description
             </p>
-          )}
+            <span className="text-[10px] text-slate-500">Shown on the client portal</span>
+          </div>
+          <textarea
+            rows={4}
+            value={clientDescription}
+            onChange={(e) => setClientDescription(e.target.value)}
+            disabled={saving}
+            placeholder="Short bio / brief for this project — what the client is building, context, goals…"
+            className="mt-2 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm leading-relaxed text-white placeholder:text-slate-600"
+          />
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => void saveClientDescription()}
+              className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-brand-500 disabled:opacity-50"
+            >
+              {saving ? "Saving…" : "Save description"}
+            </button>
+            {p.client.slug ? (
+              <Link
+                href={`/private/${p.client.slug}`}
+                target="_blank"
+                className="text-xs text-brand-300 hover:underline"
+              >
+                View portal
+              </Link>
+            ) : null}
+          </div>
         </div>
 
         <div className="mt-6">

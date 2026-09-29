@@ -214,6 +214,15 @@ export function PrivateClientPortalClient({
             </div>
           </div>
 
+          {project.clientDescription?.trim() ? (
+            <section className="client-portal-card mt-8 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5 sm:p-6">
+              <h2 className="private-portal-title text-lg font-semibold">Project description</h2>
+              <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-slate-300">
+                {project.clientDescription.trim()}
+              </p>
+            </section>
+          ) : null}
+
           <section className="private-portal-hero mt-8 rounded-2xl p-5 sm:p-7">
             <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_16.5rem] lg:items-start">
               <div>
