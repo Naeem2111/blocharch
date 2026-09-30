@@ -31,6 +31,7 @@ const redirectUri = `http://localhost:${port}/oauth2callback`;
 const scope = [
   "https://www.googleapis.com/auth/calendar",
   "https://www.googleapis.com/auth/calendar.events",
+  "https://www.googleapis.com/auth/drive",
 ].join(" ");
 
 if (!clientId || !clientSecret) {

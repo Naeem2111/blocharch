@@ -16,6 +16,8 @@ import {
   privateProjectShouldArchive,
 } from "@/lib/private-archive";
 import { normalizeClientDeliverablesForSave } from "@/lib/client-portal-deliverables";
+import { isGoogleDriveConfigured } from "@/lib/google-drive";
+import { staffDocumentPath, syncClientDriveDocuments } from "@/lib/private-drive-documents";
 import {
   parsePhaseSplitMap,
   validatePhaseSplitMap,
@@ -48,6 +50,7 @@ const projectInclude = {
       contactEmail: true,
       contactPhone: true,
       slug: true,
+      googleDriveFolderId: true,
     },
   },
   assignedAthlete: {
@@ -85,6 +88,15 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  if (isGoogleDriveConfigured()) {
+    await syncClientDriveDocuments(project.client, project.id).catch(() => {});
+  }
+
+  const documents = await prisma.privateProjectDocument.findMany({
+    where: { projectId: project.id },
+    orderBy: { createdAt: "desc" },
+  });
+
   const hoursLife = await prisma.privateHourLog.aggregate({
     where: { projectId: project.id },
     _sum: { hours: true },
@@ -110,11 +122,11 @@ export async function GET(
       clientFacing: a.clientFacing,
       completedAt: a.completedAt?.toISOString() ?? null,
     })),
-    documents: project.documents.map((d) => ({
+    documents: documents.map((d) => ({
       id: d.id,
       title: d.title,
       originalName: d.originalName,
-      fileUrl: d.fileUrl,
+      fileUrl: d.driveFileId ? staffDocumentPath(project.id, d.id) : d.fileUrl,
       mimeType: d.mimeType,
       sizeBytes: d.sizeBytes,
       clientVisible: d.clientVisible,

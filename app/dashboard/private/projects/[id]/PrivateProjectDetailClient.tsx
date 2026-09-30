@@ -1083,8 +1083,8 @@ export function PrivateProjectDetailClient({
       <section className="card-tool rounded-xl p-5">
         <h3 className="text-sm font-semibold text-white">Documents</h3>
         <p className="mt-1 text-xs text-slate-500">
-          Files stay hidden from the client until you publish them. PDF, image, Word, or Excel —
-          15 MB max.
+          Files are saved in this client&apos;s Google Drive folder. They stay hidden from the client until you
+          publish them. PDF, image, Word, or Excel — 50 MB max.
         </p>
         <ul className="mt-3 space-y-2">
           {(data.documents ?? []).length === 0 ? (

@@ -857,6 +857,8 @@ model PrivateClient {
   slug         String?  @unique
   portalEnabled Boolean @default(true) @map("portal_enabled")
   notes        String?  @db.Text
+  /** Google Drive folder for this client's shared files. */
+  googleDriveFolderId String? @map("google_drive_folder_id")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
@@ -983,6 +985,8 @@ model PrivateProjectDocument {
   fileUrl        String   @map("file_url")
   mimeType       String?  @map("mime_type")
   sizeBytes      Int      @default(0) @map("size_bytes")
+  /** Set when the file lives in the client's Google Drive folder. */
+  driveFileId    String?  @unique @map("drive_file_id")
   clientVisible  Boolean  @default(false) @map("client_visible")
   createdAt      DateTime @default(now()) @map("created_at")
 

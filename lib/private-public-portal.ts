@@ -3,6 +3,7 @@ import {
   PRIVATE_STAGE_LABELS,
   PRIVATE_STAGE_ORDER,
   PRIVATE_STAGE_DONE_COPY,
+  athleteInitials,
 } from "@/lib/private-constants";
 import { resolvePrivateProgressPercent, privateStageMeta } from "@/lib/private-progress";
 import {
@@ -14,6 +15,9 @@ import {
 } from "@/lib/private-phase-structure";
 import { isoDateOnly, parseStageDateMap, resolveStageDates } from "@/lib/private-stage-dates";
 import { parseClientDeliverables } from "@/lib/client-portal-deliverables";
+import { resolvePrivateProjectTypeLabel } from "@/lib/private-project-types";
+import { isGoogleDriveConfigured } from "@/lib/google-drive";
+import { portalDocumentPath, syncClientDriveDocuments } from "@/lib/private-drive-documents";
 
 export async function getPublicPrivateProjectBySlug(slug: string) {
   const client = await prisma.privateClient.findFirst({
@@ -28,6 +32,13 @@ export async function getPublicPrivateProjectBySlug(slug: string) {
     },
     orderBy: { updatedAt: "desc" },
     include: {
+      customProjectType: true,
+      assignedAthlete: { select: { id: true, fullName: true, email: true } },
+      athleteAssignments: {
+        where: { removedAt: null },
+        orderBy: [{ isPrimary: "desc" }, { assignedAt: "asc" }],
+        include: { athlete: { select: { id: true, fullName: true, email: true } } },
+      },
       updates: {
         where: { clientVisible: true },
         orderBy: { occurredAt: "desc" },
@@ -42,17 +53,65 @@ export async function getPublicPrivateProjectBySlug(slug: string) {
   });
   if (!project) return null;
 
-  let documents: Array<{ id: string; title: string; fileUrl: string }> = [];
+  if (isGoogleDriveConfigured() && client.slug) {
+    await syncClientDriveDocuments(client, project.id).catch(() => {});
+  }
+
+  let documents: Array<{
+    id: string;
+    title: string;
+    fileUrl: string;
+    mimeType: string | null;
+    sizeBytes: number;
+    createdAt: string;
+  }> = [];
   try {
-    documents = await prisma.privateProjectDocument.findMany({
-      where: { projectId: project.id, clientVisible: true },
+    const rows = await prisma.privateProjectDocument.findMany({
+      where: { clientVisible: true, project: { clientId: client.id } },
       orderBy: { createdAt: "desc" },
       take: 40,
-      select: { id: true, title: true, fileUrl: true },
+      select: {
+        id: true,
+        title: true,
+        fileUrl: true,
+        mimeType: true,
+        sizeBytes: true,
+        createdAt: true,
+        driveFileId: true,
+      },
     });
+    documents = rows.map((d) => ({
+      id: d.id,
+      title: d.title,
+      fileUrl: d.driveFileId && client.slug ? portalDocumentPath(client.slug, d.id) : d.fileUrl,
+      mimeType: d.mimeType,
+      sizeBytes: d.sizeBytes,
+      createdAt: d.createdAt.toISOString().slice(0, 10),
+    }));
   } catch {
     documents = [];
   }
+
+  const assignedTeam =
+    project.athleteAssignments.length > 0
+      ? project.athleteAssignments.map((row) => ({
+          id: row.athlete.id,
+          fullName: row.athlete.fullName,
+          email: row.athlete.email,
+          initials: athleteInitials(row.athlete.fullName),
+          role: row.isPrimary ? "Project Lead" : "Project Architect",
+        }))
+      : project.assignedAthlete
+        ? [
+            {
+              id: project.assignedAthlete.id,
+              fullName: project.assignedAthlete.fullName,
+              email: project.assignedAthlete.email,
+              initials: athleteInitials(project.assignedAthlete.fullName),
+              role: "Project Lead",
+            },
+          ]
+        : [];
 
   const progressPercent = resolvePrivateProgressPercent({
     designStage: project.designStage,
@@ -157,8 +216,10 @@ export async function getPublicPrivateProjectBySlug(slug: string) {
       dueDate: project.dueDate?.toISOString().slice(0, 10) ?? null,
       stageStartedAt: project.stageStartedAt.toISOString().slice(0, 10),
       stageDates,
+      projectTypeLabel: resolvePrivateProjectTypeLabel(project.projectType, project.customProjectType),
       clientDescription: project.clientDescription,
       clientLinks: parseClientDeliverables(project.clientLinks),
+      team: assignedTeam,
       estCouncilDecision,
       updatedAt: project.updatedAt.toISOString().slice(0, 10),
       outOfScopeFlag: project.outOfScopeFlag,

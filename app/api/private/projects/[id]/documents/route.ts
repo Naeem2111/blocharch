@@ -6,17 +6,27 @@ import {
   isAllowedPrivateDocumentMime,
   newDocumentId,
   PRIVATE_DOCUMENT_MAX_BYTES,
-  removePrivateDocumentFile,
   savePrivateDocumentFile,
 } from "@/lib/private-document-storage";
+import { isGoogleDriveConfigured } from "@/lib/google-drive";
+import {
+  removeStoredDocument,
+  saveDocumentToClientDrive,
+  staffDocumentPath,
+  syncClientDriveDocuments,
+  updateStoredDocumentVisibility,
+  PRIVATE_DRIVE_MAX_BYTES,
+} from "@/lib/private-drive-documents";
 
 function serializeDoc(d: {
   id: string;
+  projectId: string;
   title: string;
   originalName: string;
   fileUrl: string;
   mimeType: string | null;
   sizeBytes: number;
+  driveFileId: string | null;
   clientVisible: boolean;
   createdAt: Date;
 }) {
@@ -24,9 +34,10 @@ function serializeDoc(d: {
     id: d.id,
     title: d.title,
     originalName: d.originalName,
-    fileUrl: d.fileUrl,
+    fileUrl: d.driveFileId ? staffDocumentPath(d.projectId, d.id) : d.fileUrl,
     mimeType: d.mimeType,
     sizeBytes: d.sizeBytes,
+    driveFileId: d.driveFileId,
     clientVisible: d.clientVisible,
     createdAt: d.createdAt.toISOString(),
   };
@@ -39,8 +50,15 @@ export async function GET(
   const gate = await requirePrivateOpsSession(request);
   if (gate instanceof NextResponse) return gate;
 
-  const project = await prisma.privateProject.findUnique({ where: { id: params.id } });
+  const project = await prisma.privateProject.findUnique({
+    where: { id: params.id },
+    include: { client: true },
+  });
   if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  if (isGoogleDriveConfigured()) {
+    await syncClientDriveDocuments(project.client, project.id).catch(() => {});
+  }
 
   const documents = await prisma.privateProjectDocument.findMany({
     where: { projectId: params.id },
@@ -57,7 +75,10 @@ export async function POST(
   const gate = await requirePrivateOpsSession(request);
   if (gate instanceof NextResponse) return gate;
 
-  const project = await prisma.privateProject.findUnique({ where: { id: params.id } });
+  const project = await prisma.privateProject.findUnique({
+    where: { id: params.id },
+    include: { client: true },
+  });
   if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   let form: FormData;
@@ -77,21 +98,34 @@ export async function POST(
       { status: 400 },
     );
   }
-  if (file.size > PRIVATE_DOCUMENT_MAX_BYTES) {
-    return NextResponse.json({ error: "File must be 15 MB or smaller" }, { status: 400 });
+  if (file.size > (isGoogleDriveConfigured() ? PRIVATE_DRIVE_MAX_BYTES : PRIVATE_DOCUMENT_MAX_BYTES)) {
+    return NextResponse.json({ error: "File is too large" }, { status: 400 });
   }
 
   const title = String(form.get("title") || file.name || "Document").trim().slice(0, 200);
   const clientVisible = String(form.get("clientVisible") || "") === "true";
-  const documentId = newDocumentId();
   const bytes = Buffer.from(await file.arrayBuffer());
-  const fileUrl = await savePrivateDocumentFile(
-    params.id,
-    documentId,
-    file.type,
-    file.name,
-    bytes,
-  );
+
+  if (isGoogleDriveConfigured()) {
+    try {
+      const doc = await saveDocumentToClientDrive({
+        client: project.client,
+        projectId: project.id,
+        title,
+        originalName: file.name,
+        mimeType: file.type,
+        bytes,
+        clientVisible,
+      });
+      return NextResponse.json({ document: serializeDoc(doc) }, { status: 201 });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not save to Google Drive";
+      return NextResponse.json({ error: message }, { status: 502 });
+    }
+  }
+
+  const documentId = newDocumentId();
+  const fileUrl = await savePrivateDocumentFile(params.id, documentId, file.type, file.name, bytes);
 
   const doc = await prisma.privateProjectDocument.create({
     data: {
@@ -137,6 +171,9 @@ export async function PATCH(
     where: { id: documentId },
     data,
   });
+  if (body.clientVisible !== undefined) {
+    await updateStoredDocumentVisibility(doc, Boolean(body.clientVisible));
+  }
 
   return NextResponse.json({ document: serializeDoc(doc) });
 }
@@ -160,7 +197,7 @@ export async function DELETE(
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   await prisma.privateProjectDocument.delete({ where: { id: documentId } });
-  await removePrivateDocumentFile(existing.fileUrl);
+  await removeStoredDocument(existing);
 
   return NextResponse.json({ ok: true });
 }

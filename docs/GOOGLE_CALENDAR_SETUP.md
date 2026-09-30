@@ -6,7 +6,7 @@ The console uses **Google Calendar API** with a long-lived **refresh token** so 
 
 1. Open [Google Cloud Console](https://console.cloud.google.com/).
 2. Create or select a project (e.g. `Blocharch Console`).
-3. **APIs & Services → Library** → enable **Google Calendar API**.
+3. **APIs & Services → Library** → enable **Google Calendar API** and **Google Drive API**.
 
 ## 2. OAuth consent screen
 
@@ -15,6 +15,7 @@ The console uses **Google Calendar API** with a long-lived **refresh token** so 
 3. Add scopes:
    - `https://www.googleapis.com/auth/calendar`
    - `https://www.googleapis.com/auth/calendar.events`
+   - `https://www.googleapis.com/auth/drive` (private client file folders)
 4. Add your email as a test user if the app is in **Testing** mode.
 
 ## 3. OAuth client credentials
@@ -35,7 +36,7 @@ node scripts/google-oauth-refresh-token.mjs
 Or use [Google OAuth Playground](https://developers.google.com/oauthplayground/):
 
 1. Configure your own OAuth credentials (gear icon).
-2. Select Calendar API v3 scopes: `calendar` and `calendar.events`.
+2. Select Calendar API v3 scopes (`calendar`, `calendar.events`) and Drive scope `https://www.googleapis.com/auth/drive`.
 3. Authorize → Exchange authorization code for tokens.
 4. Copy the **Refresh token** (not the access token).
 
@@ -80,3 +81,13 @@ If the three required variables are missing, athletes still see **weekday time s
 - Never commit `.env` or refresh tokens to git.
 - Rotate the refresh token if it is exposed.
 - Use a dedicated Google Cloud project for production.
+
+## 8. Private client files (Google Drive)
+
+Private portal uploads and dashboard document uploads are stored in the connected Google account:
+
+`Blocharch Clients / {client name} /`
+
+The portal lists that folder and downloads files from it. Files dropped into the client folder in Drive show up on the portal. Uncheck “show on client portal” in the dashboard to keep a file in the folder but hide it from the client.
+
+Reconnect the refresh token after enabling Drive (`node scripts/google-oauth-refresh-token.mjs`). Optional `GOOGLE_DRIVE_ROOT_FOLDER_ID` uses an existing parent folder instead of creating “Blocharch Clients”.
