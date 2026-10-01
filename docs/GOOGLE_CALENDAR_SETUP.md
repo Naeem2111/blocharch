@@ -21,24 +21,21 @@ The console uses **Google Calendar API** with a long-lived **refresh token** so 
 ## 3. OAuth client credentials
 
 1. **APIs & Services → Credentials → Create credentials → OAuth client ID**.
-2. Application type: **Web application** (or Desktop if you use the script below locally).
-3. Authorized redirect URIs: add `http://localhost:3333/oauth2callback` (for the one-time token script).
-4. Copy **Client ID** and **Client secret**.
+2. Application type: **Web application**.
+3. Authorized redirect URI (the live site, not localhost):
+   - `https://dashboard.blocharch.com/api/google/oauth/callback`
+   - Also add `https://blocharch.vercel.app/api/google/oauth/callback` if you open the console on that host.
+4. Copy **Client ID** and **Client secret** into the site environment (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`) and redeploy before signing in.
 
-## 4. Refresh token (one-time)
+## 4. Refresh token (on the site)
 
-Run locally from the repo root (replace placeholders):
+Log in to the console as an admin on the same host you registered, then open:
 
-```bash
-node scripts/google-oauth-refresh-token.mjs
-```
+`https://dashboard.blocharch.com/api/google/oauth/start`
 
-Or use [Google OAuth Playground](https://developers.google.com/oauthplayground/):
+Sign in as the Blocharch Google account, approve Calendar and Drive, and copy the refresh token shown on the callback page into `GOOGLE_REFRESH_TOKEN`. Redeploy again.
 
-1. Configure your own OAuth credentials (gear icon).
-2. Select Calendar API v3 scopes (`calendar`, `calendar.events`) and Drive scope `https://www.googleapis.com/auth/drive`.
-3. Authorize → Exchange authorization code for tokens.
-4. Copy the **Refresh token** (not the access token).
+The callback only works while that admin session is still logged in, so do this in the browser on the machine you are using.
 
 ## 5. Environment variables
 
@@ -90,4 +87,4 @@ Private portal uploads and dashboard document uploads are stored in the connecte
 
 The portal lists that folder and downloads files from it. Files dropped into the client folder in Drive show up on the portal. Uncheck “show on client portal” in the dashboard to keep a file in the folder but hide it from the client.
 
-Reconnect the refresh token after enabling Drive (`node scripts/google-oauth-refresh-token.mjs`). Optional `GOOGLE_DRIVE_ROOT_FOLDER_ID` uses an existing parent folder instead of creating “Blocharch Clients”.
+Reconnect from the site after enabling Drive: open `/api/google/oauth/start` while logged in as admin. Optional `GOOGLE_DRIVE_ROOT_FOLDER_ID` uses an existing parent folder instead of creating “Blocharch Clients”.

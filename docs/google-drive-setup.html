@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Blocharch — Google Drive setup</title>
+  <style>
+    @page { size: A4; margin: 16mm 16mm 18mm; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: #0f172a;
+      font-family: "Segoe UI", Calibri, sans-serif;
+      font-size: 11pt;
+      line-height: 1.45;
+    }
+    h1 { font-size: 22pt; margin: 0 0 4px; letter-spacing: -0.02em; }
+    h2 { font-size: 13pt; margin: 22px 0 8px; color: #0c4a6e; page-break-after: avoid; }
+    h3 { font-size: 11.5pt; margin: 14px 0 6px; page-break-after: avoid; }
+    p { margin: 0 0 8px; }
+    ol, ul { margin: 0 0 10px; padding-left: 1.2em; }
+    li { margin: 0 0 4px; }
+    .kicker { color: #0369a1; font-size: 9pt; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
+    .lede { color: #334155; max-width: 42em; }
+    code, .path {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 9.5pt;
+      background: #f1f5f9;
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+    pre {
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 9pt;
+      line-height: 1.4;
+      white-space: pre-wrap;
+    }
+    table { width: 100%; border-collapse: collapse; margin: 8px 0 12px; font-size: 10pt; }
+    th, td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; vertical-align: top; }
+    th { background: #e0f2fe; }
+    .note {
+      border-left: 3px solid #0284c7;
+      background: #f0f9ff;
+      padding: 8px 12px;
+      margin: 10px 0;
+    }
+    .warn {
+      border-left: 3px solid #d97706;
+      background: #fffbeb;
+      padding: 8px 12px;
+      margin: 10px 0;
+    }
+    footer { margin-top: 28px; color: #64748b; font-size: 9pt; }
+  </style>
+</head>
+<body>
+  <p class="kicker">Blocharch console</p>
+  <h1>Google Drive setup guide</h1>
+  <p class="lede">Private client files are stored in the connected Google account. Each client gets one folder. Portal uploads, dashboard uploads, and downloads all use that folder.</p>
+
+  <h2>1. What this connects</h2>
+  <ul>
+    <li>The same Google account already used for Jethro’s calendar (Book a call / check-ins).</li>
+    <li>A parent folder named <strong>Blocharch Clients</strong>.</li>
+    <li>One folder inside it per private client, named from the client record.</li>
+    <li>Files added in Drive itself show on the client portal. Files marked hidden in the dashboard stay in the folder but do not appear on the portal.</li>
+  </ul>
+  <p class="path">Blocharch Clients / {client name} /</p>
+
+  <h2>2. Google Cloud</h2>
+  <ol>
+    <li>Open <strong>Google Cloud Console</strong> and select the Blocharch project (or create one).</li>
+    <li>Go to <strong>APIs &amp; Services → Library</strong>.</li>
+    <li>Enable <strong>Google Drive API</strong>. Leave <strong>Google Calendar API</strong> enabled as well.</li>
+    <li>Open <strong>OAuth consent screen</strong>.</li>
+    <li>Add these scopes:
+      <ul>
+        <li><code>https://www.googleapis.com/auth/calendar</code></li>
+        <li><code>https://www.googleapis.com/auth/calendar.events</code></li>
+        <li><code>https://www.googleapis.com/auth/drive</code></li>
+      </ul>
+    </li>
+    <li>If the app is in Testing, add the Google account you will sign in with as a test user.</li>
+  </ol>
+  <div class="warn">An existing calendar refresh token does not include Drive. You must sign in again after adding the Drive scope.</div>
+
+  <h2>3. OAuth client</h2>
+  <ol>
+    <li><strong>APIs &amp; Services → Credentials → Create credentials → OAuth client ID</strong>.</li>
+    <li>Application type: <strong>Web application</strong>.</li>
+    <li>Authorized redirect URI — use the live site, not localhost:
+      <ul>
+        <li><code>https://dashboard.blocharch.com/api/google/oauth/callback</code></li>
+        <li><code>https://blocharch.vercel.app/api/google/oauth/callback</code> if you open the console on that host</li>
+      </ul>
+    </li>
+    <li>Copy the Client ID and Client secret into the site environment and redeploy before the next step.</li>
+  </ol>
+
+  <h2>4. Refresh token</h2>
+  <p>On the machine you are using, log in to the console as an admin, then open:</p>
+  <pre>https://dashboard.blocharch.com/api/google/oauth/start</pre>
+  <ol>
+    <li>Google sends you back to the site callback. Stay logged in to Blocharch in that browser.</li>
+    <li>Sign in as the Google account that should own the client folders.</li>
+    <li>Approve Calendar and Drive.</li>
+    <li>The site shows <code>GOOGLE_REFRESH_TOKEN</code>. Copy it into the site environment and redeploy. Use the refresh token, not a short-lived access token.</li>
+  </ol>
+  <div class="note">This works over remote desktop because the callback is on the website. Nothing has to listen on localhost.</div>
+
+  <h2>5. Environment variables</h2>
+  <p>Add these to local <code>.env.local</code> and to the Vercel project for <strong>dashboard.blocharch.com</strong> (Production). Redeploy after saving them on Vercel.</p>
+  <pre>GOOGLE_CLIENT_ID=....apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=GOCSPX-...
+GOOGLE_REFRESH_TOKEN=1//0g...
+GOOGLE_DRIVE_ROOT_FOLDER_ID=</pre>
+  <table>
+    <thead>
+      <tr><th>Variable</th><th>Required</th><th>What it does</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>GOOGLE_CLIENT_ID</code></td><td>Yes</td><td>OAuth client</td></tr>
+      <tr><td><code>GOOGLE_CLIENT_SECRET</code></td><td>Yes</td><td>OAuth client</td></tr>
+      <tr><td><code>GOOGLE_REFRESH_TOKEN</code></td><td>Yes</td><td>Access for Calendar and Drive. Must be issued after the Drive scope was added.</td></tr>
+      <tr><td><code>GOOGLE_DRIVE_ROOT_FOLDER_ID</code></td><td>No</td><td>Use an existing parent folder. Leave empty to create “Blocharch Clients” in that account’s Drive.</td></tr>
+      <tr><td><code>GOOGLE_CALENDAR_ID</code></td><td>No</td><td>Calendar only. Default <code>primary</code>.</td></tr>
+    </tbody>
+  </table>
+  <div class="note">Do not commit these values. If a refresh token is exposed, open <code>/api/google/oauth/start</code> again and replace it.</div>
+
+  <h2>6. How files move</h2>
+  <ul>
+    <li><strong>Dashboard → Private project → Documents.</strong> Upload a PDF, image, Word, or Excel file (up to 50 MB). It is saved in that client’s Drive folder. It stays off the portal until “show on client portal” is checked.</li>
+    <li><strong>Client portal → Actions.</strong> The client can drop a file. It is saved in the same folder and is visible on the portal.</li>
+    <li><strong>Drive itself.</strong> Anything placed directly in the client folder appears on the portal the next time the project or portal is opened. Removing a file from Drive removes it from the portal list.</li>
+    <li><strong>Downloads and previews</strong> are read from Drive. They are not stored as public website files.</li>
+  </ul>
+  <p>Until the three required variables are set, dashboard uploads stay on the server and the portal upload tells you Drive is not connected.</p>
+
+  <h2>7. Check that it works</h2>
+  <ol>
+    <li>Restart the app locally, or wait for the Vercel deploy.</li>
+    <li>Open a private project in the dashboard and upload a small PDF with “show on client portal” checked.</li>
+    <li>In Google Drive, confirm <strong>Blocharch Clients / {client name}</strong> contains that file.</li>
+    <li>Open the client portal (<code>/private/{slug}</code>) and confirm the file is under Documents and can be downloaded.</li>
+    <li>Drop a second file into that Drive folder, refresh the portal, and confirm it appears.</li>
+    <li>Uncheck the portal flag on the dashboard file, refresh the portal, and confirm that file is hidden. It should still be in Drive.</li>
+  </ol>
+
+  <h2>8. If something fails</h2>
+  <ul>
+    <li><strong>Insufficient permissions / access denied.</strong> The refresh token was created before Drive was added. Open <code>/api/google/oauth/start</code> again and replace <code>GOOGLE_REFRESH_TOKEN</code>.</li>
+    <li><strong>Google Drive is not connected.</strong> One of the three required variables is missing in the environment that is actually running (local vs Vercel).</li>
+    <li><strong>Upload works locally and fails on the live site.</strong> The Vercel project does not have the variables, or Production was not redeployed after they were added.</li>
+    <li><strong>Redirect URI mismatch.</strong> The host in the browser must match a redirect URI on the OAuth client, for example <code>https://dashboard.blocharch.com/api/google/oauth/callback</code>.</li>
+    <li><strong>Wrong Drive account.</strong> When Google asks you to sign in, use the account that should own the client folders.</li>
+  </ul>
+
+  <footer>Blocharch · Google Drive setup · private client folders</footer>
+</body>
+</html>

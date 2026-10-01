@@ -146,5 +146,6 @@ export const config = {
     "/api/ops/:path*",
     "/api/athlete/:path*",
     "/api/private/:path*",
+    "/api/google/:path*",
   ],
 };
