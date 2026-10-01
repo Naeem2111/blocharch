@@ -4,23 +4,19 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { OpsProjectPhase } from "@prisma/client";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
 import { DueDateCalendar } from "@/components/ops/DueDateCalendar";
-import { ProjectProgressBar } from "@/components/ProjectProgressBar";
+import { OpsProjectCardBody, OpsProjectCardFrame } from "@/components/ops/OpsProjectCard";
 import { asAvatarTextTone } from "@/lib/avatar-text-tone";
 import {
   COMPLEXITY_LABELS,
-  displayProjectStageLabel,
   PROJECT_STATUS_LABELS,
   projectStageSelectValue,
 } from "@/lib/ops-constants";
 import { catalogValueFromId } from "@/lib/ops-catalog-types";
 import { useOpsCatalog } from "@/lib/use-ops-catalog";
-import { daysUntilDueFromIso, projectDueColor } from "@/lib/project-color-scale";
-import { computeProjectTimeline } from "@/lib/project-timeline";
 import { formatProjectFullTitle } from "@/lib/project-display";
 import { parseClientDeliverables, type ClientPortalDeliverable } from "@/lib/client-portal-deliverables";
 import { formatHoursCompact } from "@/lib/ops-project-hours";
 import { dueAtFallbackForDateOnly, splitProjectDueAtWallClock } from "@/lib/project-deadline";
-import { ClientPortalAthleteMark } from "@/components/client-portal/ClientPortalAthleteMark";
 import {
   emptyProjectDueFields,
   ProjectDueDateTimeFields,
@@ -100,100 +96,6 @@ function assignmentPayload(athleteIds: string[], primaryAthleteId: string) {
   const ids = Array.from(new Set(athleteIds.filter(Boolean)));
   const primary = primaryAthleteId && ids.includes(primaryAthleteId) ? primaryAthleteId : ids[0] ?? null;
   return { assignedAthleteIds: ids, primaryAthleteId: primary };
-}
-
-function assignedAthleteRows(p: ProjectRow): AssignedAthleteRow[] {
-  if (p.assignedAthletes && p.assignedAthletes.length > 0) return p.assignedAthletes;
-  if (p.assignedAthleteName && p.assignedAthleteId) {
-    return [
-      {
-        athleteId: p.assignedAthleteId,
-        fullName: p.assignedAthleteName,
-        athleteCode: p.athleteCode ?? "",
-        isPrimary: true,
-      },
-    ];
-  }
-  return [];
-}
-
-function formatAssignedAthletes(p: ProjectRow) {
-  const rows = assignedAthleteRows(p);
-  if (rows.length === 0) return "Unassigned";
-  return rows
-    .map((a) => (a.isPrimary ? `${a.fullName} (primary)` : a.fullName))
-    .join(", ");
-}
-
-function athleteInitials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? "")
-    .join("");
-}
-
-function formatShortDate(iso: string | null | undefined): string {
-  if (!iso) return "";
-  const day = iso.slice(0, 10);
-  const d = new Date(`${day}T12:00:00`);
-  if (Number.isNaN(d.getTime())) return day;
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-}
-
-function LanePill({ n }: { n: number }) {
-  return (
-    <span className="client-portal-lane-pill rounded border border-white/[0.1] bg-white/[0.04] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-      Lane {n}
-    </span>
-  );
-}
-
-function statusBadgeColor(status: string): string {
-  if (status === "completed" || status === "handed_over") return "#22c55e";
-  if (status === "waiting_on_feedback" || status === "zoom_required") return "#eab308";
-  if (status === "blocked") return "#ef4444";
-  if (status === "not_started") return "#94a3b8";
-  return "#38bdf8";
-}
-
-function OpsStatusBadge({ label, color }: { label: string; color: string }) {
-  return (
-    <span
-      className="inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide"
-      style={{
-        backgroundColor: `${color}22`,
-        color,
-        borderColor: `${color}44`,
-      }}
-    >
-      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
-      {label}
-    </span>
-  );
-}
-
-function ProjectHoursCorner({
-  hoursLogged,
-  quotedHours,
-}: {
-  hoursLogged: number;
-  quotedHours: number | null | undefined;
-}) {
-  const logged = formatHoursCompact(hoursLogged);
-  const quoted = quotedHours != null && quotedHours > 0 ? formatHoursCompact(quotedHours) : null;
-  const over = quoted != null && hoursLogged > Number(quotedHours);
-  return (
-    <div className="shrink-0 text-right">
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-        Hours to date / total
-      </p>
-      <p className={`mt-0.5 text-sm font-semibold tabular-nums ${over ? "text-amber-300" : "text-white"}`}>
-        {quoted ? `${logged} / ${quoted}h` : `${logged}h`}
-      </p>
-    </div>
-  );
 }
 
 function AthleteAssignmentsEditor({
@@ -536,23 +438,8 @@ export function OpsProjectsClient() {
   }
 
   function renderProjectCard(p: ProjectRow) {
-    const timeline = computeProjectTimeline({
-      startDate: p.startDate,
-      dueDate: p.dueDate,
-    });
-    const daysUntil = daysUntilDueFromIso(p.dueAt ?? p.dueDate);
-    const accent = projectDueColor(daysUntil);
-
     return (
-      <article
-        key={p.id}
-        className="client-portal-card relative overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.03] p-4"
-      >
-        <span
-          className="pointer-events-none absolute bottom-0 left-0 top-0 w-[3px] rounded-l-xl"
-          style={{ backgroundColor: accent }}
-          aria-hidden
-        />
+      <OpsProjectCardFrame key={p.id} dueDate={p.dueDate} dueAt={p.dueAt}>
         {editingId === p.id ? (
           <div className="grid gap-3 md:grid-cols-2">
             <label className="text-xs text-slate-400">
@@ -826,122 +713,9 @@ export function OpsProjectsClient() {
             </div>
           </div>
         ) : (
-          <div className="pl-1">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h2 className="font-semibold text-white">
-                  {p.displayTitle ?? formatProjectFullTitle(p.name, p.currentStage)}
-                </h2>
-                {p.address ? <p className="mt-0.5 text-xs text-slate-500">{p.address}</p> : null}
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <OpsStatusBadge
-                  label={PROJECT_STATUS_LABELS[p.currentStatus]}
-                  color={statusBadgeColor(p.currentStatus)}
-                />
-                <span className="rounded-md bg-white/[0.06] px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                  {COMPLEXITY_LABELS[p.complexity]}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => startEdit(p)}
-                  className="text-xs font-medium text-brand-300 hover:text-brand-200"
-                >
-                  Edit
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-3 grid grid-cols-1 items-center gap-2 sm:grid-cols-[1fr_auto_1fr]">
-              <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-slate-400">
-                <span>
-                  Stage{" "}
-                  <span className="text-slate-300">
-                    {p.stageLabel ?? displayProjectStageLabel(p.currentStage)}
-                  </span>
-                </span>
-                {p.laneNumber != null ? (
-                  <>
-                    <span className="text-slate-600">·</span>
-                    <LanePill n={p.laneNumber} />
-                  </>
-                ) : null}
-                {timeline.daysActive != null ? (
-                  <>
-                    <span className="text-slate-600">·</span>
-                    <span>{timeline.daysActive} days active</span>
-                  </>
-                ) : null}
-              </div>
-              <p className="text-center text-xs tabular-nums text-slate-400">
-                {p.startDate || p.dueDate || p.dueAt ? (
-                  <>
-                    {p.startDate ? formatShortDate(p.startDate) : "TBC"}
-                    {" — "}
-                    <span className="font-semibold" style={{ color: accent }}>
-                      {p.dueDate || p.dueAt ? formatShortDate(p.dueAt ?? p.dueDate) : "TBC"}
-                    </span>
-                  </>
-                ) : (
-                  <span className="text-slate-500">Dates to be confirmed</span>
-                )}
-              </p>
-              <span className="hidden sm:block" aria-hidden />
-            </div>
-
-            <div className="mt-3 flex items-center gap-3">
-              <div className="min-w-0 flex-1">
-                <ProjectProgressBar percent={p.progressPercent ?? 0} showLabel={false} />
-              </div>
-              <span className="shrink-0 text-xs tabular-nums text-slate-400">
-                {p.progressPercent ?? 0}%
-              </span>
-            </div>
-
-            <div className="mt-4 flex flex-wrap items-end justify-between gap-3">
-              {(() => {
-                const athletes = assignedAthleteRows(p);
-                if (athletes.length === 0) {
-                  return (
-                    <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
-                      Athlete to be assigned
-                    </span>
-                  );
-                }
-                return (
-                  <div className="min-w-0">
-                    <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-300">
-                      <ClientPortalAthleteMark />
-                      Athlete assigned
-                    </span>
-                    <div className="mt-1.5 flex min-w-0 items-center gap-2">
-                      <div className="flex shrink-0 -space-x-1.5">
-                        {athletes.slice(0, 4).map((a, i) => (
-                          <span
-                            key={a.athleteId}
-                            title={a.fullName}
-                            className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold ring-2 ring-[#0f131a] ${
-                              a.isPrimary || i === 0
-                                ? "bg-sky-500/25 text-sky-200"
-                                : "bg-white/[0.08] text-slate-300"
-                            }`}
-                          >
-                            {athleteInitials(a.fullName)}
-                          </span>
-                        ))}
-                      </div>
-                      <p className="min-w-0 truncate text-xs text-slate-400">
-                        {formatAssignedAthletes(p)}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })()}
-              <ProjectHoursCorner hoursLogged={p.hoursLogged ?? 0} quotedHours={p.quotedHours} />
-            </div>
-          </div>
+          <OpsProjectCardBody project={p} onEdit={() => startEdit(p)} />
         )}
-      </article>
+      </OpsProjectCardFrame>
     );
   }
 
