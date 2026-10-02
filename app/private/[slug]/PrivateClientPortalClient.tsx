@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import type { PrivateDesignStage } from "@prisma/client";
 import { ClientPortalBrandMark } from "@/components/client-portal/ClientPortalBrandMark";
-import { PublicThemeToggle } from "@/components/client-portal/PublicThemeToggle";
 import { PRIVATE_STAGE_CLIENT_COPY } from "@/lib/private-constants";
 
 type PortalData = NonNullable<
@@ -79,14 +78,43 @@ function linkKind(url: string | null): "zoom" | "pinterest" | "link" {
   return "link";
 }
 
-function splitLinkLabel(label: string) {
+function splitLinkLabel(label: string, url?: string | null) {
   const parts = label.split(/\s+[|—–-]\s+/);
-  if (parts.length < 2) return { title: label, subtitle: "Open link" };
+  if (parts.length < 2) {
+    let subtitle = "Open link";
+    if (url) {
+      try {
+        subtitle = new URL(url).host.replace(/^www\./, "");
+      } catch {
+        subtitle = "Open link";
+      }
+    }
+    return { title: label, subtitle };
+  }
   return { title: parts[0]!, subtitle: parts.slice(1).join(" · ") };
 }
 
 function stageBody(stage: PrivateDesignStage) {
   return STAGE_BODY[stage] ?? PRIVATE_STAGE_CLIENT_COPY[stage].current;
+}
+
+function displayAddress(value: string) {
+  const titled = value
+    .toLowerCase()
+    .replace(/(^|\s)([a-z])/g, (_, space: string, letter: string) => space + letter.toUpperCase());
+  return titled.replace(/\b(\d+)([a-z])\b/g, (_, digits: string, letter: string) => digits + letter.toUpperCase());
+}
+
+function descriptionForCard(text: string) {
+  return text
+    .split("\n")
+    .filter((line) => {
+      const trimmed = line.trim().replace(/^[*•-]\s+/, "").replace(/^🔗\s*/, "");
+      if (!trimmed) return false;
+      if (/^https?:\/\//i.test(trimmed)) return false;
+      return true;
+    })
+    .join("\n");
 }
 
 function typeLine(label: string) {
@@ -106,7 +134,7 @@ function DescriptionBody({ text }: { text: string }) {
     if (line.trim()) blocks.push({ type: "p", lines: [line.trim()] });
   }
   return (
-    <div className="mt-3 space-y-3 text-sm leading-relaxed text-slate-300">
+    <div className="space-y-2 text-sm leading-relaxed text-slate-300">
       {blocks.map((block, i) =>
         block.type === "ul" ? (
           <ul key={i} className="list-disc space-y-1 pl-5">
@@ -123,7 +151,7 @@ function DescriptionBody({ text }: { text: string }) {
 }
 
 function cardClass() {
-  return "rounded-2xl border border-white/[0.08] bg-white/[0.03]";
+  return "rounded-2xl border border-white/[0.08] bg-[#0c1524]";
 }
 
 export function PrivateClientPortalClient({ slug, data }: { slug: string; data: PortalData }) {
@@ -304,14 +332,14 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
   }
 
   return (
-    <div className="flex min-h-screen bg-[var(--bg-page)] text-slate-100">
-      <aside className="sticky top-0 hidden h-screen w-[17.5rem] shrink-0 flex-col border-r border-white/[0.06] bg-[#070d18] lg:flex">
+    <div className="flex min-h-screen bg-[#071018] text-slate-100">
+      <aside className="sticky top-0 hidden h-screen w-[16.5rem] shrink-0 flex-col border-r border-white/[0.06] bg-[#08101c] lg:flex">
         <div className="px-5 pb-2 pt-5">
           <ClientPortalBrandMark />
         </div>
         <ProjectArt />
         <div className="px-5 pb-6 pt-4">
-          <p className="text-sm font-semibold leading-snug text-white">{project.address}</p>
+          <p className="text-sm font-semibold leading-snug text-white">{displayAddress(project.address)}</p>
           <p className="mt-2 text-xs leading-relaxed text-slate-400">{subtitle}</p>
         </div>
         <p className="px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">Your project</p>
@@ -330,8 +358,7 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
       </aside>
 
       <div className="min-w-0 flex-1">
-        <header className="flex items-center justify-end gap-2 px-4 py-4 sm:px-8">
-          <PublicThemeToggle />
+        <header className="flex items-center justify-end gap-2 px-4 py-3 sm:px-8">
           <div className="relative">
             <button
               type="button"
@@ -475,9 +502,9 @@ function PageHeading({
 }) {
   const label = view === "actions" ? "Actions" : view === "documents" ? "Documents" : view === "journey" ? "Project journey" : null;
   return (
-    <div className="mb-6">
+    <div className="mb-5">
       {label ? <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-sky-300">{label}</p> : null}
-      <h1 className="mt-1 text-3xl font-semibold tracking-tight text-white sm:text-4xl">{address}</h1>
+      <h1 className="text-[1.7rem] font-semibold tracking-tight text-white sm:text-[2rem]">{displayAddress(address)}</h1>
       <p className="mt-1 text-sm text-slate-400">{subtitle}</p>
     </div>
   );
@@ -513,30 +540,32 @@ function Overview({
   subtitle: string;
 }) {
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-3">
         <Metric icon="cal" label="Brief received" value={formatDate(project.briefReceivedAt)} />
         <Metric icon="dot" label="Current stage" value={current?.label ?? project.designStageLabel} hint={current ? `Step ${current.number} of ${stages.length}` : undefined} />
         <Metric icon="cal" label="Target next stage" value={next?.label ?? "—"} hint={next?.dateFrom ? formatDate(next.dateFrom) : "To be confirmed"} />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-3">
-        <section className={`${cardClass()} p-5`}>
-          <h2 className="text-sm font-semibold text-white">Project description</h2>
-          <DescriptionBody
-            text={
-              project.clientDescription?.trim() ||
-              `Your Blocharch client portal gives you a live view of this ${subtitle.toLowerCase()}. Track the current stage, open actions, and documents as they are shared.`
-            }
-          />
+      <div className="grid items-stretch gap-3 xl:grid-cols-3">
+        <section className={`${cardClass()} flex h-52 flex-col p-4`}>
+          <CardTitle icon="doc">Project description</CardTitle>
+          <div className="mt-3 min-h-0 flex-1 overflow-y-auto pr-1">
+            <DescriptionBody
+              text={descriptionForCard(
+                project.clientDescription?.trim() ||
+                  `Your Blocharch client portal gives you a live view of this ${subtitle.toLowerCase()}. Track the current stage, open actions, and documents as they are shared.`,
+              )}
+            />
+          </div>
         </section>
-        <section className={`${cardClass()} p-5`}>
-          <h2 className="text-sm font-semibold text-white">Quick links</h2>
+        <section className={`${cardClass()} flex h-52 flex-col p-4`}>
+          <CardTitle icon="link">Quick links</CardTitle>
           <p className="mt-1 text-xs text-slate-500">Access important project resources.</p>
-          <ul className="mt-4 space-y-3">
+          <ul className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto">
             {project.clientLinks.length === 0 ? <li className="text-sm text-slate-500">Links will appear here once they are added.</li> : null}
             {project.clientLinks.map((link, i) => {
-              const parts = splitLinkLabel(link.label);
+              const parts = splitLinkLabel(link.label.replace(/^🔗\s*/, ""), link.url);
               const kind = linkKind(link.url);
               return (
                 <li key={`${link.label}-${i}`}>
@@ -553,14 +582,14 @@ function Overview({
             })}
           </ul>
         </section>
-        <section className={`${cardClass()} p-5`}>
-          <h2 className="text-sm font-semibold text-white">Project team</h2>
+        <section className={`${cardClass()} flex h-52 flex-col p-4`}>
+          <CardTitle icon="team">Project team</CardTitle>
           <p className="mt-1 text-xs text-slate-500">Your main points of contact.</p>
-          <ul className="mt-4 space-y-3">
+          <ul className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto">
             {project.team.length === 0 ? <li className="text-sm text-slate-500">The project team will appear here once assigned.</li> : null}
             {project.team.map((member) => (
               <li key={member.id} className="flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.06] text-xs font-semibold text-slate-200">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-xs font-semibold text-slate-200 ring-1 ring-white/10">
                   {member.initials}
                 </span>
                 <span className="min-w-0 flex-1">
@@ -579,29 +608,29 @@ function Overview({
       </div>
 
       {current ? (
-        <section className={`${cardClass()} p-5 sm:p-6`}>
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_16rem]">
+        <section className="private-portal-hero rounded-2xl p-5 sm:p-6">
+          <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_14rem] sm:items-start">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-300">Current stage</p>
-              <h2 className="mt-2 text-2xl font-semibold text-white">{current.label}</h2>
-              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+              <h2 className="mt-1.5 text-xl font-semibold text-white sm:text-2xl">{current.label}</h2>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
                 <span className="rounded-full bg-sky-500/15 px-2.5 py-0.5 text-sky-200 ring-1 ring-sky-400/30">In progress</span>
                 <span className="text-slate-400">Step {current.number} of {stages.length}</span>
               </div>
-              <StageRail stages={stages} />
             </div>
-            <div className="lg:border-l lg:border-white/[0.08] lg:pl-6">
+            <div className="sm:text-right">
               <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">Up next</p>
-              <p className="mt-2 text-lg font-semibold text-white">{next?.label ?? "—"}</p>
+              <p className="mt-1.5 text-base font-semibold text-white">{next?.label ?? "—"}</p>
               <p className="mt-1 text-sm text-slate-500">Target date: {next?.dateFrom ? formatDate(next.dateFrom) : "To be confirmed"}</p>
             </div>
           </div>
+          <StageRail stages={stages} />
         </section>
       ) : null}
 
       <div className="grid gap-4 xl:grid-cols-3">
         <section className={`${cardClass()} p-5`}>
-          <h2 className="text-sm font-semibold text-white">Recent updates</h2>
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-white"><span className="text-emerald-400"><ClockMini /></span>Recent updates</h2>
           <p className="mt-1 text-xs text-slate-500">The latest activity on your project.</p>
           <ul className="mt-4 space-y-3">
             {updates.length === 0 ? <li className="text-sm text-slate-500">Updates will show here as they are published.</li> : null}
@@ -615,7 +644,7 @@ function Overview({
           </ul>
         </section>
         <section className={`${cardClass()} p-5`}>
-          <h2 className="text-sm font-semibold text-white">Required from you</h2>
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-white"><span className="text-sky-300"><CheckMini /></span>Required from you</h2>
           <p className="mt-1 text-xs text-slate-500">Actions and information we need from you.</p>
           <ul className="mt-4 space-y-3">
             {actionItems.length === 0 ? <li className="text-sm text-slate-500">Nothing is waiting on you right now.</li> : null}
@@ -650,7 +679,7 @@ function Overview({
           ) : null}
         </section>
         <section className={`${cardClass()} p-5`}>
-          <h2 className="text-sm font-semibold text-white">Files for download</h2>
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-white"><span className="text-slate-300"><FolderMini /></span>Files for download</h2>
           <p className="mt-1 text-xs text-slate-500">Access and download important project documents.</p>
           <ul className="mt-4 space-y-3">
             {documents.length === 0 ? <li className="text-sm text-slate-500">Documents will appear here when they are shared.</li> : null}
@@ -701,7 +730,7 @@ function Journey({
           {stages.map((stage) => (
             <li key={stage.key} className="flex gap-4">
               <StageDot stage={stage} />
-              <div className={`min-w-0 flex-1 ${stage.state === "current" ? "rounded-xl bg-sky-500/10 px-3 py-2 ring-1 ring-sky-400/30" : ""}`}>
+              <div className={`min-w-0 flex-1 ${stage.state === "current" ? "private-portal-timeline-current rounded-xl px-3 py-2" : ""}`}>
                 <div className="flex items-start justify-between gap-3">
                   <p className="font-medium text-white">{stage.label}</p>
                   <p className="shrink-0 text-xs text-slate-500">
@@ -724,7 +753,7 @@ function Journey({
         </ol>
       </section>
       <div className="space-y-4">
-        <section className={`${cardClass()} p-5`}>
+        <section className="private-portal-hero rounded-2xl p-5">
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Current stage details</p>
             <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[11px] text-sky-200">In progress</span>
@@ -1044,26 +1073,36 @@ function Documents({
 
 function StageRail({ stages }: { stages: Stage[] }) {
   return (
-    <div className="mt-6 overflow-x-auto">
-      <div className="flex min-w-[40rem] items-start">
+    <div className="mt-5 overflow-x-auto">
+      <div className="flex min-w-[36rem] items-start">
         {stages.map((stage, i) => (
           <div key={stage.key} className="flex min-w-0 flex-1 flex-col items-center">
             <div className="flex w-full items-center">
-              {i > 0 ? <div className={`h-0.5 flex-1 ${stages[i - 1]?.state === "done" ? "bg-emerald-400" : "bg-white/10"}`} /> : <div className="flex-1" />}
+              {i > 0 ? (
+                <div className={`h-[3px] flex-1 rounded-full ${stages[i - 1]?.state === "done" ? "bg-emerald-400" : "bg-white/10"}`} />
+              ) : (
+                <div className="flex-1" />
+              )}
               <div
-                className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold ${
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${
                   stage.state === "done"
                     ? "bg-emerald-500 text-slate-950"
                     : stage.state === "current"
-                      ? "bg-sky-500 text-slate-950"
-                      : "bg-white/10 text-slate-400"
+                      ? "bg-sky-400 text-slate-950 shadow-[0_0_16px_rgba(56,189,248,0.75)] ring-4 ring-sky-400/40"
+                      : "border border-white/15 bg-[#0c1524] text-slate-400"
                 }`}
               >
                 {stage.state === "done" ? "✓" : stage.number}
               </div>
-              {i < stages.length - 1 ? <div className={`h-0.5 flex-1 ${stage.state === "done" ? "bg-emerald-400" : "bg-white/10"}`} /> : <div className="flex-1" />}
+              {i < stages.length - 1 ? (
+                <div className={`h-[3px] flex-1 rounded-full ${stage.state === "done" ? "bg-emerald-400" : "bg-white/10"}`} />
+              ) : (
+                <div className="flex-1" />
+              )}
             </div>
-            <p className="mt-2 px-1 text-center text-[10px] leading-tight text-slate-400">{stage.label}</p>
+            <p className={`mt-2 px-1 text-center text-[10px] leading-tight ${stage.state === "current" ? "font-medium text-white" : "text-slate-500"}`}>
+              {stage.label}
+            </p>
           </div>
         ))}
       </div>
@@ -1084,13 +1123,58 @@ function StageDot({ stage }: { stage: Stage }) {
 function Metric({ icon, label, value, hint }: { icon: "cal" | "dot"; label: string; value: string; hint?: string }) {
   return (
     <div className={`${cardClass()} flex items-center gap-3 px-4 py-3`}>
-      <span className="text-slate-400">{icon === "dot" ? <span className="inline-block h-2.5 w-2.5 rounded-full bg-sky-400" /> : <span className="text-sm">📅</span>}</span>
-      <span>
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.04] text-slate-300">
+        {icon === "dot" ? <span className="h-2.5 w-2.5 rounded-full bg-sky-400" /> : <CalIcon />}
+      </span>
+      <span className="min-w-0">
         <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</span>
-        <span className="block text-sm font-medium text-white">{value}</span>
-        {hint ? <span className="block text-xs text-slate-500">{hint}</span> : null}
+        <span className="block truncate text-sm font-semibold text-white">{value}</span>
+        {hint ? <span className="block truncate text-xs text-slate-500">{hint}</span> : null}
       </span>
     </div>
+  );
+}
+
+function CardTitle({ icon, children }: { icon: "doc" | "link" | "team"; children: string }) {
+  return (
+    <h2 className="flex items-center gap-2 text-sm font-semibold text-white">
+      <span className="text-slate-400">
+        {icon === "doc" ? <DocMini /> : icon === "link" ? <LinkMini /> : <TeamMini />}
+      </span>
+      {children}
+    </h2>
+  );
+}
+
+function CalIcon() {
+  return (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.6} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3.75 8.25h16.5M4.5 6.75h15A.75.75 0 0120.25 7.5v12a.75.75 0 01-.75.75h-15a.75.75 0 01-.75-.75v-12a.75.75 0 01.75-.75z" />
+    </svg>
+  );
+}
+
+function DocMini() {
+  return (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.6} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+    </svg>
+  );
+}
+
+function LinkMini() {
+  return (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.6} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+    </svg>
+  );
+}
+
+function TeamMini() {
+  return (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.6} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+    </svg>
   );
 }
 
@@ -1111,7 +1195,7 @@ function NavButton({
     <button
       type="button"
       onClick={onClick}
-      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm ${active ? "bg-sky-500/20 text-white" : "text-slate-400 hover:bg-white/[0.04] hover:text-slate-200"}`}
+      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm ${active ? "bg-sky-600 text-white" : "text-slate-400 hover:bg-white/[0.04] hover:text-slate-200"}`}
     >
       <NavIcon name={icon} />
       <span className="flex-1 text-left">{label}</span>
@@ -1126,19 +1210,51 @@ function Count({ n, hot }: { n: number; hot?: boolean }) {
 
 function ProjectArt() {
   return (
-    <div className="mx-4 mt-3 overflow-hidden rounded-2xl bg-gradient-to-b from-sky-400 to-sky-700" aria-hidden>
-      <svg viewBox="0 0 240 132" className="h-28 w-full">
-        <rect x="18" y="58" width="150" height="62" rx="4" fill="#f8fafc" />
-        <polygon points="12,62 93,28 174,62" fill="#1e3a8a" />
-        <rect x="78" y="78" width="36" height="42" fill="#0f172a" />
-        <rect x="36" y="74" width="28" height="22" fill="#38bdf8" />
-        <rect x="124" y="74" width="28" height="22" fill="#38bdf8" />
-        <circle cx="196" cy="96" r="18" fill="#fbbf24" />
-        <rect x="168" y="96" width="56" height="22" rx="6" fill="#e2e8f0" />
-        <circle cx="182" cy="118" r="6" fill="#0f172a" />
-        <circle cx="210" cy="118" r="6" fill="#0f172a" />
+    <div className="mx-4 mt-2 overflow-hidden rounded-2xl" aria-hidden>
+      <svg viewBox="0 0 280 150" className="h-[7.25rem] w-full">
+        <defs>
+          <linearGradient id="portal-sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#7eb6e8" />
+            <stop offset="55%" stopColor="#c5d7ea" />
+            <stop offset="100%" stopColor="#e7eef4" />
+          </linearGradient>
+        </defs>
+        <rect width="280" height="150" fill="url(#portal-sky)" />
+        <rect x="0" y="118" width="280" height="32" fill="#d5ddd4" />
+        <rect x="36" y="62" width="168" height="72" fill="#f4f7fb" />
+        <rect x="36" y="54" width="168" height="12" fill="#ffffff" />
+        <rect x="48" y="74" width="46" height="34" fill="#8eb4d4" />
+        <rect x="102" y="74" width="46" height="34" fill="#7aa6c8" />
+        <rect x="156" y="74" width="36" height="60" fill="#1f3348" />
+        <rect x="214" y="78" width="42" height="48" fill="#e8eef3" />
+        <rect x="222" y="88" width="14" height="16" fill="#9bb8d0" />
+        <rect x="240" y="88" width="10" height="16" fill="#9bb8d0" />
       </svg>
     </div>
+  );
+}
+
+function ClockMini() {
+  return (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.6} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  );
+}
+
+function CheckMini() {
+  return (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.6} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  );
+}
+
+function FolderMini() {
+  return (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.6} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6.75v10.5A2.25 2.25 0 004.5 19.5h15a2.25 2.25 0 002.25-2.25V11.25a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+    </svg>
   );
 }
 

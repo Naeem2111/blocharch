@@ -915,10 +915,12 @@ html[data-theme="light"] .client-portal-shell .text-slate-600 {
 
 .private-portal-hero {
   background:
-    radial-gradient(ellipse 90% 80% at 8% 0%, rgb(6 182 212 / 0.14), transparent 52%),
-    rgb(255 255 255 / 0.03);
-  border: 1px solid rgb(34 211 238 / 0.16);
-  box-shadow: inset 0 1px 0 rgb(34 211 238 / 0.08);
+    radial-gradient(ellipse 70% 130% at 0% 0%, rgb(34 211 238 / 0.28), transparent 58%),
+    #0c1524;
+  border: 1px solid rgb(34 211 238 / 0.42);
+  box-shadow:
+    inset 1px 1px 0 rgb(103 232 249 / 0.45),
+    0 0 28px rgb(34 211 238 / 0.1);
 }
 
 .private-portal-rail-current,
