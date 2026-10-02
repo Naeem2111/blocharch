@@ -9,12 +9,7 @@ export function ComplexityBadge({ value, label }: { value: string; label: string
   return (
     <span
       className="inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold"
-      style={{
-        backgroundColor: tone.background,
-        borderColor: tone.border,
-        color: tone.color,
-        boxShadow: `0 0 14px ${tone.border}`,
-      }}
+      style={{ backgroundColor: tone.background, borderColor: tone.border, color: tone.color }}
     >
       {label}
     </span>

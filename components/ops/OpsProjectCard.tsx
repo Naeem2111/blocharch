@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import type { OpsProjectPhase } from "@prisma/client";
 import { ClientPortalAthleteMark } from "@/components/client-portal/ClientPortalAthleteMark";
-import { ComplexityBadge } from "@/components/ops/ComplexityBadge";
 import { ProjectProgressBar } from "@/components/ProjectProgressBar";
 import {
   COMPLEXITY_LABELS,
@@ -55,18 +54,11 @@ export function OpsProjectCardFrame({
   return (
     <article className="client-portal-card relative overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.03] p-4">
       <span
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background: `radial-gradient(ellipse 90% 160% at 0% 45%, ${accent}38, transparent 62%)`,
-        }}
+        className="pointer-events-none absolute bottom-0 left-0 top-0 w-[3px] rounded-l-xl"
+        style={{ backgroundColor: accent }}
         aria-hidden
       />
-      <span
-        className="pointer-events-none absolute bottom-0 left-0 top-0 z-[1] w-[3px] rounded-l-xl"
-        style={{ backgroundColor: accent, boxShadow: `0 0 14px ${accent}88` }}
-        aria-hidden
-      />
-      <div className="relative z-[1]">{children}</div>
+      {children}
     </article>
   );
 }
@@ -130,10 +122,9 @@ function OpsStatusBadge({ label, color }: { label: string; color: string }) {
     <span
       className="inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide"
       style={{
-        backgroundColor: `${color}28`,
+        backgroundColor: `${color}22`,
         color,
-        borderColor: `${color}66`,
-        boxShadow: `0 0 16px ${color}40`,
+        borderColor: `${color}44`,
       }}
     >
       <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
@@ -192,8 +183,8 @@ export function OpsProjectCardBody({
             label={PROJECT_STATUS_LABELS[project.currentStatus]}
             color={statusBadgeColor(project.currentStatus)}
           />
-          <span className="uppercase tracking-wide">
-            <ComplexityBadge value={project.complexity} label={COMPLEXITY_LABELS[project.complexity]} />
+          <span className="rounded-md bg-white/[0.06] px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+            {COMPLEXITY_LABELS[project.complexity]}
           </span>
           {onEdit ? (
             <button
