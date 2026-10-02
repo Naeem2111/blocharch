@@ -98,9 +98,10 @@ function StatusBadge({
 		<span
 			className="client-portal-status-badge inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide"
 			style={{
-				backgroundColor: `${color}22`,
+				backgroundColor: `${color}28`,
 				color,
-				borderColor: `${color}44`,
+				borderColor: `${color}66`,
+				boxShadow: `0 0 16px ${color}40`,
 			}}
 		>
 			<span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
@@ -188,11 +189,18 @@ function ProjectCard({
 	return (
 		<article className="client-portal-card relative overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.03] p-4">
 			<span
-				className="pointer-events-none absolute bottom-0 left-0 top-0 w-[3px] rounded-l-xl"
-				style={{ backgroundColor: accent }}
+				className="pointer-events-none absolute inset-0"
+				style={{
+					background: `radial-gradient(ellipse 90% 160% at 0% 45%, ${accent}38, transparent 62%)`,
+				}}
 				aria-hidden
 			/>
-			<div className="flex items-start justify-between gap-3 pl-1">
+			<span
+				className="pointer-events-none absolute bottom-0 left-0 top-0 z-[1] w-[3px] rounded-l-xl"
+				style={{ backgroundColor: accent, boxShadow: `0 0 14px ${accent}88` }}
+				aria-hidden
+			/>
+			<div className="relative z-[1] flex items-start justify-between gap-3 pl-1">
 				<div className="min-w-0">
 					<h3 className="font-semibold text-white">{project.name}</h3>
 					{project.address ? <p className="mt-0.5 text-xs text-slate-500">{project.address}</p> : null}
@@ -230,11 +238,18 @@ function PipelineCard({ project }: { project: PublicClientPortalPipelineProject 
 	return (
 		<article className="client-portal-card relative overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.03] p-4">
 			<span
-				className="pointer-events-none absolute bottom-0 left-0 top-0 w-[3px] rounded-l-xl"
-				style={{ backgroundColor: PIPELINE_PURPLE }}
+				className="pointer-events-none absolute inset-0"
+				style={{
+					background: `radial-gradient(ellipse 90% 160% at 0% 45%, ${PIPELINE_PURPLE}38, transparent 62%)`,
+				}}
 				aria-hidden
 			/>
-			<div className="flex items-start justify-between gap-3 pl-1">
+			<span
+				className="pointer-events-none absolute bottom-0 left-0 top-0 z-[1] w-[3px] rounded-l-xl"
+				style={{ backgroundColor: PIPELINE_PURPLE, boxShadow: `0 0 14px ${PIPELINE_PURPLE}88` }}
+				aria-hidden
+			/>
+			<div className="relative z-[1] flex items-start justify-between gap-3 pl-1">
 				<div className="min-w-0">
 					<h3 className="font-semibold text-white">{project.name}</h3>
 					{project.address ? <p className="mt-0.5 text-xs text-slate-500">{project.address}</p> : null}
