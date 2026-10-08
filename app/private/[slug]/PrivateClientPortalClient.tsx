@@ -71,10 +71,10 @@ function documentCategory(title: string) {
   return "Other";
 }
 
-function linkKind(url: string | null): "zoom" | "pinterest" | "link" {
-  const value = (url ?? "").toLowerCase();
-  if (value.includes("zoom.")) return "zoom";
-  if (value.includes("pinterest.") || value.includes("pin.it")) return "pinterest";
+function linkKind(url: string | null, label?: string): "zoom" | "pinterest" | "link" {
+  const value = `${url ?? ""} ${label ?? ""}`.toLowerCase();
+  if (/\bzoom\b|zoom\.us|zoom\.com|zoomgov\.com/.test(value)) return "zoom";
+  if (/pinterest|pin\.it/.test(value)) return "pinterest";
   return "link";
 }
 
@@ -569,7 +569,7 @@ function Overview({
             {project.clientLinks.length === 0 ? <li className="text-sm text-slate-500">Links will appear here once they are added.</li> : null}
             {project.clientLinks.map((link, i) => {
               const parts = splitLinkLabel(link.label.replace(/^🔗\s*/, ""), link.url);
-              const kind = linkKind(link.url);
+              const kind = linkKind(link.url, link.label);
               return (
                 <li key={`${link.label}-${i}`}>
                   <a href={link.url ?? "#"} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3">
@@ -1266,9 +1266,34 @@ function PdfBadge() {
 }
 
 function LinkGlyph({ kind }: { kind: "zoom" | "pinterest" | "link" }) {
-  const cls = kind === "pinterest" ? "bg-red-500" : "bg-sky-500";
-  const mark = kind === "pinterest" ? "P" : kind === "zoom" ? "▶" : "↗";
-  return <span className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold text-white ${cls}`}>{mark}</span>;
+  if (kind === "pinterest") {
+    return (
+      <svg viewBox="0 0 24 24" className="h-9 w-9 shrink-0" aria-hidden>
+        <circle cx="12" cy="12" r="12" fill="#E60023" />
+        <path
+          fill="#fff"
+          d="M12.1 5.4c-3.2 0-4.9 2.2-4.9 4.6 0 1.3.5 2.4 1.5 2.8.2.1.3 0 .3-.2l.2-.6c0-.1 0-.2-.1-.3-.3-.3-.4-.8-.4-1.4 0-1.8 1.4-3.6 3.7-3.6 2 0 3.4 1.2 3.4 3.2 0 2.4-1.1 4.1-2.6 4.1-.8 0-1.4-.7-1.2-1.5.2-1 .7-2 .7-2.7 0-.6-.3-1.2-1.1-1.2-.8 0-1.5.9-1.5 2 0 .7.2 1.2.2 1.2l-1 4.1c-.3 1.2-.1 2.6 0 2.8.1.1.1 0 .2-.1.2-.3.8-1.1 1.1-2.1.1-.3.4-1.6.4-1.6.3.5 1 1 1.8 1 2.3 0 4-2.1 4-4.8 0-2.1-1.8-4-4.6-4z"
+        />
+      </svg>
+    );
+  }
+  if (kind === "zoom") {
+    return (
+      <svg viewBox="0 0 24 24" className="h-9 w-9 shrink-0" aria-hidden>
+        <rect width="24" height="24" rx="7" fill="#2D8CFF" />
+        <path
+          fill="#fff"
+          d="M4.8 8.4c0-.8.6-1.4 1.4-1.4h7.2c.8 0 1.4.6 1.4 1.4v7.2c0 .8-.6 1.4-1.4 1.4H6.2c-.8 0-1.4-.6-1.4-1.4V8.4z"
+        />
+        <path fill="#fff" d="M16.2 10.1 19.6 8v8l-3.4-2.1v-3.8z" />
+      </svg>
+    );
+  }
+  return (
+    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-500 text-xs font-bold text-white">
+      ↗
+    </span>
+  );
 }
 
 function BellIcon() {
