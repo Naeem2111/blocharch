@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import { loadTemplates, saveTemplates } from "@/lib/templates";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const templates = loadTemplates();
   return Response.json(templates);

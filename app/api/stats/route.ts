@@ -1,5 +1,7 @@
 import { loadArchitects } from "@/lib/architects";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const architects = await loadArchitects();
   const total = architects.length;
