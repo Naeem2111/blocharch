@@ -68,6 +68,38 @@ type PastSubmission = {
   }>;
 };
 
+function formsFromSubmission(sub: PastSubmission): LineItemForm[] {
+  return sub.lineItems.map((li) => ({
+    key: crypto.randomUUID(),
+    isHousekeeping: !!li.isHousekeeping,
+    clientId: li.isHousekeeping ? (li.clientId ?? "") : "",
+    projectId: li.projectId ?? "",
+    projectPhase: li.projectPhase,
+    taskTypes:
+      li.taskTypes && li.taskTypes.length > 0
+        ? li.taskTypes
+        : li.taskType
+          ? [li.taskType]
+          : li.isHousekeeping
+            ? ["admin_housekeeping"]
+            : ["plans"],
+    hoursWorked: String(li.hoursWorked),
+    completionPercent: li.completionPercent ?? 0,
+    completedSummary: li.completedSummary ?? "",
+    taskTypeOther: li.taskTypes?.includes("other") && li.notes ? String(li.notes) : "",
+    housekeepingNote: li.isHousekeeping && li.notes ? String(li.notes) : "",
+  }));
+}
+
+function previousLog(subs: PastSubmission[], beforeDate: string): PastSubmission | null {
+  let best: PastSubmission | null = null;
+  for (const sub of subs) {
+    if (sub.submissionDate >= beforeDate || sub.lineItems.length === 0) continue;
+    if (!best || sub.submissionDate > best.submissionDate) best = sub;
+  }
+  return best;
+}
+
 function emptyLine(): LineItemForm {
   return {
     key: crypto.randomUUID(),
@@ -231,6 +263,7 @@ export function AthleteSubmissionsClient() {
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [calendarMonth, setCalendarMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [formLocked, setFormLocked] = useState(false);
+  const [carriedFrom, setCarriedFrom] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [expandedSubmissionIds, setExpandedSubmissionIds] = useState<Set<string>>(new Set());
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
@@ -243,31 +276,8 @@ export function AthleteSubmissionsClient() {
     setIsBackloggedSession(!!sub.isBackloggedSession);
     setCheckInDetailsSubmitted(!!sub.checkInRequested);
     setFormLocked(!sub.editable);
-    setEntryLines(
-      sub.lineItems.length > 0
-        ? sub.lineItems.map((li) => ({
-            key: crypto.randomUUID(),
-            isHousekeeping: !!li.isHousekeeping,
-            clientId: li.isHousekeeping ? (li.clientId ?? "") : "",
-            projectId: li.projectId ?? "",
-            projectPhase: li.projectPhase,
-            taskTypes:
-              li.taskTypes && li.taskTypes.length > 0
-                ? li.taskTypes
-                : li.taskType
-                  ? [li.taskType]
-                  : li.isHousekeeping
-                    ? ["admin_housekeeping"]
-                    : ["plans"],
-            hoursWorked: String(li.hoursWorked),
-            completionPercent: li.completionPercent ?? 0,
-            completedSummary: li.completedSummary ?? "",
-            taskTypeOther:
-              li.taskTypes?.includes("other") && li.notes ? String(li.notes) : "",
-            housekeepingNote: li.isHousekeeping && li.notes ? String(li.notes) : "",
-          }))
-        : []
-    );
+    setEntryLines(sub.lineItems.length > 0 ? formsFromSubmission(sub) : []);
+    setCarriedFrom(null);
     setDraftEntry(null);
     if (notify) setSuccess(notify);
   }
@@ -282,18 +292,35 @@ export function AthleteSubmissionsClient() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function resetToToday() {
+  function beginEmptyDay(date: string, subs: PastSubmission[]) {
     setEditingId(null);
-    setSelectedDate(today);
-    setCalendarMonth(today.slice(0, 7));
+    setFormLocked(false);
     setDailyNote("");
     setIsBackloggedSession(false);
     setCheckInDetailsSubmitted(false);
-    setEntryLines([]);
     setDraftEntry(null);
-    setFormLocked(false);
     setError("");
+    const prev = previousLog(subs, date);
+    if (prev) {
+      setEntryLines(formsFromSubmission(prev));
+      setCarriedFrom(prev.submissionDate);
+    } else {
+      setEntryLines([]);
+      setCarriedFrom(null);
+    }
+  }
+
+  function resetToToday() {
+    setSelectedDate(today);
+    setCalendarMonth(today.slice(0, 7));
     setSuccess("");
+    const todaySub = pastSubmissions.find((s) => s.submissionDate === today);
+    if (todaySub) {
+      applySubmission(todaySub);
+      setError("");
+      return;
+    }
+    beginEmptyDay(today, pastSubmissions);
   }
 
   const load = useCallback(async () => {
@@ -310,6 +337,13 @@ export function AthleteSubmissionsClient() {
       if (sj.monthlyHourCap) setMonthlyHourCap(sj.monthlyHourCap);
       const todaySub = subs.find((s) => s.submissionDate === today);
       if (todaySub?.editable) applySubmission(todaySub);
+      else if (!todaySub) {
+        const prev = previousLog(subs, today);
+        if (prev) {
+          setEntryLines(formsFromSubmission(prev));
+          setCarriedFrom(prev.submissionDate);
+        }
+      }
     }
     setLoading(false);
   }, []);
@@ -358,14 +392,7 @@ export function AthleteSubmissionsClient() {
       applySubmission(sub);
       return;
     }
-    setEditingId(null);
-    setFormLocked(false);
-    setDailyNote("");
-    setIsBackloggedSession(false);
-    setCheckInDetailsSubmitted(false);
-    setEntryLines([]);
-    setDraftEntry(null);
-    setError("");
+    beginEmptyDay(date, pastSubmissions);
   }
 
   const todayHoursPreview =
@@ -534,10 +561,27 @@ export function AthleteSubmissionsClient() {
             onSelectDate={onPickDate}
           />
           <p className="mt-2 text-[10px] text-slate-600">
-            Blue dots = logged days. Tap a day to edit or create an entry.
+            Blue dots = logged days. A blank day starts from your last log so you can edit it and save.
           </p>
         </div>
       </div>
+
+      {carriedFrom && !editingId ? (
+        <p className="rounded-lg border border-brand-500/30 bg-brand-500/10 px-3 py-2 text-sm text-brand-100">
+          Started from your log on {carriedFrom}. Projects, phases, and hours are filled in. Change what
+          was different, then save.
+          <button
+            type="button"
+            onClick={() => {
+              setEntryLines([]);
+              setCarriedFrom(null);
+            }}
+            className="ml-2 underline"
+          >
+            Start blank
+          </button>
+        </p>
+      ) : null}
 
       <div className="card-tool grid gap-4 rounded-xl p-4 md:grid-cols-3">
         <label className="flex items-center gap-2 text-sm text-slate-300 md:col-span-3">

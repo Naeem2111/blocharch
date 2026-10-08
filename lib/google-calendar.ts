@@ -338,12 +338,13 @@ export async function createGoogleCalendarEvent(
 
 export async function patchGoogleCalendarEvent(
   eventId: string,
-  patch: { description?: string; start?: Date; end?: Date }
+  patch: { summary?: string; description?: string; start?: Date; end?: Date }
 ): Promise<void> {
   const config = getGoogleCalendarConfig();
   if (!config) return;
 
   const body: Record<string, unknown> = {};
+  if (patch.summary !== undefined) body.summary = patch.summary;
   if (patch.description !== undefined) body.description = patch.description;
   if (patch.start) body.start = { dateTime: patch.start.toISOString(), timeZone: config.timezone };
   if (patch.end) body.end = { dateTime: patch.end.toISOString(), timeZone: config.timezone };
@@ -357,5 +358,21 @@ export async function patchGoogleCalendarEvent(
   if (!res.ok) {
     const data = (await res.json()) as { error?: { message?: string } };
     throw new Error(data.error?.message || "Failed to update calendar event");
+  }
+}
+
+export async function deleteGoogleCalendarEvent(eventId: string): Promise<void> {
+  const config = getGoogleCalendarConfig();
+  if (!config) return;
+
+  const res = await googleFetch(
+    config,
+    `/calendars/${encodeURIComponent(config.calendarId)}/events/${encodeURIComponent(eventId)}?sendUpdates=none`,
+    { method: "DELETE" }
+  );
+
+  if (!res.ok && res.status !== 404 && res.status !== 410) {
+    const data = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
+    throw new Error(data.error?.message || "Failed to delete calendar event");
   }
 }

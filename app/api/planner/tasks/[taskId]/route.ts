@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { canEditBoard, canViewBoard, requirePlannerSession } from "@/lib/planner-access";
 import { deliverAssignedTaskToAthleteInbox } from "@/lib/planner-assign-to-inbox";
+import { syncPlannerTaskToGoogleCalendar } from "@/lib/planner-calendar-sync";
 import { relocateTaskToLabelLinkedColumn } from "@/lib/planner-label-column";
 
 const TASK_SUMMARY_MAX = 2_000;
@@ -139,6 +140,10 @@ export async function PATCH(request: NextRequest, context: Ctx) {
       task.assigneeId !== before?.assigneeId
     ) {
       await deliverAssignedTaskToAthleteInbox(taskId).catch(() => {});
+    }
+
+    if (task && (body.dueAt !== undefined || body.title !== undefined || body.summary !== undefined || body.description !== undefined)) {
+      await syncPlannerTaskToGoogleCalendar(task.id);
     }
 
     return NextResponse.json({ task });

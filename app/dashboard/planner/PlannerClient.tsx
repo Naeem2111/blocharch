@@ -25,15 +25,7 @@ import {
 } from "@/lib/planner-task-nudge";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
 import { asAvatarTextTone } from "@/lib/avatar-text-tone";
-import {
-  defaultPlannerBoardGroup,
-  filterBoardsByGroup,
-  groupsWithBoards,
-  normalizePlannerBoardGroup,
-  plannerBoardGroup,
-  PLANNER_BOARD_GROUP_LABELS,
-  type PlannerBoardGroup,
-} from "@/lib/planner-board-groups";
+import { plannerBoardGroup, type PlannerBoardGroup } from "@/lib/planner-board-groups";
 import { filterVisiblePlannerBoards } from "@/lib/planner-board-visibility";
 
 const FIXED_BOARD_KINDS = new Set([
@@ -528,8 +520,6 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
     return filterVisiblePlannerBoards(list);
   }, [boards, area, currentUserId, athleteUserId]);
 
-  const availableGroups = useMemo(() => groupsWithBoards(areaBoards), [areaBoards]);
-
   useEffect(() => {
     if (groupParam === "projects") {
       const p = new URLSearchParams(searchParams.toString());
@@ -537,14 +527,6 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
       router.replace(`/dashboard/planner?${p.toString()}`);
     }
   }, [groupParam, searchParams, router]);
-
-  const boardGroup: PlannerBoardGroup = useMemo(() => {
-    const normalized = normalizePlannerBoardGroup(groupParam);
-    if (normalized && availableGroups.includes(normalized)) {
-      return normalized;
-    }
-    return defaultPlannerBoardGroup(areaBoards);
-  }, [groupParam, availableGroups, areaBoards]);
 
   /** Athletes use Project planner (all work boards) vs Blocharch outbox — not Blocharch/Personal stubs. */
   const athletePlannerMode: "planner" | "outbox" =
@@ -557,8 +539,10 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
       }
       return areaBoards.filter((b) => b.kind !== "blocharch_outbox");
     }
-    return filterBoardsByGroup(areaBoards, boardGroup);
-  }, [isAthleteSelfView, athletePlannerMode, areaBoards, boardGroup]);
+    // Staff see every board in this area. The old Blocharch tab only listed empty project
+    // shells and hid the working board that is actually titled BLOCHARCH.
+    return areaBoards;
+  }, [isAthleteSelfView, athletePlannerMode, areaBoards]);
 
   useEffect(() => {
     if (!isAthleteSelfView) return;
@@ -616,15 +600,6 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
     if (params.group) p.set("group", params.group);
     const q = p.toString();
     router.push(q ? `/dashboard/planner?${q}` : "/dashboard/planner");
-    setBoardId(null);
-    setDetail(null);
-    setAllBoardsView(false);
-  }
-
-  function setBoardGroup(next: PlannerBoardGroup) {
-    const p = new URLSearchParams(searchParams.toString());
-    p.set("group", next);
-    router.push(`/dashboard/planner?${p.toString()}`);
     setBoardId(null);
     setDetail(null);
     setAllBoardsView(false);
@@ -1282,7 +1257,7 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
             </>
           ) : null}
         </div>
-        {boardGroup === "personal" ? (
+        {!isAthleteSelfView ? (
           <button
             type="button"
             onClick={() => setNewBoardOpen(true)}
@@ -1294,7 +1269,7 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
       </div>
       ) : null}
 
-      {showBoardPicker && newBoardOpen && boardGroup === "personal" ? (
+      {showBoardPicker && newBoardOpen && !isAthleteSelfView ? (
         <form
           onSubmit={createBoard}
           className="card-tool flex flex-wrap items-end gap-3 rounded-xl p-4"
@@ -1375,23 +1350,6 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
                 </span>
               ) : null}
             </button>
-          </div>
-        ) : availableGroups.length > 1 ? (
-          <div className="flex flex-wrap items-center gap-2">
-            {availableGroups.map((group) => (
-              <button
-                key={group}
-                type="button"
-                onClick={() => setBoardGroup(group)}
-                className={`planner-tab rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                  boardGroup === group
-                    ? "planner-tab-selected border-brand-500/40 bg-brand-500/10 text-brand-100"
-                    : "border-white/[0.08] bg-white/[0.03] text-slate-400 hover:bg-white/[0.06] hover:text-slate-200"
-                }`}
-              >
-                {PLANNER_BOARD_GROUP_LABELS[group]}
-              </button>
-            ))}
           </div>
         ) : null}
         {!isAthleteSelfView ? (
@@ -1485,11 +1443,7 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
           })}
           {filteredBoards.length === 0 ? (
             <p className="text-sm text-slate-500">
-              {isAthleteSelfView
-                ? "No planner boards yet."
-                : boardGroup === "personal"
-                  ? "No personal boards yet — create one to get started."
-                  : "No project boards here yet — assign an ops project to open its kanban under Blocharch."}
+              {isAthleteSelfView ? "No planner boards yet." : "No boards yet — create one to get started."}
             </p>
           ) : null}
         </div>
@@ -1517,7 +1471,7 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
                 setEditTask({ ...task, columnId });
               }}
               onToggleComplete={(taskId, completed) => void toggleTaskCompleted(taskId, completed)}
-              hideFixedBadge={isAthleteSelfView || boardGroup === "blocharch"}
+              hideFixedBadge={isAthleteSelfView}
             />
           ) : (
             <p className="text-sm text-slate-500">No boards to show.</p>
@@ -2807,14 +2761,19 @@ function EditTaskModal({
             </div>
           </div>
           {dueAtDate ? (
-            <a
-              href={googleEventUrl(title, dueAtDate)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-block text-sm text-brand-400 hover:underline"
-            >
-              Open in Google Calendar
-            </a>
+            <div className="space-y-1">
+              <a
+                href={googleEventUrl(title, dueAtDate)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block text-sm text-brand-400 hover:underline"
+              >
+                Open in Google Calendar
+              </a>
+              <p className="text-xs text-slate-500">
+                Saving a due date adds or updates this card on the connected Google Calendar.
+              </p>
+            </div>
           ) : null}
         </div>
         {footerExtra}

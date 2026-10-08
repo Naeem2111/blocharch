@@ -150,152 +150,135 @@ export function PrivateProjectsClient({
   return (
     <div className="space-y-4">
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
-      <div className="card-tool overflow-x-auto rounded-xl">
-        <table className="w-full min-w-[52rem] text-left text-sm">
-          <thead>
-            <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-wider text-slate-500">
-              <th className="px-4 py-3 font-semibold">Project</th>
-              <th className="px-4 py-3 font-semibold">Client</th>
-              <th className="px-4 py-3 font-semibold">Athletes</th>
-              <th className="px-4 py-3 font-semibold">{completed ? "Completed" : "Phase"}</th>
-              {!completed ? <th className="px-4 py-3 font-semibold">Progress</th> : null}
-              <th className="px-4 py-3 font-semibold">Fee</th>
-              <th className="px-4 py-3 font-semibold">Margin</th>
-              <th className="px-4 py-3 font-semibold">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {projects.length === 0 ? (
-              <tr>
-                <td colSpan={completed ? 7 : 8} className="px-4 py-8 text-slate-500">
-                  {completed ? (
-                    "No archived private projects yet."
-                  ) : (
-                    <>
-                      No active private projects.{" "}
-                      <Link href="/dashboard/private/onboarding" className="text-brand-300 hover:underline">
-                        Onboard one
-                      </Link>
-                    </>
-                  )}
-                </td>
-              </tr>
-            ) : (
-              projects.map((p) => (
-                <tr key={p.id} className="border-b border-white/[0.04] align-top">
-                  <td className="px-4 py-3">
+      {projects.length === 0 ? (
+        <p className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-8 text-sm text-slate-500">
+          {completed ? (
+            "No archived private projects yet."
+          ) : (
+            <>
+              No active private projects.{" "}
+              <Link href="/dashboard/private/onboarding" className="text-brand-300 hover:underline">
+                Onboard one
+              </Link>
+            </>
+          )}
+        </p>
+      ) : (
+        <div className="grid gap-3 lg:grid-cols-2">
+          {projects.map((p) => {
+            const athletes = projectAthletes(p);
+            return (
+              <article
+                key={p.id}
+                className="client-portal-card relative overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.03] p-4"
+              >
+                <span
+                  className="pointer-events-none absolute bottom-0 left-0 top-0 w-[3px] rounded-l-xl bg-brand-400"
+                  aria-hidden
+                />
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{p.client.name}</p>
                     <Link
                       href={`/dashboard/private/projects/${p.id}/edit`}
-                      className="font-medium text-white hover:text-brand-300"
+                      className="mt-1 block truncate text-base font-semibold text-white hover:text-brand-300"
                     >
                       {p.name}
                     </Link>
-                  </td>
-                  <td className="px-4 py-3 text-slate-300">{p.client.name}</td>
-                  <td className="px-4 py-3">
-                    <AthleteAvatars athletes={projectAthletes(p)} />
-                  </td>
-                  <td className="px-4 py-3">
-                    {completed ? (
-                      <span className="text-slate-300">{p.completedAt ?? p.designStageLabel}</span>
-                    ) : (
-                      <div ref={stageOpenId === p.id ? stageMenuRef : undefined} className="inline-flex flex-col items-start">
-                        <button
-                          type="button"
-                          disabled={saving}
-                          onClick={() => setStageOpenId(stageOpenId === p.id ? null : p.id)}
-                          className="rounded-lg bg-white/[0.04] px-2.5 py-1.5 text-left text-xs text-slate-200 ring-1 ring-white/[0.08] hover:bg-white/[0.07]"
-                        >
-                          {p.designStageLabel} ▾
-                        </button>
-                        {stageOpenId === p.id ? (
-                          <div className="mt-1 w-64 rounded-lg border border-white/[0.1] bg-[#0f131a] py-1">
-                            {(p.phases && p.phases.length > 0
-                              ? p.phases
-                              : PRIVATE_STAGE_ORDER.map((key) => ({
-                                  phaseId: key,
-                                  label: PRIVATE_STAGE_LABELS[key],
-                                }))
-                            ).map((row) => {
-                              const selected =
-                                row.phaseId === p.currentDesignPhaseId ||
-                                row.phaseId === p.designStage ||
-                                ("stage" in row && row.stage === p.designStage);
-                              return (
-                                <button
-                                  key={row.phaseId}
-                                  type="button"
-                                  className={`block w-full px-3 py-2 text-left text-xs hover:bg-white/[0.06] ${
-                                    selected ? "text-brand-300" : "text-slate-300"
-                                  }`}
-                                  onClick={() => void setStage(p.id, row.phaseId)}
-                                >
-                                  {selected ? "✓ " : ""}
-                                  {row.label}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        ) : null}
-                      </div>
-                    )}
-                  </td>
-                  {!completed ? (
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="h-1.5 w-20 overflow-hidden rounded-full bg-white/[0.08]">
-                          <div
-                            className="h-full rounded-full bg-brand-500"
-                            style={{ width: `${p.progressPercent}%` }}
-                          />
+                  </div>
+                  <AthleteAvatars athletes={athletes} />
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  {completed ? (
+                    <span className="text-xs text-slate-300">{p.completedAt ?? p.designStageLabel}</span>
+                  ) : (
+                    <div ref={stageOpenId === p.id ? stageMenuRef : undefined} className="relative">
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() => setStageOpenId(stageOpenId === p.id ? null : p.id)}
+                        className="rounded-lg bg-white/[0.04] px-2.5 py-1.5 text-left text-xs text-slate-200 ring-1 ring-white/[0.08] hover:bg-white/[0.07]"
+                      >
+                        {p.designStageLabel} ▾
+                      </button>
+                      {stageOpenId === p.id ? (
+                        <div className="absolute z-20 mt-1 w-64 rounded-lg border border-white/[0.1] bg-[#0f131a] py-1 shadow-xl">
+                          {(p.phases && p.phases.length > 0
+                            ? p.phases
+                            : PRIVATE_STAGE_ORDER.map((key) => ({
+                                phaseId: key,
+                                label: PRIVATE_STAGE_LABELS[key],
+                              }))
+                          ).map((row) => {
+                            const selected =
+                              row.phaseId === p.currentDesignPhaseId ||
+                              row.phaseId === p.designStage ||
+                              ("stage" in row && row.stage === p.designStage);
+                            return (
+                              <button
+                                key={row.phaseId}
+                                type="button"
+                                className={`block w-full px-3 py-2 text-left text-xs hover:bg-white/[0.06] ${
+                                  selected ? "text-brand-300" : "text-slate-300"
+                                }`}
+                                onClick={() => void setStage(p.id, row.phaseId)}
+                              >
+                                {selected ? "✓ " : ""}
+                                {row.label}
+                              </button>
+                            );
+                          })}
                         </div>
-                        <span className="tabular-nums text-slate-400">{p.progressPercent}%</span>
-                      </div>
-                    </td>
-                  ) : null}
-                  <td className="px-4 py-3 tabular-nums text-slate-300">{zar(p.feeZar)}</td>
-                  <td className="px-4 py-3 tabular-nums text-slate-300">
-                    {p.marginPercent != null ? `${p.marginPercent}%` : "—"}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-col gap-1.5">
-                      <Link
-                        href={`/dashboard/private/projects/${p.id}`}
-                        className="text-xs text-slate-400 hover:text-brand-300"
-                      >
-                        View
-                      </Link>
-                      <Link
-                        href={`/dashboard/private/projects/${p.id}/expenses`}
-                        className="text-xs text-brand-300 hover:underline"
-                      >
-                        Expenses
-                      </Link>
-                      {completed && canDelete ? (
-                        <button
-                          type="button"
-                          disabled={reactivatingId === p.id}
-                          onClick={() => void reactivate(p)}
-                          className="text-left text-xs text-emerald-300/90 hover:text-emerald-200 disabled:opacity-50"
-                        >
-                          {reactivatingId === p.id ? "Moving…" : "Bring back to active"}
-                        </button>
-                      ) : null}
-                      {canDelete ? (
-                        <PrivateDeleteProjectButton
-                          projectId={p.id}
-                          projectName={p.name}
-                          onDeleted={() => void load()}
-                        />
                       ) : null}
                     </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+                  )}
+                  {!completed ? (
+                    <div className="flex min-w-[8rem] flex-1 items-center gap-2">
+                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.08]">
+                        <div className="h-full rounded-full bg-brand-500" style={{ width: `${p.progressPercent}%` }} />
+                      </div>
+                      <span className="tabular-nums text-xs text-slate-400">{p.progressPercent}%</span>
+                    </div>
+                  ) : null}
+                </div>
+                <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-white/[0.06] pt-3 text-xs">
+                  <div>
+                    <dt className="uppercase tracking-wide text-slate-500">Fee</dt>
+                    <dd className="mt-0.5 tabular-nums text-slate-200">{zar(p.feeZar)}</dd>
+                  </div>
+                  <div>
+                    <dt className="uppercase tracking-wide text-slate-500">Margin</dt>
+                    <dd className="mt-0.5 tabular-nums text-slate-200">
+                      {p.marginPercent != null ? `${p.marginPercent}%` : "—"}
+                    </dd>
+                  </div>
+                </dl>
+                <div className="mt-3 flex flex-wrap gap-3">
+                  <Link href={`/dashboard/private/projects/${p.id}`} className="text-xs text-slate-400 hover:text-brand-300">
+                    View
+                  </Link>
+                  <Link href={`/dashboard/private/projects/${p.id}/expenses`} className="text-xs text-brand-300 hover:underline">
+                    Expenses
+                  </Link>
+                  {completed && canDelete ? (
+                    <button
+                      type="button"
+                      disabled={reactivatingId === p.id}
+                      onClick={() => void reactivate(p)}
+                      className="text-xs text-emerald-300/90 hover:text-emerald-200 disabled:opacity-50"
+                    >
+                      {reactivatingId === p.id ? "Moving…" : "Bring back to active"}
+                    </button>
+                  ) : null}
+                  {canDelete ? (
+                    <PrivateDeleteProjectButton projectId={p.id} projectName={p.name} onDeleted={() => void load()} />
+                  ) : null}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

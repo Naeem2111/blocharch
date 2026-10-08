@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { canEditBoard, requirePlannerSession } from "@/lib/planner-access";
 import { deliverAssignedTaskToAthleteInbox } from "@/lib/planner-assign-to-inbox";
+import { syncPlannerTaskToGoogleCalendar } from "@/lib/planner-calendar-sync";
 
 const TASK_SUMMARY_MAX = 2_000;
 const TASK_DESCRIPTION_MAX = 50_000;
@@ -81,6 +82,9 @@ export async function POST(request: NextRequest) {
 
     if (full?.assigneeId) {
       await deliverAssignedTaskToAthleteInbox(full.id).catch(() => {});
+    }
+    if (full?.dueAt) {
+      await syncPlannerTaskToGoogleCalendar(full.id);
     }
 
     return NextResponse.json({ task: full }, { status: 201 });
