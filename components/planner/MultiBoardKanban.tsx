@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useRef, useState } from "react";
 import type { KanbanBoardDetail, KanbanTaskRow } from "@/lib/planner-board-mutation";
+import { formatPlannerDue } from "@/lib/planner-due-datetime";
 import { KanbanTaskMovePad } from "@/components/planner/KanbanTaskMovePad";
 import { PlannerDoneToggle } from "@/components/planner/PlannerDoneToggle";
 import { taskNudgeAvailability, type NudgeDirection } from "@/lib/planner-task-nudge";
@@ -236,6 +237,7 @@ export function MultiBoardKanban({
                           : null;
 
                       const isSelected = selectedTaskId === t.id;
+                      const dueLabel = formatPlannerDue(t.dueAt);
 
                       return (
                         <Fragment key={t.id}>
@@ -341,6 +343,9 @@ export function MultiBoardKanban({
                               ) : null}
                               <div className="min-w-0 flex-1">
                                 <p className="font-medium text-slate-100">{t.title}</p>
+                                {dueLabel ? (
+                                  <p className="mt-1 text-[11px] font-medium text-slate-300">Due {dueLabel}</p>
+                                ) : null}
                                 {taskCardDescriptionPreview(t.description) ? (
                                   <p className="mt-1 line-clamp-2 text-[11px] text-slate-500">
                                     {taskCardDescriptionPreview(t.description)}

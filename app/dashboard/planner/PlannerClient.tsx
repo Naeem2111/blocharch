@@ -2,7 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { composeDueAtIso, splitDueAtIso } from "@/lib/planner-due-datetime";
+import { composeDueAtIso, formatPlannerDue, splitDueAtIso } from "@/lib/planner-due-datetime";
 import { KanbanTaskMovePad } from "@/components/planner/KanbanTaskMovePad";
 import { BlocharchOutboxPanel } from "@/components/planner/BlocharchOutboxPanel";
 import { MultiBoardKanban } from "@/components/planner/MultiBoardKanban";
@@ -1657,6 +1657,7 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
                 >
                   {col.tasks.map((t) => {
                     const descPreview = taskCardDescriptionPreview(t.summary, t.description);
+                    const dueLabel = formatPlannerDue(t.dueAt);
                     const showDoneTick =
                       detail.editable &&
                       completedColumnId !== null &&
@@ -1849,6 +1850,9 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
                           ) : null}
                           <div className="min-w-0 flex-1">
                             <p className="font-medium text-white">{t.title}</p>
+                            {dueLabel ? (
+                              <p className="mt-1 text-[11px] font-medium text-slate-300">Due {dueLabel}</p>
+                            ) : null}
                             {t.linkedFromTaskId ? (
                               <p className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-brand-400/85">
                                 From another board · edit your personal copy here
@@ -2502,7 +2506,7 @@ function TaskFormModal({
             Due date
             <input
               type="date"
-              className="select-console mt-1 w-full rounded-lg px-3 py-2 text-sm"
+              className="field-console mt-1 w-full rounded-lg px-3 py-2 text-sm"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
             />
@@ -2558,7 +2562,9 @@ function TaskFormModal({
             type="button"
             onClick={async () => {
               if (!title.trim()) return;
-              const dueIso = composeDueAtIso(dueDate, dueTime, dueAmPm);
+              const dueIso = composeDueAtIso(dueDate, dueTime, dueAmPm, {
+                dateOnlyDefaultsToNineAm: true,
+              });
               await onSave({
                 title: title.trim(),
                 summary: summary.trim() || null,
@@ -2609,9 +2615,11 @@ function EditTaskModal({
   const [dueTime, setDueTime] = useState(initialDue.time);
   const [dueAmPm, setDueAmPm] = useState<"AM" | "PM">(initialDue.ampm);
   const [labelIds, setLabelIds] = useState(task.labels.map((x) => x.label.id));
+  const dueEditedRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
+    dueEditedRef.current = false;
     setTaskLoading(true);
     fetch(`/api/planner/tasks/${encodeURIComponent(task.id)}`)
       .then(async (r) => {
@@ -2623,6 +2631,7 @@ function EditTaskModal({
         setDescription(full.description || "");
         setAssigneeId(full.assigneeId || "");
         setLabelIds(full.labels.map((x) => x.label.id));
+        if (dueEditedRef.current) return;
         const due = splitDueAtIso(full.dueAt);
         setDueDate(due.date);
         setDueTime(due.time);
@@ -2636,7 +2645,10 @@ function EditTaskModal({
     };
   }, [task.id]);
 
-  const dueAtDate = task.dueAt ? new Date(task.dueAt) : null;
+  const pendingDueIso = composeDueAtIso(dueDate, dueTime, dueAmPm, {
+    dateOnlyDefaultsToNineAm: true,
+  });
+  const dueAtDate = pendingDueIso ? new Date(pendingDueIso) : null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="dialog">
@@ -2706,11 +2718,19 @@ function EditTaskModal({
             Due date
             <input
               type="date"
-              className="select-console mt-1 w-full rounded-lg px-3 py-2 text-sm disabled:opacity-60"
+              className="field-console mt-1 w-full rounded-lg px-3 py-2 text-sm disabled:opacity-60"
               value={dueDate}
               disabled={readOnly}
-              onChange={(e) => setDueDate(e.target.value)}
+              onChange={(e) => {
+                dueEditedRef.current = true;
+                setDueDate(e.target.value);
+              }}
             />
+            {dueDate && !dueTime.trim() ? (
+              <span className="mt-1 block text-[11px] text-slate-500">
+                No time entered, so this saves at 9:00 {dueAmPm}.
+              </span>
+            ) : null}
           </label>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="block text-slate-400">
@@ -2721,7 +2741,10 @@ function EditTaskModal({
                 className="select-console mt-1 w-full rounded-lg px-3 py-2 text-sm disabled:opacity-60"
                 value={dueTime}
                 disabled={readOnly}
-                onChange={(e) => setDueTime(e.target.value)}
+                onChange={(e) => {
+                  dueEditedRef.current = true;
+                  setDueTime(e.target.value);
+                }}
               />
             </label>
             <label className="block text-slate-400">
@@ -2730,7 +2753,10 @@ function EditTaskModal({
                 className="select-console mt-1 w-full rounded-lg px-3 py-2 text-sm disabled:opacity-60"
                 value={dueAmPm}
                 disabled={readOnly}
-                onChange={(e) => setDueAmPm(e.target.value as "AM" | "PM")}
+                onChange={(e) => {
+                  dueEditedRef.current = true;
+                  setDueAmPm(e.target.value as "AM" | "PM");
+                }}
               >
                 <option value="AM">AM</option>
                 <option value="PM">PM</option>
@@ -2797,7 +2823,9 @@ function EditTaskModal({
               <button
                 type="button"
                 onClick={async () => {
-                  const dueIso = composeDueAtIso(dueDate, dueTime, dueAmPm);
+                  const dueIso = composeDueAtIso(dueDate, dueTime, dueAmPm, {
+                    dateOnlyDefaultsToNineAm: true,
+                  });
                   await onSave(task.id, {
                     title: title.trim(),
                     summary: summary.trim() || null,

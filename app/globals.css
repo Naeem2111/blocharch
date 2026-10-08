@@ -227,6 +227,11 @@
   border-color: rgb(203 213 225 / 0.95) !important;
 }
 
+input[type="date"],
+input[type="month"] {
+  color-scheme: dark;
+}
+
 [data-theme="light"] input[type="date"],
 [data-theme="light"] input[type="month"] {
   color-scheme: light;
