@@ -5,6 +5,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { canDeletePrivateProject, requirePrivateOpsSession } from "@/lib/private-access";
 import { removePrivateProjectUploads } from "@/lib/private-document-storage";
+import { deleteDriveFile } from "@/lib/google-drive";
 import { isPrivateDesignStage } from "@/lib/private-constants";
 import { PRIVATE_STAGE_LABELS } from "@/lib/private-constants";
 import { serializePrivateProject } from "@/lib/private-serialize";
@@ -498,6 +499,7 @@ export async function DELETE(
     where: { id: params.id },
     select: {
       id: true,
+      portalImageDriveFileId: true,
       client: { select: { slug: true, portalEnabled: true } },
     },
   });
@@ -507,6 +509,9 @@ export async function DELETE(
 
   try {
     await prisma.privateProject.delete({ where: { id: project.id } });
+    if (project.portalImageDriveFileId) {
+      await deleteDriveFile(project.portalImageDriveFileId).catch(() => {});
+    }
     await removePrivateProjectUploads(project.id);
     revalidatePath("/dashboard/private");
     revalidatePath("/dashboard/private/projects");

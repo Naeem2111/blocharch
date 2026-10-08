@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { PrivateDeleteProjectButton } from "@/components/private/PrivateDeleteProjectButton";
+import { PrivateProjectSidebarImage } from "@/components/private/PrivateProjectSidebarImage";
 import {
   PRIVATE_STAGE_LABELS,
   PRIVATE_STAGE_ORDER,
@@ -34,6 +35,7 @@ type Detail = {
     stageNotes: string | null;
     clientDescription: string | null;
     clientLinks?: ClientPortalDeliverable[];
+    sidebarImageUrl?: string | null;
     dueDate: string | null;
     briefReceivedAt: string | null;
     councilSubmittedAt: string | null;
@@ -121,6 +123,7 @@ export function PrivateProjectDetailClient({
   const [updateVisible, setUpdateVisible] = useState(false);
   const [clientDescription, setClientDescription] = useState("");
   const [clientLinks, setClientLinks] = useState<ClientPortalDeliverable[]>([]);
+  const [sidebarImageUrl, setSidebarImageUrl] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const r = await fetch(`/api/private/projects/${projectId}`);
@@ -137,6 +140,7 @@ export function PrivateProjectDetailClient({
     setNotes(j.project.stageNotes ?? "");
     setClientDescription(j.project.clientDescription ?? "");
     setClientLinks(parseClientDeliverables(j.project.clientLinks));
+    setSidebarImageUrl(j.project.sidebarImageUrl ?? null);
     const titles: Record<string, string> = {};
     for (const a of (j.actionItems as Detail["actionItems"]).filter((x) => !x.completedAt)) {
       titles[a.id] = a.title;
@@ -536,6 +540,14 @@ export function PrivateProjectDetailClient({
             >
               + Add link
             </button>
+          </div>
+
+          <div className="mt-5">
+            <PrivateProjectSidebarImage
+              projectId={projectId}
+              imageUrl={sidebarImageUrl}
+              onChange={setSidebarImageUrl}
+            />
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-3">

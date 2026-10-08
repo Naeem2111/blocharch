@@ -46,6 +46,7 @@ export async function syncClientDriveDocuments(client: ClientRef, projectId: str
   const seen = new Set(files.map((file) => file.id));
 
   for (const file of files) {
+    if (file.kind === "portal-sidebar") continue;
     const existing = await prisma.privateProjectDocument.findUnique({ where: { driveFileId: file.id } });
     if (existing) {
       if (existing.originalName !== file.name || existing.sizeBytes !== file.sizeBytes || existing.mimeType !== file.mimeType) {

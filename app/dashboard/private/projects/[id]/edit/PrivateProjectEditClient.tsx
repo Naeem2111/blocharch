@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PrivateDeleteProjectButton } from "@/components/private/PrivateDeleteProjectButton";
 import { PrivateProjectDocuments } from "@/components/private/PrivateProjectDocuments";
+import { PrivateProjectSidebarImage } from "@/components/private/PrivateProjectSidebarImage";
 import { ProgressSlider } from "@/components/ProgressSlider";
 import { AthleteAssignmentsEditor } from "@/components/AthleteAssignmentsEditor";
 import { PRIVATE_FIXED_FEE_EXPENSE_LABEL, PRIVATE_STAGE_LABELS, PRIVATE_STAGE_ORDER } from "@/lib/private-constants";
@@ -88,6 +89,7 @@ type ProjectPayload = {
   stageNotes: string | null;
   clientDescription: string | null;
   clientLinks?: Array<{ label: string; url: string | null }>;
+  sidebarImageUrl?: string | null;
   dueDate: string | null;
   briefReceivedAt: string | null;
   councilSubmittedAt: string | null;
@@ -131,6 +133,7 @@ export function PrivateProjectEditClient({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [sidebarImageUrl, setSidebarImageUrl] = useState<string | null>(null);
   const [useManualProgress, setUseManualProgress] = useState(false);
   const [phaseFeePercents, setPhaseFeePercents] = useState<PhaseSplitMap>(() =>
     defaultPhaseSplits(defaultPhaseStructure()),
@@ -216,6 +219,7 @@ export function PrivateProjectEditClient({
       briefReceivedAt: p.briefReceivedAt ?? "",
       councilSubmittedAt: p.councilSubmittedAt ?? "",
     });
+    setSidebarImageUrl(p.sidebarImageUrl ?? null);
     setLoading(false);
   }, [projectId]);
 
@@ -484,6 +488,11 @@ export function PrivateProjectEditClient({
               placeholder="Short bio / brief for this project — shown on the client portal."
             />
           </label>
+          <PrivateProjectSidebarImage
+            projectId={projectId}
+            imageUrl={sidebarImageUrl}
+            onChange={setSidebarImageUrl}
+          />
           <div>
             <p className="text-xs text-slate-400">Project links</p>
             <p className="mt-1 text-[11px] text-slate-500">

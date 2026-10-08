@@ -891,6 +891,11 @@ model PrivateProject {
   clientDescription String?            @map("client_description") @db.Text
   /** Client-facing links (Zoom, Pinterest, etc.) — label + url, shown under description. */
   clientLinks     Json?                @map("client_links")
+  /** Local path for the portal sidebar photo, when Drive is not connected. */
+  portalImageUrl  String?              @map("portal_image_url")
+  /** Google Drive file for the portal sidebar photo. */
+  portalImageDriveFileId String?       @map("portal_image_drive_file_id")
+  portalImageMimeType String?          @map("portal_image_mime_type")
   dueDate         DateTime?            @map("due_date") @db.Date
   briefReceivedAt DateTime?            @map("brief_received_at") @db.Date
   councilSubmittedAt DateTime?         @map("council_submitted_at") @db.Date

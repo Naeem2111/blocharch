@@ -18,6 +18,7 @@ import { parseClientDeliverables } from "@/lib/client-portal-deliverables";
 import { resolvePrivateProjectTypeLabel } from "@/lib/private-project-types";
 import { isGoogleDriveConfigured } from "@/lib/google-drive";
 import { portalDocumentPath, syncClientDriveDocuments } from "@/lib/private-drive-documents";
+import { hasSidebarImage, portalSidebarImagePath } from "@/lib/private-sidebar-image";
 
 export async function getPublicPrivateProjectBySlug(slug: string) {
   const client = await prisma.privateClient.findFirst({
@@ -219,6 +220,10 @@ export async function getPublicPrivateProjectBySlug(slug: string) {
       projectTypeLabel: resolvePrivateProjectTypeLabel(project.projectType, project.customProjectType),
       clientDescription: project.clientDescription,
       clientLinks: parseClientDeliverables(project.clientLinks),
+      sidebarImageUrl:
+        hasSidebarImage(project) && client.slug
+          ? portalSidebarImagePath(client.slug, project.updatedAt)
+          : null,
       team: assignedTeam,
       estCouncilDecision,
       updatedAt: project.updatedAt.toISOString().slice(0, 10),

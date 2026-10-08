@@ -12,6 +12,7 @@ import {
 } from "@/lib/private-phase-splits";
 import { resolvePhaseStructure, resolveCurrentDesignPhase } from "@/lib/private-phase-structure";
 import { isoDateOnly, parseStageDateMap, resolveStageDates } from "@/lib/private-stage-dates";
+import { hasSidebarImage, staffSidebarImagePath } from "@/lib/private-sidebar-image";
 
 type SerializedAthlete = {
   id: string;
@@ -119,6 +120,7 @@ export function serializePrivateProject(
     stageNotes: p.stageNotes,
     clientDescription: p.clientDescription,
     clientLinks: parseClientDeliverables(p.clientLinks),
+    sidebarImageUrl: hasSidebarImage(p) ? staffSidebarImagePath(p.id, p.updatedAt) : null,
     dueDate: p.dueDate?.toISOString().slice(0, 10) ?? null,
     briefReceivedAt: p.briefReceivedAt?.toISOString().slice(0, 10) ?? null,
     councilSubmittedAt: p.councilSubmittedAt?.toISOString().slice(0, 10) ?? null,

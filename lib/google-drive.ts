@@ -18,6 +18,7 @@ export type DriveFile = {
   mimeType: string;
   sizeBytes: number;
   clientVisible: boolean;
+  kind: string | null;
 };
 
 type TokenCache = { token: string; expiresAt: number };
@@ -170,7 +171,7 @@ export async function listClientDriveFiles(folderId: string): Promise<DriveFile[
         name: string;
         mimeType?: string;
         size?: string;
-        appProperties?: { clientVisible?: string };
+        appProperties?: { clientVisible?: string; blocharchKind?: string };
       }>;
     };
     for (const file of data.files ?? []) {
@@ -180,6 +181,7 @@ export async function listClientDriveFiles(folderId: string): Promise<DriveFile[
         mimeType: file.mimeType || "application/octet-stream",
         sizeBytes: Number(file.size || 0) || 0,
         clientVisible: file.appProperties?.clientVisible !== "false",
+        kind: file.appProperties?.blocharchKind ?? null,
       });
     }
     pageToken = data.nextPageToken ?? "";
@@ -195,6 +197,7 @@ export async function createResumableUpload(input: {
   clientVisible: boolean;
   clientId: string;
   projectId: string;
+  kind?: string;
 }): Promise<string> {
   const res = await driveFetch(
     "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true&fields=id",
@@ -212,6 +215,7 @@ export async function createResumableUpload(input: {
           blocharchClientId: input.clientId,
           blocharchProjectId: input.projectId,
           clientVisible: input.clientVisible ? "true" : "false",
+          ...(input.kind ? { blocharchKind: input.kind } : {}),
         },
       }),
     },
@@ -230,6 +234,7 @@ export async function uploadDriveFile(input: {
   clientVisible: boolean;
   clientId: string;
   projectId: string;
+  kind?: string;
 }): Promise<{ id: string; sizeBytes: number }> {
   const boundary = `blocarch_${crypto.randomUUID().replace(/-/g, "")}`;
   const meta = JSON.stringify({
@@ -239,6 +244,7 @@ export async function uploadDriveFile(input: {
       blocharchClientId: input.clientId,
       blocharchProjectId: input.projectId,
       clientVisible: input.clientVisible ? "true" : "false",
+      ...(input.kind ? { blocharchKind: input.kind } : {}),
     },
   });
   const body = Buffer.concat([
@@ -273,7 +279,7 @@ export async function assertFileInFolder(fileId: string, folderId: string): Prom
     size?: string;
     parents?: string[];
     trashed?: boolean;
-    appProperties?: { clientVisible?: string };
+    appProperties?: { clientVisible?: string; blocharchKind?: string };
   };
   if (data.trashed || !data.parents?.includes(folderId)) {
     throw new Error("File is not in this client's Drive folder");
@@ -284,6 +290,7 @@ export async function assertFileInFolder(fileId: string, folderId: string): Prom
     mimeType: data.mimeType || "application/octet-stream",
     sizeBytes: Number(data.size || 0) || 0,
     clientVisible: data.appProperties?.clientVisible !== "false",
+    kind: data.appProperties?.blocharchKind ?? null,
   };
 }
 

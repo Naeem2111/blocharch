@@ -93,6 +93,20 @@ export async function savePrivateDocumentFile(
   return `${PRIVATE_DOCUMENT_PUBLIC_DIR}/${projectId}/${safe}`;
 }
 
+export async function savePrivateSidebarImage(projectId: string, ext: string, bytes: Buffer): Promise<string> {
+  const dir = uploadsDir(projectId);
+  await fs.mkdir(dir, { recursive: true });
+  const entries = await fs.readdir(dir).catch(() => [] as string[]);
+  await Promise.all(
+    entries
+      .filter((name) => name.startsWith("sidebar."))
+      .map((name) => fs.unlink(path.join(dir, name)).catch(() => {})),
+  );
+  const safe = `sidebar${ext}`;
+  await fs.writeFile(path.join(dir, safe), bytes);
+  return `${PRIVATE_DOCUMENT_PUBLIC_DIR}/${projectId}/${safe}`;
+}
+
 export async function removePrivateDocumentFile(fileUrl: string): Promise<void> {
   if (!fileUrl.startsWith(`${PRIVATE_DOCUMENT_PUBLIC_DIR}/`)) return;
   const rel = fileUrl.slice(1);

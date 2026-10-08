@@ -340,7 +340,7 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
         <div className="px-5 pb-2 pt-5">
           <ClientPortalBrandMark />
         </div>
-        <ProjectArt />
+        <ProjectArt src={project.sidebarImageUrl} />
         <div className="px-5 pb-6 pt-4">
           <p className="text-sm font-semibold leading-snug text-white">{displayAddress(project.address)}</p>
           <p className="mt-2 text-xs leading-relaxed text-slate-400">{subtitle}</p>
@@ -1211,7 +1211,16 @@ function Count({ n, hot }: { n: number; hot?: boolean }) {
   return <span className={`ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] ${hot ? "bg-red-500 text-white" : "bg-white/10 text-slate-300"}`}>{n}</span>;
 }
 
-function ProjectArt() {
+function ProjectArt({ src }: { src: string | null }) {
+  if (src) {
+    return (
+      <div className="mx-4 mt-2 overflow-hidden rounded-2xl">
+        {/* User-uploaded project photo served by this app. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={src} alt="" className="h-[7.25rem] w-full object-cover" />
+      </div>
+    );
+  }
   return (
     <div className="mx-4 mt-2 overflow-hidden rounded-2xl" aria-hidden>
       <svg viewBox="0 0 280 150" className="h-[7.25rem] w-full">
