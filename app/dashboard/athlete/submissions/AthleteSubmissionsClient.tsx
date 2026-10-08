@@ -91,6 +91,39 @@ function formsFromSubmission(sub: PastSubmission): LineItemForm[] {
   }));
 }
 
+function previousCompletionNotes(
+  subs: PastSubmission[],
+  projectId: string,
+  excludeDate: string,
+): Array<{ key: string; label: string; text: string }> {
+  const rows: Array<{ date: string; text: string; sameProject: boolean }> = [];
+  for (const sub of subs) {
+    if (sub.submissionDate === excludeDate) continue;
+    for (const li of sub.lineItems) {
+      const text = (li.completedSummary ?? "").trim();
+      if (!text || li.isHousekeeping) continue;
+      rows.push({
+        date: sub.submissionDate,
+        text,
+        sameProject: !!projectId && li.projectId === projectId,
+      });
+    }
+  }
+  rows.sort((a, b) => b.date.localeCompare(a.date));
+  const forProject = rows.filter((row) => row.sameProject);
+  const source = forProject.length > 0 ? forProject : rows;
+  const seen = new Set<string>();
+  const options: Array<{ key: string; label: string; text: string }> = [];
+  for (const row of source) {
+    if (seen.has(row.text)) continue;
+    seen.add(row.text);
+    const short = row.text.length > 72 ? `${row.text.slice(0, 69)}…` : row.text;
+    options.push({ key: `${row.date}:${options.length}`, label: `${row.date} — ${short}`, text: row.text });
+    if (options.length >= 20) break;
+  }
+  return options;
+}
+
 function previousLog(subs: PastSubmission[], beforeDate: string): PastSubmission | null {
   let best: PastSubmission | null = null;
   for (const sub of subs) {
@@ -792,6 +825,7 @@ export function AthleteSubmissionsClient() {
           }
 
           const project = projects.find((p) => p.id === li.projectId);
+          const previousNotes = previousCompletionNotes(pastSubmissions, li.projectId, selectedDate);
           return (
             <div
               key={li.key}
@@ -923,15 +957,35 @@ export function AthleteSubmissionsClient() {
                   }
                 />
               </div>
-              <label className="text-xs text-slate-400 md:col-span-2">
-                What was completed
-                <textarea
-                  value={li.completedSummary}
-                  onChange={(e) => updateLine(li.key, { completedSummary: e.target.value })}
-                  rows={2}
-                  className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
-                />
-              </label>
+              <div className="md:col-span-2">
+                <label className="text-xs text-slate-400">
+                  What was completed
+                  {previousNotes.length > 0 && !formLocked ? (
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        const picked = previousNotes.find((note) => note.key === e.target.value);
+                        if (picked) updateLine(li.key, { completedSummary: picked.text });
+                      }}
+                      className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
+                    >
+                      <option value="">Fill from a previous submission…</option>
+                      {previousNotes.map((note) => (
+                        <option key={note.key} value={note.key}>
+                          {note.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : null}
+                  <textarea
+                    value={li.completedSummary}
+                    disabled={formLocked}
+                    onChange={(e) => updateLine(li.key, { completedSummary: e.target.value })}
+                    rows={2}
+                    className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+                  />
+                </label>
+              </div>
               {isDraft ? (
                 <div className="flex flex-wrap gap-2 md:col-span-2">
                   <button
