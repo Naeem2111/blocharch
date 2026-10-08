@@ -8,7 +8,7 @@ import {
   recordCompletedDriveUpload,
   saveDocumentToClientDrive,
 } from "@/lib/private-drive-documents";
-import { isAllowedPrivateDocumentMime } from "@/lib/private-document-storage";
+import { resolvePrivateDocumentMime } from "@/lib/private-document-storage";
 
 async function projectForSlug(slug: string) {
   const client = await prisma.privateClient.findFirst({
@@ -71,13 +71,16 @@ export async function POST(
     }
 
     const name = String(body.name || "Document").slice(0, 200);
-    const mimeType = String(body.mimeType || "application/octet-stream");
+    const mimeType = resolvePrivateDocumentMime(String(body.mimeType || ""), name);
     const sizeBytes = Number(body.sizeBytes || 0);
     if (sizeBytes <= 0 || sizeBytes > PRIVATE_DRIVE_MAX_BYTES) {
       return NextResponse.json({ error: "File must be 50 MB or smaller" }, { status: 400 });
     }
-    if (mimeType !== "application/octet-stream" && !isAllowedPrivateDocumentMime(mimeType)) {
-      return NextResponse.json({ error: "Upload a PDF, image, Word, or Excel file" }, { status: 400 });
+    if (!mimeType) {
+      return NextResponse.json(
+        { error: "Upload a PDF, image, Word, Excel, CSV, ZIP, or drawing file" },
+        { status: 400 },
+      );
     }
     try {
       const folderId = await ensureStoredClientFolder(found.client);
@@ -108,8 +111,12 @@ export async function POST(
   if (file.size > PRIVATE_DRIVE_MAX_BYTES) {
     return NextResponse.json({ error: "File must be 50 MB or smaller" }, { status: 400 });
   }
-  if (file.type && !isAllowedPrivateDocumentMime(file.type)) {
-    return NextResponse.json({ error: "Upload a PDF, image, Word, or Excel file" }, { status: 400 });
+  const mimeType = resolvePrivateDocumentMime(file.type, file.name);
+  if (!mimeType) {
+    return NextResponse.json(
+      { error: "Upload a PDF, image, Word, Excel, CSV, ZIP, or drawing file" },
+      { status: 400 },
+    );
   }
   try {
     const doc = await saveDocumentToClientDrive({
@@ -117,7 +124,7 @@ export async function POST(
       projectId: found.project.id,
       title: file.name,
       originalName: file.name,
-      mimeType: file.type || "application/octet-stream",
+      mimeType,
       bytes: Buffer.from(await file.arrayBuffer()),
       clientVisible: true,
     });

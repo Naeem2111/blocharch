@@ -185,7 +185,7 @@ export function PrivateProjectsClient({
                 <tr key={p.id} className="border-b border-white/[0.04] align-top">
                   <td className="px-4 py-3">
                     <Link
-                      href={`/dashboard/private/projects/${p.id}`}
+                      href={`/dashboard/private/projects/${p.id}/edit`}
                       className="font-medium text-white hover:text-brand-300"
                     >
                       {p.name}
@@ -260,10 +260,10 @@ export function PrivateProjectsClient({
                   <td className="px-4 py-3">
                     <div className="flex flex-col gap-1.5">
                       <Link
-                        href={`/dashboard/private/projects/${p.id}/edit`}
+                        href={`/dashboard/private/projects/${p.id}`}
                         className="text-xs text-slate-400 hover:text-brand-300"
                       >
-                        Edit
+                        View
                       </Link>
                       <Link
                         href={`/dashboard/private/projects/${p.id}/expenses`}

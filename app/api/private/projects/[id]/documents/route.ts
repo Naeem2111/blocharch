@@ -3,13 +3,15 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requirePrivateOpsSession } from "@/lib/private-access";
 import {
-  isAllowedPrivateDocumentMime,
   newDocumentId,
   PRIVATE_DOCUMENT_MAX_BYTES,
+  resolvePrivateDocumentMime,
   savePrivateDocumentFile,
 } from "@/lib/private-document-storage";
-import { isGoogleDriveConfigured } from "@/lib/google-drive";
+import { createResumableUpload, isGoogleDriveConfigured } from "@/lib/google-drive";
 import {
+  ensureStoredClientFolder,
+  recordCompletedDriveUpload,
   removeStoredDocument,
   saveDocumentToClientDrive,
   staffDocumentPath,
@@ -81,6 +83,63 @@ export async function POST(
   });
   if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  const contentType = request.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    const body = await request.json().catch(() => ({}));
+    const intent = String(body.intent || "start");
+    const clientVisible = Boolean(body.clientVisible);
+    if (intent === "complete") {
+      const driveFileId = String(body.driveFileId || "").trim();
+      if (!driveFileId) return NextResponse.json({ error: "driveFileId required" }, { status: 400 });
+      try {
+        const doc = await recordCompletedDriveUpload({
+          client: project.client,
+          projectId: project.id,
+          driveFileId,
+          title: String(body.title || body.name || "Document"),
+          originalName: String(body.name || "Document"),
+          mimeType: resolvePrivateDocumentMime(String(body.mimeType || ""), String(body.name || "")) || "application/octet-stream",
+          sizeBytes: Number(body.sizeBytes || 0),
+          clientVisible,
+        });
+        return NextResponse.json({ document: serializeDoc(doc) }, { status: 201 });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Could not save the file";
+        return NextResponse.json({ error: message }, { status: 400 });
+      }
+    }
+
+    if (!isGoogleDriveConfigured()) return NextResponse.json({ fallback: true });
+    const name = String(body.name || "Document").slice(0, 200);
+    const mimeType = resolvePrivateDocumentMime(String(body.mimeType || ""), name);
+    const sizeBytes = Number(body.sizeBytes || 0);
+    if (!mimeType) {
+      return NextResponse.json(
+        { error: "Upload a PDF, image, Word, Excel, CSV, ZIP, or drawing file" },
+        { status: 400 },
+      );
+    }
+    if (sizeBytes <= 0 || sizeBytes > PRIVATE_DRIVE_MAX_BYTES) {
+      return NextResponse.json({ error: "File must be 50 MB or smaller" }, { status: 400 });
+    }
+    try {
+      const folderId = await ensureStoredClientFolder(project.client);
+      const uploadUrl = await createResumableUpload({
+        folderId,
+        name,
+        mimeType,
+        sizeBytes,
+        clientVisible,
+        clientId: project.client.id,
+        projectId: project.id,
+      });
+      return NextResponse.json({ uploadUrl });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not start the upload";
+      return NextResponse.json({ error: message }, { status: 502 });
+    }
+  }
+
   let form: FormData;
   try {
     form = await request.formData();
@@ -92,9 +151,10 @@ export async function POST(
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "File required" }, { status: 400 });
   }
-  if (!isAllowedPrivateDocumentMime(file.type)) {
+  const mimeType = resolvePrivateDocumentMime(file.type, file.name);
+  if (!mimeType || (!isGoogleDriveConfigured() && mimeType === "application/octet-stream")) {
     return NextResponse.json(
-      { error: "Upload a PDF, image, Word, or Excel file" },
+      { error: "Upload a PDF, image, Word, Excel, CSV, ZIP, or drawing file" },
       { status: 400 },
     );
   }
@@ -113,7 +173,7 @@ export async function POST(
         projectId: project.id,
         title,
         originalName: file.name,
-        mimeType: file.type,
+        mimeType,
         bytes,
         clientVisible,
       });
@@ -125,7 +185,7 @@ export async function POST(
   }
 
   const documentId = newDocumentId();
-  const fileUrl = await savePrivateDocumentFile(params.id, documentId, file.type, file.name, bytes);
+  const fileUrl = await savePrivateDocumentFile(params.id, documentId, mimeType, file.name, bytes);
 
   const doc = await prisma.privateProjectDocument.create({
     data: {
@@ -134,7 +194,7 @@ export async function POST(
       title,
       originalName: file.name.slice(0, 200),
       fileUrl,
-      mimeType: file.type,
+      mimeType,
       sizeBytes: file.size,
       clientVisible,
     },

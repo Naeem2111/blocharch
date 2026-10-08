@@ -302,7 +302,10 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
         }
         const put = await fetch(started.uploadUrl, {
           method: "PUT",
-          headers: { "Content-Type": file.type || "application/octet-stream" },
+          headers: {
+            "Content-Type": file.type || "application/octet-stream",
+            "Content-Range": `bytes 0-${Math.max(file.size - 1, 0)}/${file.size}`,
+          },
           body: file,
         });
         const created = (await put.json().catch(() => ({}))) as { id?: string };

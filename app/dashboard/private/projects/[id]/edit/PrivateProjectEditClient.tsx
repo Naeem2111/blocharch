@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PrivateDeleteProjectButton } from "@/components/private/PrivateDeleteProjectButton";
+import { PrivateProjectDocuments } from "@/components/private/PrivateProjectDocuments";
 import { ProgressSlider } from "@/components/ProgressSlider";
 import { AthleteAssignmentsEditor } from "@/components/AthleteAssignmentsEditor";
 import { PRIVATE_FIXED_FEE_EXPENSE_LABEL, PRIVATE_STAGE_LABELS, PRIVATE_STAGE_ORDER } from "@/lib/private-constants";
@@ -407,7 +408,7 @@ export function PrivateProjectEditClient({
   if (error && !form.clientName) return <p className="text-sm text-red-300">{error}</p>;
 
   return (
-    <form onSubmit={(e) => void submit(e)} className="mx-auto max-w-3xl space-y-8">
+    <div className="mx-auto max-w-3xl space-y-8">
       <div className="flex flex-wrap items-center gap-3 text-xs">
         <Link href="/dashboard/private/projects" className="text-slate-500 hover:text-slate-300">
           ← Projects
@@ -424,6 +425,10 @@ export function PrivateProjectEditClient({
       </div>
 
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
+
+      <PrivateProjectDocuments projectId={projectId} />
+
+      <form onSubmit={(e) => void submit(e)} className="space-y-8">
 
       <section className="card-tool rounded-xl p-5">
         <h2 className="text-sm font-semibold text-white">Client</h2>
@@ -1035,6 +1040,7 @@ export function PrivateProjectEditClient({
           />
         ) : null}
       </div>
-    </form>
+      </form>
+    </div>
   );
 }

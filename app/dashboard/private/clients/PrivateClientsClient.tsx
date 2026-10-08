@@ -439,7 +439,7 @@ export function PrivateClientsClient({ canDelete = false }: { canDelete?: boolea
                           {c.projects.map((p) => (
                             <li key={p.id}>
                               <Link
-                                href={`/dashboard/private/projects/${p.id}`}
+                                href={`/dashboard/private/projects/${p.id}/edit`}
                                 className="flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-sm text-slate-300 hover:bg-white/[0.04]"
                               >
                                 <span>{p.name}</span>

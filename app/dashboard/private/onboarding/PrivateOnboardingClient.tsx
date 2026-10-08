@@ -87,7 +87,7 @@ export function PrivateOnboardingClient({ initialClientId = "" }: { initialClien
       setError(j.error || "Could not create");
       return;
     }
-    router.push(`/dashboard/private/projects/${j.project.id}`);
+    router.push(`/dashboard/private/projects/${j.project.id}/edit#documents`);
   }
 
   const field =

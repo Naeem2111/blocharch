@@ -93,7 +93,6 @@ export async function saveDocumentToClientDrive(input: {
   bytes: Buffer;
   clientVisible: boolean;
 }) {
-  if (!input.client.slug) throw new Error("Client portal slug is required before saving to Drive");
   const folderId = await ensureStoredClientFolder(input.client);
   const uploaded = await uploadDriveFile({
     folderId,
@@ -111,7 +110,9 @@ export async function saveDocumentToClientDrive(input: {
       projectId: input.projectId,
       title: input.title.slice(0, 200),
       originalName: input.originalName.slice(0, 200),
-      fileUrl: portalDocumentPath(input.client.slug, id),
+      fileUrl: input.client.slug
+        ? portalDocumentPath(input.client.slug, id)
+        : staffDocumentPath(input.projectId, id),
       mimeType: input.mimeType,
       sizeBytes: uploaded.sizeBytes,
       driveFileId: uploaded.id,
@@ -130,7 +131,6 @@ export async function recordCompletedDriveUpload(input: {
   sizeBytes: number;
   clientVisible: boolean;
 }) {
-  if (!input.client.slug) throw new Error("Client portal slug is required");
   const folderId = await ensureStoredClientFolder(input.client);
   const file = await assertFileInFolder(input.driveFileId, folderId);
   const existing = await prisma.privateProjectDocument.findUnique({ where: { driveFileId: file.id } });
@@ -142,7 +142,9 @@ export async function recordCompletedDriveUpload(input: {
       projectId: input.projectId,
       title: input.title.slice(0, 200) || file.name.slice(0, 200),
       originalName: (input.originalName || file.name).slice(0, 200),
-      fileUrl: portalDocumentPath(input.client.slug, id),
+      fileUrl: input.client.slug
+        ? portalDocumentPath(input.client.slug, id)
+        : staffDocumentPath(input.projectId, id),
       mimeType: input.mimeType || file.mimeType,
       sizeBytes: input.sizeBytes || file.sizeBytes,
       driveFileId: file.id,

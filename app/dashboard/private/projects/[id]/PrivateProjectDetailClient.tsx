@@ -119,10 +119,6 @@ export function PrivateProjectDetailClient({
   const [updateTitle, setUpdateTitle] = useState("");
   const [updateBody, setUpdateBody] = useState("");
   const [updateVisible, setUpdateVisible] = useState(false);
-  const [docTitle, setDocTitle] = useState("");
-  const [docVisible, setDocVisible] = useState(false);
-  const [docFile, setDocFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
   const [clientDescription, setClientDescription] = useState("");
   const [clientLinks, setClientLinks] = useState<ClientPortalDeliverable[]>([]);
 
@@ -341,57 +337,6 @@ export function PrivateProjectDetailClient({
     void load();
   }
 
-  async function uploadDocument(e: React.FormEvent) {
-    e.preventDefault();
-    if (!docFile) {
-      setError("Choose a file to upload.");
-      return;
-    }
-    setUploading(true);
-    setError("");
-    const form = new FormData();
-    form.set("file", docFile);
-    form.set("title", docTitle.trim() || docFile.name);
-    form.set("clientVisible", docVisible ? "true" : "false");
-    const r = await fetch(`/api/private/projects/${projectId}/documents`, {
-      method: "POST",
-      body: form,
-    });
-    const j = await r.json().catch(() => ({}));
-    setUploading(false);
-    if (!r.ok) {
-      setError(j.error || "Could not upload document");
-      return;
-    }
-    setDocTitle("");
-    setDocFile(null);
-    setDocVisible(false);
-    void load();
-  }
-
-  async function toggleDocumentVisible(documentId: string, clientVisible: boolean) {
-    setItemLoading(documentId);
-    await fetch(`/api/private/projects/${projectId}/documents`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ documentId, clientVisible }),
-    });
-    setItemLoading(null);
-    void load();
-  }
-
-  async function removeDocument(documentId: string) {
-    if (!confirm("Remove this document?")) return;
-    setItemLoading(documentId);
-    await fetch(`/api/private/projects/${projectId}/documents`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ documentId }),
-    });
-    setItemLoading(null);
-    void load();
-  }
-
   if (!data) {
     if (error) return <p className="text-sm text-red-300">{error}</p>;
     return <p className="text-sm text-slate-500">Loading…</p>;
@@ -431,7 +376,7 @@ export function PrivateProjectDetailClient({
           Expenses
         </Link>
         <Link
-          href={`/dashboard/private/projects/${projectId}/edit`}
+          href={`/dashboard/private/projects/${projectId}/edit#documents`}
           className="text-xs text-brand-300 hover:underline"
         >
           Edit project
@@ -456,7 +401,13 @@ export function PrivateProjectDetailClient({
       </div>
       <p className="text-xs text-slate-500">
         The client portal only shows what you publish: description, dates, documents, updates, and
-        actions marked “Show on portal”.
+        actions marked “Show on portal”.{" "}
+        <Link
+          href={`/dashboard/private/projects/${projectId}/edit#documents`}
+          className="text-brand-300 hover:underline"
+        >
+          Upload documents
+        </Link>
       </p>
 
       {openActions.length > 0 ? (
@@ -1078,93 +1029,6 @@ export function PrivateProjectDetailClient({
             </button>
           </div>
         </div>
-      </section>
-
-      <section className="card-tool rounded-xl p-5">
-        <h3 className="text-sm font-semibold text-white">Documents</h3>
-        <p className="mt-1 text-xs text-slate-500">
-          Files are saved in this client&apos;s Google Drive folder. They stay hidden from the client until you
-          publish them. PDF, image, Word, or Excel — 50 MB max.
-        </p>
-        <ul className="mt-3 space-y-2">
-          {(data.documents ?? []).length === 0 ? (
-            <li className="text-sm text-slate-500">No documents yet.</li>
-          ) : (
-            (data.documents ?? []).map((d) => {
-              const loading = itemLoading === d.id;
-              return (
-                <li
-                  key={d.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white/[0.03] px-3 py-2 ring-1 ring-white/[0.06]"
-                >
-                  <div className="min-w-0">
-                    <a
-                      href={d.fileUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-sm text-slate-200 hover:text-brand-300"
-                    >
-                      {d.title}
-                    </a>
-                    <p className="text-[11px] text-slate-500">{d.originalName}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <label className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-slate-500">
-                      <input
-                        type="checkbox"
-                        checked={d.clientVisible}
-                        disabled={loading}
-                        onChange={(e) => void toggleDocumentVisible(d.id, e.target.checked)}
-                        className="h-3.5 w-3.5 accent-brand-400"
-                      />
-                      Show on portal
-                    </label>
-                    <button
-                      type="button"
-                      disabled={loading}
-                      onClick={() => void removeDocument(d.id)}
-                      className="rounded px-2 py-0.5 text-[10px] font-medium text-red-300/80 ring-1 ring-red-500/20 hover:bg-red-500/10 disabled:opacity-50"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </li>
-              );
-            })
-          )}
-        </ul>
-        <form onSubmit={(e) => void uploadDocument(e)} className="mt-4 space-y-2 border-t border-white/[0.06] pt-4">
-          <input
-            value={docTitle}
-            onChange={(e) => setDocTitle(e.target.value)}
-            placeholder="Document title (optional)"
-            className="w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
-          />
-          <input
-            type="file"
-            accept=".pdf,.doc,.docx,.xls,.xlsx,image/jpeg,image/png,image/webp,image/gif"
-            onChange={(e) => setDocFile(e.target.files?.[0] ?? null)}
-            className="w-full text-xs text-slate-400 file:mr-3 file:rounded-md file:border-0 file:bg-white/[0.08] file:px-3 file:py-1.5 file:text-xs file:text-slate-200"
-          />
-          <div className="flex flex-wrap items-center gap-3">
-            <label className="flex items-center gap-2 text-xs text-slate-500">
-              <input
-                type="checkbox"
-                checked={docVisible}
-                onChange={(e) => setDocVisible(e.target.checked)}
-                className="h-3.5 w-3.5 accent-brand-400"
-              />
-              Show on client portal
-            </label>
-            <button
-              type="submit"
-              disabled={uploading || !docFile}
-              className="rounded-lg bg-brand-500/20 px-3 py-1.5 text-xs font-medium text-brand-200 ring-1 ring-brand-500/30 disabled:opacity-50"
-            >
-              {uploading ? "Uploading…" : "Upload"}
-            </button>
-          </div>
-        </form>
       </section>
     </div>
   );
