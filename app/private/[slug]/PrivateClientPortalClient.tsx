@@ -551,9 +551,9 @@ function Overview({
       </div>
 
       <div className="grid items-stretch gap-3 xl:grid-cols-3">
-        <section className={`${cardClass()} flex h-52 flex-col p-4`}>
+        <section className={`${cardClass()} p-4`}>
           <CardTitle icon="doc">Project description</CardTitle>
-          <div className="mt-3 min-h-0 flex-1 overflow-y-auto pr-1">
+          <div className="mt-3">
             <DescriptionBody
               text={descriptionForCard(
                 project.clientDescription?.trim() ||
@@ -729,11 +729,21 @@ function Journey({
       <section className={`${cardClass()} p-5 sm:p-6`}>
         <h2 className="text-lg font-semibold text-white">Project timeline</h2>
         <p className="mt-1 text-sm text-slate-500">A step-by-step guide to your project journey.</p>
-        <ol className="mt-6 space-y-4">
-          {stages.map((stage) => (
-            <li key={stage.key} className="flex gap-4">
-              <StageDot stage={stage} />
-              <div className={`min-w-0 flex-1 ${stage.state === "current" ? "private-portal-timeline-current rounded-xl px-3 py-2" : ""}`}>
+        <ol className="mt-6">
+          {stages.map((stage, i) => (
+            <li key={stage.key} className="flex gap-4 pb-5 last:pb-0">
+              <div className="relative w-8 shrink-0 self-stretch">
+                {i < stages.length - 1 ? (
+                  <span
+                    aria-hidden
+                    className={`absolute left-1/2 top-4 z-0 w-[3px] -translate-x-1/2 bottom-[-2.25rem] ${
+                      stage.state === "done" ? "bg-emerald-400" : "bg-[#3e6288]"
+                    }`}
+                  />
+                ) : null}
+                <StageDot stage={stage} />
+              </div>
+              <div className={`min-w-0 flex-1 ${stage.state === "current" ? "private-portal-timeline-current rounded-xl px-4 py-3" : "pt-0.5"}`}>
                 <div className="flex items-start justify-between gap-3">
                   <p className="font-medium text-white">{stage.label}</p>
                   <p className="shrink-0 text-xs text-slate-500">
@@ -839,14 +849,14 @@ function Actions({
         <button
           type="button"
           onClick={() => onTab("required")}
-          className={`rounded-2xl border px-4 py-3 text-sm font-medium ${tab === "required" ? "border-sky-400/40 bg-sky-500/20 text-white" : "border-white/[0.08] text-slate-300"}`}
+          className={`rounded-2xl border px-4 py-3 text-sm font-medium ${tab === "required" ? "border-sky-400 bg-sky-500 text-white" : "border-white/10 bg-[#0c1524] text-slate-300"}`}
         >
           Required from you <Count n={actionItems.length} hot />
         </button>
         <button
           type="button"
           onClick={() => onTab("completed")}
-          className={`rounded-2xl border px-4 py-3 text-sm font-medium ${tab === "completed" ? "border-sky-400/40 bg-sky-500/20 text-white" : "border-white/[0.08] text-slate-300"}`}
+          className={`rounded-2xl border px-4 py-3 text-sm font-medium ${tab === "completed" ? "border-sky-400 bg-sky-500 text-white" : "border-white/10 bg-[#0c1524] text-slate-300"}`}
         >
           Completed <Count n={completed.length} />
         </button>
@@ -859,20 +869,20 @@ function Actions({
           <ul className="mt-5 space-y-3">
             {actionItems.length === 0 ? <li className="text-sm text-slate-500">Nothing is waiting on you right now.</li> : null}
             {actionItems.map((action) => (
-              <li key={action.id} className="flex items-center gap-3 rounded-2xl border border-white/[0.08] px-4 py-3">
+              <li key={action.id} className="flex items-center gap-3 rounded-2xl border border-sky-400/25 bg-sky-400/[0.04] px-4 py-3">
                 <button
                   type="button"
                   disabled={completing === action.id}
                   onClick={() => onComplete(action.id)}
                   aria-label={`Mark ${action.title} complete`}
-                  className="h-5 w-5 shrink-0 rounded-full border border-slate-500 hover:border-emerald-400 disabled:opacity-50"
+                  className="h-5 w-5 shrink-0 rounded-full border border-sky-300/70 hover:border-emerald-400 disabled:opacity-50"
                 />
                 <span className="min-w-0 flex-1 text-sm font-medium text-white">{action.title}</span>
               </li>
             ))}
           </ul>
           <label
-            className="mt-5 flex cursor-pointer flex-col items-center rounded-2xl border border-dashed border-sky-400/40 px-4 py-8 text-center"
+            className="mt-5 flex cursor-pointer flex-col items-center rounded-2xl border border-dashed border-sky-400/70 bg-sky-400/[0.04] px-4 py-8 text-center"
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => {
               e.preventDefault();
@@ -929,13 +939,13 @@ function Actions({
 
       <section className={`${cardClass()} flex flex-wrap items-center justify-between gap-3 p-4`}>
         <div className="flex items-center gap-3">
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-sky-500/15 text-sky-300">?</span>
+          <span className="flex h-9 w-9 items-center justify-center rounded-full border border-sky-300/70 bg-sky-400/20 text-sky-200">?</span>
           <div>
             <p className="text-sm font-medium text-white">Have a question?</p>
             <p className="text-xs text-slate-500">If you're unsure about anything or need more information, please reach out.</p>
           </div>
         </div>
-        <button type="button" onClick={onContact} className="rounded-xl border border-white/10 px-3 py-2 text-sm text-white hover:bg-white/[0.04]">
+        <button type="button" onClick={onContact} className="rounded-xl border border-sky-400/40 px-3 py-2 text-sm text-white hover:bg-sky-400/10">
           Contact BLOCHARCH
         </button>
       </section>
@@ -1076,34 +1086,36 @@ function Documents({
 
 function StageRail({ stages }: { stages: Stage[] }) {
   return (
-    <div className="mt-5 overflow-x-auto">
+    <div className="mt-5 overflow-x-auto px-1 py-3">
       <div className="flex min-w-[36rem] items-start">
         {stages.map((stage, i) => (
           <div key={stage.key} className="flex min-w-0 flex-1 flex-col items-center">
             <div className="flex w-full items-center">
               {i > 0 ? (
-                <div className={`h-[3px] flex-1 rounded-full ${stages[i - 1]?.state === "done" ? "bg-emerald-400" : "bg-white/10"}`} />
+                <div className={`h-[3px] min-w-0 flex-1 ${stages[i - 1]?.state === "done" ? "bg-emerald-400" : "bg-white/10"}`} />
               ) : (
                 <div className="flex-1" />
               )}
-              <div
-                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${
-                  stage.state === "done"
-                    ? "bg-emerald-500 text-slate-950"
-                    : stage.state === "current"
-                      ? "bg-sky-400 text-slate-950 shadow-[0_0_16px_rgba(56,189,248,0.75)] ring-4 ring-sky-400/40"
-                      : "border border-white/15 bg-[#0c1524] text-slate-400"
-                }`}
-              >
-                {stage.state === "done" ? "✓" : stage.number}
+              <div className="relative z-10 mx-2 shrink-0">
+                <div
+                  className={`flex size-8 items-center justify-center rounded-full text-xs font-semibold leading-none ${
+                    stage.state === "done"
+                      ? "bg-emerald-500 text-slate-950"
+                      : stage.state === "current"
+                        ? "bg-sky-400 text-slate-950 shadow-[0_0_0_5px_rgba(56,189,248,0.45)]"
+                        : "border border-white/20 bg-[#0c1524] text-slate-400"
+                  }`}
+                >
+                  {stage.state === "done" ? "✓" : stage.number}
+                </div>
               </div>
               {i < stages.length - 1 ? (
-                <div className={`h-[3px] flex-1 rounded-full ${stage.state === "done" ? "bg-emerald-400" : "bg-white/10"}`} />
+                <div className={`h-[3px] min-w-0 flex-1 ${stage.state === "done" ? "bg-emerald-400" : "bg-white/10"}`} />
               ) : (
                 <div className="flex-1" />
               )}
             </div>
-            <p className={`mt-2 px-1 text-center text-[10px] leading-tight ${stage.state === "current" ? "font-medium text-white" : "text-slate-500"}`}>
+            <p className={`mt-3 max-w-full px-1 text-center text-[10px] leading-tight ${stage.state === "current" ? "font-medium text-white" : "text-slate-500"}`}>
               {stage.label}
             </p>
           </div>
@@ -1116,11 +1128,15 @@ function StageRail({ stages }: { stages: Stage[] }) {
 function StageDot({ stage }: { stage: Stage }) {
   const cls =
     stage.state === "done"
-      ? "bg-emerald-500 text-slate-950"
+      ? "bg-emerald-500 text-white"
       : stage.state === "current"
-        ? "bg-sky-500 text-slate-950"
-        : "bg-white/10 text-slate-400";
-  return <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${cls}`}>{stage.state === "done" ? "✓" : stage.number}</span>;
+        ? "bg-sky-400 text-slate-950 shadow-[0_0_0_5px_rgba(56,189,248,0.35),0_0_18px_rgba(56,189,248,0.45)]"
+        : "border border-slate-500 bg-[#0c1524] text-slate-300";
+  return (
+    <span className={`relative z-10 flex size-8 items-center justify-center rounded-full text-xs font-semibold ${cls}`}>
+      {stage.state === "done" ? "✓" : stage.number}
+    </span>
+  );
 }
 
 function Metric({ icon, label, value, hint }: { icon: "cal" | "dot"; label: string; value: string; hint?: string }) {
@@ -1214,10 +1230,10 @@ function Count({ n, hot }: { n: number; hot?: boolean }) {
 function ProjectArt({ src }: { src: string | null }) {
   if (src) {
     return (
-      <div className="mx-4 mt-2 overflow-hidden rounded-2xl">
+      <div className="mx-4 mt-2 aspect-square overflow-hidden rounded-2xl bg-[#10192b]">
         {/* User-uploaded project photo served by this app. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt="" className="h-[7.25rem] w-full object-cover" />
+        <img src={src} alt="" className="h-full w-full object-contain" />
       </div>
     );
   }
@@ -1278,10 +1294,9 @@ function LinkGlyph({ kind }: { kind: "zoom" | "pinterest" | "link" }) {
   if (kind === "pinterest") {
     return (
       <svg viewBox="0 0 24 24" className="h-9 w-9 shrink-0" aria-hidden>
-        <circle cx="12" cy="12" r="12" fill="#E60023" />
         <path
-          fill="#fff"
-          d="M12.1 5.4c-3.2 0-4.9 2.2-4.9 4.6 0 1.3.5 2.4 1.5 2.8.2.1.3 0 .3-.2l.2-.6c0-.1 0-.2-.1-.3-.3-.3-.4-.8-.4-1.4 0-1.8 1.4-3.6 3.7-3.6 2 0 3.4 1.2 3.4 3.2 0 2.4-1.1 4.1-2.6 4.1-.8 0-1.4-.7-1.2-1.5.2-1 .7-2 .7-2.7 0-.6-.3-1.2-1.1-1.2-.8 0-1.5.9-1.5 2 0 .7.2 1.2.2 1.2l-1 4.1c-.3 1.2-.1 2.6 0 2.8.1.1.1 0 .2-.1.2-.3.8-1.1 1.1-2.1.1-.3.4-1.6.4-1.6.3.5 1 1 1.8 1 2.3 0 4-2.1 4-4.8 0-2.1-1.8-4-4.6-4z"
+          fill="#E60023"
+          d="M12.017 0C5.396 0 .029 5.367.029 11.987c0 5.079 3.158 9.417 7.618 11.162-.105-.949-.199-2.403.041-3.439.219-.937 1.406-5.957 1.406-5.957s-.359-.72-.359-1.781c0-1.663.967-2.911 2.168-2.911 1.024 0 1.518.769 1.518 1.688 0 1.029-.653 2.567-.992 3.992-.285 1.193.6 2.165 1.775 2.165 2.128 0 3.768-2.245 3.768-5.487 0-2.861-2.063-4.869-5.008-4.869-3.41 0-5.409 2.562-5.409 5.199 0 1.033.394 2.143.889 2.741.099.12.112.225.085.345-.09.375-.293 1.199-.334 1.363-.053.225-.172.271-.401.165-1.495-.69-2.433-2.878-2.433-4.646 0-3.776 2.748-7.252 7.92-7.252 4.158 0 7.392 2.967 7.392 6.923 0 4.135-2.607 7.462-6.233 7.462-1.214 0-2.354-.629-2.758-1.379l-.749 2.848c-.269 1.045-1.004 2.352-1.498 3.146 1.123.345 2.306.535 3.55.535 6.607 0 11.985-5.365 11.985-11.987C23.97 5.39 18.592.026 11.985.026L12.017 0z"
         />
       </svg>
     );
