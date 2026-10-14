@@ -1228,12 +1228,13 @@ function Count({ n, hot }: { n: number; hot?: boolean }) {
 }
 
 function ProjectArt({ src }: { src: string | null }) {
-  if (src) {
+  const [failed, setFailed] = useState(false);
+  if (src && !failed) {
     return (
       <div className="mx-4 mt-2 aspect-square overflow-hidden rounded-2xl bg-[#10192b]">
         {/* User-uploaded project photo served by this app. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt="" className="h-full w-full object-contain" />
+        <img src={src} alt="" className="h-full w-full object-contain" onError={() => setFailed(true)} />
       </div>
     );
   }

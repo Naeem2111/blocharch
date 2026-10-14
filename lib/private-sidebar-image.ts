@@ -133,8 +133,15 @@ export async function sidebarImageResponse(project: {
   portalImageMimeType: string | null;
 }) {
   if (project.portalImageDriveFileId) {
-    const file = await downloadDriveFile(project.portalImageDriveFileId);
-    return documentStreamResponse("sidebar", project.portalImageMimeType || file.mimeType, file.body, true);
+    if (!isGoogleDriveConfigured()) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    try {
+      const file = await downloadDriveFile(project.portalImageDriveFileId);
+      return documentStreamResponse("sidebar", project.portalImageMimeType || file.mimeType, file.body, true);
+    } catch {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
   }
   const fileUrl = project.portalImageUrl;
   if (!fileUrl?.startsWith("/uploads/private/")) {
