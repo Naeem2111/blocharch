@@ -616,7 +616,8 @@ export function OpsProjectsClient() {
                 Full title preview:{" "}
                 {formatProjectFullTitle(
                   editForm.name || editForm.address,
-                  editForm.currentStage as OpsProjectPhase
+                  editForm.currentStage,
+                  phases.find((opt) => opt.value === editForm.currentStage)?.label,
                 )}
               </p>
             ) : null}
@@ -922,7 +923,8 @@ export function OpsProjectsClient() {
               Full title preview:{" "}
               {formatProjectFullTitle(
                 form.name || form.address,
-                form.currentStage as OpsProjectPhase
+                form.currentStage,
+                phases.find((opt) => opt.value === form.currentStage)?.label,
               )}
             </p>
           ) : null}

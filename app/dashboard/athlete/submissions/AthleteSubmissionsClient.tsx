@@ -91,6 +91,39 @@ function formsFromSubmission(sub: PastSubmission): LineItemForm[] {
   }));
 }
 
+function previousCompletionNotes(
+  subs: PastSubmission[],
+  projectId: string,
+  excludeDate: string,
+): Array<{ key: string; label: string; text: string }> {
+  const rows: Array<{ date: string; text: string; sameProject: boolean }> = [];
+  for (const sub of subs) {
+    if (sub.submissionDate === excludeDate) continue;
+    for (const li of sub.lineItems) {
+      const text = (li.completedSummary ?? "").trim();
+      if (!text || li.isHousekeeping) continue;
+      rows.push({
+        date: sub.submissionDate,
+        text,
+        sameProject: !!projectId && li.projectId === projectId,
+      });
+    }
+  }
+  rows.sort((a, b) => b.date.localeCompare(a.date));
+  const forProject = rows.filter((row) => row.sameProject);
+  const source = forProject.length > 0 ? forProject : rows;
+  const seen = new Set<string>();
+  const options: Array<{ key: string; label: string; text: string }> = [];
+  for (const row of source) {
+    if (seen.has(row.text)) continue;
+    seen.add(row.text);
+    const short = row.text.length > 72 ? `${row.text.slice(0, 69)}…` : row.text;
+    options.push({ key: `${row.date}:${options.length}`, label: `${row.date} — ${short}`, text: row.text });
+    if (options.length >= 20) break;
+  }
+  return options;
+}
+
 function emptyLine(): LineItemForm {
   return {
     key: crypto.randomUUID(),
@@ -305,7 +338,7 @@ export function AthleteSubmissionsClient() {
     beginEmptyDay();
   }
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (applyToday = true) => {
     const [pr, sr] = await Promise.all([fetch("/api/athlete/projects"), fetch("/api/athlete/submissions")]);
     const pj = await pr.json();
     const sj = await sr.json();
@@ -317,8 +350,10 @@ export function AthleteSubmissionsClient() {
       const subs: PastSubmission[] = sj.submissions || [];
       setPastSubmissions(subs);
       if (sj.monthlyHourCap) setMonthlyHourCap(sj.monthlyHourCap);
-      const todaySub = subs.find((s) => s.submissionDate === today);
-      if (todaySub?.editable) applySubmission(todaySub);
+      if (applyToday) {
+        const todaySub = subs.find((s) => s.submissionDate === today);
+        if (todaySub?.editable) applySubmission(todaySub);
+      }
     }
     setLoading(false);
   }, []);
@@ -479,7 +514,14 @@ export function AthleteSubmissionsClient() {
       }
       setCalc(j.calculation);
       setSuccess("Daily log saved.");
-      void load();
+      setEntryLines([]);
+      setDraftEntry(null);
+      setDailyNote("");
+      setEditingId(null);
+      setFormLocked(false);
+      setIsBackloggedSession(false);
+      setCheckInDetailsSubmitted(false);
+      void load(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save");
     } finally {
@@ -748,6 +790,7 @@ export function AthleteSubmissionsClient() {
           }
 
           const project = projects.find((p) => p.id === li.projectId);
+          const previousNotes = previousCompletionNotes(pastSubmissions, li.projectId, selectedDate);
           return (
             <div
               key={li.key}
@@ -882,6 +925,23 @@ export function AthleteSubmissionsClient() {
               <div className="md:col-span-2">
                 <label className="text-xs text-slate-400">
                   What was completed
+                  {previousNotes.length > 0 && !formLocked ? (
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        const picked = previousNotes.find((note) => note.key === e.target.value);
+                        if (picked) updateLine(li.key, { completedSummary: picked.text });
+                      }}
+                      className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
+                    >
+                      <option value="">Previous completions…</option>
+                      {previousNotes.map((note) => (
+                        <option key={note.key} value={note.key}>
+                          {note.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : null}
                   <textarea
                     value={li.completedSummary}
                     disabled={formLocked}

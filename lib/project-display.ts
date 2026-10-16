@@ -1,18 +1,25 @@
 import type { OpsProjectPhase } from "@prisma/client";
-import { displayProjectStageLabel } from "@/lib/ops-constants";
+import { displayProjectStageLabel, PROJECT_PHASE_LABELS } from "@/lib/ops-constants";
 
 export function projectStageDisplayLabel(
-  stage: OpsProjectPhase,
+  stage: OpsProjectPhase | string,
   customLabel?: string | null,
 ): string {
-  if (customLabel) return customLabel;
-  return displayProjectStageLabel(stage);
+  const custom = customLabel?.trim();
+  if (custom) return custom;
+  if (stage === "survey_conversion" || stage === "existing_drawings") {
+    return displayProjectStageLabel(stage);
+  }
+  if (stage in PROJECT_PHASE_LABELS) {
+    return displayProjectStageLabel(stage as OpsProjectPhase);
+  }
+  return "Custom package";
 }
 
 /** Full title with stage/package — consistent across athlete, admin, archives, and daily logs. */
 export function formatProjectFullTitle(
   name: string,
-  currentStage: OpsProjectPhase,
+  currentStage: OpsProjectPhase | string,
   customLabel?: string | null,
 ): string {
   const stageLabel = projectStageDisplayLabel(currentStage, customLabel);
