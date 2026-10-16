@@ -5,6 +5,14 @@ import type { OpsCatalogOption } from "@/lib/ops-catalog-types";
 
 type Kind = "phase" | "work_type";
 
+function moveValues(values: string[], fromIndex: number, toIndex: number): string[] {
+  if (toIndex < 0 || toIndex >= values.length || fromIndex === toIndex) return values;
+  const next = [...values];
+  const [item] = next.splice(fromIndex, 1);
+  next.splice(toIndex, 0, item);
+  return next;
+}
+
 function CatalogList({
   title,
   description,
@@ -15,6 +23,7 @@ function CatalogList({
   onAdd,
   onSave,
   onRemove,
+  onReorder,
 }: {
   title: string;
   description: string;
@@ -25,9 +34,11 @@ function CatalogList({
   onAdd: (kind: Kind, label: string) => Promise<void>;
   onSave: (kind: Kind, option: OpsCatalogOption, label: string) => Promise<void>;
   onRemove: (kind: Kind, option: OpsCatalogOption) => Promise<void>;
+  onReorder: (kind: Kind, values: string[]) => Promise<void>;
 }) {
   const [newLabel, setNewLabel] = useState("");
   const [editLabels, setEditLabels] = useState<Record<string, string>>({});
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
 
   useEffect(() => {
     setEditLabels(Object.fromEntries(options.map((o) => [o.value, o.label])));
@@ -35,21 +46,79 @@ function CatalogList({
 
   const field =
     "w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white";
+  const reordering = busy === `${kind}:reorder`;
+  const values = options.map((option) => option.value);
+
+  function reorder(fromIndex: number, toIndex: number) {
+    const next = moveValues(values, fromIndex, toIndex);
+    if (next === values) return;
+    void onReorder(kind, next);
+  }
 
   return (
     <section className="card-tool rounded-xl p-5">
       <h2 className="text-sm font-semibold text-white">{title}</h2>
       <p className="mt-1 text-xs text-slate-500">{description}</p>
       <ul className="mt-4 space-y-3">
-        {options.map((option) => {
+        {options.map((option, index) => {
           const edited = editLabels[option.value] ?? option.label;
           const changed = edited.trim() !== option.label;
-          const loadingRow = busy === `${kind}:${option.value}`;
+          const loadingRow = busy === `${kind}:${option.value}` || reordering;
           return (
             <li
               key={option.value}
-              className="flex flex-wrap items-center gap-2 rounded-lg bg-white/[0.03] p-3 ring-1 ring-white/[0.06]"
+              onDragOver={(e) => {
+                if (dragIndex == null) return;
+                e.preventDefault();
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (dragIndex == null) return;
+                reorder(dragIndex, index);
+                setDragIndex(null);
+              }}
+              className={`flex flex-wrap items-center gap-2 rounded-lg bg-white/[0.03] p-3 ring-1 ring-white/[0.06] ${
+                dragIndex === index ? "opacity-50" : ""
+              }`}
             >
+              <div
+                role="button"
+                tabIndex={loadingRow ? -1 : 0}
+                draggable={!loadingRow}
+                aria-label={`Drag ${option.label}`}
+                title="Drag to reorder"
+                onDragStart={(e) => {
+                  e.dataTransfer.effectAllowed = "move";
+                  e.dataTransfer.setData("text/plain", option.value);
+                  setDragIndex(index);
+                }}
+                onDragEnd={() => setDragIndex(null)}
+                className={`cursor-grab select-none px-1 text-slate-500 active:cursor-grabbing ${
+                  loadingRow ? "pointer-events-none opacity-40" : ""
+                }`}
+              >
+                ⋮⋮
+              </div>
+              <div className="flex flex-col">
+                <button
+                  type="button"
+                  aria-label={`Move ${option.label} up`}
+                  disabled={loadingRow || index === 0}
+                  onClick={() => reorder(index, index - 1)}
+                  className="px-1 text-[10px] leading-none text-slate-400 hover:text-white disabled:opacity-30"
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Move ${option.label} down`}
+                  disabled={loadingRow || index === options.length - 1}
+                  onClick={() => reorder(index, index + 1)}
+                  className="px-1 text-[10px] leading-none text-slate-400 hover:text-white disabled:opacity-30"
+                >
+                  ↓
+                </button>
+              </div>
               <input
                 value={edited}
                 disabled={loadingRow}
@@ -200,6 +269,34 @@ export function OpsCatalogClient() {
     void load();
   }
 
+  async function reorderItems(kind: Kind, values: string[]) {
+    const apply = (list: OpsCatalogOption[]) => {
+      const byValue = new Map(list.map((option) => [option.value, option]));
+      return values.map((value) => byValue.get(value)).filter((option): option is OpsCatalogOption => Boolean(option));
+    };
+    const previousPhases = phases;
+    const previousWorkTypes = workTypes;
+    if (kind === "phase") setPhases(apply(phases));
+    else setWorkTypes(apply(workTypes));
+    setBusy(`${kind}:reorder`);
+    setError("");
+    const r = await fetch("/api/ops/catalog", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind, order: values }),
+    });
+    const j = await r.json().catch(() => ({}));
+    setBusy(null);
+    if (!r.ok) {
+      setPhases(previousPhases);
+      setWorkTypes(previousWorkTypes);
+      setError(j.error || "Could not reorder");
+      return;
+    }
+    if (Array.isArray(j.phases)) setPhases(j.phases);
+    if (Array.isArray(j.workTypes)) setWorkTypes(j.workTypes);
+  }
+
   if (loading) return <p className="text-sm text-slate-500">Loading catalog…</p>;
 
   return (
@@ -207,7 +304,7 @@ export function OpsCatalogClient() {
       {error ? <p className="text-sm text-red-300 lg:col-span-2">{error}</p> : null}
       <CatalogList
         title="Phases / packages"
-        description="Shown on the project tracker and daily log. Rename, add custom packages, or remove any option (built-ins are hidden from pickers)."
+        description="Shown on the project tracker and daily log, in this order. Drag a row or use the arrows. Built-ins are hidden from pickers when removed."
         addPlaceholder="e.g. Interior package, Measured survey"
         kind="phase"
         options={phases}
@@ -215,10 +312,11 @@ export function OpsCatalogClient() {
         onAdd={addItem}
         onSave={saveItem}
         onRemove={removeItem}
+        onReorder={reorderItems}
       />
       <CatalogList
         title="Work types"
-        description="Task types athletes pick on the daily log. Rename, add custom types, or remove any option (built-ins are hidden from pickers)."
+        description="Task types athletes pick on the daily log, in this order. Drag a row or use the arrows. Built-ins are hidden from pickers when removed."
         addPlaceholder="e.g. BIM coordination, Site visit"
         kind="work_type"
         options={workTypes}
@@ -226,6 +324,7 @@ export function OpsCatalogClient() {
         onAdd={addItem}
         onSave={saveItem}
         onRemove={removeItem}
+        onReorder={reorderItems}
       />
     </div>
   );

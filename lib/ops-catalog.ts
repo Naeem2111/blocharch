@@ -28,76 +28,144 @@ export function isCatalogWorkTypeValue(value: string): boolean {
   return isOpsTaskType(value) || isCustomCatalogValue(value);
 }
 
+/** Stored sort values at or above this mean the staff list was reordered. */
+const CATALOG_ORDER_BASE = 1000;
+
+function optionSortKey(storedSort: number | null | undefined, defaultKey: number): number {
+  if (storedSort != null && storedSort >= CATALOG_ORDER_BASE) return storedSort;
+  return defaultKey;
+}
+
+function sortCatalogOptions(
+  items: { option: OpsCatalogOption; sort: number }[],
+): OpsCatalogOption[] {
+  return items.sort((a, b) => a.sort - b.sort || a.option.label.localeCompare(b.option.label)).map((item) => item.option);
+}
+
 export async function listOpsPhaseOptions(): Promise<OpsCatalogOption[]> {
   const rows = await prisma.opsCatalogPhase.findMany({
     orderBy: [{ sortOrder: "asc" }, { label: "asc" }],
-    select: { id: true, label: true, builtInKey: true, hidden: true },
+    select: { id: true, label: true, builtInKey: true, hidden: true, sortOrder: true },
   });
 
   const hiddenBuiltIns = new Set(
     rows.filter((r) => r.builtInKey && r.hidden).map((r) => r.builtInKey as string),
   );
 
-  const options: OpsCatalogOption[] = OPS_PROJECT_STAGE_OPTIONS.filter(
-    (opt) => !hiddenBuiltIns.has(opt.value),
-  ).map((opt) => {
-    const override = rows.find((r) => r.builtInKey === opt.value && !r.hidden);
-    return {
-      id: override?.id ?? null,
-      value: opt.value,
-      label: override?.label ?? opt.label,
-      builtInKey: opt.value,
-      isBuiltIn: true,
-    };
-  });
+  const builtIns = OPS_PROJECT_STAGE_OPTIONS.filter((opt) => !hiddenBuiltIns.has(opt.value)).map(
+    (opt, index) => {
+      const override = rows.find((r) => r.builtInKey === opt.value && !r.hidden);
+      return {
+        sort: optionSortKey(override?.sortOrder, index),
+        option: {
+          id: override?.id ?? null,
+          value: opt.value,
+          label: override?.label ?? opt.label,
+          builtInKey: opt.value,
+          isBuiltIn: true,
+        } satisfies OpsCatalogOption,
+      };
+    },
+  );
 
-  for (const row of rows.filter((r) => !r.builtInKey && !r.hidden)) {
-    options.push({
-      id: row.id,
-      value: catalogValueFromId(row.id),
-      label: row.label,
-      builtInKey: null,
-      isBuiltIn: false,
-    });
-  }
+  const customs = rows
+    .filter((r) => !r.builtInKey && !r.hidden)
+    .map((row, index) => ({
+      sort: optionSortKey(row.sortOrder, CATALOG_ORDER_BASE + index),
+      option: {
+        id: row.id,
+        value: catalogValueFromId(row.id),
+        label: row.label,
+        builtInKey: null,
+        isBuiltIn: false,
+      } satisfies OpsCatalogOption,
+    }));
 
-  return options;
+  return sortCatalogOptions([...builtIns, ...customs]);
 }
 
 export async function listOpsWorkTypeOptions(): Promise<OpsCatalogOption[]> {
   const rows = await prisma.opsCatalogWorkType.findMany({
     orderBy: [{ sortOrder: "asc" }, { label: "asc" }],
-    select: { id: true, label: true, builtInKey: true, hidden: true },
+    select: { id: true, label: true, builtInKey: true, hidden: true, sortOrder: true },
   });
 
   const hiddenBuiltIns = new Set(
     rows.filter((r) => r.builtInKey && r.hidden).map((r) => r.builtInKey as string),
   );
 
-  const options: OpsCatalogOption[] = Object.entries(TASK_TYPE_LABELS)
+  const builtIns = Object.entries(TASK_TYPE_LABELS)
     .filter(([value]) => !hiddenBuiltIns.has(value))
-    .map(([value, label]) => {
+    .map(([value, label], index) => {
       const override = rows.find((r) => r.builtInKey === value && !r.hidden);
       return {
-        id: override?.id ?? null,
-        value,
-        label: override?.label ?? label,
-        builtInKey: value,
-        isBuiltIn: true,
+        sort: optionSortKey(override?.sortOrder, index),
+        option: {
+          id: override?.id ?? null,
+          value,
+          label: override?.label ?? label,
+          builtInKey: value,
+          isBuiltIn: true,
+        } satisfies OpsCatalogOption,
       };
     });
 
-  for (const row of rows.filter((r) => !r.builtInKey && !r.hidden)) {
-    options.push({
-      id: row.id,
-      value: catalogValueFromId(row.id),
-      label: row.label,
-      builtInKey: null,
-      isBuiltIn: false,
-    });
-  }
+  const customs = rows
+    .filter((r) => !r.builtInKey && !r.hidden)
+    .map((row, index) => ({
+      sort: optionSortKey(row.sortOrder, CATALOG_ORDER_BASE + index),
+      option: {
+        id: row.id,
+        value: catalogValueFromId(row.id),
+        label: row.label,
+        builtInKey: null,
+        isBuiltIn: false,
+      } satisfies OpsCatalogOption,
+    }));
 
-  return options;
+  return sortCatalogOptions([...builtIns, ...customs]);
+}
+
+export async function reorderOpsCatalog(kind: "phase" | "work_type", values: string[]): Promise<string | null> {
+  const current = kind === "phase" ? await listOpsPhaseOptions() : await listOpsWorkTypeOptions();
+  if (values.length !== current.length || new Set(values).size !== values.length) {
+    return "Reorder the full list";
+  }
+  const allowed = new Set(current.map((option) => option.value));
+  if (values.some((value) => !allowed.has(value))) return "Unknown catalog item";
+
+  const writes = values.map((value, index) => {
+    const sortOrder = CATALOG_ORDER_BASE + index;
+    if (kind === "phase") {
+      if (isCustomCatalogValue(value)) {
+        const id = catalogIdFromValue(value);
+        if (!id) return null;
+        return prisma.opsCatalogPhase.update({ where: { id }, data: { sortOrder } });
+      }
+      if (!isOpsProjectPhase(value) || value === "custom") return null;
+      const label = OPS_PROJECT_STAGE_OPTIONS.find((opt) => opt.value === value)?.label ?? PROJECT_PHASE_LABELS[value];
+      return prisma.opsCatalogPhase.upsert({
+        where: { builtInKey: value },
+        create: { label, builtInKey: value, sortOrder },
+        update: { sortOrder },
+      });
+    }
+    if (isCustomCatalogValue(value)) {
+      const id = catalogIdFromValue(value);
+      if (!id) return null;
+      return prisma.opsCatalogWorkType.update({ where: { id }, data: { sortOrder } });
+    }
+    if (!isOpsTaskType(value)) return null;
+    return prisma.opsCatalogWorkType.upsert({
+      where: { builtInKey: value },
+      create: { label: TASK_TYPE_LABELS[value], builtInKey: value, sortOrder },
+      update: { sortOrder },
+    });
+  });
+
+  if (writes.some((write) => write == null)) return "Unknown catalog item";
+  await prisma.$transaction(writes.filter((write): write is NonNullable<typeof write> => write != null));
+  return null;
 }
 
 export async function listOpsCatalog(): Promise<{

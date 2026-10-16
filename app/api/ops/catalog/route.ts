@@ -14,6 +14,7 @@ import {
 import {
   catalogValueFromId,
   listOpsCatalog,
+  reorderOpsCatalog,
   type OpsCatalogKind,
 } from "@/lib/ops-catalog";
 
@@ -57,7 +58,6 @@ export async function POST(request: NextRequest) {
     }
     const maxSort = await prisma.opsCatalogPhase.aggregate({
       _max: { sortOrder: true },
-      where: { builtInKey: null },
     });
     const row = await prisma.opsCatalogPhase.create({
       data: { label, sortOrder: (maxSort._max.sortOrder ?? 0) + 1 },
@@ -84,7 +84,6 @@ export async function POST(request: NextRequest) {
   }
   const maxSort = await prisma.opsCatalogWorkType.aggregate({
     _max: { sortOrder: true },
-    where: { builtInKey: null },
   });
   const row = await prisma.opsCatalogWorkType.create({
     data: { label, sortOrder: (maxSort._max.sortOrder ?? 0) + 1 },
@@ -109,9 +108,17 @@ export async function PATCH(request: NextRequest) {
 
   const body = await request.json();
   const kind = parseKind(body.kind);
+  if (!kind) return NextResponse.json({ error: "kind must be phase or work_type" }, { status: 400 });
+
+  if (Array.isArray(body.order)) {
+    const values = body.order.map((value: unknown) => String(value || "").trim()).filter(Boolean);
+    const error = await reorderOpsCatalog(kind, values);
+    if (error) return NextResponse.json({ error }, { status: 400 });
+    return NextResponse.json(await listOpsCatalog());
+  }
+
   const label = String(body.label || "").trim();
   const id = body.id ? String(body.id).trim() : "";
-  if (!kind) return NextResponse.json({ error: "kind must be phase or work_type" }, { status: 400 });
   if (!label) return NextResponse.json({ error: "Label required" }, { status: 400 });
 
   if (kind === "phase") {

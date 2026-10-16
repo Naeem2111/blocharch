@@ -124,15 +124,6 @@ function previousCompletionNotes(
   return options;
 }
 
-function previousLog(subs: PastSubmission[], beforeDate: string): PastSubmission | null {
-  let best: PastSubmission | null = null;
-  for (const sub of subs) {
-    if (sub.submissionDate >= beforeDate || sub.lineItems.length === 0) continue;
-    if (!best || sub.submissionDate > best.submissionDate) best = sub;
-  }
-  return best;
-}
-
 function emptyLine(): LineItemForm {
   return {
     key: crypto.randomUUID(),
@@ -296,7 +287,6 @@ export function AthleteSubmissionsClient() {
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [calendarMonth, setCalendarMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [formLocked, setFormLocked] = useState(false);
-  const [carriedFrom, setCarriedFrom] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [expandedSubmissionIds, setExpandedSubmissionIds] = useState<Set<string>>(new Set());
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
@@ -310,7 +300,6 @@ export function AthleteSubmissionsClient() {
     setCheckInDetailsSubmitted(!!sub.checkInRequested);
     setFormLocked(!sub.editable);
     setEntryLines(sub.lineItems.length > 0 ? formsFromSubmission(sub) : []);
-    setCarriedFrom(null);
     setDraftEntry(null);
     if (notify) setSuccess(notify);
   }
@@ -325,22 +314,15 @@ export function AthleteSubmissionsClient() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function beginEmptyDay(date: string, subs: PastSubmission[]) {
+  function beginEmptyDay() {
     setEditingId(null);
     setFormLocked(false);
     setDailyNote("");
     setIsBackloggedSession(false);
     setCheckInDetailsSubmitted(false);
     setDraftEntry(null);
+    setEntryLines([]);
     setError("");
-    const prev = previousLog(subs, date);
-    if (prev) {
-      setEntryLines(formsFromSubmission(prev));
-      setCarriedFrom(prev.submissionDate);
-    } else {
-      setEntryLines([]);
-      setCarriedFrom(null);
-    }
   }
 
   function resetToToday() {
@@ -353,7 +335,7 @@ export function AthleteSubmissionsClient() {
       setError("");
       return;
     }
-    beginEmptyDay(today, pastSubmissions);
+    beginEmptyDay();
   }
 
   const load = useCallback(async () => {
@@ -370,13 +352,6 @@ export function AthleteSubmissionsClient() {
       if (sj.monthlyHourCap) setMonthlyHourCap(sj.monthlyHourCap);
       const todaySub = subs.find((s) => s.submissionDate === today);
       if (todaySub?.editable) applySubmission(todaySub);
-      else if (!todaySub) {
-        const prev = previousLog(subs, today);
-        if (prev) {
-          setEntryLines(formsFromSubmission(prev));
-          setCarriedFrom(prev.submissionDate);
-        }
-      }
     }
     setLoading(false);
   }, []);
@@ -425,7 +400,7 @@ export function AthleteSubmissionsClient() {
       applySubmission(sub);
       return;
     }
-    beginEmptyDay(date, pastSubmissions);
+    beginEmptyDay();
   }
 
   const todayHoursPreview =
@@ -593,28 +568,9 @@ export function AthleteSubmissionsClient() {
             selectedDate={selectedDate}
             onSelectDate={onPickDate}
           />
-          <p className="mt-2 text-[10px] text-slate-600">
-            Blue dots = logged days. A blank day starts from your last log so you can edit it and save.
-          </p>
+          <p className="mt-2 text-[10px] text-slate-600">Blue dots = logged days.</p>
         </div>
       </div>
-
-      {carriedFrom && !editingId ? (
-        <p className="rounded-lg border border-brand-500/30 bg-brand-500/10 px-3 py-2 text-sm text-brand-100">
-          Started from your log on {carriedFrom}. Projects, phases, and hours are filled in. Change what
-          was different, then save.
-          <button
-            type="button"
-            onClick={() => {
-              setEntryLines([]);
-              setCarriedFrom(null);
-            }}
-            className="ml-2 underline"
-          >
-            Start blank
-          </button>
-        </p>
-      ) : null}
 
       <div className="card-tool grid gap-4 rounded-xl p-4 md:grid-cols-3">
         <label className="flex items-center gap-2 text-sm text-slate-300 md:col-span-3">
@@ -960,30 +916,22 @@ export function AthleteSubmissionsClient() {
               <div className="md:col-span-2">
                 <label className="text-xs text-slate-400">
                   What was completed
-                  {previousNotes.length > 0 && !formLocked ? (
-                    <select
-                      value=""
-                      onChange={(e) => {
-                        const picked = previousNotes.find((note) => note.key === e.target.value);
-                        if (picked) updateLine(li.key, { completedSummary: picked.text });
-                      }}
-                      className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
-                    >
-                      <option value="">Fill from a previous submission…</option>
-                      {previousNotes.map((note) => (
-                        <option key={note.key} value={note.key}>
-                          {note.label}
-                        </option>
-                      ))}
-                    </select>
-                  ) : null}
                   <textarea
                     value={li.completedSummary}
                     disabled={formLocked}
+                    list={!formLocked && previousNotes.length > 0 ? `completion-${li.key}` : undefined}
                     onChange={(e) => updateLine(li.key, { completedSummary: e.target.value })}
                     rows={2}
+                    placeholder="Start typing to reuse a previous completion note"
                     className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
                   />
+                  {!formLocked && previousNotes.length > 0 ? (
+                    <datalist id={`completion-${li.key}`}>
+                      {previousNotes.map((note) => (
+                        <option key={note.key} value={note.text} />
+                      ))}
+                    </datalist>
+                  ) : null}
                 </label>
               </div>
               {isDraft ? (

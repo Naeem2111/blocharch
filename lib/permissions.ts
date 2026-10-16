@@ -69,6 +69,8 @@ export function canAccessOpsApiPath(role: UserRole, path: string): boolean {
     if (/^\/api\/ops\/projects\/[^/]+\/reactivate$/.test(normalized)) return true;
     return false;
   }
+  // Athletes read phases and work types for the daily log. Writes stay on the route.
+  if (role === "user" && normalized === "/api/ops/catalog") return true;
   return false;
 }
 

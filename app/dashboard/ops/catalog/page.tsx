@@ -6,7 +6,7 @@ export default function OpsCatalogPage() {
     <>
       <PageHeader
         title="Phases & work types"
-        description="Add and rename project phases / packages and daily-log work types used across Athlete operations."
+        description="Add, rename, and reorder project phases / packages and daily-log work types. The daily log uses this order."
         className="mb-8"
       />
       <OpsCatalogClient />
