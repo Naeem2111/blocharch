@@ -984,6 +984,31 @@ html[data-theme="light"] .client-portal-shell .text-slate-600 {
   background: linear-gradient(90deg, rgb(52 211 153 / 0.85), rgb(34 211 238 / 0.75));
 }
 
+.project-description p + p,
+.project-description ul + p,
+.project-description p + ul,
+.project-description ul + ul {
+  margin-top: 0.5rem;
+}
+
+.project-description ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+}
+
+.project-description li + li {
+  margin-top: 0.25rem;
+}
+
+.project-description u {
+  text-decoration: underline;
+}
+
+.project-description-editor:empty::before {
+  content: attr(data-placeholder);
+  color: rgb(71 85 105);
+}
+
 .private-portal-timeline-line {
   position: absolute;
   left: 1.4375rem;

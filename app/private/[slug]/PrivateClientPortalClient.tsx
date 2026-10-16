@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { PrivateDesignStage } from "@prisma/client";
 import { ClientPortalBrandMark } from "@/components/client-portal/ClientPortalBrandMark";
+import { ProjectDescriptionView } from "@/components/private/ProjectDescriptionField";
 import { PRIVATE_STAGE_CLIENT_COPY } from "@/lib/private-constants";
 
 type PortalData = NonNullable<
@@ -105,47 +106,15 @@ function displayAddress(value: string) {
   return titled.replace(/\b(\d+)([a-z])\b/g, (_, digits: string, letter: string) => digits + letter.toUpperCase());
 }
 
-function descriptionForCard(text: string) {
-  return text
-    .split("\n")
-    .filter((line) => {
-      const trimmed = line.trim().replace(/^[*•-]\s+/, "").replace(/^🔗\s*/, "");
-      if (!trimmed) return false;
-      if (/^https?:\/\//i.test(trimmed)) return false;
-      return true;
-    })
-    .join("\n");
-}
 
 function typeLine(label: string) {
   return label === "Residential extension" ? "Private residential project" : label;
 }
 
 function DescriptionBody({ text }: { text: string }) {
-  const blocks: Array<{ type: "p" | "ul"; lines: string[] }> = [];
-  for (const line of text.split("\n")) {
-    const bullet = line.match(/^\s*[*•-]\s+(.*)$/);
-    if (bullet) {
-      const last = blocks[blocks.length - 1];
-      if (last?.type === "ul") last.lines.push(bullet[1]!);
-      else blocks.push({ type: "ul", lines: [bullet[1]!] });
-      continue;
-    }
-    if (line.trim()) blocks.push({ type: "p", lines: [line.trim()] });
-  }
   return (
-    <div className="space-y-2 text-sm leading-relaxed text-slate-300">
-      {blocks.map((block, i) =>
-        block.type === "ul" ? (
-          <ul key={i} className="list-disc space-y-1 pl-5">
-            {block.lines.map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
-        ) : (
-          <p key={i}>{block.lines[0]}</p>
-        ),
-      )}
+    <div className="text-sm leading-relaxed text-slate-300">
+      <ProjectDescriptionView html={text} />
     </div>
   );
 }
@@ -555,10 +524,10 @@ function Overview({
           <CardTitle icon="doc">Project description</CardTitle>
           <div className="mt-3">
             <DescriptionBody
-              text={descriptionForCard(
+              text={
                 project.clientDescription?.trim() ||
-                  `Your Blocharch client portal gives you a live view of this ${subtitle.toLowerCase()}. Track the current stage, open actions, and documents as they are shared.`,
-              )}
+                `Your Blocharch client portal gives you a live view of this ${subtitle.toLowerCase()}. Track the current stage, open actions, and documents as they are shared.`
+              }
             />
           </div>
         </section>

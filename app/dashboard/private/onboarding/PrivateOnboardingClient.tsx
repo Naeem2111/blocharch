@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { PRIVATE_STAGE_LABELS, PRIVATE_STAGE_ORDER } from "@/lib/private-constants";
 import { AthleteAssignmentsEditor } from "@/components/AthleteAssignmentsEditor";
+import { ProjectDescriptionField } from "@/components/private/ProjectDescriptionField";
 import type { PrivateProjectTypeOption } from "@/lib/private-project-types";
 import type { PrivateDesignStage } from "@prisma/client";
 import type { ClientPortalDeliverable } from "@/lib/client-portal-deliverables";
@@ -170,16 +171,14 @@ export function PrivateOnboardingClient({ initialClientId = "" }: { initialClien
               placeholder="47A Kloof Road, Fresnaye"
             />
           </label>
-          <label className="block text-xs text-slate-400">
-            Project description
-            <textarea
-              rows={12}
-              className={field}
+          <div>
+            <p className="text-xs text-slate-400">Project description</p>
+            <ProjectDescriptionField
               value={form.clientDescription}
-              onChange={(e) => setForm({ ...form, clientDescription: e.target.value })}
+              onChange={(clientDescription) => setForm({ ...form, clientDescription })}
               placeholder="Short bio / brief for this project — shown on the client portal."
             />
-          </label>
+          </div>
           <div>
             <p className="text-xs text-slate-400">Project links</p>
             <p className="mt-1 text-[11px] text-slate-500">

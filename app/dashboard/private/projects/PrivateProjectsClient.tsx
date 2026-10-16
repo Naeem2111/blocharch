@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { PrivateDeleteProjectButton } from "@/components/private/PrivateDeleteProjectButton";
 import { PRIVATE_STAGE_LABELS, PRIVATE_STAGE_ORDER } from "@/lib/private-constants";
 
@@ -20,8 +21,30 @@ type ProjectRow = {
   client: { id: string; name: string };
   athlete: AssignedAthlete | null;
   athletes?: AssignedAthlete[];
-  phases?: Array<{ phaseId: string; label: string; stage?: string }>;
+  phases?: PhaseOption[];
+  phaseGroups?: PhaseGroupOption[];
 };
+
+type PhaseOption = { phaseId: string; label: string; stage?: string };
+type PhaseGroupOption = { id: string; name: string; stages: PhaseOption[] };
+
+function stageChoices(project: ProjectRow): PhaseGroupOption[] {
+  const groups = (project.phaseGroups ?? []).filter((group) => group.stages.length > 0);
+  if (groups.length > 0) return groups;
+  if (project.phases && project.phases.length > 0) {
+    return [{ id: "phases", name: "", stages: project.phases }];
+  }
+  return [
+    {
+      id: "builtin",
+      name: "",
+      stages: PRIVATE_STAGE_ORDER.map((key) => ({
+        phaseId: key,
+        label: PRIVATE_STAGE_LABELS[key],
+      })),
+    },
+  ];
+}
 
 function zar(n: number) {
   return `R ${Math.round(n).toLocaleString("en-ZA")}`;
@@ -67,9 +90,11 @@ export function PrivateProjectsClient({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [stageOpenId, setStageOpenId] = useState<string | null>(null);
+  const [menuBox, setMenuBox] = useState<{ top: number; left: number; maxHeight: number } | null>(null);
   const [reactivatingId, setReactivatingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const stageMenuRef = useRef<HTMLDivElement>(null);
+  const stageTriggerRef = useRef<HTMLButtonElement>(null);
   const completed = scope === "completed";
 
   const load = useCallback(async () => {
@@ -88,10 +113,43 @@ export function PrivateProjectsClient({
     void load();
   }, [load]);
 
+  useLayoutEffect(() => {
+    if (!stageOpenId) {
+      setMenuBox(null);
+      return;
+    }
+    function place() {
+      const trigger = stageTriggerRef.current;
+      if (!trigger) return;
+      const rect = trigger.getBoundingClientRect();
+      const margin = 8;
+      const width = 256;
+      const spaceBelow = window.innerHeight - rect.bottom - margin;
+      const spaceAbove = rect.top - margin;
+      const openBelow = spaceBelow >= 180 || spaceBelow >= spaceAbove;
+      const maxHeight = Math.max(140, Math.min(360, openBelow ? spaceBelow : spaceAbove));
+      const left = Math.max(margin, Math.min(rect.left, window.innerWidth - width - margin));
+      setMenuBox({
+        left,
+        maxHeight,
+        top: openBelow ? rect.bottom + 4 : Math.max(margin, rect.top - maxHeight - 4),
+      });
+    }
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [stageOpenId]);
+
   useEffect(() => {
     if (!stageOpenId) return;
     function onPointerDown(event: PointerEvent) {
-      if (stageMenuRef.current?.contains(event.target as Node)) return;
+      const target = event.target as Node;
+      if (stageMenuRef.current?.contains(target)) return;
+      if (stageTriggerRef.current?.contains(target)) return;
       setStageOpenId(null);
     }
     function onKeyDown(event: KeyboardEvent) {
@@ -192,44 +250,54 @@ export function PrivateProjectsClient({
                   {completed ? (
                     <span className="text-xs text-slate-300">{p.completedAt ?? p.designStageLabel}</span>
                   ) : (
-                    <div ref={stageOpenId === p.id ? stageMenuRef : undefined} className="relative">
+                    <div className="relative">
                       <button
                         type="button"
+                        ref={stageOpenId === p.id ? stageTriggerRef : undefined}
                         disabled={saving}
                         onClick={() => setStageOpenId(stageOpenId === p.id ? null : p.id)}
                         className="rounded-lg bg-white/[0.04] px-2.5 py-1.5 text-left text-xs text-slate-200 ring-1 ring-white/[0.08] hover:bg-white/[0.07]"
                       >
                         {p.designStageLabel} ▾
                       </button>
-                      {stageOpenId === p.id ? (
-                        <div className="absolute z-20 mt-1 w-64 rounded-lg border border-white/[0.1] bg-[#0f131a] py-1 shadow-xl">
-                          {(p.phases && p.phases.length > 0
-                            ? p.phases
-                            : PRIVATE_STAGE_ORDER.map((key) => ({
-                                phaseId: key,
-                                label: PRIVATE_STAGE_LABELS[key],
-                              }))
-                          ).map((row) => {
-                            const selected =
-                              row.phaseId === p.currentDesignPhaseId ||
-                              row.phaseId === p.designStage ||
-                              ("stage" in row && row.stage === p.designStage);
-                            return (
-                              <button
-                                key={row.phaseId}
-                                type="button"
-                                className={`block w-full px-3 py-2 text-left text-xs hover:bg-white/[0.06] ${
-                                  selected ? "text-brand-300" : "text-slate-300"
-                                }`}
-                                onClick={() => void setStage(p.id, row.phaseId)}
-                              >
-                                {selected ? "✓ " : ""}
-                                {row.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      ) : null}
+                      {stageOpenId === p.id && menuBox
+                        ? createPortal(
+                            <div
+                              ref={stageMenuRef}
+                              style={{ top: menuBox.top, left: menuBox.left, maxHeight: menuBox.maxHeight }}
+                              className="fixed z-[80] w-64 overflow-y-auto rounded-lg border border-white/[0.1] bg-[#0f131a] py-1 shadow-xl"
+                            >
+                              {stageChoices(p).map((group) => (
+                                <div key={group.id}>
+                                  {group.name ? (
+                                    <p className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                                      {group.name}
+                                    </p>
+                                  ) : null}
+                                  {group.stages.map((row) => {
+                                    const selected = p.currentDesignPhaseId
+                                      ? row.phaseId === p.currentDesignPhaseId
+                                      : row.phaseId === p.designStage || row.stage === p.designStage;
+                                    return (
+                                      <button
+                                        key={row.phaseId}
+                                        type="button"
+                                        className={`block w-full px-3 py-2 text-left text-xs hover:bg-white/[0.06] ${
+                                          selected ? "text-brand-300" : "text-slate-300"
+                                        }`}
+                                        onClick={() => void setStage(p.id, row.phaseId)}
+                                      >
+                                        {selected ? "✓ " : ""}
+                                        {row.label}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              ))}
+                            </div>,
+                            document.body,
+                          )
+                        : null}
                     </div>
                   )}
                   {!completed ? (

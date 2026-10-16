@@ -16,6 +16,7 @@ import {
 } from "@/lib/private-project-assignments";
 import { syncPrivateProjectsIntoArchives } from "@/lib/private-archive";
 import { normalizeClientDeliverablesForSave } from "@/lib/client-portal-deliverables";
+import { normalizeProjectDescription } from "@/lib/rich-text";
 
 const projectInclude = {
   client: {
@@ -113,9 +114,7 @@ export async function POST(request: NextRequest) {
       ? parseDateOnly(String(body.briefReceivedAt))
       : new Date();
     const dueDate = body.dueDate ? parseDateOnly(String(body.dueDate)) : null;
-    const clientDescription = body.clientDescription
-      ? String(body.clientDescription).trim()
-      : null;
+    const clientDescription = normalizeProjectDescription(body.clientDescription);
     const clientLinks = normalizeClientDeliverablesForSave(body.clientLinks);
 
     const defaultStructure = defaultPhaseStructure();

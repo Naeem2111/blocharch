@@ -17,6 +17,7 @@ import {
   privateProjectShouldArchive,
 } from "@/lib/private-archive";
 import { normalizeClientDeliverablesForSave } from "@/lib/client-portal-deliverables";
+import { normalizeProjectDescription } from "@/lib/rich-text";
 import { isGoogleDriveConfigured } from "@/lib/google-drive";
 import { staffDocumentPath, syncClientDriveDocuments } from "@/lib/private-drive-documents";
 import {
@@ -206,7 +207,7 @@ export async function PATCH(
     }
     if (body.stageNotes !== undefined) data.stageNotes = String(body.stageNotes || "") || null;
     if (body.clientDescription !== undefined) {
-      data.clientDescription = String(body.clientDescription || "").trim() || null;
+      data.clientDescription = normalizeProjectDescription(body.clientDescription);
     }
     if (body.clientLinks !== undefined) {
       const links = normalizeClientDeliverablesForSave(body.clientLinks);

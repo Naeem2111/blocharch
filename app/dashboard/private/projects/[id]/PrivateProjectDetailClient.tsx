@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { PrivateDeleteProjectButton } from "@/components/private/PrivateDeleteProjectButton";
+import { ProjectDescriptionField } from "@/components/private/ProjectDescriptionField";
 import { PrivateProjectSidebarImage } from "@/components/private/PrivateProjectSidebarImage";
 import {
   PRIVATE_STAGE_LABELS,
@@ -476,13 +477,11 @@ export function PrivateProjectDetailClient({
             </p>
             <span className="text-[10px] text-slate-500">Shown on the client portal</span>
           </div>
-          <textarea
-            rows={12}
+          <ProjectDescriptionField
             value={clientDescription}
-            onChange={(e) => setClientDescription(e.target.value)}
+            onChange={setClientDescription}
             disabled={saving}
             placeholder="Short bio / brief for this project — what the client is building, context, goals…"
-            className="mt-2 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm leading-relaxed text-white placeholder:text-slate-600"
           />
 
           <div className="mt-5">

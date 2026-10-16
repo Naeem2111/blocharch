@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PrivateDeleteProjectButton } from "@/components/private/PrivateDeleteProjectButton";
 import { PrivateProjectDocuments } from "@/components/private/PrivateProjectDocuments";
+import { ProjectDescriptionField } from "@/components/private/ProjectDescriptionField";
 import { PrivateProjectSidebarImage } from "@/components/private/PrivateProjectSidebarImage";
 import { ProgressSlider } from "@/components/ProgressSlider";
 import { AthleteAssignmentsEditor } from "@/components/AthleteAssignmentsEditor";
@@ -478,16 +479,14 @@ export function PrivateProjectEditClient({
               onChange={(e) => setForm({ ...form, projectName: e.target.value })}
             />
           </label>
-          <label className="block text-xs text-slate-400">
-            Project description
-            <textarea
-              rows={12}
-              className={field}
+          <div>
+            <p className="text-xs text-slate-400">Project description</p>
+            <ProjectDescriptionField
               value={form.clientDescription}
-              onChange={(e) => setForm({ ...form, clientDescription: e.target.value })}
+              onChange={(clientDescription) => setForm({ ...form, clientDescription })}
               placeholder="Short bio / brief for this project — shown on the client portal."
             />
-          </label>
+          </div>
           <PrivateProjectSidebarImage
             projectId={projectId}
             imageUrl={sidebarImageUrl}

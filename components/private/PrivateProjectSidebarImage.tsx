@@ -49,9 +49,14 @@ export function PrivateProjectSidebarImage({
         Shown at the top of the client portal sidebar. The house illustration stays until you add a photo.
       </p>
       {imageUrl ? (
-        // User-uploaded project photo; served from this app, not a remote optimizer host.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={imageUrl} alt="" className="mt-3 h-28 w-full max-w-xs rounded-xl object-cover" />
+        <div className="mt-3 w-[14.5rem] max-w-full">
+          {/* Same frame as the client portal sidebar: square, full photo, no crop. */}
+          <div className="aspect-square overflow-hidden rounded-2xl bg-[#10192b]">
+            {/* User-uploaded project photo; served from this app, not a remote optimizer host. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={imageUrl} alt="" className="h-full w-full object-contain" />
+          </div>
+        </div>
       ) : null}
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <label className="cursor-pointer rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-xs text-slate-200 hover:bg-white/[0.08]">
