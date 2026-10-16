@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type DragEvent } from "react";
 import type { PrivateDesignStage } from "@prisma/client";
 import { ClientPortalBrandMark } from "@/components/client-portal/ClientPortalBrandMark";
 import { ProjectDescriptionView } from "@/components/private/ProjectDescriptionField";
@@ -40,12 +40,48 @@ const STAGE_FOCUS: Record<PrivateDesignStage, string[]> = {
 
 const DOC_FILTERS = ["All documents", "Concept design", "Design development", "Council submission", "Other"] as const;
 
+const PORTAL_UPLOAD_ACCEPT =
+  ".pdf,.jpg,.jpeg,.png,.webp,.gif,.doc,.docx,.xls,.xlsx,application/pdf,image/*";
+
+const PORTAL_UPLOAD_EXTENSIONS = new Set([
+  "pdf",
+  "jpg",
+  "jpeg",
+  "png",
+  "webp",
+  "gif",
+  "doc",
+  "docx",
+  "xls",
+  "xlsx",
+]);
+
+function isPortalUploadFile(file: File) {
+  const ext = file.name.includes(".") ? file.name.split(".").pop()!.toLowerCase() : "";
+  if (PORTAL_UPLOAD_EXTENSIONS.has(ext)) return true;
+  const mime = file.type.toLowerCase();
+  return mime === "application/pdf" || mime.startsWith("image/");
+}
+
+function dragHasFiles(event: DragEvent<HTMLElement>) {
+  return Array.from(event.dataTransfer.types).includes("Files");
+}
+
 function formatDate(iso: string | null) {
   if (!iso) return "—";
   const [y, m, d] = iso.split("-").map(Number);
   if (!y || !m || !d) return iso;
   return new Date(Date.UTC(y, m - 1, d))
     .toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })
+    .replace(/\bSep\b/, "Sept");
+}
+
+function formatUpdateDate(iso: string | null) {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return iso;
+  return new Date(Date.UTC(y, m - 1, d))
+    .toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" })
     .replace(/\bSep\b/, "Sept");
 }
 
@@ -130,21 +166,30 @@ function viewForUpdate(kind: string): View {
   return "overview";
 }
 
+function NewBadge() {
+  return (
+    <span className="rounded bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-300">
+      New
+    </span>
+  );
+}
+
 function RecentUpdates({ updates, limit }: { updates: PortalData["updates"]; limit?: number }) {
   const rows = limit ? updates.slice(0, limit) : updates;
   if (rows.length === 0) {
     return <p className="mt-4 text-sm text-slate-500">Updates will show here as the project moves.</p>;
   }
   return (
-    <ul className="mt-4 space-y-2">
-      {rows.map((update) => (
+    <ul className="mt-3">
+      {rows.map((update, i) => (
         <li
           key={update.id}
-          className="rounded-xl border border-white/[0.1] bg-white/[0.03] px-3 py-2.5"
+          className={`flex items-baseline justify-between gap-4 py-2.5 ${
+            i < rows.length - 1 ? "border-b border-white/[0.08]" : ""
+          }`}
         >
-          <p className="text-[11px] text-slate-500">{formatDate(update.occurredAt)}</p>
-          <p className="mt-1 text-sm font-medium text-white">{update.title}</p>
-          {update.body ? <p className="mt-1 text-xs leading-relaxed text-slate-400">{update.body}</p> : null}
+          <span className="min-w-0 text-sm text-slate-200">{update.title}</span>
+          <span className="shrink-0 text-xs tabular-nums text-slate-500">{formatUpdateDate(update.occurredAt)}</span>
         </li>
       ))}
     </ul>
@@ -251,10 +296,19 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
 
   async function uploadPortalFiles(files: File[]) {
     if (files.length === 0) return;
+    const notes: string[] = [];
+    const queue = files.filter((file) => {
+      if (isPortalUploadFile(file)) return true;
+      notes.push(`${file.name} is not a supported document or image.`);
+      return false;
+    });
+    if (queue.length === 0) {
+      setUploadNote(notes.join(" "));
+      return;
+    }
     setUploading(true);
     setUploadNote("");
-    const notes: string[] = [];
-    for (const file of files) {
+    for (const file of queue) {
       if (file.size > 50 * 1024 * 1024) {
         notes.push(`${file.name} is over 50 MB.`);
         continue;
@@ -476,6 +530,9 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
               onMenu={setDocMenu}
               details={docDetails}
               onDetails={setDocDetails}
+              uploadNote={uploadNote}
+              uploading={uploading}
+              onFiles={(files) => void uploadPortalFiles(files)}
             />
           ) : null}
         </main>
@@ -634,7 +691,11 @@ function Overview({
 
       <div className="grid gap-4 xl:grid-cols-3">
         <section className={`${cardClass()} p-5`}>
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-white"><span className="text-emerald-400"><ClockMini /></span>Recent updates</h2>
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-white">
+            <span className="text-emerald-400"><ClockMini /></span>
+            Recent updates
+            {updates.length > 0 ? <NewBadge /> : null}
+          </h2>
           <p className="mt-1 text-xs text-slate-500">The latest activity on your project.</p>
           <RecentUpdates updates={updates} limit={6} />
         </section>
@@ -789,7 +850,10 @@ function Journey({
           </section>
         ) : null}
         <section className={`${cardClass()} p-5`}>
-          <h2 className="text-sm font-semibold text-white">Recent updates</h2>
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-white">
+            Recent updates
+            {updates.length > 0 ? <NewBadge /> : null}
+          </h2>
           <RecentUpdates updates={updates} limit={6} />
           <button type="button" onClick={onOpenOverview} className="mt-4 text-sm text-sky-300 hover:underline">
             View all updates →
@@ -881,7 +945,7 @@ function Actions({
             <input
               type="file"
               multiple
-              accept=".pdf,.jpg,.jpeg,.png,.webp,.gif,.doc,.docx,.xls,.xlsx,application/pdf,image/*"
+              accept={PORTAL_UPLOAD_ACCEPT}
               className="sr-only"
               disabled={uploading}
               onChange={(e) => {
@@ -949,6 +1013,9 @@ function Documents({
   onMenu,
   details,
   onDetails,
+  uploadNote,
+  uploading,
+  onFiles,
 }: {
   docs: PortalDocument[];
   query: string;
@@ -961,9 +1028,68 @@ function Documents({
   onMenu: (id: string | null) => void;
   details: PortalDocument | null;
   onDetails: (doc: PortalDocument | null) => void;
+  uploadNote: string;
+  uploading: boolean;
+  onFiles: (files: File[]) => void;
 }) {
+  const [draggingFiles, setDraggingFiles] = useState(false);
+
+  useEffect(() => {
+    const blockFileNavigation = (event: globalThis.DragEvent) => {
+      if (!Array.from(event.dataTransfer?.types ?? []).includes("Files")) return;
+      event.preventDefault();
+    };
+    window.addEventListener("dragover", blockFileNavigation);
+    window.addEventListener("drop", blockFileNavigation);
+    return () => {
+      window.removeEventListener("dragover", blockFileNavigation);
+      window.removeEventListener("drop", blockFileNavigation);
+    };
+  }, []);
+
+  function keepFileDrag(event: DragEvent<HTMLDivElement>) {
+    if (!dragHasFiles(event)) return false;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    return true;
+  }
+
   return (
-    <div>
+    <div
+      data-portal-documents-drop=""
+      data-drop-active={draggingFiles ? "true" : "false"}
+      className="rounded-2xl"
+      style={
+        draggingFiles
+          ? {
+              backgroundColor: "rgba(56, 189, 248, 0.1)",
+              boxShadow: "inset 0 0 0 2px rgba(56, 189, 248, 0.9), 0 0 28px rgba(56, 189, 248, 0.4)",
+            }
+          : undefined
+      }
+      onDragEnter={(event) => {
+        if (!keepFileDrag(event)) return;
+        const next = event.relatedTarget;
+        if (next instanceof Node && event.currentTarget.contains(next)) return;
+        setDraggingFiles(true);
+      }}
+      onDragOver={(event) => {
+        keepFileDrag(event);
+      }}
+      onDragLeave={(event) => {
+        const next = event.relatedTarget;
+        if (next instanceof Node && event.currentTarget.contains(next)) return;
+        setDraggingFiles(false);
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
+        setDraggingFiles(false);
+        if (uploading || !dragHasFiles(event)) return;
+        const files = Array.from(event.dataTransfer.files);
+        if (files.length === 0) return;
+        onFiles(files);
+      }}
+    >
       <div className="flex flex-wrap gap-2">
         {DOC_FILTERS.map((item) => (
           <button
@@ -992,7 +1118,54 @@ function Documents({
           <option value="oldest">Date (oldest first)</option>
         </select>
       </div>
-      <div className={`${cardClass()} mt-4 overflow-x-auto`}>
+      <label
+        className="mt-4 flex cursor-pointer flex-col items-center rounded-2xl border border-dashed border-sky-400/70 bg-sky-400/[0.04] px-4 py-6 text-center"
+        style={
+          draggingFiles
+            ? {
+                borderColor: "rgb(125, 211, 252)",
+                backgroundColor: "rgba(56, 189, 248, 0.16)",
+                boxShadow: "0 0 24px rgba(56, 189, 248, 0.4)",
+              }
+            : undefined
+        }
+      >
+        <span className="text-sky-300">↑</span>
+        <span className="mt-2 text-sm text-slate-200">
+          {uploading
+            ? "Saving to your project folder…"
+            : draggingFiles
+              ? "Drop to upload"
+              : <>Drag and drop documents or images here, or <span className="text-sky-300 underline">browse</span></>}
+        </span>
+        <span className="mt-1 text-xs text-slate-500">PDF, JPG, PNG, Word, or Excel (Max 50 MB)</span>
+        <input
+          type="file"
+          multiple
+          accept={PORTAL_UPLOAD_ACCEPT}
+          className="sr-only"
+          disabled={uploading}
+          aria-label="Choose documents or images"
+          onChange={(event) => {
+            const files = Array.from(event.target.files ?? []);
+            onFiles(files);
+            event.target.value = "";
+          }}
+        />
+      </label>
+      {uploadNote ? <p className="mt-3 text-sm text-slate-400">{uploadNote}</p> : null}
+      <div
+        className={`${cardClass()} relative mt-4 overflow-x-auto`}
+        style={
+          draggingFiles
+            ? {
+                borderColor: "rgb(56, 189, 248)",
+                backgroundColor: "rgba(14, 42, 68, 0.96)",
+                boxShadow: "0 0 28px rgba(56, 189, 248, 0.45)",
+              }
+            : undefined
+        }
+      >
         <table className="min-w-full text-left text-sm">
           <thead className="text-[10px] uppercase tracking-[0.14em] text-slate-500">
             <tr>

@@ -423,7 +423,9 @@ export async function PATCH(
         const stageKey = typeof data.designStage === "string" ? data.designStage : existing.designStage;
         const label = nextPhaseId
           ? designPhaseLabel(structure, nextPhaseId)
-          : PRIVATE_STAGE_LABELS[stageKey];
+          : isPrivateDesignStage(stageKey)
+            ? PRIVATE_STAGE_LABELS[stageKey]
+            : "the next stage";
         await recordPrivateActivity(tx, {
           projectId: project.id,
           kind: "stage",

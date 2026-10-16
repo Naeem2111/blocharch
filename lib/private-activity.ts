@@ -86,7 +86,7 @@ export function targetDateActivityLines(
   const after = parseStageDateMap(afterRaw) ?? {};
   const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
   const lines: string[] = [];
-  for (const key of keys) {
+  for (const key of Array.from(keys)) {
     const previous = before[key as keyof StageDateMap];
     const next = after[key as keyof StageDateMap];
     if ((previous?.from ?? null) === (next?.from ?? null) && (previous?.to ?? null) === (next?.to ?? null)) {
