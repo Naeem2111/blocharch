@@ -65,6 +65,7 @@ export async function getPublicPrivateProjectBySlug(slug: string) {
     mimeType: string | null;
     sizeBytes: number;
     createdAt: string;
+    category: string | null;
   }> = [];
   try {
     const rows = await prisma.privateProjectDocument.findMany({
@@ -79,6 +80,7 @@ export async function getPublicPrivateProjectBySlug(slug: string) {
         sizeBytes: true,
         createdAt: true,
         driveFileId: true,
+        category: true,
       },
     });
     documents = rows.map((d) => ({
@@ -88,6 +90,7 @@ export async function getPublicPrivateProjectBySlug(slug: string) {
       mimeType: d.mimeType,
       sizeBytes: d.sizeBytes,
       createdAt: d.createdAt.toISOString().slice(0, 10),
+      category: d.category,
     }));
   } catch {
     documents = [];

@@ -101,7 +101,11 @@ export async function middleware(request: NextRequest) {
   const publicPrivatePortalApi = isPrivatePublicApiPath(path);
 
   if ((isPrivateDashboardPath(path) || isPrivateApiPath(path)) && !n8nAuthorized && !publicPrivatePortalApi) {
-    if (!role || !canAccessModule(role, "private_work", username)) {
+    const athleteProjectFiles =
+      /^\/api\/private\/projects\/[^/]+\/documents(\/[^/]+)?$/.test(path) &&
+      role != null &&
+      canAccessModule(role, "athlete_portal", username);
+    if (!athleteProjectFiles && (!role || !canAccessModule(role, "private_work", username))) {
       if (isApi) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }

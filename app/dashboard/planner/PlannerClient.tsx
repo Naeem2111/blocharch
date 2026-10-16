@@ -2853,15 +2853,29 @@ function EditTaskModal({
                       </option>
                     ))}
                   </select>
-                  <input
-                    type="file"
-                    className="w-full text-xs text-slate-400 file:mr-3 file:rounded-md file:border-0 file:bg-white/[0.08] file:px-3 file:py-1.5 file:text-xs file:text-slate-200"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      e.target.value = "";
+                  <div
+                    className="rounded-lg border border-dashed border-white/20 px-3 py-2"
+                    onDragOver={(e) => {
+                      if (!Array.from(e.dataTransfer.types).includes("Files")) return;
+                      e.preventDefault();
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const file = e.dataTransfer.files?.[0];
                       if (file) void attachNewFile(file);
                     }}
-                  />
+                  >
+                    <p className="mb-2 text-xs text-white">Drag and drop a file here, or browse.</p>
+                    <input
+                      type="file"
+                      className="w-full text-xs text-slate-400 file:mr-3 file:rounded-md file:border-0 file:bg-white/[0.08] file:px-3 file:py-1.5 file:text-xs file:text-slate-200"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = "";
+                        if (file) void attachNewFile(file);
+                      }}
+                    />
+                  </div>
                   <p className="text-[11px] text-slate-500">
                     A new upload is stored once on the project. This card points at that same file.
                   </p>

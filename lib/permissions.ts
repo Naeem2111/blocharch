@@ -71,6 +71,8 @@ export function canAccessOpsApiPath(role: UserRole, path: string): boolean {
   }
   // Athletes read phases and work types for the daily log. Writes stay on the route.
   if (role === "user" && normalized === "/api/ops/catalog") return true;
+  // Assigned athletes upload and download files. The route checks the assignment.
+  if (role === "user" && /^\/api\/ops\/projects\/[^/]+\/documents(\/[^/]+)?$/.test(normalized)) return true;
   return false;
 }
 

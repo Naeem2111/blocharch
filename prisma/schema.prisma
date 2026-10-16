@@ -1033,6 +1033,8 @@ model PrivateProjectDocument {
   /** Set when the file lives in the client's Google Drive folder. */
   driveFileId    String?  @unique @map("drive_file_id")
   clientVisible  Boolean  @default(false) @map("client_visible")
+  /** Design phase this file is listed under on the client Documents tab. */
+  category       String?  @db.VarChar(80)
   createdAt      DateTime @default(now()) @map("created_at")
 
   project PrivateProject @relation(fields: [projectId], references: [id], onDelete: Cascade)

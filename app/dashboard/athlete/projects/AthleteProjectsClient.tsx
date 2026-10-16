@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
+import { OpsProjectDocuments } from "@/components/ops/OpsProjectDocuments";
 import { DueDateCalendar } from "@/components/ops/DueDateCalendar";
 import { OpsProjectCardBody, OpsProjectCardFrame } from "@/components/ops/OpsProjectCard";
 import { asAvatarTextTone } from "@/lib/avatar-text-tone";
@@ -306,6 +307,7 @@ export function AthleteProjectsClient() {
                             {p.notes}
                           </p>
                         ) : null}
+                        <OpsProjectDocuments projectId={p.id} variant="athlete" />
                       </>
                     )}
                   </OpsProjectCardFrame>

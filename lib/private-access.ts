@@ -8,7 +8,33 @@ import { prisma } from "@/lib/prisma";
 import { ensureLinkedAthleteProfile } from "@/lib/ops-athlete-profile";
 import { isStaffAdmin } from "@/lib/admin-only-accounts";
 import { actsAsManager } from "@/lib/effective-roles";
+import { whereAthletePrivateProjects } from "@/lib/private-project-assignments";
 import type { UserRole } from "@/lib/users-store";
+
+/** Staff can manage every private project. An assigned athlete can read and upload its files. */
+export async function requirePrivateDocumentAccess(
+  request: NextRequest,
+  projectId: string,
+): Promise<{ user: SessionUser; staff: boolean } | NextResponse> {
+  const session = await getSessionFromRequest(request);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (canAccessModule(session.user.role, "private_work", session.user.username)) {
+    return { user: session.user, staff: true };
+  }
+  if (!canAccessModule(session.user.role, "athlete_portal", session.user.username)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  const athlete = await prisma.opsAthlete.findUnique({ where: { userId: session.user.id } });
+  if (!athlete || athlete.status !== "active") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  const project = await prisma.privateProject.findFirst({
+    where: { id: projectId, AND: [whereAthletePrivateProjects(athlete.id)] },
+    select: { id: true },
+  });
+  if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  return { user: session.user, staff: false };
+}
 
 export async function requirePrivateOpsSession(
   request: NextRequest,

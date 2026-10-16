@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type DragEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { PrivateDesignStage } from "@prisma/client";
 import { ClientPortalBrandMark } from "@/components/client-portal/ClientPortalBrandMark";
 import { ProjectDescriptionView } from "@/components/private/ProjectDescriptionField";
@@ -38,8 +38,6 @@ const STAGE_FOCUS: Record<PrivateDesignStage, string[]> = {
   council_approved: ["The design is approved", "Construction follows as a separate phase"],
 };
 
-const DOC_FILTERS = ["All documents", "Concept design", "Design development", "Council submission", "Other"] as const;
-
 const PORTAL_UPLOAD_ACCEPT =
   ".pdf,.jpg,.jpeg,.png,.webp,.gif,.doc,.docx,.xls,.xlsx,application/pdf,image/*";
 
@@ -61,10 +59,6 @@ function isPortalUploadFile(file: File) {
   if (PORTAL_UPLOAD_EXTENSIONS.has(ext)) return true;
   const mime = file.type.toLowerCase();
   return mime === "application/pdf" || mime.startsWith("image/");
-}
-
-function dragHasFiles(event: DragEvent<HTMLElement>) {
-  return Array.from(event.dataTransfer.types).includes("Files");
 }
 
 function formatDate(iso: string | null) {
@@ -96,6 +90,10 @@ function fileKind(doc: PortalDocument) {
   if (mime.includes("pdf") || doc.title.toLowerCase().endsWith(".pdf")) return "PDF";
   if (mime.startsWith("image/")) return "Image";
   return "File";
+}
+
+function documentPhase(doc: { title: string; category?: string | null }) {
+  return doc.category?.trim() || documentCategory(doc.title);
 }
 
 function documentCategory(title: string) {
@@ -209,7 +207,7 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
   const [showCompletedOnOverview, setShowCompletedOnOverview] = useState(false);
   const [noticesOpen, setNoticesOpen] = useState(false);
   const [docQuery, setDocQuery] = useState("");
-  const [docFilter, setDocFilter] = useState<(typeof DOC_FILTERS)[number]>("All documents");
+  const [docFilter, setDocFilter] = useState("All documents");
   const [docSort, setDocSort] = useState<"newest" | "oldest">("newest");
   const [docMenu, setDocMenu] = useState<string | null>(null);
   const [docDetails, setDocDetails] = useState<PortalDocument | null>(null);
@@ -237,20 +235,25 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
   const [readIds, setReadIds] = useState<string[]>([]);
   const unread = notices.filter((item) => !readIds.includes(item.id));
 
+  const docFilters = useMemo(() => {
+    const phases = stages.map((stage) => stage.label).filter((label) => label && label !== "Other");
+    return ["All documents", ...Array.from(new Set(phases)), "Other"];
+  }, [stages]);
+
   const visibleDocs = useMemo(() => {
     const q = docQuery.trim().toLowerCase();
+    const phases = new Set(stages.map((stage) => stage.label));
     const rows = portalDocuments.filter((doc) => {
-      const category = documentCategory(doc.title);
+      const category = documentPhase(doc);
       const matchesFilter =
         docFilter === "All documents" ||
-        category === docFilter ||
-        (docFilter === "Other" && category !== "Concept design" && category !== "Design development" && category !== "Council submission");
+        (docFilter === "Other" ? category === "Other" || !phases.has(category) : category === docFilter);
       return matchesFilter && (!q || doc.title.toLowerCase().includes(q));
     });
     return [...rows].sort((a, b) =>
       docSort === "newest" ? b.createdAt.localeCompare(a.createdAt) : a.createdAt.localeCompare(b.createdAt),
     );
-  }, [docFilter, docQuery, docSort, portalDocuments]);
+  }, [docFilter, docQuery, docSort, portalDocuments, stages]);
 
   async function completeAction(actionItemId: string) {
     setCompleting(actionItemId);
@@ -522,6 +525,7 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
               docs={visibleDocs}
               query={docQuery}
               onQuery={setDocQuery}
+              filters={docFilters}
               filter={docFilter}
               onFilter={setDocFilter}
               sort={docSort}
@@ -530,9 +534,6 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
               onMenu={setDocMenu}
               details={docDetails}
               onDetails={setDocDetails}
-              uploadNote={uploadNote}
-              uploading={uploading}
-              onFiles={(files) => void uploadPortalFiles(files)}
             />
           ) : null}
         </main>
@@ -1006,6 +1007,7 @@ function Documents({
   docs,
   query,
   onQuery,
+  filters,
   filter,
   onFilter,
   sort,
@@ -1014,85 +1016,24 @@ function Documents({
   onMenu,
   details,
   onDetails,
-  uploadNote,
-  uploading,
-  onFiles,
 }: {
   docs: PortalDocument[];
   query: string;
   onQuery: (value: string) => void;
-  filter: (typeof DOC_FILTERS)[number];
-  onFilter: (value: (typeof DOC_FILTERS)[number]) => void;
+  filters: string[];
+  filter: string;
+  onFilter: (value: string) => void;
   sort: "newest" | "oldest";
   onSort: (value: "newest" | "oldest") => void;
   menuId: string | null;
   onMenu: (id: string | null) => void;
   details: PortalDocument | null;
   onDetails: (doc: PortalDocument | null) => void;
-  uploadNote: string;
-  uploading: boolean;
-  onFiles: (files: File[]) => void;
 }) {
-  const [draggingFiles, setDraggingFiles] = useState(false);
-
-  useEffect(() => {
-    const blockFileNavigation = (event: globalThis.DragEvent) => {
-      if (!Array.from(event.dataTransfer?.types ?? []).includes("Files")) return;
-      event.preventDefault();
-    };
-    window.addEventListener("dragover", blockFileNavigation);
-    window.addEventListener("drop", blockFileNavigation);
-    return () => {
-      window.removeEventListener("dragover", blockFileNavigation);
-      window.removeEventListener("drop", blockFileNavigation);
-    };
-  }, []);
-
-  function keepFileDrag(event: DragEvent<HTMLDivElement>) {
-    if (!dragHasFiles(event)) return false;
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "copy";
-    return true;
-  }
-
   return (
-    <div
-      data-portal-documents-drop=""
-      data-drop-active={draggingFiles ? "true" : "false"}
-      className="rounded-2xl"
-      style={
-        draggingFiles
-          ? {
-              backgroundColor: "rgba(56, 189, 248, 0.1)",
-              boxShadow: "inset 0 0 0 2px rgba(56, 189, 248, 0.9), 0 0 28px rgba(56, 189, 248, 0.4)",
-            }
-          : undefined
-      }
-      onDragEnter={(event) => {
-        if (!keepFileDrag(event)) return;
-        const next = event.relatedTarget;
-        if (next instanceof Node && event.currentTarget.contains(next)) return;
-        setDraggingFiles(true);
-      }}
-      onDragOver={(event) => {
-        keepFileDrag(event);
-      }}
-      onDragLeave={(event) => {
-        const next = event.relatedTarget;
-        if (next instanceof Node && event.currentTarget.contains(next)) return;
-        setDraggingFiles(false);
-      }}
-      onDrop={(event) => {
-        event.preventDefault();
-        setDraggingFiles(false);
-        if (uploading || !dragHasFiles(event)) return;
-        const files = Array.from(event.dataTransfer.files);
-        if (files.length === 0) return;
-        onFiles(files);
-      }}
-    >
+    <div className="rounded-2xl">
       <div className="flex flex-wrap gap-2">
-        {DOC_FILTERS.map((item) => (
+        {filters.map((item) => (
           <button
             key={item}
             type="button"
@@ -1119,54 +1060,7 @@ function Documents({
           <option value="oldest">Date (oldest first)</option>
         </select>
       </div>
-      <label
-        className="mt-4 flex cursor-pointer flex-col items-center rounded-2xl border border-dashed border-sky-400/70 bg-sky-400/[0.04] px-4 py-6 text-center"
-        style={
-          draggingFiles
-            ? {
-                borderColor: "rgb(125, 211, 252)",
-                backgroundColor: "rgba(56, 189, 248, 0.16)",
-                boxShadow: "0 0 24px rgba(56, 189, 248, 0.4)",
-              }
-            : undefined
-        }
-      >
-        <span className="text-sky-300">↑</span>
-        <span className="mt-2 text-sm text-slate-200">
-          {uploading
-            ? "Saving to your project folder…"
-            : draggingFiles
-              ? "Drop to upload"
-              : <>Drag and drop documents or images here, or <span className="text-sky-300 underline">browse</span></>}
-        </span>
-        <span className="mt-1 text-xs text-slate-500">PDF, JPG, PNG, Word, or Excel (Max 50 MB)</span>
-        <input
-          type="file"
-          multiple
-          accept={PORTAL_UPLOAD_ACCEPT}
-          className="sr-only"
-          disabled={uploading}
-          aria-label="Choose documents or images"
-          onChange={(event) => {
-            const files = Array.from(event.target.files ?? []);
-            onFiles(files);
-            event.target.value = "";
-          }}
-        />
-      </label>
-      {uploadNote ? <p className="mt-3 text-sm text-slate-400">{uploadNote}</p> : null}
-      <div
-        className={`${cardClass()} relative mt-4 overflow-x-auto`}
-        style={
-          draggingFiles
-            ? {
-                borderColor: "rgb(56, 189, 248)",
-                backgroundColor: "rgba(14, 42, 68, 0.96)",
-                boxShadow: "0 0 28px rgba(56, 189, 248, 0.45)",
-              }
-            : undefined
-        }
-      >
+      <div className={`${cardClass()} relative mt-4 overflow-x-auto`}>
         <table className="min-w-full text-left text-sm">
           <thead className="text-[10px] uppercase tracking-[0.14em] text-slate-500">
             <tr>
@@ -1192,7 +1086,7 @@ function Documents({
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-xs text-slate-300">{documentCategory(doc.title)}</span>
+                    <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-xs text-slate-300">{documentPhase(doc)}</span>
                   </td>
                   <td className="px-4 py-3 text-slate-400">{formatBytes(doc.sizeBytes)}</td>
                   <td className="px-4 py-3 text-slate-400">{formatDate(doc.createdAt)}</td>
@@ -1230,7 +1124,7 @@ function Documents({
             <div>
               <p className="font-medium text-white">{details.title}</p>
               <p className="mt-1 text-slate-400">
-                {fileKind(details)} · {documentCategory(details.title)} · {formatBytes(details.sizeBytes)} · {formatDate(details.createdAt)}
+                {fileKind(details)} · {documentPhase(details)} · {formatBytes(details.sizeBytes)} · {formatDate(details.createdAt)}
               </p>
               <p className="mt-2 text-xs text-slate-500">Current file only — older versions are not stored on the portal.</p>
             </div>

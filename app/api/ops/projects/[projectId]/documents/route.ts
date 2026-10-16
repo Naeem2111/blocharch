@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireOpsSession } from "@/lib/ops-access";
+import { requireOpsDocumentAccess, requireOpsSession } from "@/lib/ops-access";
 import { createResumableUpload, isGoogleDriveConfigured } from "@/lib/google-drive";
 import {
   newDocumentId,
@@ -46,7 +46,7 @@ function serializeDoc(d: {
 }
 
 export async function GET(request: NextRequest, { params }: { params: { projectId: string } }) {
-  const gate = await requireOpsSession(request);
+  const gate = await requireOpsDocumentAccess(request, params.projectId);
   if (gate instanceof NextResponse) return gate;
 
   const project = await prisma.opsProject.findUnique({
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest, { params }: { params: { projectI
 }
 
 export async function POST(request: NextRequest, { params }: { params: { projectId: string } }) {
-  const gate = await requireOpsSession(request);
+  const gate = await requireOpsDocumentAccess(request, params.projectId);
   if (gate instanceof NextResponse) return gate;
 
   const project = await prisma.opsProject.findUnique({
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest, { params }: { params: { project
   if (contentType.includes("application/json")) {
     const body = await request.json().catch(() => ({}));
     const intent = String(body.intent || "start");
-    const clientVisible = Boolean(body.clientVisible);
+    const clientVisible = gate.staff && Boolean(body.clientVisible);
     if (intent === "complete") {
       const driveFileId = String(body.driveFileId || "").trim();
       if (!driveFileId) return NextResponse.json({ error: "driveFileId required" }, { status: 400 });
@@ -154,7 +154,7 @@ export async function POST(request: NextRequest, { params }: { params: { project
     return NextResponse.json({ error: "File is too large" }, { status: 400 });
   }
   const title = String(form.get("title") || file.name || "Document").trim().slice(0, 200);
-  const clientVisible = String(form.get("clientVisible") || "") === "true";
+  const clientVisible = gate.staff && String(form.get("clientVisible") || "") === "true";
   const bytes = Buffer.from(await file.arrayBuffer());
 
   if (isGoogleDriveConfigured()) {

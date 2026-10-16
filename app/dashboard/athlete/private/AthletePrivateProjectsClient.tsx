@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
+import { PrivateProjectDocuments } from "@/components/private/PrivateProjectDocuments";
 
 type ProjectRow = {
   id: string;
@@ -51,27 +52,36 @@ export function AthletePrivateProjectsClient({ scope }: { scope: "active" | "com
             </tr>
           ) : (
             projects.map((p) => (
-              <tr key={p.id} className="border-b border-white/[0.04]">
-                <td className="px-4 py-3 font-medium text-white">{p.name}</td>
-                {scope === "active" ? (
-                  <>
-                    <td className="px-4 py-3 text-slate-300">{p.designStageLabel}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="h-1.5 w-16 overflow-hidden rounded-full bg-white/[0.08]">
-                          <div
-                            className="h-full rounded-full bg-brand-500"
-                            style={{ width: `${p.progressPercent}%` }}
-                          />
+              <Fragment key={p.id}>
+                <tr className="border-b border-white/[0.04]">
+                  <td className="px-4 py-3 font-medium text-white">{p.name}</td>
+                  {scope === "active" ? (
+                    <>
+                      <td className="px-4 py-3 text-slate-300">{p.designStageLabel}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="h-1.5 w-16 overflow-hidden rounded-full bg-white/[0.08]">
+                            <div
+                              className="h-full rounded-full bg-brand-500"
+                              style={{ width: `${p.progressPercent}%` }}
+                            />
+                          </div>
+                          <span className="tabular-nums text-slate-400">{p.progressPercent}%</span>
                         </div>
-                        <span className="tabular-nums text-slate-400">{p.progressPercent}%</span>
-                      </div>
+                      </td>
+                    </>
+                  ) : (
+                    <td className="px-4 py-3 text-slate-300">{p.completedAt ?? "—"}</td>
+                  )}
+                </tr>
+                {scope === "active" ? (
+                  <tr className="border-b border-white/[0.04]">
+                    <td colSpan={3} className="px-4 pb-4">
+                      <PrivateProjectDocuments projectId={p.id} variant="athlete" />
                     </td>
-                  </>
-                ) : (
-                  <td className="px-4 py-3 text-slate-300">{p.completedAt ?? "—"}</td>
-                )}
-              </tr>
+                  </tr>
+                ) : null}
+              </Fragment>
             ))
           )}
         </tbody>

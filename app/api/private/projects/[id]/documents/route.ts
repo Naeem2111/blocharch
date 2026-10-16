@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requirePrivateOpsSession } from "@/lib/private-access";
+import { requirePrivateDocumentAccess, requirePrivateOpsSession } from "@/lib/private-access";
 import { recordPrivateActivity } from "@/lib/private-activity";
 import { revalidatePath } from "next/cache";
 import {
@@ -21,6 +21,12 @@ import {
   updateStoredDocumentVisibility,
   PRIVATE_DRIVE_MAX_BYTES,
 } from "@/lib/private-drive-documents";
+import { allDesignPhases, resolvePhaseStructure } from "@/lib/private-phase-structure";
+
+function cleanCategory(value: unknown): string | null {
+  const text = String(value ?? "").trim().slice(0, 80);
+  return text || null;
+}
 
 async function noteVisibleFile(
   project: { id: string; client: { slug: string | null } },
@@ -46,6 +52,7 @@ function serializeDoc(d: {
   sizeBytes: number;
   driveFileId: string | null;
   clientVisible: boolean;
+  category: string | null;
   createdAt: Date;
 }) {
   return {
@@ -57,6 +64,7 @@ function serializeDoc(d: {
     sizeBytes: d.sizeBytes,
     driveFileId: d.driveFileId,
     clientVisible: d.clientVisible,
+    category: d.category,
     createdAt: d.createdAt.toISOString(),
   };
 }
@@ -65,7 +73,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } },
 ) {
-  const gate = await requirePrivateOpsSession(request);
+  const gate = await requirePrivateDocumentAccess(request, params.id);
   if (gate instanceof NextResponse) return gate;
 
   const project = await prisma.privateProject.findUnique({
@@ -82,15 +90,16 @@ export async function GET(
     where: { projectId: params.id },
     orderBy: { createdAt: "desc" },
   });
+  const phases = allDesignPhases(resolvePhaseStructure(project.phaseStructure)).map((phase) => phase.name);
 
-  return NextResponse.json({ documents: documents.map(serializeDoc) });
+  return NextResponse.json({ documents: documents.map(serializeDoc), phases });
 }
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } },
 ) {
-  const gate = await requirePrivateOpsSession(request);
+  const gate = await requirePrivateDocumentAccess(request, params.id);
   if (gate instanceof NextResponse) return gate;
 
   const project = await prisma.privateProject.findUnique({
@@ -103,7 +112,7 @@ export async function POST(
   if (contentType.includes("application/json")) {
     const body = await request.json().catch(() => ({}));
     const intent = String(body.intent || "start");
-    const clientVisible = Boolean(body.clientVisible);
+    const clientVisible = gate.staff && Boolean(body.clientVisible);
     if (intent === "complete") {
       const driveFileId = String(body.driveFileId || "").trim();
       if (!driveFileId) return NextResponse.json({ error: "driveFileId required" }, { status: 400 });
@@ -117,6 +126,7 @@ export async function POST(
           mimeType: resolvePrivateDocumentMime(String(body.mimeType || ""), String(body.name || "")) || "application/octet-stream",
           sizeBytes: Number(body.sizeBytes || 0),
           clientVisible,
+          category: cleanCategory(body.category),
         });
         await noteVisibleFile(project, doc);
         return NextResponse.json({ document: serializeDoc(doc) }, { status: 201 });
@@ -180,7 +190,8 @@ export async function POST(
   }
 
   const title = String(form.get("title") || file.name || "Document").trim().slice(0, 200);
-  const clientVisible = String(form.get("clientVisible") || "") === "true";
+  const clientVisible = gate.staff && String(form.get("clientVisible") || "") === "true";
+  const category = cleanCategory(form.get("category"));
   const bytes = Buffer.from(await file.arrayBuffer());
 
   if (isGoogleDriveConfigured()) {
@@ -193,6 +204,7 @@ export async function POST(
         mimeType,
         bytes,
         clientVisible,
+        category,
       });
       await noteVisibleFile(project, doc);
       return NextResponse.json({ document: serializeDoc(doc) }, { status: 201 });
@@ -215,6 +227,7 @@ export async function POST(
       mimeType,
       sizeBytes: file.size,
       clientVisible,
+      category,
     },
   });
 
@@ -226,25 +239,29 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } },
 ) {
-  const gate = await requirePrivateOpsSession(request);
+  const gate = await requirePrivateDocumentAccess(request, params.id);
   if (gate instanceof NextResponse) return gate;
 
   const body = await request.json();
   const documentId = String(body.documentId || "").trim();
   if (!documentId) return NextResponse.json({ error: "documentId required" }, { status: 400 });
+  if (!gate.staff && (body.title !== undefined || body.clientVisible !== undefined)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const existing = await prisma.privateProjectDocument.findFirst({
     where: { id: documentId, projectId: params.id },
   });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const data: { title?: string; clientVisible?: boolean } = {};
+  const data: { title?: string; clientVisible?: boolean; category?: string | null } = {};
   if (body.title !== undefined) {
     const title = String(body.title || "").trim();
     if (!title) return NextResponse.json({ error: "Title required" }, { status: 400 });
     data.title = title.slice(0, 200);
   }
   if (body.clientVisible !== undefined) data.clientVisible = Boolean(body.clientVisible);
+  if (body.category !== undefined) data.category = cleanCategory(body.category);
 
   const doc = await prisma.privateProjectDocument.update({
     where: { id: documentId },

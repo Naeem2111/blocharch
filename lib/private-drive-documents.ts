@@ -93,6 +93,7 @@ export async function saveDocumentToClientDrive(input: {
   mimeType: string;
   bytes: Buffer;
   clientVisible: boolean;
+  category?: string | null;
 }) {
   const folderId = await ensureStoredClientFolder(input.client);
   const uploaded = await uploadDriveFile({
@@ -118,6 +119,7 @@ export async function saveDocumentToClientDrive(input: {
       sizeBytes: uploaded.sizeBytes,
       driveFileId: uploaded.id,
       clientVisible: input.clientVisible,
+      category: input.category?.trim().slice(0, 80) || null,
     },
   });
 }
@@ -131,6 +133,7 @@ export async function recordCompletedDriveUpload(input: {
   mimeType: string;
   sizeBytes: number;
   clientVisible: boolean;
+  category?: string | null;
 }) {
   const folderId = await ensureStoredClientFolder(input.client);
   const file = await assertFileInFolder(input.driveFileId, folderId);
@@ -150,6 +153,7 @@ export async function recordCompletedDriveUpload(input: {
       sizeBytes: input.sizeBytes || file.sizeBytes,
       driveFileId: file.id,
       clientVisible: input.clientVisible,
+      category: input.category?.trim().slice(0, 80) || null,
     },
   });
 }

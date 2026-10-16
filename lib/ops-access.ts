@@ -10,6 +10,33 @@ import { projectDisplayFields } from "@/lib/project-display";
 import { serializeProjectDueAt } from "@/lib/project-deadline";
 import { ensureLinkedAthleteProfile } from "@/lib/ops-athlete-profile";
 import { isStaffAdmin } from "@/lib/admin-only-accounts";
+import { whereAthleteProjectAccess } from "@/lib/ops-project-assignments";
+
+/** Staff can manage every UK project file. An assigned athlete can read and upload files on their own project. */
+export async function requireOpsDocumentAccess(
+  request: NextRequest,
+  projectId: string,
+): Promise<{ user: SessionUser; staff: boolean } | NextResponse> {
+  const session = await getSessionFromRequest(request);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (canAccessModule(session.user.role, "ops", session.user.username)) {
+    return { user: session.user, staff: true };
+  }
+  if (!canAccessModule(session.user.role, "athlete_portal", session.user.username)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  let athlete = await prisma.opsAthlete.findUnique({ where: { userId: session.user.id } });
+  if (!athlete) athlete = await ensureLinkedAthleteProfile(session.user);
+  if (!athlete || athlete.status !== "active") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  const project = await prisma.opsProject.findFirst({
+    where: whereAthleteProjectAccess(athlete.id, projectId),
+    select: { id: true },
+  });
+  if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  return { user: session.user, staff: false };
+}
 
 export async function requireOpsSession(
   request: NextRequest

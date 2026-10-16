@@ -3,14 +3,14 @@ import { NextResponse } from "next/server";
 import fs from "node:fs";
 import path from "node:path";
 import { prisma } from "@/lib/prisma";
-import { requirePrivateOpsSession } from "@/lib/private-access";
+import { requirePrivateDocumentAccess } from "@/lib/private-access";
 import { streamDriveDocument } from "@/lib/private-document-response";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string; documentId: string } },
 ) {
-  const gate = await requirePrivateOpsSession(request);
+  const gate = await requirePrivateDocumentAccess(request, params.id);
   if (gate instanceof NextResponse) return gate;
 
   const doc = await prisma.privateProjectDocument.findFirst({

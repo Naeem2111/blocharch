@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import fs from "node:fs";
 import path from "node:path";
 import { prisma } from "@/lib/prisma";
-import { requireOpsSession } from "@/lib/ops-access";
+import { requireOpsDocumentAccess } from "@/lib/ops-access";
 import { streamDriveDocument } from "@/lib/private-document-response";
 import { OPS_DOCUMENT_PUBLIC_DIR } from "@/lib/ops-document-storage";
 
@@ -11,7 +11,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { projectId: string; documentId: string } },
 ) {
-  const gate = await requireOpsSession(request);
+  const gate = await requireOpsDocumentAccess(request, params.projectId);
   if (gate instanceof NextResponse) return gate;
 
   const doc = await prisma.opsProjectDocument.findFirst({
