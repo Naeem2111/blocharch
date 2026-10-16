@@ -917,9 +917,16 @@ export function AthleteSubmissionsClient() {
                 <label className="text-xs text-slate-400">
                   What was completed
                   <textarea
+                    ref={(node) => {
+                      if (!node) return;
+                      if (!formLocked && previousNotes.length > 0) {
+                        node.setAttribute("list", `completion-${li.key}`);
+                      } else {
+                        node.removeAttribute("list");
+                      }
+                    }}
                     value={li.completedSummary}
                     disabled={formLocked}
-                    list={!formLocked && previousNotes.length > 0 ? `completion-${li.key}` : undefined}
                     onChange={(e) => updateLine(li.key, { completedSummary: e.target.value })}
                     rows={2}
                     placeholder="Start typing to reuse a previous completion note"
