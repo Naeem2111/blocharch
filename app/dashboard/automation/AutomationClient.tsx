@@ -8,10 +8,13 @@ import { LeadStageTag } from "@/components/LeadStageTag";
 import { LEAD_FILTER_OPTIONS, followUpStatusColor, followUpStatusLabel } from "@/lib/lead-stage-ui";
 import { LeadStagePicker } from "@/components/LeadStagePicker";
 import { isManualPracticeUrl } from "@/lib/practice-url";
+import { PracticeTypeSelect } from "@/components/practices/PracticeTypeSelect";
+import type { PracticeTypeValue } from "@/lib/practice-types";
 
 interface LeadItem {
   url: string;
   name: string;
+  practice_type?: string;
   email: string;
   contact: string;
   slug: string;
@@ -86,6 +89,7 @@ export function AutomationClient() {
   const [data, setData] = useState<{ items: LeadItem[]; total: number; totalPages: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [savingTypeUrl, setSavingTypeUrl] = useState<string | null>(null);
 
   const loadData = useCallback(() => {
     setLoading(true);
@@ -157,6 +161,42 @@ export function AutomationClient() {
             : item
         ),
       });
+    }
+  }
+
+  async function changePracticeType(item: LeadItem, practiceType: PracticeTypeValue) {
+    const previous = item.practice_type || "architecture_firm";
+    setSavingTypeUrl(item.url);
+    setData((current) =>
+      current
+        ? {
+            ...current,
+            items: current.items.map((row) =>
+              row.url === item.url ? { ...row, practice_type: practiceType } : row,
+            ),
+          }
+        : current,
+    );
+    try {
+      const res = await fetch(`/api/practices/${encodeURIComponent(item.slug || slugFromUrl(item.url))}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ practiceType }),
+      });
+      if (!res.ok) throw new Error("Could not save practice type");
+    } catch {
+      setData((current) =>
+        current
+          ? {
+              ...current,
+              items: current.items.map((row) =>
+                row.url === item.url ? { ...row, practice_type: previous } : row,
+              ),
+            }
+          : current,
+      );
+    } finally {
+      setSavingTypeUrl(null);
     }
   }
 
@@ -278,6 +318,7 @@ export function AutomationClient() {
               <thead>
                 <tr className="bg-white/[0.04] text-left text-sm text-slate-400">
                   <th className="px-4 py-3 font-medium">Name</th>
+                  <th className="px-4 py-3 font-medium">Practice type</th>
                   <th className="px-4 py-3 font-medium">Stage</th>
                   <th className="px-4 py-3 font-medium">Rating</th>
                   <th className="px-4 py-3 font-medium whitespace-nowrap">Last contacted</th>
@@ -315,6 +356,13 @@ export function AutomationClient() {
                           {item.lead.nextAction}
                         </p>
                       ) : null}
+                    </td>
+                    <td className="px-4 py-3">
+                      <PracticeTypeSelect
+                        value={item.practice_type || "architecture_firm"}
+                        disabled={savingTypeUrl === item.url}
+                        onChange={(practiceType) => void changePracticeType(item, practiceType)}
+                      />
                     </td>
                     <td className="px-4 py-3">
                       <LeadStagePicker

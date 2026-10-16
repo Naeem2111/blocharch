@@ -6,6 +6,7 @@ import {
   updateArchitect,
 } from "@/lib/architects";
 import { slugFromPracticeUrl } from "@/lib/practice-url";
+import { isPracticeType, type PracticeTypeValue } from "@/lib/practice-types";
 
 function slugFromUrl(url: string): string {
   return slugFromPracticeUrl(url);
@@ -43,6 +44,7 @@ export async function PATCH(
     phone?: string | null;
     website?: string | null;
     address?: string | null;
+    practiceType?: PracticeTypeValue;
   } = {};
 
   if (typeof body.name === "string") updates.name = body.name;
@@ -51,6 +53,12 @@ export async function PATCH(
   if (body.phone === null || typeof body.phone === "string") updates.phone = body.phone;
   if (body.website === null || typeof body.website === "string") updates.website = body.website;
   if (body.address === null || typeof body.address === "string") updates.address = body.address;
+  if (typeof body.practiceType === "string") {
+    if (!isPracticeType(body.practiceType)) {
+      return Response.json({ error: "Choose a practice type" }, { status: 400 });
+    }
+    updates.practiceType = body.practiceType;
+  }
 
   if (Object.keys(updates).length === 0) {
     return Response.json({ error: "No updates provided" }, { status: 400 });

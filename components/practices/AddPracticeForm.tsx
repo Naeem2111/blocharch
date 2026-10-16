@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { PracticeTypeSelect } from "@/components/practices/PracticeTypeSelect";
+import type { PracticeTypeValue } from "@/lib/practice-types";
 
 export function AddPracticeForm({
   onCreated,
@@ -17,6 +19,7 @@ export function AddPracticeForm({
   const [form, setForm] = useState({
     name: "",
     email: "",
+    practiceType: "architecture_firm" as PracticeTypeValue,
     contact: "",
     phone: "",
     website: "",
@@ -41,7 +44,15 @@ export function AddPracticeForm({
       }
       setCreated({ slug: data.slug, name: data.name });
       onCreated?.(data);
-      setForm({ name: "", email: "", contact: "", phone: "", website: "", address: "" });
+      setForm({
+        name: "",
+        email: "",
+        practiceType: "architecture_firm",
+        contact: "",
+        phone: "",
+        website: "",
+        address: "",
+      });
       if (compact) setOpen(false);
     } finally {
       setSaving(false);
@@ -109,6 +120,15 @@ export function AddPracticeForm({
               placeholder="e.g. Smith Architects"
               required
             />
+          </label>
+          <label className="block text-xs text-slate-400">
+            Practice type
+            <div className="mt-1">
+              <PracticeTypeSelect
+                value={form.practiceType}
+                onChange={(practiceType) => setForm({ ...form, practiceType })}
+              />
+            </div>
           </label>
           <label className="block text-xs text-slate-400">
             Email <span className="text-red-400">*</span>

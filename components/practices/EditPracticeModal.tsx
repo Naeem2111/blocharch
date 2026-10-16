@@ -2,10 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { slugFromPracticeUrl } from "@/lib/practice-url";
+import { PracticeTypeSelect } from "@/components/practices/PracticeTypeSelect";
+import { isPracticeType, type PracticeTypeValue } from "@/lib/practice-types";
 
 type Practice = {
   url: string;
   name: string;
+  practice_type?: string;
   email: string;
   contact: string;
   phone: string;
@@ -27,6 +30,9 @@ export function EditPracticeModal({
   const [error, setError] = useState("");
   const [form, setForm] = useState({
     name: practice.name,
+    practiceType: (isPracticeType(practice.practice_type || "")
+      ? practice.practice_type
+      : "architecture_firm") as PracticeTypeValue,
     email: practice.email,
     contact: practice.contact,
     phone: practice.phone,
@@ -37,6 +43,9 @@ export function EditPracticeModal({
   useEffect(() => {
     setForm({
       name: practice.name,
+      practiceType: (isPracticeType(practice.practice_type || "")
+        ? practice.practice_type
+        : "architecture_firm") as PracticeTypeValue,
       email: practice.email,
       contact: practice.contact,
       phone: practice.phone,
@@ -63,6 +72,7 @@ export function EditPracticeModal({
       onSaved({
         url: data.url ?? practice.url,
         name: data.name ?? form.name,
+        practice_type: data.practice_type ?? form.practiceType,
         email: data.email ?? "",
         contact: data.contact ?? "",
         phone: data.phone ?? "",
@@ -104,6 +114,15 @@ export function EditPracticeModal({
               className="field-console mt-1 w-full rounded-lg px-3 py-2 text-sm"
               required
             />
+          </label>
+          <label className="block text-xs text-slate-400">
+            Practice type
+            <div className="mt-1">
+              <PracticeTypeSelect
+                value={form.practiceType}
+                onChange={(practiceType) => setForm({ ...form, practiceType })}
+              />
+            </div>
           </label>
           <label className="block text-xs text-slate-400">
             Email

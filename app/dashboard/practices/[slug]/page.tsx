@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getBestAddress, loadArchitects } from "@/lib/architects";
 import { gmailComposeUrl } from "@/lib/gmail-compose";
 import { isManualPracticeUrl } from "@/lib/practice-url";
+import { practiceTypeLabel } from "@/lib/practice-types";
 import { LeadStatus } from "@/components/LeadStatus";
 import { LeadOutreachPanel } from "@/components/outreach/LeadOutreachPanel";
 import { PracticeMap } from "@/components/PracticeMap";
@@ -44,6 +45,7 @@ export default async function PracticeDetailPage({
           <div className="card-tool overflow-hidden rounded-2xl ring-1 ring-white/[0.06]">
         <div className="border-b border-white/[0.06] p-6">
           <h1 className="text-2xl font-semibold text-white">{practice.name}</h1>
+          <p className="mt-1 text-sm text-slate-400">{practiceTypeLabel(practice.practice_type)}</p>
           {practice.website && (
             <a
               href={practice.website}

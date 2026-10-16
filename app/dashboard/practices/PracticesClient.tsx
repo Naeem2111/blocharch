@@ -4,12 +4,15 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { AddPracticeForm } from "@/components/practices/AddPracticeForm";
 import { EditPracticeModal } from "@/components/practices/EditPracticeModal";
+import { PracticeTypeSelect } from "@/components/practices/PracticeTypeSelect";
+import { practiceTypeLabel, type PracticeTypeValue } from "@/lib/practice-types";
 import { getBestAddressFromFields } from "@/lib/address-display";
 import { gmailComposeUrl } from "@/lib/gmail-compose";
 
 interface Architect {
 	url: string;
 	name: string;
+	practice_type: string;
 	website: string;
 	socials: string[];
 	email: string;
@@ -24,6 +27,7 @@ interface Architect {
 
 const COLUMN_IDS = [
 	"name",
+	"practice_type",
 	"email",
 	"contact",
 	"phone",
@@ -41,6 +45,7 @@ type ColumnId = (typeof COLUMN_IDS)[number];
 
 const COLUMN_LABELS: Record<ColumnId, string> = {
 	name: "Name",
+	practice_type: "Practice type",
 	email: "Email",
 	contact: "Contact",
 	phone: "Contact number",
@@ -58,6 +63,7 @@ const STORAGE_KEY = "blocarch-practices-columns";
 
 const DEFAULT_VISIBLE: Record<ColumnId, boolean> = {
 	name: true,
+	practice_type: true,
 	email: true,
 	contact: true,
 	phone: true,
@@ -110,6 +116,8 @@ export function PracticesClient() {
 	const [editing, setEditing] = useState<Architect | null>(null);
 	const [restoringUrl, setRestoringUrl] = useState<string | null>(null);
 	const [restoreError, setRestoreError] = useState<string | null>(null);
+	const [typeError, setTypeError] = useState<string | null>(null);
+	const [savingTypeUrl, setSavingTypeUrl] = useState<string | null>(null);
 	const [columnsOpen, setColumnsOpen] = useState(false);
 	const [visible, setVisible] =
 		useState<Record<ColumnId, boolean>>(DEFAULT_VISIBLE);
@@ -172,6 +180,47 @@ export function PracticesClient() {
 			);
 		} finally {
 			setRestoringUrl(null);
+		}
+	};
+
+	const changePracticeType = async (p: Architect, practiceType: PracticeTypeValue) => {
+		const previous = p.practice_type;
+		setTypeError(null);
+		setSavingTypeUrl(p.url);
+		setData((current) =>
+			current
+				? {
+						...current,
+						items: current.items.map((item) =>
+							item.url === p.url ? { ...item, practice_type: practiceType } : item,
+						),
+					}
+				: current,
+		);
+		try {
+			const res = await fetch(`/api/practices/${encodeURIComponent(slugFromUrl(p.url))}`, {
+				method: "PATCH",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ practiceType }),
+			});
+			if (!res.ok) {
+				const j = await res.json().catch(() => ({}));
+				throw new Error((j as { error?: string }).error || "Could not save practice type");
+			}
+		} catch (e) {
+			setData((current) =>
+				current
+					? {
+							...current,
+							items: current.items.map((item) =>
+								item.url === p.url ? { ...item, practice_type: previous } : item,
+							),
+						}
+					: current,
+			);
+			setTypeError(e instanceof Error ? e.message : "Could not save practice type");
+		} finally {
+			setSavingTypeUrl(null);
 		}
 	};
 
@@ -260,9 +309,9 @@ export function PracticesClient() {
 					them back on the map and in All practices.
 				</p>
 			) : null}
-			{restoreError ? (
+			{restoreError || typeError ? (
 				<p className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400/90">
-					{restoreError}
+					{restoreError || typeError}
 				</p>
 			) : null}
 			<div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-start sm:gap-3">
@@ -397,6 +446,23 @@ export function PracticesClient() {
 													<span className="font-medium text-white">
 														{p.name || "—"}
 													</span>
+												</td>
+											)}
+											{visible.practice_type && (
+												<td className="px-4 py-3">
+													{tab === "active" ? (
+														<PracticeTypeSelect
+															value={p.practice_type || "architecture_firm"}
+															disabled={savingTypeUrl === p.url}
+															onChange={(practiceType) =>
+																void changePracticeType(p, practiceType)
+															}
+														/>
+													) : (
+														<span className="text-sm text-slate-300">
+															{practiceTypeLabel(p.practice_type)}
+														</span>
+													)}
 												</td>
 											)}
 											{visible.email && (

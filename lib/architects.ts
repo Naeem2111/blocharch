@@ -2,6 +2,7 @@ import { getBestAddressFromFields } from "@/lib/address-display";
 import { geocodeAndPersistArchitect } from "@/lib/geocode-architect";
 import { getOrCreateLead } from "@/lib/leads";
 import { prisma } from "@/lib/prisma";
+import { isPracticeType, type PracticeTypeValue } from "@/lib/practice-types";
 import {
   isValidEmail,
   manualPracticeUrl,
@@ -12,6 +13,7 @@ import {
 export interface Architect {
   url: string;
   name: string;
+  practice_type: PracticeTypeValue;
   website: string;
   socials: string[];
   email: string;
@@ -118,6 +120,7 @@ export async function searchDeletedArchitects(params: {
 export type CreateManualPracticeInput = {
   name: string;
   email: string;
+  practiceType?: string;
   contact?: string;
   phone?: string;
   website?: string;
@@ -132,6 +135,13 @@ export async function createManualPractice(
   if (!name) throw new Error("Practice name is required");
   if (!email) throw new Error("Email is required");
   if (!isValidEmail(email)) throw new Error("Enter a valid email address");
+  if (input.practiceType && !isPracticeType(input.practiceType)) {
+    throw new Error("Choose a practice type");
+  }
+  const practiceType: PracticeTypeValue =
+    input.practiceType && isPracticeType(input.practiceType)
+      ? input.practiceType
+      : "architecture_firm";
 
   const duplicateEmail = await prisma.architect.findFirst({
     where: { email: { equals: email, mode: "insensitive" }, deletedAt: null },
@@ -158,6 +168,7 @@ export async function createManualPractice(
     data: {
       url,
       name,
+      practiceType,
       email,
       contact: input.contact?.trim() || null,
       phone: input.phone?.trim() || null,
@@ -181,6 +192,7 @@ export async function createManualPractice(
   return {
     url: row.url,
     name: row.name,
+    practice_type: row.practiceType,
     website: row.website || "",
     socials: row.socials,
     email: row.email || "",
@@ -198,6 +210,7 @@ export async function createManualPractice(
 export type UpdatePracticeInput = {
   name?: string;
   email?: string | null;
+  practiceType?: PracticeTypeValue;
   contact?: string | null;
   phone?: string | null;
   website?: string | null;
@@ -207,6 +220,7 @@ export type UpdatePracticeInput = {
 function mapArchitectRow(r: {
   url: string;
   name: string;
+  practiceType: PracticeTypeValue;
   website: string | null;
   socials: string[];
   email: string | null;
@@ -221,6 +235,7 @@ function mapArchitectRow(r: {
   return {
     url: r.url,
     name: r.name,
+    practice_type: r.practiceType,
     website: r.website || "",
     socials: r.socials,
     email: r.email || "",
@@ -303,11 +318,16 @@ export async function updateArchitect(
   if (input.address !== undefined) {
     updates.address = input.address?.trim() || null;
   }
+  if (input.practiceType !== undefined) {
+    if (!isPracticeType(input.practiceType)) throw new Error("Choose a practice type");
+    updates.practiceType = input.practiceType;
+  }
 
   const row = await prisma.architect.update({
     where: { url: existing.url },
     data: {
       ...(updates.name !== undefined ? { name: updates.name } : {}),
+      ...(updates.practiceType !== undefined ? { practiceType: updates.practiceType } : {}),
       ...(updates.email !== undefined ? { email: updates.email } : {}),
       ...(updates.contact !== undefined ? { contact: updates.contact } : {}),
       ...(updates.phone !== undefined ? { phone: updates.phone } : {}),

@@ -145,10 +145,17 @@ enum OpsExchangeRateType {
   reporting
 }
 
+enum PracticeType {
+  architecture_firm
+  interior_design
+  development
+}
+
 model Architect {
   id          String   @id @default(uuid())
   url         String   @unique
   name        String
+  practiceType PracticeType @default(architecture_firm) @map("practice_type")
   website     String?
   socials     String[]
   email       String?

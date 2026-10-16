@@ -31,6 +31,7 @@ export async function POST(request: NextRequest) {
       phone: typeof body.phone === "string" ? body.phone : undefined,
       website: typeof body.website === "string" ? body.website : undefined,
       address: typeof body.address === "string" ? body.address : undefined,
+      practiceType: typeof body.practiceType === "string" ? body.practiceType : undefined,
     });
     return Response.json(practice, { status: 201 });
   } catch (e) {

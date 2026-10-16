@@ -14,6 +14,14 @@ BASE_URL = "https://architectdirectory.co.uk"
 ARCHITECTS_URL = f"{BASE_URL}/architects/"
 LANDSCAPE_ARCHITECTS_URL = f"{BASE_URL}/landscape-architects/"  # ~130 results, all pages scraped
 
+# practice_type values match lib/practice-types.ts.
+# Add a listing here when a new scrape source is introduced so each record
+# records where it came from.
+SCRAPE_SOURCES = [
+    (ARCHITECTS_URL, "architecture_firm"),
+    (LANDSCAPE_ARCHITECTS_URL, "architecture_firm"),
+]
+
 # Hosts we should not treat as the practice "website" (use actual site, not socials)
 SOCIAL_OR_NON_WEBSITE_HOSTS = frozenset({
     'twitter.com', 'www.twitter.com', 'x.com', 'www.x.com',
@@ -196,6 +204,7 @@ class ArchitectScraper:
             practice_data = {
                 'url': url,
                 'name': '',
+                'practice_type': 'architecture_firm',
                 'website': '',
                 'socials': [],
                 'email': '',
@@ -397,31 +406,22 @@ class ArchitectScraper:
             List of practice data dictionaries
         """
         all_practices = []
-        
-        # Scrape regular architects (all pages)
-        print("=" * 50)
-        print("Scraping architects (all pages)...")
-        print("=" * 50)
-        architect_urls = self.get_all_architect_urls(ARCHITECTS_URL)
-        print(f"\nFound {len(architect_urls)} architect practice URLs")
-        
-        all_urls = list(architect_urls)
-        
-        if include_landscape:
-            print("\n" + "=" * 50)
-            print("Scraping landscape architects (all pages)...")
+        sources = [source for source in SCRAPE_SOURCES if include_landscape or "landscape-architects" not in source[0]]
+        url_types = {}
+
+        for listing_url, practice_type in sources:
             print("=" * 50)
-            landscape_urls = self.get_all_architect_urls(LANDSCAPE_ARCHITECTS_URL)
-            print(f"\nFound {len(landscape_urls)} landscape architect practice URLs")
-            # Deduplicate: same practice may appear in both lists
-            seen = set(all_urls)
-            for u in landscape_urls:
-                if u not in seen:
-                    seen.add(u)
-                    all_urls.append(u)
-            print(f"Combined unique practices: {len(all_urls)}")
-        
-        architect_urls = all_urls
+            print(f"Scraping {listing_url} as {practice_type}...")
+            print("=" * 50)
+            found_urls = self.get_all_architect_urls(listing_url)
+            print(f"\nFound {len(found_urls)} practice URLs")
+            for practice_url in found_urls:
+                # First listing wins when the same practice appears in more than one source.
+                if practice_url not in url_types:
+                    url_types[practice_url] = practice_type
+
+        architect_urls = list(url_types.keys())
+        print(f"Combined unique practices: {len(architect_urls)}")
         total_urls = len(architect_urls)
         if max_practices:
             architect_urls = architect_urls[:max_practices]
@@ -434,6 +434,8 @@ class ArchitectScraper:
         for i, url in enumerate(architect_urls, 1):
             print(f"[{i}/{total_urls}] Scraping: {url}")
             practice_data = self.scrape_practice_page(url)
+            if isinstance(practice_data, dict) and "error" not in practice_data:
+                practice_data["practice_type"] = url_types.get(url, "architecture_firm")
             all_practices.append(practice_data)
             time.sleep(self.delay)
         

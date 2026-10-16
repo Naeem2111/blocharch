@@ -39,6 +39,11 @@ async function seedArchitects() {
       return {
         url,
         name: String(item?.name || ""),
+        practiceType: ["architecture_firm", "interior_design", "development"].includes(
+          String(item?.practice_type || item?.practiceType || ""),
+        )
+          ? String(item.practice_type || item.practiceType)
+          : "architecture_firm",
         website: item?.website ? String(item.website) : null,
         socials: Array.isArray(item?.socials) ? item.socials.map(String) : [],
         email: item?.email ? String(item.email) : null,
