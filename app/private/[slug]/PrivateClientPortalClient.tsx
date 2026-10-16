@@ -184,12 +184,12 @@ function RecentUpdates({ updates, limit }: { updates: PortalData["updates"]; lim
       {rows.map((update, i) => (
         <li
           key={update.id}
-          className={`flex items-baseline justify-between gap-4 py-2.5 ${
-            i < rows.length - 1 ? "border-b border-white/[0.08]" : ""
+          className={`flex items-baseline justify-between gap-4 py-3 ${
+            i < rows.length - 1 ? "border-b border-white/30" : ""
           }`}
         >
-          <span className="min-w-0 text-sm text-slate-200">{update.title}</span>
-          <span className="shrink-0 text-xs tabular-nums text-slate-500">{formatUpdateDate(update.occurredAt)}</span>
+          <span className="min-w-0 text-sm text-white">{update.title}</span>
+          <span className="shrink-0 text-xs tabular-nums text-white">{formatUpdateDate(update.occurredAt)}</span>
         </li>
       ))}
     </ul>
@@ -593,7 +593,7 @@ function Overview({
     <div className="min-w-0 space-y-4">
       <div className="grid gap-3 md:grid-cols-3">
         <Metric icon="cal" label="Brief received" value={formatDate(project.briefReceivedAt)} />
-        <Metric icon="dot" label="Current stage" value={current?.label ?? project.designStageLabel} hint={current ? `Step ${current.number} of ${stages.length}` : undefined} />
+        <Metric icon="dot" label="Current stage" value={current?.label ?? project.designStageLabel} hint={current ? `Step ${current.number} of ${stages.length}` : undefined} emphasis />
         <Metric icon="cal" label="Target next stage" value={next?.label ?? "—"} hint={next?.dateFrom ? formatDate(next.dateFrom) : "To be confirmed"} />
       </div>
 
@@ -669,18 +669,18 @@ function Overview({
         <section className="private-portal-hero min-w-0 overflow-hidden rounded-2xl p-5 sm:p-6">
           <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_1px_13.5rem] sm:gap-0 sm:items-stretch">
             <div className="sm:pr-6">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-300">Current stage</p>
-              <h2 className="mt-1.5 text-xl font-semibold text-white sm:text-2xl">{current.label}</h2>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white">Current stage</p>
+              <h2 className="mt-1.5 text-xl font-bold text-white sm:text-2xl">{current.label}</h2>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
                 <span className="rounded-full bg-sky-500/15 px-2.5 py-0.5 text-sky-200 ring-1 ring-sky-400/30">In progress</span>
-                <span className="text-slate-400">Step {current.number} of {stages.length}</span>
+                <span className="text-white">Step {current.number} of {stages.length}</span>
               </div>
             </div>
             <div className="hidden bg-white/25 sm:block" aria-hidden />
             <div className="sm:pl-6">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">Up next</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white">Up next</p>
               <p className="mt-1.5 text-base font-semibold text-white">{next?.label ?? "—"}</p>
-              <p className="mt-1 text-sm text-slate-500">Target date: {next?.dateFrom ? formatDate(next.dateFrom) : "To be confirmed"}</p>
+              <p className="mt-1 text-sm text-white">Target date: {next?.dateFrom ? formatDate(next.dateFrom) : "To be confirmed"}</p>
             </div>
           </div>
           <div className="overflow-x-auto">
@@ -716,17 +716,18 @@ function Overview({
           </button>
           {completedActionItems.length > 0 ? (
             <div className="mt-4 border-t border-white/[0.06] pt-3">
-              <button type="button" onClick={onToggleCompleted} className="flex w-full items-center gap-2 text-sm text-emerald-300">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/20 text-[10px]">✓</span>
+              <button type="button" onClick={onToggleCompleted} className="flex w-full items-center gap-2 text-sm text-white">
+                <DoneMark />
                 Completed actions ({completedActionItems.length})
                 <span className="ml-auto text-slate-500">{showCompleted ? "▴" : "▾"}</span>
               </button>
               {showCompleted ? (
-                <ul className="mt-3 space-y-2 text-sm text-slate-300">
+                <ul className="mt-3 space-y-2 text-sm text-white">
                   {completedActionItems.map((action) => (
-                    <li key={action.id} className="flex justify-between gap-3">
-                      <span>{action.title}</span>
-                      <span className="text-xs text-slate-500">{formatDate(action.completedAt)}</span>
+                    <li key={action.id} className="flex items-center gap-3">
+                      <DoneMark />
+                      <span className="min-w-0 flex-1">{action.title}</span>
+                      <span className="shrink-0 text-xs text-white">{formatDate(action.completedAt)}</span>
                     </li>
                   ))}
                 </ul>
@@ -798,12 +799,12 @@ function Journey({
               </div>
               <div className={`min-w-0 flex-1 ${stage.state === "current" ? "private-portal-timeline-current rounded-xl px-4 py-3" : "pt-0.5"}`}>
                 <div className="flex items-start justify-between gap-3">
-                  <p className="font-medium text-white">{stage.label}</p>
-                  <p className="shrink-0 text-xs text-slate-500">
+                  <p className={stage.state === "current" ? "font-bold text-white" : "font-medium text-white"}>{stage.label}</p>
+                  <p className={`shrink-0 text-xs text-white ${stage.state === "current" ? "font-bold" : ""}`}>
                     {stage.dateFrom ? formatDate(stage.dateFrom) : stage.state === "upcoming" ? "To be confirmed" : "—"}
                   </p>
                 </div>
-                <p className={`text-xs ${stage.state === "done" ? "text-emerald-300" : stage.state === "current" ? "text-sky-300" : "text-slate-500"}`}>
+                <p className={`text-xs text-white ${stage.state === "current" ? "font-bold" : ""}`}>
                   {stage.state === "done"
                     ? "Completed"
                     : stage.state === "current"
@@ -812,7 +813,7 @@ function Journey({
                         ? "Final milestone"
                         : "Upcoming"}
                 </p>
-                {stage.state === "current" ? <p className="mt-1 text-sm text-slate-400">{stageBody(project.designStage)}</p> : null}
+                {stage.state === "current" ? <p className="mt-1 text-sm font-bold text-white">{stageBody(project.designStage)}</p> : null}
               </div>
             </li>
           ))}
@@ -821,11 +822,11 @@ function Journey({
       <div className="space-y-4">
         <section className="private-portal-hero rounded-2xl p-5">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Current stage details</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white">Current stage details</p>
             <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[11px] text-sky-200">In progress</span>
           </div>
-          <h2 className="mt-3 text-2xl font-semibold text-white">{current.label}</h2>
-          <p className="mt-1 text-sm text-slate-500">Step {current.number} of {stages.length}</p>
+          <h2 className="mt-3 text-2xl font-bold text-white">{current.label}</h2>
+          <p className="mt-1 text-sm text-white">Step {current.number} of {stages.length}</p>
           <p className="mt-3 text-sm leading-relaxed text-slate-300">{stageBody(project.designStage)}</p>
           {focus.length > 0 ? (
             <>
@@ -841,11 +842,11 @@ function Journey({
         {next ? (
           <section className={`${cardClass()} p-5`}>
             <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Next stage</p>
-              <span className="text-xs text-slate-500">{next.dateFrom ? formatDate(next.dateFrom) : "To be confirmed"}</span>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white">Next stage</p>
+              <span className="text-xs text-white">{next.dateFrom ? formatDate(next.dateFrom) : "To be confirmed"}</span>
             </div>
             <h3 className="mt-3 text-xl font-semibold text-white">{next.label}</h3>
-            <p className="mt-1 text-sm text-slate-500">Step {next.number} of {stages.length}</p>
+            <p className="mt-1 text-sm text-white">Step {next.number} of {stages.length}</p>
             <p className="mt-3 text-sm leading-relaxed text-slate-400">{PRIVATE_STAGE_CLIENT_COPY[project.designStage].nextHint}</p>
           </section>
         ) : null}
@@ -968,7 +969,7 @@ function Actions({
               return (
                 <li key={action.id} className="rounded-2xl border border-white/[0.08] px-4 py-3">
                   <button type="button" onClick={() => onToggleCompleted(action.id)} className="flex w-full items-center gap-3 text-left">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500/20 text-xs text-emerald-300">✓</span>
+                    <DoneMark />
                     <span className="min-w-0 flex-1 text-sm font-medium text-white">{action.title}</span>
                     <span className="rounded-full border border-white/10 px-2 py-1 text-[11px] text-slate-400">Completed {formatDate(action.completedAt)}</span>
                     <span className="text-slate-500">{open ? "▴" : "▾"}</span>
@@ -1269,14 +1270,14 @@ function StageRail({ stages }: { stages: Stage[] }) {
                       ? "bg-emerald-500 text-slate-950"
                       : stage.state === "current"
                         ? "bg-sky-400 text-slate-950 shadow-[0_0_0_5px_rgba(56,189,248,0.45)]"
-                        : "border border-white/20 bg-[#0c1524] text-slate-400"
+                        : "border border-white/20 bg-[#0c1524] text-white"
                   }`}
                 >
                   {stage.state === "done" ? "✓" : stage.number}
                 </div>
               </div>
             </div>
-            <p className={`mt-3 max-w-full px-1 text-center text-[10px] leading-tight ${stage.state === "current" ? "font-medium text-white" : "text-slate-500"}`}>
+            <p className={`mt-3 max-w-full px-1 text-center text-[10px] leading-tight text-white ${stage.state === "current" ? "font-bold" : ""}`}>
               {stage.label}
             </p>
           </div>
@@ -1292,7 +1293,7 @@ function StageDot({ stage }: { stage: Stage }) {
       ? "bg-emerald-500 text-white"
       : stage.state === "current"
         ? "bg-sky-400 text-slate-950 shadow-[0_0_0_5px_rgba(56,189,248,0.35),0_0_18px_rgba(56,189,248,0.45)]"
-        : "border border-slate-500 bg-[#0c1524] text-slate-300";
+        : "border border-slate-500 bg-[#0c1524] text-white";
   return (
     <span className={`relative z-10 flex size-8 items-center justify-center rounded-full text-xs font-semibold ${cls}`}>
       {stage.state === "done" ? "✓" : stage.number}
@@ -1300,16 +1301,16 @@ function StageDot({ stage }: { stage: Stage }) {
   );
 }
 
-function Metric({ icon, label, value, hint }: { icon: "cal" | "dot"; label: string; value: string; hint?: string }) {
+function Metric({ icon, label, value, hint, emphasis }: { icon: "cal" | "dot"; label: string; value: string; hint?: string; emphasis?: boolean }) {
   return (
     <div className={`${cardClass()} flex items-center gap-3 px-4 py-3`}>
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.04] text-slate-300">
         {icon === "dot" ? <span className="h-2.5 w-2.5 rounded-full bg-sky-400" /> : <CalIcon />}
       </span>
       <span className="min-w-0">
-        <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</span>
-        <span className="block truncate text-sm font-semibold text-white">{value}</span>
-        {hint ? <span className="block truncate text-xs text-slate-500">{hint}</span> : null}
+        <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-white">{label}</span>
+        <span className={`block truncate text-sm text-white ${emphasis ? "font-bold" : "font-semibold"}`}>{value}</span>
+        {hint ? <span className="block truncate text-xs text-white">{hint}</span> : null}
       </span>
     </div>
   );
@@ -1429,6 +1430,16 @@ function ClockMini() {
     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.6} stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>
+  );
+}
+
+function DoneMark() {
+  return (
+    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
+      <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" aria-hidden>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+      </svg>
+    </span>
   );
 }
 
