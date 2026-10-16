@@ -70,15 +70,6 @@ function formatDate(iso: string | null) {
     .replace(/\bSep\b/, "Sept");
 }
 
-function formatUpdateDate(iso: string | null) {
-  if (!iso) return "";
-  const [y, m, d] = iso.split("-").map(Number);
-  if (!y || !m || !d) return iso;
-  return new Date(Date.UTC(y, m - 1, d))
-    .toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" })
-    .replace(/\bSep\b/, "Sept");
-}
-
 function formatBytes(n: number) {
   if (!n) return "—";
   if (n < 1024 * 1024) return `${Math.max(1, Math.round(n / 1024))} KB`;
@@ -175,22 +166,34 @@ function NewBadge() {
 function RecentUpdates({ updates, limit }: { updates: PortalData["updates"]; limit?: number }) {
   const rows = limit ? updates.slice(0, limit) : updates;
   if (rows.length === 0) {
-    return <p className="mt-4 text-sm text-slate-500">Updates will show here as the project moves.</p>;
+    return <p className="mt-4 text-base text-slate-500">Updates will show here as the project moves.</p>;
   }
   return (
-    <ul className="mt-3">
-      {rows.map((update, i) => (
-        <li
-          key={update.id}
-          className={`flex items-baseline justify-between gap-4 py-3 ${
-            i < rows.length - 1 ? "border-b border-white/30" : ""
-          }`}
-        >
-          <span className="min-w-0 text-sm text-white">{update.title}</span>
-          <span className="shrink-0 text-xs tabular-nums text-white">{formatUpdateDate(update.occurredAt)}</span>
-        </li>
-      ))}
-    </ul>
+    <ol className="mt-5">
+      {rows.map((update, i) => {
+        const last = i === rows.length - 1;
+        return (
+          <li key={update.id} className="flex items-stretch gap-4">
+            <p className="w-44 shrink-0 py-3.5 text-right text-lg font-medium leading-8 text-white">
+              {formatDate(update.occurredAt)}
+            </p>
+            <div className="relative flex w-8 shrink-0 justify-center">
+              {i < rows.length - 1 ? (
+                <span
+                  aria-hidden
+                  className={`absolute left-1/2 top-7 w-1 -translate-x-1/2 ${i === rows.length - 2 ? "bg-sky-400" : "bg-emerald-400"}`}
+                  style={{ height: "calc(100% - 0.15rem)" }}
+                />
+              ) : null}
+              <span
+                className={`relative z-10 mt-4 size-5 shrink-0 rounded-full ring-4 ring-[#0c1524] ${last ? "bg-sky-400" : "bg-emerald-400"}`}
+              />
+            </div>
+            <p className="min-w-0 flex-1 py-3.5 text-xl leading-8 text-white">{update.title}</p>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
@@ -692,8 +695,8 @@ function Overview({
 
       <div className="grid gap-4 xl:grid-cols-3">
         <section className={`${cardClass()} p-5`}>
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-white">
-            <span className="text-emerald-400"><BellMini /></span>
+          <h2 className="flex items-center gap-2 border-b border-white/[0.08] pb-3 text-base font-bold text-white">
+            <span className="text-white"><BellMini className="h-8 w-8" /></span>
             Recent updates
             {updates.length > 0 ? <NewBadge /> : null}
           </h2>
@@ -701,19 +704,24 @@ function Overview({
           <RecentUpdates updates={updates} limit={6} />
         </section>
         <section className={`${cardClass()} p-5`}>
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-white"><span className="text-sky-300"><CheckMini /></span>Required from you</h2>
+          <h2 className="flex items-center gap-2 border-b border-white/[0.08] pb-3 text-base font-bold text-white"><span className="text-white"><CheckMini className="h-8 w-8" /></span>Required from you</h2>
           <p className="mt-1 text-xs text-slate-500">Actions and information we need from you.</p>
-          <ul className="mt-4 space-y-3">
+          <ul className="mt-4 space-y-2">
             {actionItems.length === 0 ? <li className="text-sm text-slate-500">Nothing is waiting on you right now.</li> : null}
             {actionItems.slice(0, 3).map((action) => (
-              <li key={action.id} className="flex items-start gap-3 text-sm text-slate-200">
-                <span className="mt-0.5 h-4 w-4 shrink-0 rounded-full border border-slate-500" />
+              <li key={action.id} className="flex items-center gap-3 rounded-xl border border-white/[0.1] bg-white/[0.03] px-3 py-2.5 text-sm text-white">
+                <span className="h-4 w-4 shrink-0 rounded-full border border-white" />
                 <span>{action.title}</span>
               </li>
             ))}
           </ul>
-          <button type="button" onClick={onOpenActions} className="mt-4 text-sm text-sky-300 hover:underline">
-            View all actions →
+          <button
+            type="button"
+            onClick={onOpenActions}
+            className="mt-2 flex w-full items-center justify-between rounded-xl border border-white/[0.1] bg-white/[0.03] px-3 py-2.5 text-sm text-sky-300 hover:bg-white/[0.06]"
+          >
+            View all actions
+            <span aria-hidden>→</span>
           </button>
           {completedActionItems.length > 0 ? (
             <div className="mt-5 border-t border-white/[0.08] pt-4">
@@ -751,7 +759,7 @@ function Overview({
           ) : null}
         </section>
         <section className={`${cardClass()} p-5`}>
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-white"><span className="text-slate-300"><FolderMini /></span>Files for download</h2>
+          <h2 className="flex items-center gap-2 border-b border-white/[0.08] pb-3 text-base font-bold text-white"><span className="text-white"><FolderMini className="h-8 w-8" /></span>Files for download</h2>
           <p className="mt-1 text-xs text-slate-500">Access and download important project documents.</p>
           <ul className="mt-4 space-y-3">
             {documents.length === 0 ? <li className="text-sm text-slate-500">Documents will appear here when they are shared.</li> : null}
@@ -866,9 +874,9 @@ function Journey({
           </section>
         ) : null}
         <section className={`${cardClass()} p-5`}>
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-white">
+          <h2 className="flex items-center gap-2 border-b border-white/[0.08] pb-3 text-base font-bold text-white">
+            <span className="text-white"><BellMini className="h-8 w-8" /></span>
             Recent updates
-            {updates.length > 0 ? <NewBadge /> : null}
           </h2>
           <RecentUpdates updates={updates} limit={6} />
           <button type="button" onClick={onOpenOverview} className="mt-4 text-sm text-sky-300 hover:underline">
@@ -939,7 +947,7 @@ function Actions({
                   disabled={completing === action.id}
                   onClick={() => onComplete(action.id)}
                   aria-label={`Mark ${action.title} complete`}
-                  className="h-5 w-5 shrink-0 rounded-full border border-sky-300/70 hover:border-emerald-400 disabled:opacity-50"
+                  className="h-5 w-5 shrink-0 rounded-full border border-white hover:border-emerald-400 disabled:opacity-50"
                 />
                 <span className="min-w-0 flex-1 text-sm font-medium text-white">{action.title}</span>
               </li>
@@ -1175,9 +1183,9 @@ function StageRail({ stages }: { stages: Stage[] }) {
                 <div
                   className={`flex size-8 items-center justify-center rounded-full text-xs font-semibold leading-none ${
                     stage.state === "done"
-                      ? "bg-emerald-500 text-slate-950"
+                      ? "bg-emerald-500 text-white"
                       : stage.state === "current"
-                        ? "bg-sky-400 text-slate-950 shadow-[0_0_0_5px_rgba(56,189,248,0.45)]"
+                        ? "bg-sky-400 text-white shadow-[0_0_0_5px_rgba(56,189,248,0.45)]"
                         : "border border-white/20 bg-[#0c1524] text-white"
                   }`}
                 >
@@ -1200,7 +1208,7 @@ function StageDot({ stage }: { stage: Stage }) {
     stage.state === "done"
       ? "bg-emerald-500 text-white"
       : stage.state === "current"
-        ? "bg-sky-400 text-slate-950 shadow-[0_0_0_5px_rgba(56,189,248,0.35),0_0_18px_rgba(56,189,248,0.45)]"
+        ? "bg-sky-400 text-white shadow-[0_0_0_5px_rgba(56,189,248,0.35),0_0_18px_rgba(56,189,248,0.45)]"
         : "border border-slate-500 bg-[#0c1524] text-white";
   return (
     <span className={`relative z-10 flex size-8 items-center justify-center rounded-full text-xs font-semibold ${cls}`}>
@@ -1227,8 +1235,8 @@ function Metric({ icon, label, value, hint, emphasis }: { icon: "cal" | "dot"; l
 function CardTitle({ icon, children }: { icon: "doc" | "link" | "team"; children: string }) {
   return (
     <h2 className="flex items-center gap-2 border-b border-white/[0.08] pb-3 text-base font-bold text-white">
-      <span className="text-slate-200">
-        {icon === "doc" ? <DocMini /> : icon === "link" ? <LinkMini /> : <TeamMini />}
+      <span className="text-white">
+        {icon === "doc" ? <DocMini className="h-8 w-8" /> : icon === "link" ? <LinkMini className="h-8 w-8" /> : <TeamMini className="h-8 w-8" />}
       </span>
       {children}
     </h2>
@@ -1243,25 +1251,25 @@ function CalIcon() {
   );
 }
 
-function DocMini() {
+function DocMini({ className = "h-4 w-4" }: { className?: string }) {
   return (
-    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.6} stroke="currentColor">
+    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.6} stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
     </svg>
   );
 }
 
-function LinkMini() {
+function LinkMini({ className = "h-4 w-4" }: { className?: string }) {
   return (
-    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.6} stroke="currentColor">
+    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.6} stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
     </svg>
   );
 }
 
-function TeamMini() {
+function TeamMini({ className = "h-4 w-4" }: { className?: string }) {
   return (
-    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.6} stroke="currentColor">
+    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.6} stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
     </svg>
   );
@@ -1294,7 +1302,7 @@ function NavButton({
 }
 
 function Count({ n, hot }: { n: number; hot?: boolean }) {
-  return <span className={`ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] ${hot ? "bg-red-500 text-white" : "bg-white/10 text-slate-300"}`}>{n}</span>;
+  return <span className={`ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] text-white ${hot ? "bg-red-500" : "bg-white/10"}`}>{n}</span>;
 }
 
 function ProjectArt({ src }: { src: string | null }) {
@@ -1351,17 +1359,17 @@ function DoneMark() {
   );
 }
 
-function CheckMini() {
+function CheckMini({ className = "h-4 w-4" }: { className?: string }) {
   return (
-    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.6} stroke="currentColor">
+    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.6} stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>
   );
 }
 
-function FolderMini() {
+function FolderMini({ className = "h-4 w-4" }: { className?: string }) {
   return (
-    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.6} stroke="currentColor">
+    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.6} stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6.75v10.5A2.25 2.25 0 004.5 19.5h15a2.25 2.25 0 002.25-2.25V11.25a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
     </svg>
   );
@@ -1432,9 +1440,9 @@ function NoticeIcon({ kind, unread }: { kind: string; unread: boolean }) {
   );
 }
 
-function BellMini() {
+function BellMini({ className = "h-4 w-4" }: { className?: string }) {
   return (
-    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.6} stroke="currentColor">
+    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.6} stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
     </svg>
   );
