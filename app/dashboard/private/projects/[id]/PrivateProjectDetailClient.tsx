@@ -49,7 +49,7 @@ type Detail = {
       overTypical: boolean;
     };
     athlete: { fullName: string; initials: string } | null;
-    athletes?: Array<{ fullName: string; initials: string; isPrimary: boolean }>;
+    athletes?: Array<{ fullName: string; initials: string; isPrimary: boolean; title?: string | null }>;
     client: { id: string; name: string; slug: string | null };
     hoursLifeToDate: number | null;
     phaseGroups: Array<{
@@ -790,6 +790,9 @@ export function PrivateProjectDetailClient({
                       {a.initials}
                     </span>
                     {a.fullName}
+                    {"title" in a && a.title ? (
+                      <span className="text-xs text-slate-400">{a.title}</span>
+                    ) : null}
                     {"isPrimary" in a && a.isPrimary ? (
                       <span className="text-[10px] uppercase tracking-wider text-slate-500">Primary</span>
                     ) : null}

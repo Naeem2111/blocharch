@@ -26,27 +26,46 @@ export function whereAthletePrivateProjects(athleteId: string): Prisma.PrivatePr
   };
 }
 
+export function parseAthleteTitles(value: unknown): Record<string, string> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const titles: Record<string, string> = {};
+  for (const [id, title] of Object.entries(value as Record<string, unknown>)) {
+    const athleteId = id.trim();
+    if (!athleteId) continue;
+    titles[athleteId] = String(title ?? "").trim().slice(0, 80);
+  }
+  return titles;
+}
+
 export function parseOptionalPrivateAssignment(body: {
   assignedAthleteId?: unknown;
   assignedAthleteIds?: unknown;
   primaryAthleteId?: unknown;
-}): { athleteIds: string[]; primaryAthleteId: string | null } | { error: string } {
+  athleteTitles?: unknown;
+}): { athleteIds: string[]; primaryAthleteId: string | null; athleteTitles: Record<string, string> } | { error: string } {
   const hasFields =
     body.assignedAthleteId !== undefined ||
     body.assignedAthleteIds !== undefined ||
     body.primaryAthleteId !== undefined;
   if (!hasFields) {
-    return { athleteIds: [], primaryAthleteId: null };
+    return { athleteIds: [], primaryAthleteId: null, athleteTitles: {} };
   }
-  return parseProjectAssignmentInput(body);
+  const parsed = parseProjectAssignmentInput(body);
+  if ("error" in parsed) return parsed;
+  return { ...parsed, athleteTitles: parseAthleteTitles(body.athleteTitles) };
+}
+
+function assignmentTitle(titles: Record<string, string>, athleteId: string): string | null {
+  const title = titles[athleteId]?.trim() ?? "";
+  return title ? title.slice(0, 80) : null;
 }
 
 export async function applyPrivateProjectAthleteAssignments(
   projectId: string,
-  input: { athleteIds: string[]; primaryAthleteId: string | null },
+  input: { athleteIds: string[]; primaryAthleteId: string | null; athleteTitles?: Record<string, string> },
   db: Prisma.TransactionClient | typeof prisma = prisma,
 ): Promise<{ primaryAthleteId: string | null }> {
-  const { athleteIds, primaryAthleteId } = input;
+  const { athleteIds, primaryAthleteId, athleteTitles = {} } = input;
   const targetIds = new Set(athleteIds);
 
   if (athleteIds.length > 0) {
@@ -65,17 +84,14 @@ export async function applyPrivateProjectAthleteAssignments(
 
   for (const row of existing) {
     if (targetIds.has(row.athleteId)) {
-      if (row.removedAt) {
-        await db.privateProjectAthleteAssignment.update({
-          where: { id: row.id },
-          data: { removedAt: null, isPrimary: row.athleteId === primaryAthleteId },
-        });
-      } else if (row.isPrimary !== (row.athleteId === primaryAthleteId)) {
-        await db.privateProjectAthleteAssignment.update({
-          where: { id: row.id },
-          data: { isPrimary: row.athleteId === primaryAthleteId },
-        });
-      }
+      await db.privateProjectAthleteAssignment.update({
+        where: { id: row.id },
+        data: {
+          removedAt: null,
+          isPrimary: row.athleteId === primaryAthleteId,
+          title: assignmentTitle(athleteTitles, row.athleteId),
+        },
+      });
     } else if (!row.removedAt) {
       await db.privateProjectAthleteAssignment.update({
         where: { id: row.id },
@@ -92,6 +108,7 @@ export async function applyPrivateProjectAthleteAssignments(
           projectId,
           athleteId,
           isPrimary: athleteId === primaryAthleteId,
+          title: assignmentTitle(athleteTitles, athleteId),
         },
       });
     }

@@ -945,6 +945,8 @@ model PrivateProjectAthleteAssignment {
   projectId  String    @map("project_id")
   athleteId  String    @map("athlete_id")
   isPrimary  Boolean   @default(false) @map("is_primary")
+  /** Client-portal job title. Blank means no title is shown. */
+  title      String?   @db.VarChar(80)
   assignedAt DateTime  @default(now()) @map("assigned_at")
   removedAt  DateTime? @map("removed_at")
 

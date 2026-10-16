@@ -30,6 +30,7 @@ export function PrivateOnboardingClient({ initialClientId = "" }: { initialClien
     feeZar: "",
     assignedAthleteIds: [] as string[],
     primaryAthleteId: "",
+    athleteTitles: {} as Record<string, string>,
     designStage: "site_measure_up" as PrivateDesignStage,
     clientDescription: "",
     clientLinks: [] as ClientPortalDeliverable[],
@@ -76,6 +77,7 @@ export function PrivateOnboardingClient({ initialClientId = "" }: { initialClien
         feeZar: Number(form.feeZar || 0),
         assignedAthleteIds: form.assignedAthleteIds,
         primaryAthleteId: form.primaryAthleteId || null,
+        athleteTitles: form.athleteTitles,
         designStage: form.designStage,
         clientDescription: form.clientDescription.trim() || null,
         clientLinks: form.clientLinks,
@@ -274,17 +276,20 @@ export function PrivateOnboardingClient({ initialClientId = "" }: { initialClien
           <AthleteAssignmentsEditor
             className="block"
             radioName="private-onboarding-primary-athlete"
+            showTitles
             athleteIds={form.assignedAthleteIds}
             primaryAthleteId={form.primaryAthleteId}
+            athleteTitles={form.athleteTitles}
             athletes={athletes}
             onChange={(next) =>
               setForm({
                 ...form,
                 assignedAthleteIds: next.assignedAthleteIds,
                 primaryAthleteId: next.primaryAthleteId,
+                athleteTitles: next.athleteTitles,
               })
             }
-            hint="Select one or more athletes. Leave empty to onboard unassigned."
+            hint="Select one or more athletes. Leave empty to onboard unassigned. Portal title is what the client sees."
           />
           <label className="block text-xs text-slate-400">
             Target completion

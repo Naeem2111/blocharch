@@ -574,7 +574,7 @@ function Overview({
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold text-white">{member.fullName}</span>
-                  <span className="block text-xs text-slate-500">{member.role}</span>
+                  {member.role ? <span className="block text-xs text-slate-500">{member.role}</span> : null}
                 </span>
                 {member.email ? (
                   <a href={`mailto:${member.email}`} className="text-slate-400 hover:text-white" aria-label={`Email ${member.fullName}`}>

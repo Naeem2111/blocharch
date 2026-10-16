@@ -100,7 +100,7 @@ export async function getPublicPrivateProjectBySlug(slug: string) {
           fullName: row.athlete.fullName,
           email: row.athlete.email,
           initials: athleteInitials(row.athlete.fullName),
-          role: row.isPrimary ? "Project Lead" : "Project Architect",
+          role: row.title?.trim() || null,
         }))
       : project.assignedAthlete
         ? [
@@ -109,7 +109,7 @@ export async function getPublicPrivateProjectBySlug(slug: string) {
               fullName: project.assignedAthlete.fullName,
               email: project.assignedAthlete.email,
               initials: athleteInitials(project.assignedAthlete.fullName),
-              role: "Project Lead",
+              role: null,
             },
           ]
         : [];

@@ -20,11 +20,13 @@ type SerializedAthlete = {
   athleteCode: string;
   initials: string;
   isPrimary: boolean;
+  title: string | null;
   privateWeeklyCapHours: number;
 };
 
 type AssignmentRow = {
   isPrimary: boolean;
+  title: string | null;
   athlete: Pick<OpsAthlete, "id" | "fullName" | "athleteCode" | "privateWeeklyCapHours">;
 };
 
@@ -39,6 +41,7 @@ type ProjectWithRelations = PrivateProject & {
 function serializeAthlete(
   athlete: Pick<OpsAthlete, "id" | "fullName" | "athleteCode" | "privateWeeklyCapHours">,
   isPrimary: boolean,
+  title: string | null,
 ): SerializedAthlete {
   return {
     id: athlete.id,
@@ -46,16 +49,17 @@ function serializeAthlete(
     athleteCode: athlete.athleteCode,
     initials: athleteInitials(athlete.fullName),
     isPrimary,
+    title: title?.trim() || null,
     privateWeeklyCapHours: athlete.privateWeeklyCapHours,
   };
 }
 
 function serializePrivateAthletes(p: ProjectWithRelations): SerializedAthlete[] {
   const fromAssignments = (p.athleteAssignments ?? []).map((row) =>
-    serializeAthlete(row.athlete, row.isPrimary),
+    serializeAthlete(row.athlete, row.isPrimary, row.title),
   );
   if (fromAssignments.length > 0) return fromAssignments;
-  if (p.assignedAthlete) return [serializeAthlete(p.assignedAthlete, true)];
+  if (p.assignedAthlete) return [serializeAthlete(p.assignedAthlete, true, null)];
   return [];
 }
 

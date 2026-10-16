@@ -102,7 +102,7 @@ type ProjectPayload = {
     contactPhone: string | null;
   };
   athlete: { id: string; fullName: string } | null;
-  athletes?: Array<{ id: string; fullName: string; isPrimary: boolean }>;
+  athletes?: Array<{ id: string; fullName: string; isPrimary: boolean; title?: string | null }>;
 };
 
 function zar(n: number) {
@@ -154,6 +154,7 @@ export function PrivateProjectEditClient({
     feeZar: "",
     assignedAthleteIds: [] as string[],
     primaryAthleteId: "",
+    athleteTitles: {} as Record<string, string>,
     designStage: "site_measure_up" as PrivateDesignStage,
     currentDesignPhaseId: "",
     manualProgressPercent: "",
@@ -195,7 +196,7 @@ export function PrivateProjectEditClient({
       p.athletes && p.athletes.length > 0
         ? p.athletes
         : p.athlete
-          ? [{ id: p.athlete.id, fullName: p.athlete.fullName, isPrimary: true }]
+          ? [{ id: p.athlete.id, fullName: p.athlete.fullName, isPrimary: true, title: null }]
           : [];
     setForm({
       clientName: p.client.name,
@@ -206,6 +207,7 @@ export function PrivateProjectEditClient({
       feeZar: String(p.feeZar),
       assignedAthleteIds: assigned.map((a) => a.id),
       primaryAthleteId: assigned.find((a) => a.isPrimary)?.id ?? assigned[0]?.id ?? "",
+      athleteTitles: Object.fromEntries(assigned.map((a) => [a.id, a.title ?? ""])),
       designStage: p.designStage as PrivateDesignStage,
       currentDesignPhaseId:
         p.currentDesignPhaseId ??
@@ -385,6 +387,7 @@ export function PrivateProjectEditClient({
         feeZar: Number(form.feeZar || 0),
         assignedAthleteIds: form.assignedAthleteIds,
         primaryAthleteId: form.primaryAthleteId || null,
+        athleteTitles: form.athleteTitles,
         designStage: form.designStage,
         currentDesignPhaseId: form.currentDesignPhaseId || selectedDesignPhaseId || null,
         manualProgressPercent: useManualProgress ? Number(form.manualProgressPercent) : null,
@@ -944,14 +947,18 @@ export function PrivateProjectEditClient({
           </div>
           <AthleteAssignmentsEditor
             radioName="private-edit-primary-athlete"
+            showTitles
             athleteIds={form.assignedAthleteIds}
             primaryAthleteId={form.primaryAthleteId}
+            athleteTitles={form.athleteTitles}
             athletes={athletes}
+            hint="Select one or more athletes. The portal title is what the client sees under each name."
             onChange={(next) =>
               setForm({
                 ...form,
                 assignedAthleteIds: next.assignedAthleteIds,
                 primaryAthleteId: next.primaryAthleteId,
+                athleteTitles: next.athleteTitles,
               })
             }
           />
