@@ -693,7 +693,7 @@ function Overview({
       <div className="grid gap-4 xl:grid-cols-3">
         <section className={`${cardClass()} p-5`}>
           <h2 className="flex items-center gap-2 text-sm font-semibold text-white">
-            <span className="text-emerald-400"><ClockMini /></span>
+            <span className="text-emerald-400"><BellMini /></span>
             Recent updates
             {updates.length > 0 ? <NewBadge /> : null}
           </h2>
@@ -716,11 +716,25 @@ function Overview({
             View all actions →
           </button>
           {completedActionItems.length > 0 ? (
-            <div className="mt-4 border-t border-white/[0.06] pt-3">
-              <button type="button" onClick={onToggleCompleted} className="flex w-full items-center gap-2 text-sm text-white">
+            <div className="mt-5 border-t border-white/[0.08] pt-4">
+              <button
+                type="button"
+                onClick={onToggleCompleted}
+                aria-expanded={showCompleted}
+                className="flex w-full items-center gap-3 rounded-xl px-1 py-1 text-left text-base font-bold text-white hover:bg-white/[0.04]"
+              >
                 <DoneMark />
-                Completed actions ({completedActionItems.length})
-                <span className="ml-auto text-slate-500">{showCompleted ? "▴" : "▾"}</span>
+                <span className="min-w-0 flex-1">Completed actions ({completedActionItems.length})</span>
+                <svg
+                  className={`h-7 w-7 shrink-0 text-white transition ${showCompleted ? "rotate-180" : ""}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2.4}
+                  stroke="currentColor"
+                  aria-hidden
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                </svg>
               </button>
               {showCompleted ? (
                 <ul className="mt-3 space-y-2 text-sm text-white">
@@ -1415,6 +1429,14 @@ function NoticeIcon({ kind, unread }: { kind: string; unread: boolean }) {
       )}
       {unread ? <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-sky-400" /> : null}
     </span>
+  );
+}
+
+function BellMini() {
+  return (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.6} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+    </svg>
   );
 }
 
