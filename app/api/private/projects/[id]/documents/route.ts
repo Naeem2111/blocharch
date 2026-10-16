@@ -2,6 +2,8 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requirePrivateOpsSession } from "@/lib/private-access";
+import { recordPrivateActivity } from "@/lib/private-activity";
+import { revalidatePath } from "next/cache";
 import {
   newDocumentId,
   PRIVATE_DOCUMENT_MAX_BYTES,
@@ -19,6 +21,20 @@ import {
   updateStoredDocumentVisibility,
   PRIVATE_DRIVE_MAX_BYTES,
 } from "@/lib/private-drive-documents";
+
+async function noteVisibleFile(
+  project: { id: string; client: { slug: string | null } },
+  doc: { id: string; title: string; clientVisible: boolean },
+) {
+  if (!doc.clientVisible) return;
+  await recordPrivateActivity(prisma, {
+    projectId: project.id,
+    kind: "file",
+    title: `New file: ${doc.title}`,
+    sourceKey: `file:${doc.id}`,
+  });
+  if (project.client.slug) revalidatePath(`/private/${project.client.slug}`);
+}
 
 function serializeDoc(d: {
   id: string;
@@ -102,6 +118,7 @@ export async function POST(
           sizeBytes: Number(body.sizeBytes || 0),
           clientVisible,
         });
+        await noteVisibleFile(project, doc);
         return NextResponse.json({ document: serializeDoc(doc) }, { status: 201 });
       } catch (error) {
         const message = error instanceof Error ? error.message : "Could not save the file";
@@ -177,6 +194,7 @@ export async function POST(
         bytes,
         clientVisible,
       });
+      await noteVisibleFile(project, doc);
       return NextResponse.json({ document: serializeDoc(doc) }, { status: 201 });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not save to Google Drive";
@@ -200,6 +218,7 @@ export async function POST(
     },
   });
 
+  await noteVisibleFile(project, doc);
   return NextResponse.json({ document: serializeDoc(doc) }, { status: 201 });
 }
 
@@ -233,6 +252,13 @@ export async function PATCH(
   });
   if (body.clientVisible !== undefined) {
     await updateStoredDocumentVisibility(doc, Boolean(body.clientVisible));
+  }
+  if (doc.clientVisible && !existing.clientVisible) {
+    const owner = await prisma.privateProject.findUnique({
+      where: { id: params.id },
+      select: { id: true, client: { select: { slug: true } } },
+    });
+    if (owner) await noteVisibleFile(owner, doc);
   }
 
   return NextResponse.json({ document: serializeDoc(doc) });

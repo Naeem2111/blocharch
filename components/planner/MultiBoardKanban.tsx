@@ -351,6 +351,17 @@ export function MultiBoardKanban({
                                     {taskCardDescriptionPreview(t.description)}
                                   </p>
                                 ) : null}
+                                {t.document ? (
+                                  <a
+                                    href={`/api/planner/tasks/${encodeURIComponent(t.id)}/document`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="mt-1 inline-block text-[11px] text-brand-300 hover:underline"
+                                  >
+                                    {t.document.title}
+                                  </a>
+                                ) : null}
                               </div>
                               {nudge ? (
                                 <KanbanTaskMovePad

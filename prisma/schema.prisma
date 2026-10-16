@@ -329,6 +329,8 @@ model PlannerTask {
   assigneeId   String?  @map("assignee_id")
   dueAt        DateTime? @map("due_at")
   architectUrl String?  @map("architect_url")
+  /** Same file as the UK project document. Inbox copies point here instead of uploading again. */
+  opsProjectDocumentId String? @map("ops_project_document_id")
   customFields Json?    @map("custom_fields")
   /** When set, this task row is a duplicate pulled onto a personal board from another planner task. */
   linkedFromTaskId String? @map("linked_from_task_id")
@@ -337,6 +339,7 @@ model PlannerTask {
 
   column   PlannerColumn     @relation(fields: [columnId], references: [id], onDelete: Cascade)
   assignee User?             @relation("PlannerTaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  document OpsProjectDocument? @relation(fields: [opsProjectDocumentId], references: [id], onDelete: SetNull)
   labels   PlannerTaskLabel[]
   linkedFromPlannerTask PlannerTask? @relation("PlannerTaskCopies", fields: [linkedFromTaskId], references: [id], onDelete: SetNull)
   copiedPlannerTasks    PlannerTask[] @relation("PlannerTaskCopies")
@@ -345,6 +348,7 @@ model PlannerTask {
   @@index([columnId])
   @@index([assigneeId])
   @@index([linkedFromTaskId])
+  @@index([opsProjectDocumentId])
   @@map("planner_tasks")
 }
 
@@ -393,6 +397,8 @@ model OpsClient {
   slug                 String? @unique
   publicPortalEnabled  Boolean @default(false) @map("public_portal_enabled")
   notes       String?         @db.Text
+  /** Google Drive folder for this UK client's shared files. Separate from private clients. */
+  googleDriveFolderId String? @map("google_drive_folder_id")
   createdAt   DateTime        @default(now()) @map("created_at")
   updatedAt   DateTime        @updatedAt @map("updated_at")
 
@@ -555,6 +561,7 @@ model OpsProject {
   checkInRequests OpsCheckInRequest[]
   pipelineSource  OpsPipelineProject?
   customStage     OpsCatalogPhase?      @relation("ProjectCustomStage", fields: [customStageId], references: [id], onDelete: SetNull)
+  documents       OpsProjectDocument[]
 
   @@index([clientId, projectNumber])
   @@index([assignedAthleteId])
@@ -964,7 +971,11 @@ model PrivateProjectUpdate {
   projectId String   @map("project_id")
   title     String
   body      String?  @db.Text
-  /** Shown on the client portal feed. Publish explicitly from the dashboard. */
+  /** note, stage, file, action, action_done, description, date */
+  kind      String   @default("note") @db.VarChar(32)
+  /** Stops the same file or action from being logged twice. */
+  sourceKey String?  @unique @map("source_key")
+  /** Shown on the client portal feed. Automatic client-facing events are published. */
   clientVisible Boolean @default(false) @map("client_visible")
   occurredAt DateTime @default(now()) @map("occurred_at") @db.Date
   createdAt DateTime @default(now()) @map("created_at")
@@ -988,6 +999,26 @@ model PrivateActionItem {
 
   @@index([projectId, completedAt])
   @@map("private_action_items")
+}
+
+/** Files attached to a UK ops project. Only clientVisible rows appear on /clients/{slug}. */
+model OpsProjectDocument {
+  id             String   @id @default(uuid())
+  projectId      String   @map("project_id")
+  title          String
+  originalName   String   @map("original_name")
+  fileUrl        String   @map("file_url")
+  mimeType       String?  @map("mime_type")
+  sizeBytes      Int      @default(0) @map("size_bytes")
+  driveFileId    String?  @unique @map("drive_file_id")
+  clientVisible  Boolean  @default(false) @map("client_visible")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  project OpsProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  plannerTasks PlannerTask[]
+
+  @@index([projectId, clientVisible])
+  @@map("ops_project_documents")
 }
 
 /** Files attached to a private project. Only clientVisible rows appear on the portal. */

@@ -10,6 +10,7 @@ export type KanbanTaskRow = {
   dueAt: string | null;
   customFields: Record<string, unknown> | null;
   linkedFromTaskId?: string | null;
+  document?: { id: string; title: string } | null;
   assignee: { id: string; username: string } | null;
   labels: Array<{ label: { id: string; name: string; color: string } }>;
 };

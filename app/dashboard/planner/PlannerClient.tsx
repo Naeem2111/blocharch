@@ -83,6 +83,7 @@ type TaskRow = {
   dueAt: string | null;
   customFields: Record<string, unknown> | null;
   linkedFromTaskId?: string | null;
+  document?: { id: string; title: string } | null;
   assignee: Assignee | null;
   labels: TaskLbl[];
 };
@@ -108,6 +109,7 @@ type BoardDetail = {
   title: string;
   scope: "personal" | "team";
   kind?: string;
+  opsProjectId?: string | null;
   athleteId?: string | null;
   isSystem?: boolean;
   color: string;
@@ -1863,6 +1865,17 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
                                 {descPreview}
                               </p>
                             ) : null}
+                            {t.document ? (
+                              <a
+                                href={`/api/planner/tasks/${encodeURIComponent(t.id)}/document`}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="mt-1 inline-block text-[12px] text-brand-300 hover:underline"
+                              >
+                                {t.document.title}
+                              </a>
+                            ) : null}
                             {t.labels.length > 0 ? (
                               <div className="mt-2 flex flex-wrap gap-1">
                                 {t.labels.map((x) => (
@@ -2018,6 +2031,7 @@ export function PlannerClient({ initialUser = null }: { initialUser?: PlannerIni
               key={editTask.id}
               readOnly={!detail.editable}
               task={editTask}
+              opsProjectId={detail.opsProjectId}
               labels={detail.labels}
               assignees={assignees}
               showAssignee={currentRole === "admin" || currentRole === "manager"}
@@ -2586,6 +2600,7 @@ function TaskFormModal({
 
 function EditTaskModal({
   task,
+  opsProjectId = null,
   labels,
   assignees,
   showAssignee = true,
@@ -2596,6 +2611,7 @@ function EditTaskModal({
   onDelete,
 }: {
   task: TaskRow & { columnId: string };
+  opsProjectId?: string | null;
   labels: Label[];
   assignees: AssigneeOption[];
   showAssignee?: boolean;
@@ -2615,6 +2631,10 @@ function EditTaskModal({
   const [dueTime, setDueTime] = useState(initialDue.time);
   const [dueAmPm, setDueAmPm] = useState<"AM" | "PM">(initialDue.ampm);
   const [labelIds, setLabelIds] = useState(task.labels.map((x) => x.label.id));
+  const [documentId, setDocumentId] = useState(task.document?.id || "");
+  const [documentTitle, setDocumentTitle] = useState(task.document?.title || "");
+  const [projectFiles, setProjectFiles] = useState<Array<{ id: string; title: string }>>([]);
+  const [fileError, setFileError] = useState("");
   const dueEditedRef = useRef(false);
 
   useEffect(() => {
@@ -2631,6 +2651,9 @@ function EditTaskModal({
         setDescription(full.description || "");
         setAssigneeId(full.assigneeId || "");
         setLabelIds(full.labels.map((x) => x.label.id));
+        const attached = (full as TaskRow).document;
+        setDocumentId(attached?.id || "");
+        setDocumentTitle(attached?.title || "");
         if (dueEditedRef.current) return;
         const due = splitDueAtIso(full.dueAt);
         setDueDate(due.date);
@@ -2644,6 +2667,42 @@ function EditTaskModal({
       cancelled = true;
     };
   }, [task.id]);
+
+  useEffect(() => {
+    if (!opsProjectId) return;
+    let cancelled = false;
+    fetch(`/api/ops/projects/${opsProjectId}/documents`)
+      .then(async (r) => {
+        const j = await r.json().catch(() => ({}));
+        if (cancelled || !r.ok) return;
+        const rows = (j.documents || []) as Array<{ id: string; title: string }>;
+        setProjectFiles(rows.map((row) => ({ id: row.id, title: row.title })));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [opsProjectId]);
+
+  async function attachNewFile(file: File) {
+    if (!opsProjectId) return;
+    setFileError("");
+    const form = new FormData();
+    form.set("file", file);
+    form.set("title", file.name);
+    form.set("clientVisible", "false");
+    const posted = await fetch(`/api/ops/projects/${opsProjectId}/documents`, { method: "POST", body: form });
+    const body = (await posted.json().catch(() => ({}))) as { error?: string; document?: { id: string; title: string } };
+    if (!posted.ok || !body.document) {
+      setFileError(body.error || "Could not upload the file");
+      return;
+    }
+    setProjectFiles((prev) =>
+      prev.some((row) => row.id === body.document!.id) ? prev : [...prev, body.document!],
+    );
+    setDocumentId(body.document.id);
+    setDocumentTitle(body.document.title);
+  }
 
   const pendingDueIso = composeDueAtIso(dueDate, dueTime, dueAmPm, {
     dateOnlyDefaultsToNineAm: true,
@@ -2763,6 +2822,54 @@ function EditTaskModal({
               </select>
             </label>
           </div>
+          {opsProjectId || documentId ? (
+            <div className="space-y-2">
+              <p className="text-slate-400">Project file</p>
+              {documentId ? (
+                <a
+                  href={`/api/planner/tasks/${encodeURIComponent(task.id)}/document`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-block text-sm text-brand-300 hover:underline"
+                >
+                  {documentTitle || "Open file"}
+                </a>
+              ) : null}
+              {opsProjectId && !readOnly ? (
+                <>
+                  <select
+                    className="select-console w-full rounded-lg px-3 py-2 text-sm"
+                    value={documentId}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      setDocumentId(next);
+                      setDocumentTitle(projectFiles.find((row) => row.id === next)?.title || "");
+                    }}
+                  >
+                    <option value="">No file</option>
+                    {projectFiles.map((row) => (
+                      <option key={row.id} value={row.id}>
+                        {row.title}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="file"
+                    className="w-full text-xs text-slate-400 file:mr-3 file:rounded-md file:border-0 file:bg-white/[0.08] file:px-3 file:py-1.5 file:text-xs file:text-slate-200"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = "";
+                      if (file) void attachNewFile(file);
+                    }}
+                  />
+                  <p className="text-[11px] text-slate-500">
+                    A new upload is stored once on the project. This card points at that same file.
+                  </p>
+                </>
+              ) : null}
+              {fileError ? <p className="text-xs text-red-300">{fileError}</p> : null}
+            </div>
+          ) : null}
           <div>
             <p className="text-slate-400">Labels</p>
             <div className="mt-1 flex flex-wrap gap-2">
@@ -2833,6 +2940,7 @@ function EditTaskModal({
                     assigneeId: showAssignee ? assigneeId || null : undefined,
                     dueAt: dueIso ? new Date(dueIso).toISOString() : null,
                     labelIds,
+                    ...(opsProjectId ? { opsProjectDocumentId: documentId || null } : {}),
                   });
                 }}
                 className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-slate-950"

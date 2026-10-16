@@ -18,6 +18,12 @@ import {
 } from "@/lib/private-archive";
 import { normalizeClientDeliverablesForSave } from "@/lib/client-portal-deliverables";
 import { normalizeProjectDescription } from "@/lib/rich-text";
+import {
+  designPhaseLabel,
+  dueDateActivityLine,
+  recordPrivateActivity,
+  targetDateActivityLines,
+} from "@/lib/private-activity";
 import { isGoogleDriveConfigured } from "@/lib/google-drive";
 import { staffDocumentPath, syncClientDriveDocuments } from "@/lib/private-drive-documents";
 import {
@@ -404,21 +410,66 @@ export async function PATCH(
         }
       }
 
-      if (data.designStage && data.designStage !== existing.designStage) {
-        const label =
-          PRIVATE_STAGE_LABELS[data.designStage as keyof typeof PRIVATE_STAGE_LABELS];
-        await tx.privateProjectUpdate.create({
-          data: {
-            projectId: project.id,
-            title: label,
-            body:
-              data.designStage === "council_approved"
-                ? "Design approved — construction is the next, separate phase."
-                : `Moved to ${label}.`,
-            clientVisible: false,
-            occurredAt: new Date(),
-          },
+      const structure = nextStructurePreview ?? resolvePhaseStructure(existing.phaseStructure);
+      const nextPhaseId =
+        data.currentDesignPhaseId !== undefined
+          ? (data.currentDesignPhaseId as string | null)
+          : existing.currentDesignPhaseId;
+      const stageChanged =
+        (data.designStage !== undefined && data.designStage !== existing.designStage) ||
+        (data.currentDesignPhaseId !== undefined &&
+          data.currentDesignPhaseId !== existing.currentDesignPhaseId);
+      if (stageChanged) {
+        const stageKey = typeof data.designStage === "string" ? data.designStage : existing.designStage;
+        const label = nextPhaseId
+          ? designPhaseLabel(structure, nextPhaseId)
+          : PRIVATE_STAGE_LABELS[stageKey];
+        await recordPrivateActivity(tx, {
+          projectId: project.id,
+          kind: "stage",
+          title: `Stage updated to ${label}`,
+          body:
+            data.designStage === "council_approved"
+              ? "Design approved. Construction is the next, separate phase."
+              : null,
         });
+      }
+
+      if (
+        data.clientDescription !== undefined &&
+        normalizeProjectDescription(existing.clientDescription) !== data.clientDescription
+      ) {
+        await recordPrivateActivity(tx, {
+          projectId: project.id,
+          kind: "description",
+          title: "Project description updated",
+        });
+      }
+
+      if (data.dueDate !== undefined) {
+        const line = dueDateActivityLine(
+          existing.dueDate,
+          (data.dueDate as Date | null) ?? null,
+        );
+        if (line) {
+          await recordPrivateActivity(tx, {
+            projectId: project.id,
+            kind: "date",
+            title: "Target date updated",
+            body: line,
+          });
+        }
+      }
+
+      if (data.stageDates !== undefined) {
+        for (const line of targetDateActivityLines(existing.stageDates, data.stageDates, structure)) {
+          await recordPrivateActivity(tx, {
+            projectId: project.id,
+            kind: "date",
+            title: "Target date updated",
+            body: line,
+          });
+        }
       }
 
       return tx.privateProject.findUniqueOrThrow({

@@ -6,6 +6,7 @@ export const PLANNER_BOARD_TASK_LIST_SELECT = {
   assigneeId: true,
   dueAt: true,
   linkedFromTaskId: true,
+  document: { select: { id: true, title: true } },
   assignee: { select: { id: true, username: true } },
   labels: { include: { label: true } },
 } as const;

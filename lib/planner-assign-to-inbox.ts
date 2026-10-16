@@ -92,6 +92,7 @@ export async function deliverAssignedTaskToAthleteInbox(
       sortOrder: (maxOrder._max.sortOrder ?? -1) + 1,
       assigneeId: source.assigneeId,
       dueAt: source.dueAt,
+      opsProjectDocumentId: source.opsProjectDocumentId,
       customFields: {
         sourceTaskId,
         source: "assignee",

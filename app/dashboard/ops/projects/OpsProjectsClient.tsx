@@ -5,6 +5,7 @@ import type { OpsProjectPhase } from "@prisma/client";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
 import { DueDateCalendar } from "@/components/ops/DueDateCalendar";
 import { OpsProjectCardBody, OpsProjectCardFrame } from "@/components/ops/OpsProjectCard";
+import { OpsProjectDocuments } from "@/components/ops/OpsProjectDocuments";
 import { asAvatarTextTone } from "@/lib/avatar-text-tone";
 import {
   COMPLEXITY_LABELS,
@@ -714,7 +715,10 @@ export function OpsProjectsClient() {
             </div>
           </div>
         ) : (
-          <OpsProjectCardBody project={p} onEdit={() => startEdit(p)} />
+          <>
+            <OpsProjectCardBody project={p} onEdit={() => startEdit(p)} />
+            <OpsProjectDocuments projectId={p.id} />
+          </>
         )}
       </OpsProjectCardFrame>
     );

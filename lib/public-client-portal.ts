@@ -51,6 +51,7 @@ export type PublicClientPortalProject = {
   clientDeliverables: ClientPortalDeliverable[];
   complexity: OpsProjectComplexity;
   complexityLabel: string;
+  documents: Array<{ id: string; title: string; href: string }>;
 };
 
 export type PublicClientPortalPipelineProject = {
@@ -141,7 +142,8 @@ function mapProject(
     assignedAthlete: { id: string; fullName: string } | null;
   },
   openTasks: PublicClientPortalTask[],
-  laneNumber: number
+  laneNumber: number,
+  documents: Array<{ id: string; title: string; href: string }> = []
 ): PublicClientPortalProject {
   const progressPercent = p.progressPercent ?? 0;
   const contact = p.projectLeadContact;
@@ -175,6 +177,7 @@ function mapProject(
     clientDeliverables: parseClientDeliverables(p.clientDeliverables),
     complexity: p.complexity,
     complexityLabel: COMPLEXITY_LABELS[p.complexity],
+    documents,
   };
 }
 
@@ -222,6 +225,23 @@ export async function getPublicClientPortal(clientSlug: string): Promise<PublicC
   const activeLaneCount = client.commercial?.activeLaneCount ?? 1;
 
   const allProjectIds = clientProjects.map((p) => p.id);
+  const visibleDocs = allProjectIds.length
+    ? await prisma.opsProjectDocument.findMany({
+        where: { projectId: { in: allProjectIds }, clientVisible: true },
+        orderBy: { createdAt: "desc" },
+        select: { id: true, projectId: true, title: true },
+      })
+    : [];
+  const docsByProject = new Map<string, Array<{ id: string; title: string; href: string }>>();
+  for (const doc of visibleDocs) {
+    const list = docsByProject.get(doc.projectId) ?? [];
+    list.push({
+      id: doc.id,
+      title: doc.title,
+      href: `/api/clients/${encodeURIComponent(decoded)}/documents/${doc.id}`,
+    });
+    docsByProject.set(doc.projectId, list);
+  }
   const boards = await prisma.plannerBoard.findMany({
     where: { kind: "project", opsProjectId: { in: allProjectIds } },
     include: {
@@ -275,7 +295,8 @@ export async function getPublicClientPortal(clientSlug: string): Promise<PublicC
       return mapProject(
         { ...p, dueDate },
         tasksByProjectId.get(p.id) ?? [],
-        deriveClientPortalLaneNumber(p.projectNumber, activeLaneCount)
+        deriveClientPortalLaneNumber(p.projectNumber, activeLaneCount),
+        docsByProject.get(p.id) ?? []
       );
     });
   })();

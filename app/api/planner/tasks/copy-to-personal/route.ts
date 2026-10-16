@@ -105,6 +105,7 @@ export async function POST(request: NextRequest) {
       sortOrder,
       assigneeId: source.assigneeId,
       dueAt: source.dueAt,
+      opsProjectDocumentId: source.opsProjectDocumentId,
       ...(source.customFields !== null && source.customFields !== undefined
         ? { customFields: source.customFields as Prisma.InputJsonValue }
         : {}),

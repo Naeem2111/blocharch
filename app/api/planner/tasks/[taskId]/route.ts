@@ -45,7 +45,8 @@ export async function GET(request: NextRequest, context: Ctx) {
     include: {
       assignee: { select: { id: true, username: true } },
       labels: { include: { label: true } },
-      column: { select: { id: true, boardId: true } },
+      column: { select: { id: true, boardId: true, board: { select: { opsProjectId: true } } } },
+      document: { select: { id: true, title: true, projectId: true } },
     },
   });
 
@@ -106,6 +107,30 @@ export async function PATCH(request: NextRequest, context: Ctx) {
     if (body.customFields !== undefined) {
       data.customFields =
         body.customFields === null ? Prisma.JsonNull : (body.customFields as Prisma.InputJsonValue);
+    }
+
+    if (body.opsProjectDocumentId === null) {
+      data.opsProjectDocumentId = null;
+    } else if (typeof body.opsProjectDocumentId === "string") {
+      const documentId = body.opsProjectDocumentId.trim();
+      if (!documentId) {
+        data.opsProjectDocumentId = null;
+      } else {
+        const board = await prisma.plannerBoard.findUnique({
+          where: { id: boardId },
+          select: { opsProjectId: true },
+        });
+        const doc = board?.opsProjectId
+          ? await prisma.opsProjectDocument.findFirst({
+              where: { id: documentId, projectId: board.opsProjectId },
+              select: { id: true },
+            })
+          : null;
+        if (!doc) {
+          return NextResponse.json({ error: "That file is not on this project" }, { status: 400 });
+        }
+        data.opsProjectDocumentId = doc.id;
+      }
     }
 
     await prisma.plannerTask.update({

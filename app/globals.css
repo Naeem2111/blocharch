@@ -918,6 +918,64 @@ html[data-theme="light"] .client-portal-shell .text-slate-600 {
   color: #e2e8f0;
 }
 
+.portal-bell-live {
+  color: #e0f2fe;
+  background: rgb(14 165 233 / 0.16);
+  animation: portal-bell-glow 1.6s ease-in-out infinite;
+}
+
+.portal-bell-live svg {
+  width: 1.7rem;
+  height: 1.7rem;
+  transform-origin: 50% 15%;
+  animation: portal-bell-swing 1.6s ease-in-out infinite;
+}
+
+@keyframes portal-bell-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(56 189 248 / 0.2);
+    background: rgb(14 165 233 / 0.1);
+  }
+  50% {
+    box-shadow: 0 0 18px 4px rgb(56 189 248 / 0.65);
+    background: rgb(14 165 233 / 0.22);
+  }
+}
+
+@keyframes portal-bell-swing {
+  0%,
+  62%,
+  100% {
+    transform: rotate(0);
+  }
+  8% {
+    transform: rotate(16deg);
+  }
+  16% {
+    transform: rotate(-14deg);
+  }
+  26% {
+    transform: rotate(10deg);
+  }
+  36% {
+    transform: rotate(-6deg);
+  }
+  48% {
+    transform: rotate(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .portal-bell-live,
+  .portal-bell-live svg {
+    animation: none;
+  }
+  .portal-bell-live {
+    box-shadow: 0 0 16px 2px rgb(56 189 248 / 0.55);
+  }
+}
+
 .private-portal-hero {
   background:
     radial-gradient(ellipse 70% 130% at 0% 0%, rgb(34 211 238 / 0.28), transparent 58%),

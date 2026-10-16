@@ -1,7 +1,9 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requirePrivateOpsSession } from "@/lib/private-access";
+import { recordPrivateActivity } from "@/lib/private-activity";
 
 export async function POST(
   request: NextRequest,
@@ -10,20 +12,33 @@ export async function POST(
   const gate = await requirePrivateOpsSession(request);
   if (gate instanceof NextResponse) return gate;
 
-  const project = await prisma.privateProject.findUnique({ where: { id: params.id } });
+  const project = await prisma.privateProject.findUnique({
+    where: { id: params.id },
+    include: { client: { select: { slug: true } } },
+  });
   if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await request.json();
   const title = String(body.title || "").trim();
   if (!title) return NextResponse.json({ error: "Title required" }, { status: 400 });
 
+  const clientFacing = body.clientFacing !== false;
   const item = await prisma.privateActionItem.create({
     data: {
       projectId: params.id,
       title,
-      clientFacing: body.clientFacing !== false,
+      clientFacing,
     },
   });
+  if (clientFacing) {
+    await recordPrivateActivity(prisma, {
+      projectId: params.id,
+      kind: "action",
+      title: `New action: ${title}`,
+      sourceKey: `action:${item.id}`,
+    });
+    if (project.client.slug) revalidatePath(`/private/${project.client.slug}`);
+  }
 
   return NextResponse.json({
     actionItem: {
@@ -75,6 +90,32 @@ export async function PATCH(
     where: { id: actionId },
     data: updateData,
   });
+  if (!item.clientFacing && updated.clientFacing) {
+    await recordPrivateActivity(prisma, {
+      projectId: params.id,
+      kind: "action",
+      title: `New action: ${updated.title}`,
+      sourceKey: `action:${updated.id}`,
+    });
+  }
+  if (!item.completedAt && updated.completedAt && updated.clientFacing) {
+    await recordPrivateActivity(prisma, {
+      projectId: params.id,
+      kind: "action_done",
+      title: `Completed: ${updated.title}`,
+      sourceKey: `action-done:${updated.id}`,
+    });
+  }
+  if (
+    (!item.clientFacing && updated.clientFacing) ||
+    (!item.completedAt && updated.completedAt && updated.clientFacing)
+  ) {
+    const owner = await prisma.privateProject.findUnique({
+      where: { id: params.id },
+      select: { client: { select: { slug: true } } },
+    });
+    if (owner?.client.slug) revalidatePath(`/private/${owner.client.slug}`);
+  }
 
   return NextResponse.json({
     actionItem: {

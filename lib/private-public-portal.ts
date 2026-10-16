@@ -42,8 +42,8 @@ export async function getPublicPrivateProjectBySlug(slug: string) {
       },
       updates: {
         where: { clientVisible: true },
-        orderBy: { occurredAt: "desc" },
-        take: 12,
+        orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }],
+        take: 20,
       },
       actionItems: {
         where: { clientFacing: true },
@@ -242,6 +242,8 @@ export async function getPublicPrivateProjectBySlug(slug: string) {
         completedAt: a.completedAt!.toISOString().slice(0, 10),
       })),
     updates: project.updates.map((u) => ({
+      id: u.id,
+      kind: u.kind,
       title: u.title,
       body: u.body,
       occurredAt: u.occurredAt.toISOString().slice(0, 10),

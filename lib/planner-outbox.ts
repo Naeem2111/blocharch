@@ -5,6 +5,12 @@ import { isApprovedLabelName } from "@/lib/planner-approved-labels";
 import { ensureDefaultLabelsOnBoard } from "@/lib/planner-labels-seed";
 import { resolveAthleteDeliveryBoard } from "@/lib/planner-system-boards";
 
+function documentIdFromAttachments(attachments: unknown, projectId: string | null): string | null {
+  if (!projectId || !attachments || typeof attachments !== "object") return null;
+  const id = (attachments as { documentId?: unknown }).documentId;
+  return typeof id === "string" && id.trim() ? id.trim() : null;
+}
+
 function buildInboxDescription(input: {
   description: string | null;
   notes: string | null;
@@ -96,6 +102,14 @@ export async function deliverOutboxTaskToInbox(outboxTaskId: string) {
     _max: { sortOrder: true },
   });
 
+  const requestedDocumentId = documentIdFromAttachments(row.attachments, row.projectId);
+  const linkedDocument = requestedDocumentId
+    ? await prisma.opsProjectDocument.findFirst({
+        where: { id: requestedDocumentId, projectId: row.projectId ?? undefined },
+        select: { id: true },
+      })
+    : null;
+
   const title = (row.title?.trim() || "Assigned task").slice(0, 200);
   const description = buildInboxDescription({
     description: row.description,
@@ -114,6 +128,7 @@ export async function deliverOutboxTaskToInbox(outboxTaskId: string) {
       description,
       sortOrder: (maxOrder._max.sortOrder ?? -1) + 1,
       dueAt: row.dueAt,
+      opsProjectDocumentId: linkedDocument?.id ?? null,
       customFields: {
         outboxTaskId: row.id,
         source: "blocharch_outbox",

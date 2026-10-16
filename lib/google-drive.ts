@@ -141,13 +141,21 @@ export async function ensureClientDriveFolder(input: {
   clientName: string;
   slug: string | null;
   existingFolderId: string | null;
+  /** Puts this client under a named folder so UK and private files stay apart. */
+  parentFolderName?: string;
 }): Promise<string> {
   if (input.existingFolderId && (await folderExists(input.existingFolderId))) {
     return input.existingFolderId;
   }
   const rootId = await ensureDriveRootFolder();
+  let parentId = rootId;
+  if (input.parentFolderName) {
+    parentId =
+      (await findChildFolder(rootId, input.parentFolderName)) ??
+      (await createFolder(input.parentFolderName, rootId));
+  }
   const name = clientFolderName(input.clientName, input.slug);
-  return (await findChildFolder(rootId, name)) ?? (await createFolder(name, rootId));
+  return (await findChildFolder(parentId, name)) ?? (await createFolder(name, parentId));
 }
 
 export async function listClientDriveFiles(folderId: string): Promise<DriveFile[]> {

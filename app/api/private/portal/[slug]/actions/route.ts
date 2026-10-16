@@ -1,6 +1,8 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { recordPrivateActivity } from "@/lib/private-activity";
 
 /** Client portal: mark a client-facing action item as done (no login). */
 export async function PATCH(
@@ -44,12 +46,26 @@ export async function PATCH(
     where: { id: actionId },
     data: { completedAt: new Date() },
   });
+  revalidatePath(`/private/${slug}`);
+  const activity = await recordPrivateActivity(prisma, {
+    projectId: project.id,
+    kind: "action_done",
+    title: `Completed: ${updated.title}`,
+    sourceKey: `action-done:${updated.id}`,
+  });
 
   return NextResponse.json({
     actionItem: {
       id: updated.id,
       title: updated.title,
       completedAt: updated.completedAt?.toISOString() ?? null,
+    },
+    update: {
+      id: activity.id,
+      title: activity.title,
+      body: activity.body,
+      kind: activity.kind,
+      occurredAt: activity.occurredAt.toISOString().slice(0, 10),
     },
   });
 }

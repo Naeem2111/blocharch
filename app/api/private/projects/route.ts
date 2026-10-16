@@ -17,6 +17,7 @@ import {
 import { syncPrivateProjectsIntoArchives } from "@/lib/private-archive";
 import { normalizeClientDeliverablesForSave } from "@/lib/client-portal-deliverables";
 import { normalizeProjectDescription } from "@/lib/rich-text";
+import { recordPrivateActivity } from "@/lib/private-activity";
 
 const projectInclude = {
   client: {
@@ -179,14 +180,11 @@ export async function POST(request: NextRequest) {
 
       await applyPrivateProjectAthleteAssignments(project.id, assignment, tx);
 
-      await tx.privateProjectUpdate.create({
-        data: {
-          projectId: project.id,
-          title: "Project opened",
-          body: `Brief received. Starting at ${designStage.replace(/_/g, " ")}.`,
-          clientVisible: false,
-          occurredAt: briefReceivedAt ?? new Date(),
-        },
+      await recordPrivateActivity(tx, {
+        projectId: project.id,
+        kind: "stage",
+        title: "Project opened",
+        body: `Brief received. Starting at ${designStage.replace(/_/g, " ")}.`,
       });
 
       return tx.privateProject.findUniqueOrThrow({

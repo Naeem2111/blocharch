@@ -123,8 +123,37 @@ function cardClass() {
   return "rounded-2xl border border-white/[0.08] bg-[#0c1524]";
 }
 
+function viewForUpdate(kind: string): View {
+  if (kind === "file") return "documents";
+  if (kind === "action" || kind === "action_done") return "actions";
+  if (kind === "stage" || kind === "date") return "journey";
+  return "overview";
+}
+
+function RecentUpdates({ updates, limit }: { updates: PortalData["updates"]; limit?: number }) {
+  const rows = limit ? updates.slice(0, limit) : updates;
+  if (rows.length === 0) {
+    return <p className="mt-4 text-sm text-slate-500">Updates will show here as the project moves.</p>;
+  }
+  return (
+    <ul className="mt-4 space-y-2">
+      {rows.map((update) => (
+        <li
+          key={update.id}
+          className="rounded-xl border border-white/[0.1] bg-white/[0.03] px-3 py-2.5"
+        >
+          <p className="text-[11px] text-slate-500">{formatDate(update.occurredAt)}</p>
+          <p className="mt-1 text-sm font-medium text-white">{update.title}</p>
+          {update.body ? <p className="mt-1 text-xs leading-relaxed text-slate-400">{update.body}</p> : null}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function PrivateClientPortalClient({ slug, data }: { slug: string; data: PortalData }) {
-  const { project, updates, stages } = data;
+  const { project, stages } = data;
+  const [updates, setUpdates] = useState(data.updates);
   const [portalDocuments, setPortalDocuments] = useState(data.documents ?? []);
   const [view, setView] = useState<View>("overview");
   const [actionTab, setActionTab] = useState<"required" | "completed">("required");
@@ -147,40 +176,18 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
   const contactEmail = project.team.find((member) => member.email)?.email ?? null;
   const subtitle = typeLine(project.projectTypeLabel);
 
-  const notices = useMemo(() => {
-    const items: Array<{ id: string; kind: "document" | "action" | "update"; title: string; detail: string; cta: string; view: View }> = [];
-    for (const doc of portalDocuments.slice(0, 2)) {
-      items.push({
-        id: `doc-${doc.id}`,
-        kind: "document",
-        title: doc.title,
-        detail: `${documentCategory(doc.title)} · ${formatDate(doc.createdAt)}`,
-        cta: "Open document",
-        view: "documents",
-      });
-    }
-    for (const action of actionItems.slice(0, 2)) {
-      items.push({
-        id: `act-${action.id}`,
-        kind: "action",
-        title: action.title,
-        detail: "Please respond when you can",
-        cta: "View action",
-        view: "actions",
-      });
-    }
-    for (const update of updates.slice(0, 2)) {
-      items.push({
-        id: `upd-${update.occurredAt}-${update.title}`,
-        kind: "update",
+  const notices = useMemo(
+    () =>
+      updates.slice(0, 8).map((update) => ({
+        id: update.id,
+        kind: update.kind,
         title: update.title,
-        detail: formatDate(update.occurredAt),
+        detail: update.body?.trim() || formatDate(update.occurredAt),
         cta: "View update",
-        view: "overview",
-      });
-    }
-    return items;
-  }, [actionItems, portalDocuments, updates]);
+        view: viewForUpdate(update.kind),
+      })),
+    [updates],
+  );
 
   const [readIds, setReadIds] = useState<string[]>([]);
   const unread = notices.filter((item) => !readIds.includes(item.id));
@@ -209,7 +216,13 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
         body: JSON.stringify({ actionItemId }),
       });
       if (!r.ok) return;
-      const j = (await r.json()) as { actionItem: { id: string; title: string; completedAt: string } };
+      const j = (await r.json()) as {
+        actionItem: { id: string; title: string; completedAt: string };
+        update?: PortalData["updates"][number];
+      };
+      if (j.update) {
+        setUpdates((prev) => (prev.some((row) => row.id === j.update!.id) ? prev : [j.update!, ...prev]));
+      }
       setActionItems((prev) => prev.filter((a) => a.id !== actionItemId));
       setCompletedActionItems((prev) => [
         { id: j.actionItem.id, title: j.actionItem.title, completedAt: j.actionItem.completedAt.slice(0, 10) },
@@ -224,7 +237,7 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
   function openNotice(item: (typeof notices)[number]) {
     setReadIds((prev) => (prev.includes(item.id) ? prev : [...prev, item.id]));
     setView(item.view);
-    if (item.view === "actions") setActionTab("required");
+    if (item.view === "actions") setActionTab(item.kind === "action_done" ? "completed" : "required");
     setNoticesOpen(false);
   }
 
@@ -334,12 +347,18 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
           <div className="relative">
             <button
               type="button"
-              aria-label="Notifications"
+              aria-label={unread.length > 0 ? `Notifications, ${unread.length} unread` : "Notifications"}
               onClick={() => setNoticesOpen((open) => !open)}
-              className="relative rounded-full p-2 text-slate-300 hover:bg-white/[0.06]"
+              className={
+                unread.length > 0
+                  ? "portal-bell-live relative rounded-full p-2.5"
+                  : "relative rounded-full p-2 text-slate-300 hover:bg-white/[0.06]"
+              }
             >
               <BellIcon />
-              {unread.length > 0 ? <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-red-500" /> : null}
+              {unread.length > 0 ? (
+                <span className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-red-500 shadow-[0_0_8px_rgb(239,68,68,0.95)]" />
+              ) : null}
             </button>
             {noticesOpen ? (
               <div className="absolute right-0 z-30 mt-2 w-[min(24rem,calc(100vw-2rem))] rounded-2xl border border-white/[0.08] bg-[#0c1422] p-4 shadow-2xl">
@@ -365,13 +384,14 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
                     </button>
                   </div>
                 </div>
-                <ul className="mt-3 divide-y divide-white/[0.06]">
+                <ul className="mt-3 space-y-2">
                   {notices.length === 0 ? (
                     <li className="py-4 text-sm text-slate-500">No notifications yet.</li>
                   ) : (
                     notices.map((item) => (
-                      <li key={item.id} className="flex items-start gap-3 py-3">
-                        {!readIds.includes(item.id) ? <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-sky-400" /> : <span className="w-1.5" />}
+                      <li key={item.id} className="rounded-xl border border-white/[0.1] bg-white/[0.03] px-3 py-2.5">
+                        <div className="flex items-start gap-3">
+                        <NoticeIcon kind={item.kind} unread={!readIds.includes(item.id)} />
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium text-white">{item.title}</p>
                           <p className="text-xs text-slate-500">{item.detail}</p>
@@ -379,6 +399,7 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
                         <button type="button" className="shrink-0 text-xs text-sky-300 hover:underline" onClick={() => openNotice(item)}>
                           {item.cta} →
                         </button>
+                        </div>
                       </li>
                     ))
                   )}
@@ -512,7 +533,7 @@ function Overview({
   subtitle: string;
 }) {
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-4">
       <div className="grid gap-3 md:grid-cols-3">
         <Metric icon="cal" label="Brief received" value={formatDate(project.briefReceivedAt)} />
         <Metric icon="dot" label="Current stage" value={current?.label ?? project.designStageLabel} hint={current ? `Step ${current.number} of ${stages.length}` : undefined} />
@@ -588,9 +609,9 @@ function Overview({
       </div>
 
       {current ? (
-        <section className="private-portal-hero rounded-2xl p-5 sm:p-6">
-          <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_14rem] sm:items-start">
-            <div>
+        <section className="private-portal-hero min-w-0 overflow-hidden rounded-2xl p-5 sm:p-6">
+          <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_1px_13.5rem] sm:gap-0 sm:items-stretch">
+            <div className="sm:pr-6">
               <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-300">Current stage</p>
               <h2 className="mt-1.5 text-xl font-semibold text-white sm:text-2xl">{current.label}</h2>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
@@ -598,13 +619,16 @@ function Overview({
                 <span className="text-slate-400">Step {current.number} of {stages.length}</span>
               </div>
             </div>
-            <div className="sm:text-right">
+            <div className="hidden bg-white/25 sm:block" aria-hidden />
+            <div className="sm:pl-6">
               <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">Up next</p>
               <p className="mt-1.5 text-base font-semibold text-white">{next?.label ?? "—"}</p>
               <p className="mt-1 text-sm text-slate-500">Target date: {next?.dateFrom ? formatDate(next.dateFrom) : "To be confirmed"}</p>
             </div>
           </div>
-          <StageRail stages={stages} />
+          <div className="overflow-x-auto">
+            <StageRail stages={stages} />
+          </div>
         </section>
       ) : null}
 
@@ -612,16 +636,7 @@ function Overview({
         <section className={`${cardClass()} p-5`}>
           <h2 className="flex items-center gap-2 text-sm font-semibold text-white"><span className="text-emerald-400"><ClockMini /></span>Recent updates</h2>
           <p className="mt-1 text-xs text-slate-500">The latest activity on your project.</p>
-          <ul className="mt-4 space-y-3">
-            {updates.length === 0 ? <li className="text-sm text-slate-500">Updates will show here as they are published.</li> : null}
-            {updates.slice(0, 4).map((update, i) => (
-              <li key={`${update.occurredAt}-${update.title}`} className="flex gap-3 text-sm">
-                <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${["bg-emerald-400", "bg-sky-400", "bg-violet-400", "bg-slate-400"][i % 4]}`} />
-                <span className="w-24 shrink-0 text-xs text-slate-500">{formatDate(update.occurredAt)}</span>
-                <span className="text-slate-200">{update.title}</span>
-              </li>
-            ))}
-          </ul>
+          <RecentUpdates updates={updates} limit={6} />
         </section>
         <section className={`${cardClass()} p-5`}>
           <h2 className="flex items-center gap-2 text-sm font-semibold text-white"><span className="text-sky-300"><CheckMini /></span>Required from you</h2>
@@ -775,15 +790,7 @@ function Journey({
         ) : null}
         <section className={`${cardClass()} p-5`}>
           <h2 className="text-sm font-semibold text-white">Recent updates</h2>
-          <ul className="mt-4 space-y-3">
-            {updates.slice(0, 4).map((update) => (
-              <li key={`${update.occurredAt}-${update.title}`} className="flex gap-3 text-sm">
-                <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-sky-400" />
-                <span className="w-24 shrink-0 text-xs text-slate-500">{formatDate(update.occurredAt)}</span>
-                <span>{update.title}</span>
-              </li>
-            ))}
-          </ul>
+          <RecentUpdates updates={updates} limit={6} />
           <button type="button" onClick={onOpenOverview} className="mt-4 text-sm text-sky-300 hover:underline">
             View all updates →
           </button>
@@ -1063,17 +1070,26 @@ function Documents({
 
 function StageRail({ stages }: { stages: Stage[] }) {
   return (
-    <div className="mt-5 overflow-x-auto px-1 py-3">
+    <div className="mt-5 px-1 py-3">
       <div className="flex min-w-[36rem] items-start">
         {stages.map((stage, i) => (
           <div key={stage.key} className="flex min-w-0 flex-1 flex-col items-center">
-            <div className="flex w-full items-center">
+            <div className="relative flex h-8 w-full items-center justify-center">
               {i > 0 ? (
-                <div className={`h-[3px] min-w-0 flex-1 ${stages[i - 1]?.state === "done" ? "bg-emerald-400" : "bg-white/10"}`} />
-              ) : (
-                <div className="flex-1" />
-              )}
-              <div className="relative z-10 mx-2 shrink-0">
+                <span
+                  className={`absolute left-0 right-1/2 top-1/2 h-[3px] -translate-y-1/2 ${
+                    stages[i - 1]?.state === "done" ? "bg-emerald-400" : "bg-[#3e6288]"
+                  }`}
+                />
+              ) : null}
+              {i < stages.length - 1 ? (
+                <span
+                  className={`absolute left-1/2 right-0 top-1/2 h-[3px] -translate-y-1/2 ${
+                    stage.state === "done" ? "bg-emerald-400" : "bg-[#3e6288]"
+                  }`}
+                />
+              ) : null}
+              <div className="relative z-10 shrink-0">
                 <div
                   className={`flex size-8 items-center justify-center rounded-full text-xs font-semibold leading-none ${
                     stage.state === "done"
@@ -1086,11 +1102,6 @@ function StageRail({ stages }: { stages: Stage[] }) {
                   {stage.state === "done" ? "✓" : stage.number}
                 </div>
               </div>
-              {i < stages.length - 1 ? (
-                <div className={`h-[3px] min-w-0 flex-1 ${stage.state === "done" ? "bg-emerald-400" : "bg-white/10"}`} />
-              ) : (
-                <div className="flex-1" />
-              )}
             </div>
             <p className={`mt-3 max-w-full px-1 text-center text-[10px] leading-tight ${stage.state === "current" ? "font-medium text-white" : "text-slate-500"}`}>
               {stage.label}
@@ -1294,6 +1305,37 @@ function LinkGlyph({ kind }: { kind: "zoom" | "pinterest" | "link" }) {
   return (
     <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-500 text-xs font-bold text-white">
       ↗
+    </span>
+  );
+}
+
+function NoticeIcon({ kind, unread }: { kind: string; unread: boolean }) {
+  const tone =
+    kind === "file"
+      ? "text-slate-200"
+      : kind === "action"
+        ? "text-sky-300"
+        : kind === "action_done"
+          ? "text-emerald-300"
+          : kind === "date"
+            ? "text-amber-200"
+            : kind === "description"
+              ? "text-violet-200"
+              : "text-emerald-300";
+  return (
+    <span className={`relative mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.05] ring-1 ring-white/10 ${tone}`}>
+      {kind === "file" ? (
+        <FolderMini />
+      ) : kind === "action" || kind === "action_done" ? (
+        <CheckMini />
+      ) : kind === "date" ? (
+        <CalIcon />
+      ) : kind === "description" ? (
+        <DocMini />
+      ) : (
+        <ClockMini />
+      )}
+      {unread ? <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-sky-400" /> : null}
     </span>
   );
 }

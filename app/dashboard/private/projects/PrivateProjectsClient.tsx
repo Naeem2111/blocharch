@@ -309,9 +309,13 @@ export function PrivateProjectsClient({
                                 ref={stageOpenId === p.id ? stageTriggerRef : undefined}
                                 disabled={saving}
                                 onClick={() => setStageOpenId(stageOpenId === p.id ? null : p.id)}
-                                className="text-left hover:text-slate-200"
+                                className={`cursor-pointer rounded-md border px-2 py-1 text-left transition duration-150 disabled:opacity-50 ${
+                                  stageOpenId === p.id
+                                    ? "border-sky-200 bg-sky-400/35 text-white shadow-[0_0_0_1px_rgba(186,230,253,0.7),0_0_28px_rgba(56,189,248,0.85),inset_0_0_18px_rgba(56,189,248,0.35)]"
+                                    : "border-white/15 bg-white/[0.06] text-slate-300 hover:border-sky-200 hover:bg-sky-400/35 hover:text-white hover:shadow-[0_0_0_1px_rgba(186,230,253,0.7),0_0_28px_rgba(56,189,248,0.85),inset_0_0_18px_rgba(56,189,248,0.35)]"
+                                }`}
                               >
-                                Stage <span className="text-slate-300">{p.designStageLabel}</span> ▾
+                                Stage <span className="font-medium text-slate-200">{p.designStageLabel}</span> ▾
                               </button>
                             )}
                             {timeline.daysActive != null ? (
@@ -342,7 +346,7 @@ export function PrivateProjectsClient({
                                             <button
                                               key={row.phaseId}
                                               type="button"
-                                              className={`block w-full px-3 py-2 text-left text-xs hover:bg-white/[0.06] ${
+                                              className={`block w-full px-3 py-2 text-left text-xs transition duration-150 hover:bg-sky-400/20 hover:text-white hover:shadow-[inset_0_0_0_1px_rgba(125,211,252,0.45),0_0_16px_rgba(56,189,248,0.28)] ${
                                                 selected ? "text-brand-300" : "text-slate-300"
                                               }`}
                                               onClick={() => void setStage(p.id, row.phaseId)}
