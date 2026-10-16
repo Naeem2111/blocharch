@@ -58,8 +58,20 @@ export async function GET(request: NextRequest) {
     orderBy: [{ updatedAt: "desc" }, { name: "asc" }],
   });
 
+  const hourRows =
+    projects.length === 0
+      ? []
+      : await prisma.privateHourLog.groupBy({
+          by: ["projectId"],
+          where: { projectId: { in: projects.map((p) => p.id) } },
+          _sum: { hours: true },
+        });
+  const hoursById = new Map(hourRows.map((row) => [row.projectId, Number(row._sum.hours ?? 0)]));
+
   return NextResponse.json({
-    projects: projects.map((p) => serializePrivateProject(p)),
+    projects: projects.map((p) =>
+      serializePrivateProject(p, { hoursLifeToDate: hoursById.get(p.id) ?? 0 }),
+    ),
   });
 }
 

@@ -1,23 +1,35 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { ClientPortalAthleteMark } from "@/components/client-portal/ClientPortalAthleteMark";
+import { ClientAvatar } from "@/components/ops/ClientAvatar";
+import { OpsProjectCardFrame } from "@/components/ops/OpsProjectCard";
 import { PrivateDeleteProjectButton } from "@/components/private/PrivateDeleteProjectButton";
+import { ProjectProgressBar } from "@/components/ProjectProgressBar";
 import { PRIVATE_STAGE_LABELS, PRIVATE_STAGE_ORDER } from "@/lib/private-constants";
+import { formatHoursCompact } from "@/lib/ops-project-hours";
+import { daysUntilDueFromIso, projectDueColor } from "@/lib/project-color-scale";
+import { computeProjectTimeline } from "@/lib/project-timeline";
 
-type AssignedAthlete = { initials: string; fullName: string; isPrimary?: boolean };
+type AssignedAthlete = { id?: string; initials: string; fullName: string; isPrimary?: boolean };
 
 type ProjectRow = {
   id: string;
   name: string;
+  address: string | null;
+  projectTypeLabel: string;
+  status: string;
   designStage: string;
   designStageLabel: string;
   currentDesignPhaseId?: string | null;
   progressPercent: number;
   completedAt: string | null;
-  feeZar: number;
-  marginPercent: number | null;
+  briefReceivedAt: string | null;
+  dueDate: string | null;
+  stageStartedAt: string;
+  hoursLifeToDate: number | null;
   client: { id: string; name: string };
   athlete: AssignedAthlete | null;
   athletes?: AssignedAthlete[];
@@ -46,37 +58,28 @@ function stageChoices(project: ProjectRow): PhaseGroupOption[] {
   ];
 }
 
-function zar(n: number) {
-  return `R ${Math.round(n).toLocaleString("en-ZA")}`;
-}
-
 function projectAthletes(p: ProjectRow): AssignedAthlete[] {
   if (p.athletes && p.athletes.length > 0) return p.athletes;
   return p.athlete ? [p.athlete] : [];
 }
 
-function AthleteAvatars({ athletes }: { athletes: AssignedAthlete[] }) {
-  if (athletes.length === 0) return <span className="text-slate-500">—</span>;
-  const title = athletes
-    .map((a) => (a.isPrimary ? `${a.fullName} (primary)` : a.fullName))
-    .join(", ");
-  return (
-    <div className="flex -space-x-1.5" title={title}>
-      {athletes.slice(0, 4).map((a) => (
-        <span
-          key={`${a.fullName}-${a.initials}`}
-          className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-brand-500/20 text-[10px] font-bold text-brand-200 ring-2 ring-[#0f131a]"
-        >
-          {a.initials}
-        </span>
-      ))}
-      {athletes.length > 4 ? (
-        <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/[0.08] text-[10px] font-bold text-slate-300 ring-2 ring-[#0f131a]">
-          +{athletes.length - 4}
-        </span>
-      ) : null}
-    </div>
-  );
+function formatAssignedAthletes(athletes: AssignedAthlete[]) {
+  if (athletes.length === 0) return "Unassigned";
+  return athletes.map((a) => (a.isPrimary ? `${a.fullName} (primary)` : a.fullName)).join(", ");
+}
+
+function formatShortDate(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const day = iso.slice(0, 10);
+  const d = new Date(`${day}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return day;
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+}
+
+function statusPresentation(status: string): { label: string; color: string } {
+  if (status === "completed") return { label: "Completed", color: "#22c55e" };
+  if (status === "on_hold") return { label: "On hold", color: "#eab308" };
+  return { label: "Active", color: "#38bdf8" };
 }
 
 export function PrivateProjectsClient({
@@ -203,6 +206,22 @@ export function PrivateProjectsClient({
     void load();
   }
 
+  const projectsByClient = useMemo(() => {
+    const groups = new Map<string, { clientId: string; clientName: string; projects: ProjectRow[] }>();
+    for (const project of projects) {
+      const existing = groups.get(project.client.id);
+      if (existing) existing.projects.push(project);
+      else {
+        groups.set(project.client.id, {
+          clientId: project.client.id,
+          clientName: project.client.name,
+          projects: [project],
+        });
+      }
+    }
+    return Array.from(groups.values()).sort((a, b) => a.clientName.localeCompare(b.clientName));
+  }, [projects]);
+
   if (loading) return <p className="text-sm text-slate-500">Loading projects…</p>;
 
   return (
@@ -222,129 +241,221 @@ export function PrivateProjectsClient({
           )}
         </p>
       ) : (
-        <div className="grid gap-3 lg:grid-cols-2">
-          {projects.map((p) => {
-            const athletes = projectAthletes(p);
-            return (
-              <article
-                key={p.id}
-                className="client-portal-card relative overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.03] p-4"
-              >
-                <span
-                  className="pointer-events-none absolute bottom-0 left-0 top-0 w-[3px] rounded-l-xl bg-brand-400"
-                  aria-hidden
-                />
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{p.client.name}</p>
-                    <Link
-                      href={`/dashboard/private/projects/${p.id}/edit`}
-                      className="mt-1 block truncate text-base font-semibold text-white hover:text-brand-300"
-                    >
-                      {p.name}
-                    </Link>
-                  </div>
-                  <AthleteAvatars athletes={athletes} />
+        <div className="space-y-8">
+          {projectsByClient.map((group) => (
+            <section key={group.clientId} className="space-y-3">
+              <div className="flex flex-wrap items-center gap-3 border-b border-white/[0.06] pb-2">
+                <ClientAvatar name={group.clientName} size={36} />
+                <div>
+                  <h2 className="text-sm font-semibold text-white">{group.clientName}</h2>
+                  <p className="text-xs text-slate-500">
+                    {group.projects.length} project{group.projects.length === 1 ? "" : "s"}
+                  </p>
                 </div>
-                <div className="mt-3 flex flex-wrap items-center gap-3">
-                  {completed ? (
-                    <span className="text-xs text-slate-300">{p.completedAt ?? p.designStageLabel}</span>
-                  ) : (
-                    <div className="relative">
-                      <button
-                        type="button"
-                        ref={stageOpenId === p.id ? stageTriggerRef : undefined}
-                        disabled={saving}
-                        onClick={() => setStageOpenId(stageOpenId === p.id ? null : p.id)}
-                        className="rounded-lg bg-white/[0.04] px-2.5 py-1.5 text-left text-xs text-slate-200 ring-1 ring-white/[0.08] hover:bg-white/[0.07]"
-                      >
-                        {p.designStageLabel} ▾
-                      </button>
-                      {stageOpenId === p.id && menuBox
-                        ? createPortal(
-                            <div
-                              ref={stageMenuRef}
-                              style={{ top: menuBox.top, left: menuBox.left, maxHeight: menuBox.maxHeight }}
-                              className="fixed z-[80] w-64 overflow-y-auto rounded-lg border border-white/[0.1] bg-[#0f131a] py-1 shadow-xl"
+              </div>
+              <div className="space-y-3">
+                {group.projects.map((p) => {
+                  const athletes = projectAthletes(p);
+                  const status = statusPresentation(p.status);
+                  const startDate = p.briefReceivedAt || p.stageStartedAt;
+                  const timeline = computeProjectTimeline({ startDate, dueDate: p.dueDate });
+                  const accent = projectDueColor(daysUntilDueFromIso(p.dueDate));
+                  return (
+                    <OpsProjectCardFrame key={p.id} dueDate={p.dueDate}>
+                      <div className="pl-1">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <Link
+                              href={`/dashboard/private/projects/${p.id}`}
+                              className="font-semibold text-white hover:text-brand-200"
                             >
-                              {stageChoices(p).map((group) => (
-                                <div key={group.id}>
-                                  {group.name ? (
-                                    <p className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                                      {group.name}
-                                    </p>
-                                  ) : null}
-                                  {group.stages.map((row) => {
-                                    const selected = p.currentDesignPhaseId
-                                      ? row.phaseId === p.currentDesignPhaseId
-                                      : row.phaseId === p.designStage || row.stage === p.designStage;
-                                    return (
-                                      <button
-                                        key={row.phaseId}
-                                        type="button"
-                                        className={`block w-full px-3 py-2 text-left text-xs hover:bg-white/[0.06] ${
-                                          selected ? "text-brand-300" : "text-slate-300"
-                                        }`}
-                                        onClick={() => void setStage(p.id, row.phaseId)}
-                                      >
-                                        {selected ? "✓ " : ""}
-                                        {row.label}
-                                      </button>
-                                    );
-                                  })}
+                              {p.name}
+                            </Link>
+                            {p.address && p.address !== p.name ? (
+                              <p className="mt-0.5 text-xs text-slate-500">{p.address}</p>
+                            ) : null}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span
+                              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide"
+                              style={{
+                                backgroundColor: `${status.color}22`,
+                                color: status.color,
+                                borderColor: `${status.color}44`,
+                              }}
+                            >
+                              <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: status.color }} />
+                              {status.label}
+                            </span>
+                            <span className="rounded-md bg-white/[0.06] px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                              {p.projectTypeLabel}
+                            </span>
+                            <Link
+                              href={`/dashboard/private/projects/${p.id}/edit`}
+                              className="text-xs font-medium text-brand-300 hover:text-brand-200"
+                            >
+                              Edit
+                            </Link>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 grid grid-cols-1 items-center gap-2 sm:grid-cols-[1fr_auto_1fr]">
+                          <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-slate-400">
+                            {completed ? (
+                              <span className="text-slate-300">{p.completedAt ?? p.designStageLabel}</span>
+                            ) : (
+                              <button
+                                type="button"
+                                ref={stageOpenId === p.id ? stageTriggerRef : undefined}
+                                disabled={saving}
+                                onClick={() => setStageOpenId(stageOpenId === p.id ? null : p.id)}
+                                className="text-left hover:text-slate-200"
+                              >
+                                Stage <span className="text-slate-300">{p.designStageLabel}</span> ▾
+                              </button>
+                            )}
+                            {timeline.daysActive != null ? (
+                              <>
+                                <span className="text-slate-600">·</span>
+                                <span>{timeline.daysActive} days active</span>
+                              </>
+                            ) : null}
+                            {stageOpenId === p.id && menuBox
+                              ? createPortal(
+                                  <div
+                                    ref={stageMenuRef}
+                                    style={{ top: menuBox.top, left: menuBox.left, maxHeight: menuBox.maxHeight }}
+                                    className="fixed z-[80] w-64 overflow-y-auto rounded-lg border border-white/[0.1] bg-[#0f131a] py-1 shadow-xl"
+                                  >
+                                    {stageChoices(p).map((stageGroup) => (
+                                      <div key={stageGroup.id}>
+                                        {stageGroup.name ? (
+                                          <p className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                                            {stageGroup.name}
+                                          </p>
+                                        ) : null}
+                                        {stageGroup.stages.map((row) => {
+                                          const selected = p.currentDesignPhaseId
+                                            ? row.phaseId === p.currentDesignPhaseId
+                                            : row.phaseId === p.designStage || row.stage === p.designStage;
+                                          return (
+                                            <button
+                                              key={row.phaseId}
+                                              type="button"
+                                              className={`block w-full px-3 py-2 text-left text-xs hover:bg-white/[0.06] ${
+                                                selected ? "text-brand-300" : "text-slate-300"
+                                              }`}
+                                              onClick={() => void setStage(p.id, row.phaseId)}
+                                            >
+                                              {selected ? "✓ " : ""}
+                                              {row.label}
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    ))}
+                                  </div>,
+                                  document.body,
+                                )
+                              : null}
+                          </div>
+                          <p className="text-center text-xs tabular-nums text-slate-400">
+                            {startDate || p.dueDate ? (
+                              <>
+                                {startDate ? formatShortDate(startDate) : "TBC"}
+                                {" — "}
+                                <span className="font-semibold" style={{ color: accent }}>
+                                  {p.dueDate ? formatShortDate(p.dueDate) : "TBC"}
+                                </span>
+                              </>
+                            ) : (
+                              <span className="text-slate-500">Dates to be confirmed</span>
+                            )}
+                          </p>
+                          <span className="hidden sm:block" aria-hidden />
+                        </div>
+
+                        <div className="mt-3 flex items-center gap-3">
+                          <div className="min-w-0 flex-1">
+                            <ProjectProgressBar percent={p.progressPercent} showLabel={false} />
+                          </div>
+                          <span className="shrink-0 text-xs tabular-nums text-slate-400">{p.progressPercent}%</span>
+                        </div>
+
+                        <div className="mt-4 flex flex-wrap items-end justify-between gap-3">
+                          {athletes.length === 0 ? (
+                            <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
+                              Athlete to be assigned
+                            </span>
+                          ) : (
+                            <div className="min-w-0">
+                              <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-300">
+                                <ClientPortalAthleteMark />
+                                Athlete assigned
+                              </span>
+                              <div className="mt-1.5 flex min-w-0 items-center gap-2">
+                                <div className="flex shrink-0 -space-x-1.5">
+                                  {athletes.slice(0, 4).map((a, i) => (
+                                    <span
+                                      key={a.id ?? `${a.fullName}-${a.initials}`}
+                                      title={a.fullName}
+                                      className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold ring-2 ring-[#0f131a] ${
+                                        a.isPrimary || i === 0
+                                          ? "bg-sky-500/25 text-sky-200"
+                                          : "bg-white/[0.08] text-slate-300"
+                                      }`}
+                                    >
+                                      {a.initials}
+                                    </span>
+                                  ))}
                                 </div>
-                              ))}
-                            </div>,
-                            document.body,
-                          )
-                        : null}
-                    </div>
-                  )}
-                  {!completed ? (
-                    <div className="flex min-w-[8rem] flex-1 items-center gap-2">
-                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.08]">
-                        <div className="h-full rounded-full bg-brand-500" style={{ width: `${p.progressPercent}%` }} />
+                                <p className="min-w-0 truncate text-xs text-slate-400">{formatAssignedAthletes(athletes)}</p>
+                              </div>
+                            </div>
+                          )}
+                          <div className="flex flex-wrap items-end gap-4">
+                            <div className="flex flex-wrap items-center gap-3">
+                              <Link
+                                href={`/dashboard/private/projects/${p.id}/expenses`}
+                                className="text-xs text-brand-300 hover:underline"
+                              >
+                                Expenses
+                              </Link>
+                              {completed && canDelete ? (
+                                <button
+                                  type="button"
+                                  disabled={reactivatingId === p.id}
+                                  onClick={() => void reactivate(p)}
+                                  className="text-xs text-emerald-300/90 hover:text-emerald-200 disabled:opacity-50"
+                                >
+                                  {reactivatingId === p.id ? "Moving…" : "Bring back to active"}
+                                </button>
+                              ) : null}
+                              {canDelete ? (
+                                <PrivateDeleteProjectButton
+                                  projectId={p.id}
+                                  projectName={p.name}
+                                  onDeleted={() => void load()}
+                                />
+                              ) : null}
+                            </div>
+                            <div className="shrink-0 text-right">
+                              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                                Hours to date / total
+                              </p>
+                              <p className="mt-0.5 text-sm font-semibold tabular-nums text-white">
+                                {formatHoursCompact(p.hoursLifeToDate ?? 0)}h
+                              </p>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <span className="tabular-nums text-xs text-slate-400">{p.progressPercent}%</span>
-                    </div>
-                  ) : null}
-                </div>
-                <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-white/[0.06] pt-3 text-xs">
-                  <div>
-                    <dt className="uppercase tracking-wide text-slate-500">Fee</dt>
-                    <dd className="mt-0.5 tabular-nums text-slate-200">{zar(p.feeZar)}</dd>
-                  </div>
-                  <div>
-                    <dt className="uppercase tracking-wide text-slate-500">Margin</dt>
-                    <dd className="mt-0.5 tabular-nums text-slate-200">
-                      {p.marginPercent != null ? `${p.marginPercent}%` : "—"}
-                    </dd>
-                  </div>
-                </dl>
-                <div className="mt-3 flex flex-wrap gap-3">
-                  <Link href={`/dashboard/private/projects/${p.id}`} className="text-xs text-slate-400 hover:text-brand-300">
-                    View
-                  </Link>
-                  <Link href={`/dashboard/private/projects/${p.id}/expenses`} className="text-xs text-brand-300 hover:underline">
-                    Expenses
-                  </Link>
-                  {completed && canDelete ? (
-                    <button
-                      type="button"
-                      disabled={reactivatingId === p.id}
-                      onClick={() => void reactivate(p)}
-                      className="text-xs text-emerald-300/90 hover:text-emerald-200 disabled:opacity-50"
-                    >
-                      {reactivatingId === p.id ? "Moving…" : "Bring back to active"}
-                    </button>
-                  ) : null}
-                  {canDelete ? (
-                    <PrivateDeleteProjectButton projectId={p.id} projectName={p.name} onDeleted={() => void load()} />
-                  ) : null}
-                </div>
-              </article>
-            );
-          })}
+                    </OpsProjectCardFrame>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
         </div>
       )}
     </div>

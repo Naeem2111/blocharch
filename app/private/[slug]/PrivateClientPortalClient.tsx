@@ -531,20 +531,25 @@ function Overview({
             />
           </div>
         </section>
-        <section className={`${cardClass()} flex h-52 flex-col p-4`}>
+        <section className={`${cardClass()} flex flex-col p-4`}>
           <CardTitle icon="link">Quick links</CardTitle>
           <p className="mt-1 text-xs text-slate-500">Access important project resources.</p>
-          <ul className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto">
+          <ul className="mt-3 space-y-2">
             {project.clientLinks.length === 0 ? <li className="text-sm text-slate-500">Links will appear here once they are added.</li> : null}
             {project.clientLinks.map((link, i) => {
               const parts = splitLinkLabel(link.label.replace(/^🔗\s*/, ""), link.url);
               const kind = linkKind(link.url, link.label);
               return (
                 <li key={`${link.label}-${i}`}>
-                  <a href={link.url ?? "#"} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3">
+                  <a
+                    href={link.url ?? "#"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 rounded-xl border border-white/[0.1] bg-white/[0.03] px-3 py-2.5 hover:bg-white/[0.06]"
+                  >
                     <LinkGlyph kind={kind} />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium text-white">{parts.title}</span>
+                      <span className="block truncate text-sm font-semibold text-white">{parts.title}</span>
                       <span className="block truncate text-xs text-slate-500">{parts.subtitle}</span>
                     </span>
                     <ExternalIcon />
@@ -554,22 +559,25 @@ function Overview({
             })}
           </ul>
         </section>
-        <section className={`${cardClass()} flex h-52 flex-col p-4`}>
+        <section className={`${cardClass()} flex flex-col p-4`}>
           <CardTitle icon="team">Project team</CardTitle>
           <p className="mt-1 text-xs text-slate-500">Your main points of contact.</p>
-          <ul className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto">
+          <ul className="mt-3 space-y-2">
             {project.team.length === 0 ? <li className="text-sm text-slate-500">The project team will appear here once assigned.</li> : null}
             {project.team.map((member) => (
-              <li key={member.id} className="flex items-center gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-xs font-semibold text-slate-200 ring-1 ring-white/10">
+              <li
+                key={member.id}
+                className="flex items-center gap-3 rounded-xl border border-white/[0.1] bg-white/[0.03] px-3 py-2.5"
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-xs font-semibold text-slate-200 ring-1 ring-white/10">
                   {member.initials}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium text-white">{member.fullName}</span>
+                  <span className="block truncate text-sm font-semibold text-white">{member.fullName}</span>
                   <span className="block text-xs text-slate-500">{member.role}</span>
                 </span>
                 {member.email ? (
-                  <a href={`mailto:${member.email}`} className="rounded-lg border border-white/10 p-2 text-slate-300 hover:text-white" aria-label={`Email ${member.fullName}`}>
+                  <a href={`mailto:${member.email}`} className="text-slate-400 hover:text-white" aria-label={`Email ${member.fullName}`}>
                     <MailIcon />
                   </a>
                 ) : null}
@@ -1125,8 +1133,8 @@ function Metric({ icon, label, value, hint }: { icon: "cal" | "dot"; label: stri
 
 function CardTitle({ icon, children }: { icon: "doc" | "link" | "team"; children: string }) {
   return (
-    <h2 className="flex items-center gap-2 text-sm font-semibold text-white">
-      <span className="text-slate-400">
+    <h2 className="flex items-center gap-2 border-b border-white/[0.08] pb-3 text-base font-bold text-white">
+      <span className="text-slate-200">
         {icon === "doc" ? <DocMini /> : icon === "link" ? <LinkMini /> : <TeamMini />}
       </span>
       {children}
