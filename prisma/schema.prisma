@@ -997,7 +997,8 @@ model PrivateActionItem {
   completedAt DateTime? @map("completed_at")
   createdAt   DateTime  @default(now()) @map("created_at")
 
-  project PrivateProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project   PrivateProject           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  documents PrivateProjectDocument[]
 
   @@index([projectId, completedAt])
   @@map("private_action_items")
@@ -1037,11 +1038,15 @@ model PrivateProjectDocument {
   clientVisible  Boolean  @default(false) @map("client_visible")
   /** Design phase this file is listed under on the client Documents tab. */
   category       String?  @db.VarChar(80)
+  /** Set when the client uploaded this file to complete an action. */
+  actionItemId   String?  @map("action_item_id")
   createdAt      DateTime @default(now()) @map("created_at")
 
-  project PrivateProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project    PrivateProject    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  actionItem PrivateActionItem? @relation(fields: [actionItemId], references: [id], onDelete: SetNull)
 
   @@index([projectId, clientVisible])
+  @@index([actionItemId])
   @@map("private_project_documents")
 }
 

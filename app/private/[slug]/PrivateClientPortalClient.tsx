@@ -263,7 +263,13 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
         return false;
       }
       const j = (await r.json()) as {
-        actionItem: { id: string; title: string; completedAt: string; requiresUpload?: boolean };
+        actionItem: {
+          id: string;
+          title: string;
+          completedAt: string;
+          requiresUpload?: boolean;
+          documents?: PortalDocument[];
+        };
         update?: PortalData["updates"][number];
       };
       if (j.update) {
@@ -276,9 +282,14 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
           title: j.actionItem.title,
           requiresUpload: Boolean(j.actionItem.requiresUpload),
           completedAt: j.actionItem.completedAt.slice(0, 10),
+          documents: j.actionItem.documents ?? [],
         },
         ...prev,
       ]);
+      if (opts?.confirmUpload) {
+        setActionTab("completed");
+        setUploadNote("Files saved to Documents and this action is complete.");
+      }
       setOpenCompleted(j.actionItem.id);
       return true;
     } finally {
@@ -293,7 +304,19 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
     setNoticesOpen(false);
   }
 
-  async function uploadPortalFiles(files: File[]) {
+  async function postPortalMultipart(file: File, actionItemId?: string) {
+    const form = new FormData();
+    form.set("file", file);
+    form.set("title", file.name);
+    if (actionItemId) form.set("actionItemId", actionItemId);
+    const posted = await fetch(`/api/private/portal/${slug}/documents`, { method: "POST", body: form });
+    const body = (await posted.json().catch(() => ({}))) as { error?: string; document?: PortalDocument };
+    if (!posted.ok || !body.document) throw new Error(body.error || "Upload failed");
+    setPortalDocuments((prev) => [body.document!, ...prev.filter((doc) => doc.id !== body.document!.id)]);
+    return body.document;
+  }
+
+  async function uploadPortalFiles(files: File[], actionItemId?: string) {
     if (files.length === 0) return false;
     const notes: string[] = [];
     const queue = files.filter((file) => {
@@ -322,48 +345,59 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
             name: file.name,
             mimeType: file.type || "application/octet-stream",
             sizeBytes: file.size,
+            actionItemId,
           }),
         });
-        const started = (await start.json().catch(() => ({}))) as { uploadUrl?: string; error?: string };
-        if (!start.ok || !started.uploadUrl) {
-          if (file.size > 4 * 1024 * 1024) throw new Error(started.error || "Could not start the upload");
-          const form = new FormData();
-          form.set("file", file);
-          const posted = await fetch(`/api/private/portal/${slug}/documents`, { method: "POST", body: form });
-          const body = (await posted.json().catch(() => ({}))) as { error?: string; document?: PortalDocument };
-          if (!posted.ok || !body.document) throw new Error(body.error || started.error || "Upload failed");
-          setPortalDocuments((prev) => [body.document!, ...prev.filter((doc) => doc.id !== body.document!.id)]);
+        const started = (await start.json().catch(() => ({}))) as {
+          uploadUrl?: string;
+          fallback?: boolean;
+          error?: string;
+        };
+
+        const uploadUrl = started.uploadUrl;
+        const useMultipart = !start.ok || !uploadUrl || started.fallback;
+        if (useMultipart) {
+          await postPortalMultipart(file, actionItemId);
           notes.push(`${file.name} saved to your project folder.`);
           okCount += 1;
           continue;
         }
-        const put = await fetch(started.uploadUrl, {
-          method: "PUT",
-          headers: {
-            "Content-Type": file.type || "application/octet-stream",
-            "Content-Range": `bytes 0-${Math.max(file.size - 1, 0)}/${file.size}`,
-          },
-          body: file,
-        });
-        const created = (await put.json().catch(() => ({}))) as { id?: string };
-        if (!put.ok || !created.id) throw new Error("Google Drive did not accept the file");
-        const done = await fetch(`/api/private/portal/${slug}/documents`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            intent: "complete",
-            driveFileId: created.id,
-            name: file.name,
-            title: file.name,
-            mimeType: file.type || "application/octet-stream",
-            sizeBytes: file.size,
-          }),
-        });
-        const finished = (await done.json().catch(() => ({}))) as { error?: string; document?: PortalDocument };
-        if (!done.ok || !finished.document) throw new Error(finished.error || "Could not record the file");
-        setPortalDocuments((prev) => [finished.document!, ...prev.filter((doc) => doc.id !== finished.document!.id)]);
-        notes.push(`${file.name} saved to your Google Drive folder.`);
-        okCount += 1;
+
+        try {
+          const put = await fetch(uploadUrl, {
+            method: "PUT",
+            headers: {
+              "Content-Type": file.type || "application/octet-stream",
+              "Content-Range": `bytes 0-${Math.max(file.size - 1, 0)}/${file.size}`,
+            },
+            body: file,
+          });
+          const created = (await put.json().catch(() => ({}))) as { id?: string };
+          if (!put.ok || !created.id) throw new Error("Google Drive did not accept the file");
+          const done = await fetch(`/api/private/portal/${slug}/documents`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              intent: "complete",
+              driveFileId: created.id,
+              name: file.name,
+              title: file.name,
+              mimeType: file.type || "application/octet-stream",
+              sizeBytes: file.size,
+              actionItemId,
+            }),
+          });
+          const finished = (await done.json().catch(() => ({}))) as { error?: string; document?: PortalDocument };
+          if (!done.ok || !finished.document) throw new Error(finished.error || "Could not record the file");
+          setPortalDocuments((prev) => [finished.document!, ...prev.filter((doc) => doc.id !== finished.document!.id)]);
+          notes.push(`${file.name} saved to your Google Drive folder.`);
+          okCount += 1;
+        } catch {
+          // Browser PUT to Drive often fails CORS ("Failed to fetch") — upload through our API instead.
+          await postPortalMultipart(file, actionItemId);
+          notes.push(`${file.name} saved to your project folder.`);
+          okCount += 1;
+        }
       } catch (error) {
         notes.push(error instanceof Error ? `${file.name}: ${error.message}` : `Could not upload ${file.name}`);
       }
@@ -517,7 +551,7 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
               uploadNote={uploadNote}
               onComplete={(id) => void completeAction(id)}
               onSubmitUpload={async (id, files) => {
-                const uploaded = await uploadPortalFiles(files);
+                const uploaded = await uploadPortalFiles(files, id);
                 if (!uploaded) return false;
                 return Boolean(await completeAction(id, { confirmUpload: true }));
               }}
@@ -813,11 +847,7 @@ function Journey({
                   <span
                     aria-hidden
                     className={`absolute left-1/2 top-4 z-0 w-[3px] -translate-x-1/2 bottom-[-2.25rem] ${
-                      stages[i + 1]?.state === "current"
-                        ? "bg-sky-400"
-                        : stage.state === "done"
-                          ? "bg-emerald-700"
-                          : "bg-[#3e6288]"
+                      stage.state === "done" ? "bg-emerald-400" : "bg-[#3e6288]"
                     }`}
                   />
                 ) : null}
@@ -833,7 +863,7 @@ function Journey({
                 <p
                   className={`text-xs ${
                     stage.state === "done"
-                      ? "text-emerald-600"
+                      ? "font-medium text-emerald-400"
                       : stage.state === "current"
                         ? "font-bold text-sky-400"
                         : "text-slate-500"
@@ -854,14 +884,18 @@ function Journey({
         </ol>
       </section>
       <div className="space-y-4">
-        <section className="private-portal-hero rounded-2xl p-5">
+        <section className="private-portal-hero rounded-2xl p-6 sm:p-7">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white">Current stage details</p>
-            <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[11px] text-sky-200">In progress</span>
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-sky-300 [text-shadow:0_0_18px_rgba(56,189,248,0.55)]">
+              Current stage details
+            </p>
+            <span className="rounded-full bg-sky-500/20 px-3 py-1 text-[11px] text-sky-100 ring-1 ring-sky-400/40 shadow-[0_0_16px_rgba(56,189,248,0.35)]">
+              In progress
+            </span>
           </div>
-          <h2 className="mt-3 text-2xl font-bold text-white">{current.label}</h2>
-          <p className="mt-1 text-sm text-white">Step {current.number} of {stages.length}</p>
-          <p className="mt-3 text-sm leading-relaxed text-slate-300">{stageBody(project.designStage)}</p>
+          <h2 className="mt-3 text-3xl font-bold text-white">{current.label}</h2>
+          <p className="mt-1.5 text-sm text-white">Step {current.number} of {stages.length}</p>
+          <p className="mt-3 text-sm leading-relaxed text-slate-200">{stageBody(project.designStage)}</p>
           {focus.length > 0 ? (
             <>
               <p className="mt-5 text-sm font-semibold text-white">Key focus areas</p>
@@ -1117,9 +1151,33 @@ function Actions({
                     <span className="text-slate-500">{open ? "▴" : "▾"}</span>
                   </button>
                   {open ? (
-                    <p className="mt-3 border-t border-white/[0.06] pt-3 text-xs text-slate-500">
-                      Recorded by BLOCHARCH · {formatDate(action.completedAt)}
-                    </p>
+                    <div className="mt-3 space-y-3 border-t border-white/[0.06] pt-3">
+                      <p className="text-xs text-slate-500">
+                        Recorded by BLOCHARCH · {formatDate(action.completedAt)}
+                      </p>
+                      {"documents" in action && Array.isArray(action.documents) && action.documents.length > 0 ? (
+                        <ul className="space-y-2">
+                          {action.documents.map((doc) => (
+                            <li key={doc.id}>
+                              <a
+                                href={doc.fileUrl}
+                                download
+                                className="flex items-center gap-3 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2 hover:bg-white/[0.06]"
+                              >
+                                <PdfBadge />
+                                <span className="min-w-0 flex-1">
+                                  <span className="block truncate text-sm text-white">{doc.title}</span>
+                                  <span className="block text-xs text-slate-500">
+                                    {formatBytes(doc.sizeBytes)} · {formatDate(doc.createdAt)}
+                                  </span>
+                                </span>
+                                <DownloadIcon />
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </div>
                   ) : null}
                 </li>
               );
@@ -1282,14 +1340,14 @@ function StageRail({ stages }: { stages: Stage[] }) {
               {i > 0 ? (
                 <span
                   className={`absolute left-0 right-1/2 top-1/2 h-[3px] -translate-y-1/2 ${
-                    stages[i - 1]?.state === "done" ? "bg-emerald-700" : "bg-[#3e6288]"
+                    stages[i - 1]?.state === "done" ? "bg-emerald-400" : "bg-[#3e6288]"
                   }`}
                 />
               ) : null}
               {i < stages.length - 1 ? (
                 <span
                   className={`absolute left-1/2 right-0 top-1/2 h-[3px] -translate-y-1/2 ${
-                    stage.state === "done" ? "bg-emerald-700" : "bg-[#3e6288]"
+                    stage.state === "done" ? "bg-emerald-400" : "bg-[#3e6288]"
                   }`}
                 />
               ) : null}
@@ -1297,9 +1355,9 @@ function StageRail({ stages }: { stages: Stage[] }) {
                 <div
                   className={`flex size-11 items-center justify-center rounded-full text-sm font-semibold leading-none ${
                     stage.state === "done"
-                      ? "bg-emerald-700 text-white"
+                      ? "bg-emerald-900 text-white shadow-[0_0_0_3px_rgba(52,211,153,0.95),0_0_14px_rgba(16,185,129,0.55)]"
                       : stage.state === "current"
-                        ? "bg-sky-400 text-white shadow-[0_0_0_5px_rgba(56,189,248,0.45)]"
+                        ? "bg-sky-400 text-white shadow-[0_0_0_5px_rgba(56,189,248,0.45),0_0_18px_rgba(56,189,248,0.55)]"
                         : "border border-white/20 bg-[#0c1524] text-white"
                   }`}
                 >
@@ -1327,9 +1385,9 @@ function StageRail({ stages }: { stages: Stage[] }) {
 function StageDot({ stage }: { stage: Stage }) {
   const cls =
     stage.state === "done"
-      ? "bg-emerald-700 text-white"
+      ? "bg-emerald-900 text-white shadow-[0_0_0_3px_rgba(52,211,153,0.95),0_0_14px_rgba(16,185,129,0.55)]"
       : stage.state === "current"
-        ? "bg-sky-400 text-white shadow-[0_0_0_5px_rgba(56,189,248,0.35),0_0_18px_rgba(56,189,248,0.45)]"
+        ? "bg-sky-400 text-white shadow-[0_0_0_5px_rgba(56,189,248,0.4),0_0_20px_rgba(56,189,248,0.55)]"
         : "border border-slate-500 bg-[#0c1524] text-white";
   return (
     <span className={`relative z-10 flex size-8 items-center justify-center rounded-full text-xs font-semibold ${cls}`}>

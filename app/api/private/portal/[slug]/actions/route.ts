@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { recordPrivateActivity } from "@/lib/private-activity";
+import { portalDocumentPath } from "@/lib/private-drive-documents";
 
 /** Client portal: mark a client-facing action item as done (no login). */
 export async function PATCH(
@@ -14,7 +15,7 @@ export async function PATCH(
 
   const client = await prisma.privateClient.findFirst({
     where: { slug, portalEnabled: true },
-    select: { id: true },
+    select: { id: true, slug: true },
   });
   if (!client) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -42,11 +43,22 @@ export async function PATCH(
   });
   if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  if (item.requiresUpload && body.confirmUpload !== true) {
-    return NextResponse.json(
-      { error: "This action needs a file upload before it can be completed." },
-      { status: 400 },
-    );
+  if (item.requiresUpload) {
+    if (body.confirmUpload !== true) {
+      return NextResponse.json(
+        { error: "This action needs a file upload before it can be completed." },
+        { status: 400 },
+      );
+    }
+    const linked = await prisma.privateProjectDocument.count({
+      where: { actionItemId: actionId, projectId: project.id, clientVisible: true },
+    });
+    if (linked < 1) {
+      return NextResponse.json(
+        { error: "Upload at least one file before completing this action." },
+        { status: 400 },
+      );
+    }
   }
 
   const updated = await prisma.privateActionItem.update({
@@ -61,12 +73,34 @@ export async function PATCH(
     sourceKey: `action-done:${updated.id}`,
   });
 
+  const docs = await prisma.privateProjectDocument.findMany({
+    where: { actionItemId: actionId, clientVisible: true },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      title: true,
+      fileUrl: true,
+      mimeType: true,
+      sizeBytes: true,
+      createdAt: true,
+      driveFileId: true,
+    },
+  });
+
   return NextResponse.json({
     actionItem: {
       id: updated.id,
       title: updated.title,
       requiresUpload: updated.requiresUpload,
       completedAt: updated.completedAt?.toISOString() ?? null,
+      documents: docs.map((d) => ({
+        id: d.id,
+        title: d.title,
+        fileUrl: d.driveFileId && client.slug ? portalDocumentPath(client.slug, d.id) : d.fileUrl,
+        mimeType: d.mimeType,
+        sizeBytes: d.sizeBytes,
+        createdAt: d.createdAt.toISOString().slice(0, 10),
+      })),
     },
     update: {
       id: activity.id,

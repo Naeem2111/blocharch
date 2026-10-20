@@ -66,6 +66,7 @@ export async function getPublicPrivateProjectBySlug(slug: string) {
     sizeBytes: number;
     createdAt: string;
     category: string | null;
+    actionItemId: string | null;
   }> = [];
   try {
     const rows = await prisma.privateProjectDocument.findMany({
@@ -81,6 +82,7 @@ export async function getPublicPrivateProjectBySlug(slug: string) {
         createdAt: true,
         driveFileId: true,
         category: true,
+        actionItemId: true,
       },
     });
     documents = rows.map((d) => ({
@@ -91,9 +93,18 @@ export async function getPublicPrivateProjectBySlug(slug: string) {
       sizeBytes: d.sizeBytes,
       createdAt: d.createdAt.toISOString().slice(0, 10),
       category: d.category,
+      actionItemId: d.actionItemId,
     }));
   } catch {
     documents = [];
+  }
+
+  const documentsByActionId = new Map<string, typeof documents>();
+  for (const doc of documents) {
+    if (!doc.actionItemId) continue;
+    const list = documentsByActionId.get(doc.actionItemId) ?? [];
+    list.push(doc);
+    documentsByActionId.set(doc.actionItemId, list);
   }
 
   const assignedTeam =
@@ -244,6 +255,14 @@ export async function getPublicPrivateProjectBySlug(slug: string) {
         title: a.title,
         requiresUpload: a.requiresUpload,
         completedAt: a.completedAt!.toISOString().slice(0, 10),
+        documents: (documentsByActionId.get(a.id) ?? []).map((d) => ({
+          id: d.id,
+          title: d.title,
+          fileUrl: d.fileUrl,
+          mimeType: d.mimeType,
+          sizeBytes: d.sizeBytes,
+          createdAt: d.createdAt,
+        })),
       })),
     updates: project.updates.map((u) => ({
       id: u.id,

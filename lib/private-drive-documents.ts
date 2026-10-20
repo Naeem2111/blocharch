@@ -94,6 +94,7 @@ export async function saveDocumentToClientDrive(input: {
   bytes: Buffer;
   clientVisible: boolean;
   category?: string | null;
+  actionItemId?: string | null;
 }) {
   const folderId = await ensureStoredClientFolder(input.client);
   const uploaded = await uploadDriveFile({
@@ -120,6 +121,7 @@ export async function saveDocumentToClientDrive(input: {
       driveFileId: uploaded.id,
       clientVisible: input.clientVisible,
       category: input.category?.trim().slice(0, 80) || null,
+      actionItemId: input.actionItemId || null,
     },
   });
 }
@@ -134,11 +136,20 @@ export async function recordCompletedDriveUpload(input: {
   sizeBytes: number;
   clientVisible: boolean;
   category?: string | null;
+  actionItemId?: string | null;
 }) {
   const folderId = await ensureStoredClientFolder(input.client);
   const file = await assertFileInFolder(input.driveFileId, folderId);
   const existing = await prisma.privateProjectDocument.findUnique({ where: { driveFileId: file.id } });
-  if (existing) return existing;
+  if (existing) {
+    if (input.actionItemId && !existing.actionItemId) {
+      return prisma.privateProjectDocument.update({
+        where: { id: existing.id },
+        data: { actionItemId: input.actionItemId },
+      });
+    }
+    return existing;
+  }
   const id = newDocumentId();
   return prisma.privateProjectDocument.create({
     data: {
@@ -154,6 +165,7 @@ export async function recordCompletedDriveUpload(input: {
       driveFileId: file.id,
       clientVisible: input.clientVisible,
       category: input.category?.trim().slice(0, 80) || null,
+      actionItemId: input.actionItemId || null,
     },
   });
 }

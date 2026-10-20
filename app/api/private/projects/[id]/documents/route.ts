@@ -159,6 +159,7 @@ export async function POST(
         clientVisible,
         clientId: project.client.id,
         projectId: project.id,
+        origin: request.headers.get("origin"),
       });
       return NextResponse.json({ uploadUrl });
     } catch (error) {

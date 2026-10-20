@@ -206,6 +206,8 @@ export async function createResumableUpload(input: {
   clientId: string;
   projectId: string;
   kind?: string;
+  /** Browser Origin so Google allows the client PUT (CORS). */
+  origin?: string | null;
 }): Promise<string> {
   const res = await driveFetch(
     "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true&fields=id",
@@ -215,6 +217,7 @@ export async function createResumableUpload(input: {
         "Content-Type": "application/json; charset=UTF-8",
         "X-Upload-Content-Type": input.mimeType || "application/octet-stream",
         "X-Upload-Content-Length": String(input.sizeBytes),
+        ...(input.origin ? { Origin: input.origin } : {}),
       },
       body: JSON.stringify({
         name: input.name,
