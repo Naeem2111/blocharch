@@ -155,41 +155,33 @@ function viewForUpdate(kind: string): View {
   return "overview";
 }
 
-function NewBadge() {
-  return (
-    <span className="rounded bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-300">
-      New
-    </span>
-  );
-}
-
 function RecentUpdates({ updates, limit }: { updates: PortalData["updates"]; limit?: number }) {
   const rows = limit ? updates.slice(0, limit) : updates;
   if (rows.length === 0) {
-    return <p className="mt-4 text-base text-slate-500">Updates will show here as the project moves.</p>;
+    return <p className="mt-4 text-sm text-slate-500">Updates will show here as the project moves.</p>;
   }
+  const blueFrom = Math.ceil(rows.length / 2);
   return (
-    <ol className="mt-5">
+    <ol className="mt-4">
       {rows.map((update, i) => {
-        const last = i === rows.length - 1;
+        const blue = i >= blueFrom;
+        const nextBlue = i + 1 >= blueFrom;
+        const lineTone = nextBlue ? "bg-sky-400" : "bg-emerald-700";
         return (
-          <li key={update.id} className="flex items-stretch gap-4">
-            <p className="w-44 shrink-0 py-3.5 text-right text-lg font-medium leading-8 text-white">
-              {formatDate(update.occurredAt)}
-            </p>
-            <div className="relative flex w-8 shrink-0 justify-center">
+          <li key={update.id} className="flex items-center gap-3">
+            <div className="relative flex w-5 shrink-0 justify-center self-stretch">
               {i < rows.length - 1 ? (
-                <span
-                  aria-hidden
-                  className={`absolute left-1/2 top-7 w-1 -translate-x-1/2 ${i === rows.length - 2 ? "bg-sky-400" : "bg-emerald-400"}`}
-                  style={{ height: "calc(100% - 0.15rem)" }}
-                />
+                <span aria-hidden className={`absolute left-1/2 top-5 w-0.5 -translate-x-1/2 ${lineTone}`} style={{ bottom: "-0.35rem" }} />
               ) : null}
               <span
-                className={`relative z-10 mt-4 size-5 shrink-0 rounded-full ring-4 ring-[#0c1524] ${last ? "bg-sky-400" : "bg-emerald-400"}`}
+                className={`relative z-10 mt-3 size-3.5 shrink-0 rounded-full border-[2.5px] bg-white ${blue ? "border-sky-400" : "border-emerald-700"}`}
               />
             </div>
-            <p className="min-w-0 flex-1 py-3.5 text-xl leading-8 text-white">{update.title}</p>
+            <p className="w-[7.25rem] shrink-0 py-2.5 text-sm text-white">{formatDate(update.occurredAt)}</p>
+            <p className="min-w-0 flex-1 py-2.5 text-sm text-white">{update.title}</p>
+            <span className="shrink-0 text-sm text-white/70" aria-hidden>
+              ›
+            </span>
           </li>
         );
       })}
@@ -615,9 +607,9 @@ function Overview({
         </section>
         <section className={`${cardClass()} flex flex-col p-4`}>
           <CardTitle icon="link">Quick links</CardTitle>
-          <p className="mt-1 text-xs text-slate-500">Access important project resources.</p>
+          <p className="mt-1 text-xs text-white">Access important project resources.</p>
           <ul className="mt-3 space-y-2">
-            {project.clientLinks.length === 0 ? <li className="text-sm text-slate-500">Links will appear here once they are added.</li> : null}
+            {project.clientLinks.length === 0 ? <li className="text-sm text-white">Links will appear here once they are added.</li> : null}
             {project.clientLinks.map((link, i) => {
               const parts = splitLinkLabel(link.label.replace(/^🔗\s*/, ""), link.url);
               const kind = linkKind(link.url, link.label);
@@ -632,7 +624,7 @@ function Overview({
                     <LinkGlyph kind={kind} />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-semibold text-white">{parts.title}</span>
-                      <span className="block truncate text-xs text-slate-500">{parts.subtitle}</span>
+                      <span className="block truncate text-xs text-white">{parts.subtitle}</span>
                     </span>
                     <ExternalIcon />
                   </a>
@@ -643,9 +635,9 @@ function Overview({
         </section>
         <section className={`${cardClass()} flex flex-col p-4`}>
           <CardTitle icon="team">Project team</CardTitle>
-          <p className="mt-1 text-xs text-slate-500">Your main points of contact.</p>
+          <p className="mt-1 text-xs text-white">Your main points of contact.</p>
           <ul className="mt-3 space-y-2">
-            {project.team.length === 0 ? <li className="text-sm text-slate-500">The project team will appear here once assigned.</li> : null}
+            {project.team.length === 0 ? <li className="text-sm text-white">The project team will appear here once assigned.</li> : null}
             {project.team.map((member) => (
               <li
                 key={member.id}
@@ -656,7 +648,7 @@ function Overview({
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold text-white">{member.fullName}</span>
-                  {member.role ? <span className="block text-xs text-slate-500">{member.role}</span> : null}
+                  {member.role ? <span className="block text-xs text-white">{member.role}</span> : null}
                 </span>
                 {member.email ? (
                   <a href={`mailto:${member.email}`} className="text-slate-400 hover:text-white" aria-label={`Email ${member.fullName}`}>
@@ -670,21 +662,21 @@ function Overview({
       </div>
 
       {current ? (
-        <section className="private-portal-hero min-w-0 overflow-hidden rounded-2xl p-5 sm:p-6">
-          <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_1px_13.5rem] sm:gap-0 sm:items-stretch">
-            <div className="sm:pr-6">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white">Current stage</p>
-              <h2 className="mt-1.5 text-xl font-bold text-white sm:text-2xl">{current.label}</h2>
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                <span className="rounded-full bg-sky-500/15 px-2.5 py-0.5 text-sky-200 ring-1 ring-sky-400/30">In progress</span>
+        <section className="private-portal-hero min-w-0 overflow-hidden rounded-2xl p-6 sm:p-8">
+          <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_1px_15rem] sm:gap-0 sm:items-stretch">
+            <div className="sm:pr-7">
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-sky-300 [text-shadow:0_0_18px_rgba(56,189,248,0.55)]">Current stage</p>
+              <h2 className="mt-2 text-3xl font-bold text-white sm:text-4xl">{current.label}</h2>
+              <div className="mt-3 flex flex-wrap items-center gap-2.5 text-sm">
+                <span className="rounded-full bg-sky-500/20 px-3 py-1 text-sky-100 ring-1 ring-sky-400/40 shadow-[0_0_16px_rgba(56,189,248,0.35)]">In progress</span>
                 <span className="text-white">Step {current.number} of {stages.length}</span>
               </div>
             </div>
-            <div className="hidden bg-white/25 sm:block" aria-hidden />
-            <div className="sm:pl-6">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white">Up next</p>
-              <p className="mt-1.5 text-base font-semibold text-white">{next?.label ?? "—"}</p>
-              <p className="mt-1 text-sm text-white">Target date: {next?.dateFrom ? formatDate(next.dateFrom) : "To be confirmed"}</p>
+            <div className="hidden bg-sky-400/40 sm:block" aria-hidden />
+            <div className="sm:pl-7">
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-sky-300 [text-shadow:0_0_18px_rgba(56,189,248,0.55)]">Up next</p>
+              <p className="mt-2 text-xl font-semibold text-white">{next?.label ?? "—"}</p>
+              <p className="mt-1.5 text-base text-white">Target date: {next?.dateFrom ? formatDate(next.dateFrom) : "To be confirmed"}</p>
             </div>
           </div>
           <div className="overflow-x-auto">
@@ -698,7 +690,6 @@ function Overview({
           <h2 className="flex items-center gap-2 border-b border-white/[0.08] pb-3 text-base font-bold text-white">
             <span className="text-white"><BellMini className="h-8 w-8" /></span>
             Recent updates
-            {updates.length > 0 ? <NewBadge /> : null}
           </h2>
           <p className="mt-1 text-xs text-slate-500">The latest activity on your project.</p>
           <RecentUpdates updates={updates} limit={6} />
@@ -814,7 +805,11 @@ function Journey({
                   <span
                     aria-hidden
                     className={`absolute left-1/2 top-4 z-0 w-[3px] -translate-x-1/2 bottom-[-2.25rem] ${
-                      stage.state === "done" ? "bg-emerald-400" : "bg-[#3e6288]"
+                      stages[i + 1]?.state === "current"
+                        ? "bg-sky-400"
+                        : stage.state === "done"
+                          ? "bg-emerald-700"
+                          : "bg-[#3e6288]"
                     }`}
                   />
                 ) : null}
@@ -823,11 +818,19 @@ function Journey({
               <div className={`min-w-0 flex-1 ${stage.state === "current" ? "private-portal-timeline-current rounded-xl px-4 py-3" : "pt-0.5"}`}>
                 <div className="flex items-start justify-between gap-3">
                   <p className={stage.state === "current" ? "font-bold text-white" : "font-medium text-white"}>{stage.label}</p>
-                  <p className={`shrink-0 text-xs text-white ${stage.state === "current" ? "font-bold" : ""}`}>
+                  <p className={`shrink-0 text-xs ${stage.state === "current" ? "font-bold text-white" : "text-slate-400"}`}>
                     {stage.dateFrom ? formatDate(stage.dateFrom) : stage.state === "upcoming" ? "To be confirmed" : "—"}
                   </p>
                 </div>
-                <p className={`text-xs text-white ${stage.state === "current" ? "font-bold" : ""}`}>
+                <p
+                  className={`text-xs ${
+                    stage.state === "done"
+                      ? "text-emerald-600"
+                      : stage.state === "current"
+                        ? "font-bold text-sky-400"
+                        : "text-slate-500"
+                  }`}
+                >
                   {stage.state === "done"
                     ? "Completed"
                     : stage.state === "current"
@@ -836,7 +839,7 @@ function Journey({
                         ? "Final milestone"
                         : "Upcoming"}
                 </p>
-                {stage.state === "current" ? <p className="mt-1 text-sm font-bold text-white">{stageBody(project.designStage)}</p> : null}
+                {stage.state === "current" ? <p className="mt-1 text-sm text-slate-300">{stageBody(project.designStage)}</p> : null}
               </div>
             </li>
           ))}
@@ -1164,26 +1167,26 @@ function StageRail({ stages }: { stages: Stage[] }) {
       <div className="flex min-w-[36rem] items-start">
         {stages.map((stage, i) => (
           <div key={stage.key} className="flex min-w-0 flex-1 flex-col items-center">
-            <div className="relative flex h-8 w-full items-center justify-center">
+            <div className="relative flex h-11 w-full items-center justify-center">
               {i > 0 ? (
                 <span
                   className={`absolute left-0 right-1/2 top-1/2 h-[3px] -translate-y-1/2 ${
-                    stages[i - 1]?.state === "done" ? "bg-emerald-400" : "bg-[#3e6288]"
+                    stages[i - 1]?.state === "done" ? "bg-emerald-700" : "bg-[#3e6288]"
                   }`}
                 />
               ) : null}
               {i < stages.length - 1 ? (
                 <span
                   className={`absolute left-1/2 right-0 top-1/2 h-[3px] -translate-y-1/2 ${
-                    stage.state === "done" ? "bg-emerald-400" : "bg-[#3e6288]"
+                    stage.state === "done" ? "bg-emerald-700" : "bg-[#3e6288]"
                   }`}
                 />
               ) : null}
               <div className="relative z-10 shrink-0">
                 <div
-                  className={`flex size-8 items-center justify-center rounded-full text-xs font-semibold leading-none ${
+                  className={`flex size-11 items-center justify-center rounded-full text-sm font-semibold leading-none ${
                     stage.state === "done"
-                      ? "bg-emerald-500 text-white"
+                      ? "bg-emerald-700 text-white"
                       : stage.state === "current"
                         ? "bg-sky-400 text-white shadow-[0_0_0_5px_rgba(56,189,248,0.45)]"
                         : "border border-white/20 bg-[#0c1524] text-white"
@@ -1193,9 +1196,16 @@ function StageRail({ stages }: { stages: Stage[] }) {
                 </div>
               </div>
             </div>
-            <p className={`mt-3 max-w-full px-1 text-center text-[10px] leading-tight text-white ${stage.state === "current" ? "font-bold" : ""}`}>
-              {stage.label}
-            </p>
+            {stage.state === "done" ? (
+              <div className="mt-3 max-w-full px-1 text-center text-white">
+                <p className="text-sm font-bold leading-tight">{stage.number}</p>
+                <p className="mt-0.5 text-[10px] leading-tight">{stage.label}</p>
+              </div>
+            ) : (
+              <p className={`mt-3 max-w-full px-1 text-center text-[10px] leading-tight text-white ${stage.state === "current" ? "font-bold" : ""}`}>
+                {stage.label}
+              </p>
+            )}
           </div>
         ))}
       </div>
@@ -1206,7 +1216,7 @@ function StageRail({ stages }: { stages: Stage[] }) {
 function StageDot({ stage }: { stage: Stage }) {
   const cls =
     stage.state === "done"
-      ? "bg-emerald-500 text-white"
+      ? "bg-emerald-700 text-white"
       : stage.state === "current"
         ? "bg-sky-400 text-white shadow-[0_0_0_5px_rgba(56,189,248,0.35),0_0_18px_rgba(56,189,248,0.45)]"
         : "border border-slate-500 bg-[#0c1524] text-white";

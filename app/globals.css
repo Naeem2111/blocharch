@@ -978,12 +978,14 @@ html[data-theme="light"] .client-portal-shell .text-slate-600 {
 
 .private-portal-hero {
   background:
-    radial-gradient(ellipse 70% 130% at 0% 0%, rgb(34 211 238 / 0.28), transparent 58%),
+    radial-gradient(ellipse 85% 140% at 0% 0%, rgb(56 189 248 / 0.38), transparent 55%),
+    radial-gradient(ellipse 55% 90% at 100% 100%, rgb(14 165 233 / 0.18), transparent 50%),
     #0c1524;
-  border: 1px solid rgb(34 211 238 / 0.42);
+  border: 1px solid rgb(56 189 248 / 0.55);
   box-shadow:
-    inset 1px 1px 0 rgb(103 232 249 / 0.45),
-    0 0 28px rgb(34 211 238 / 0.1);
+    inset 1px 1px 0 rgb(125 211 252 / 0.55),
+    0 0 36px rgb(56 189 248 / 0.28),
+    0 0 64px rgb(14 165 233 / 0.16);
 }
 
 .private-portal-rail-current,
