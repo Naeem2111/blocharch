@@ -211,7 +211,6 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
 
   const current = stages.find((s) => s.state === "current") ?? stages[0];
   const next = current ? stages.find((s) => s.number === current.number + 1) ?? null : null;
-  const contactEmail = project.team.find((member) => member.email)?.email ?? null;
   const subtitle = typeLine(project.projectTypeLabel);
 
   const notices = useMemo(
@@ -250,17 +249,21 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
     );
   }, [docFilter, docQuery, docSort, portalDocuments, stages]);
 
-  async function completeAction(actionItemId: string) {
+  async function completeAction(actionItemId: string, opts?: { confirmUpload?: boolean }) {
     setCompleting(actionItemId);
     try {
       const r = await fetch(`/api/private/portal/${slug}/actions`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ actionItemId }),
+        body: JSON.stringify({ actionItemId, confirmUpload: opts?.confirmUpload === true }),
       });
-      if (!r.ok) return;
+      if (!r.ok) {
+        const body = (await r.json().catch(() => ({}))) as { error?: string };
+        setUploadNote(body.error || "Could not complete this action.");
+        return false;
+      }
       const j = (await r.json()) as {
-        actionItem: { id: string; title: string; completedAt: string };
+        actionItem: { id: string; title: string; completedAt: string; requiresUpload?: boolean };
         update?: PortalData["updates"][number];
       };
       if (j.update) {
@@ -268,10 +271,16 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
       }
       setActionItems((prev) => prev.filter((a) => a.id !== actionItemId));
       setCompletedActionItems((prev) => [
-        { id: j.actionItem.id, title: j.actionItem.title, completedAt: j.actionItem.completedAt.slice(0, 10) },
+        {
+          id: j.actionItem.id,
+          title: j.actionItem.title,
+          requiresUpload: Boolean(j.actionItem.requiresUpload),
+          completedAt: j.actionItem.completedAt.slice(0, 10),
+        },
         ...prev,
       ]);
       setOpenCompleted(j.actionItem.id);
+      return true;
     } finally {
       setCompleting(null);
     }
@@ -284,16 +293,8 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
     setNoticesOpen(false);
   }
 
-  function emailTeam(subject: string) {
-    if (!contactEmail) {
-      setUploadNote("Your project team has no email on file yet. Blocharch can add one from the project.");
-      return;
-    }
-    window.location.href = `mailto:${contactEmail}?subject=${encodeURIComponent(subject)}`;
-  }
-
   async function uploadPortalFiles(files: File[]) {
-    if (files.length === 0) return;
+    if (files.length === 0) return false;
     const notes: string[] = [];
     const queue = files.filter((file) => {
       if (isPortalUploadFile(file)) return true;
@@ -302,10 +303,11 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
     });
     if (queue.length === 0) {
       setUploadNote(notes.join(" "));
-      return;
+      return false;
     }
     setUploading(true);
     setUploadNote("");
+    let okCount = 0;
     for (const file of queue) {
       if (file.size > 50 * 1024 * 1024) {
         notes.push(`${file.name} is over 50 MB.`);
@@ -332,6 +334,7 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
           if (!posted.ok || !body.document) throw new Error(body.error || started.error || "Upload failed");
           setPortalDocuments((prev) => [body.document!, ...prev.filter((doc) => doc.id !== body.document!.id)]);
           notes.push(`${file.name} saved to your project folder.`);
+          okCount += 1;
           continue;
         }
         const put = await fetch(started.uploadUrl, {
@@ -360,12 +363,14 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
         if (!done.ok || !finished.document) throw new Error(finished.error || "Could not record the file");
         setPortalDocuments((prev) => [finished.document!, ...prev.filter((doc) => doc.id !== finished.document!.id)]);
         notes.push(`${file.name} saved to your Google Drive folder.`);
+        okCount += 1;
       } catch (error) {
         notes.push(error instanceof Error ? `${file.name}: ${error.message}` : `Could not upload ${file.name}`);
       }
     }
     setUploadNote(notes.join(" "));
     setUploading(false);
+    return okCount > 0 && okCount === queue.length;
   }
 
   return (
@@ -508,11 +513,14 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
               openCompleted={openCompleted}
               onToggleCompleted={(id) => setOpenCompleted((currentId) => (currentId === id ? null : id))}
               completing={completing}
-              onComplete={(id) => void completeAction(id)}
-              onContact={() => emailTeam(`Question about ${project.address}`)}
-              uploadNote={uploadNote}
               uploading={uploading}
-              onFiles={(files) => void uploadPortalFiles(files)}
+              uploadNote={uploadNote}
+              onComplete={(id) => void completeAction(id)}
+              onSubmitUpload={async (id, files) => {
+                const uploaded = await uploadPortalFiles(files);
+                if (!uploaded) return false;
+                return Boolean(await completeAction(id, { confirmUpload: true }));
+              }}
             />
           ) : null}
           {view === "documents" ? (
@@ -899,11 +907,10 @@ function Actions({
   openCompleted,
   onToggleCompleted,
   completing,
-  onComplete,
-  onContact,
-  uploadNote,
   uploading,
-  onFiles,
+  uploadNote,
+  onComplete,
+  onSubmitUpload,
 }: {
   tab: "required" | "completed";
   onTab: (tab: "required" | "completed") => void;
@@ -912,12 +919,49 @@ function Actions({
   openCompleted: string | null;
   onToggleCompleted: (id: string) => void;
   completing: string | null;
-  onComplete: (id: string) => void;
-  onContact: () => void;
-  uploadNote: string;
   uploading: boolean;
-  onFiles: (files: File[]) => void;
+  uploadNote: string;
+  onComplete: (id: string) => void;
+  onSubmitUpload: (id: string, files: File[]) => Promise<boolean>;
 }) {
+  const [expandedUploadId, setExpandedUploadId] = useState<string | null>(
+    () => actionItems.find((a) => a.requiresUpload)?.id ?? null,
+  );
+  const [pendingByAction, setPendingByAction] = useState<Record<string, File[]>>({});
+
+  function addPending(actionId: string, files: File[]) {
+    const allowed = files.filter((file) => {
+      const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+      return ["pdf", "png", "jpg", "jpeg"].includes(ext) || /pdf|png|jpe?g/i.test(file.type);
+    });
+    if (allowed.length === 0) return;
+    setPendingByAction((prev) => ({
+      ...prev,
+      [actionId]: [...(prev[actionId] ?? []), ...allowed],
+    }));
+  }
+
+  function removePending(actionId: string, index: number) {
+    setPendingByAction((prev) => ({
+      ...prev,
+      [actionId]: (prev[actionId] ?? []).filter((_, i) => i !== index),
+    }));
+  }
+
+  async function submitUpload(actionId: string) {
+    const files = pendingByAction[actionId] ?? [];
+    if (files.length === 0) return;
+    const ok = await onSubmitUpload(actionId, files);
+    if (ok) {
+      setPendingByAction((prev) => {
+        const next = { ...prev };
+        delete next[actionId];
+        return next;
+      });
+      setExpandedUploadId(null);
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2">
@@ -939,49 +983,121 @@ function Actions({
 
       {tab === "required" ? (
         <section className={`${cardClass()} p-5 sm:p-6`}>
-          <h2 className="text-xl font-semibold text-white">Actions required from you</h2>
+          <h2 className="text-xl font-semibold text-white">Your actions</h2>
           <p className="mt-1 text-sm text-slate-400">Actions and information we need from you to keep the project on track.</p>
           <ul className="mt-5 space-y-3">
             {actionItems.length === 0 ? <li className="text-sm text-slate-500">Nothing is waiting on you right now.</li> : null}
-            {actionItems.map((action) => (
-              <li key={action.id} className="flex items-center gap-3 rounded-2xl border border-sky-400/25 bg-sky-400/[0.04] px-4 py-3">
-                <button
-                  type="button"
-                  disabled={completing === action.id}
-                  onClick={() => onComplete(action.id)}
-                  aria-label={`Mark ${action.title} complete`}
-                  className="h-5 w-5 shrink-0 rounded-full border border-white hover:border-emerald-400 disabled:opacity-50"
-                />
-                <span className="min-w-0 flex-1 text-sm font-medium text-white">{action.title}</span>
-              </li>
-            ))}
+            {actionItems.map((action) => {
+              if (action.requiresUpload) {
+                const open = expandedUploadId === action.id;
+                const pending = pendingByAction[action.id] ?? [];
+                const busy = uploading || completing === action.id;
+                return (
+                  <li key={action.id} className="rounded-2xl border border-sky-400/30 bg-sky-400/[0.04] px-4 py-3">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedUploadId((id) => (id === action.id ? null : action.id))}
+                      className="flex w-full items-center gap-3 text-left"
+                      aria-expanded={open}
+                    >
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-500/15 text-sky-200 ring-1 ring-sky-400/30">
+                        <UploadActionIcon />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-medium text-white">{action.title}</span>
+                      </span>
+                      <span className="rounded-full border border-sky-400/50 px-2.5 py-0.5 text-[11px] font-medium text-sky-200">
+                        Upload requested
+                      </span>
+                      <span className={`text-slate-400 transition ${open ? "rotate-180" : ""}`} aria-hidden>
+                        ▾
+                      </span>
+                    </button>
+                    {open ? (
+                      <div className="mt-4 border-t border-white/[0.06] pt-4">
+                        <p className="text-sm text-slate-300">Upload the files needed for this action.</p>
+                        <label
+                          className="mt-3 flex cursor-pointer flex-col items-center rounded-2xl border border-dashed border-sky-400/70 bg-sky-400/[0.04] px-4 py-8 text-center"
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            if (!busy) addPending(action.id, Array.from(e.dataTransfer.files));
+                          }}
+                        >
+                          <span className="text-sky-300">↑</span>
+                          <span className="mt-2 text-sm text-slate-200">
+                            Drag & drop files here or <span className="text-sky-300 underline">browse</span>
+                          </span>
+                          <span className="mt-1 text-xs text-slate-500">PDF, PNG or JPEG · Max 50 MB</span>
+                          <input
+                            type="file"
+                            multiple
+                            accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+                            className="sr-only"
+                            disabled={busy}
+                            onChange={(e) => {
+                              addPending(action.id, Array.from(e.target.files ?? []));
+                              e.target.value = "";
+                            }}
+                          />
+                        </label>
+                        {pending.length > 0 ? (
+                          <ul className="mt-3 space-y-2">
+                            {pending.map((file, index) => (
+                              <li
+                                key={`${file.name}-${file.size}-${index}`}
+                                className="flex items-center gap-3 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2"
+                              >
+                                <PdfBadge />
+                                <span className="min-w-0 flex-1">
+                                  <span className="block truncate text-sm text-white">{file.name}</span>
+                                  <span className="block text-xs text-slate-500">
+                                    {formatBytes(file.size)} · Ready to submit
+                                  </span>
+                                </span>
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  onClick={() => removePending(action.id, index)}
+                                  className="text-slate-400 hover:text-white"
+                                  aria-label={`Remove ${file.name}`}
+                                >
+                                  ×
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
+                        <div className="mt-4 flex justify-end">
+                          <button
+                            type="button"
+                            disabled={busy || pending.length === 0}
+                            onClick={() => void submitUpload(action.id)}
+                            className="rounded-xl bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-400 disabled:opacity-50"
+                          >
+                            {busy ? "Submitting…" : "Submit files"}
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+                  </li>
+                );
+              }
+              return (
+                <li key={action.id} className="flex items-center gap-3 rounded-2xl border border-sky-400/25 bg-sky-400/[0.04] px-4 py-3">
+                  <button
+                    type="button"
+                    disabled={completing === action.id}
+                    onClick={() => onComplete(action.id)}
+                    aria-label={`Mark ${action.title} complete`}
+                    className="h-5 w-5 shrink-0 rounded-full border border-white hover:border-emerald-400 disabled:opacity-50"
+                  />
+                  <span className="min-w-0 flex-1 text-sm font-medium text-white">{action.title}</span>
+                  <span className="shrink-0 text-xs text-slate-400">Tick to confirm</span>
+                </li>
+              );
+            })}
           </ul>
-          <label
-            className="mt-5 flex cursor-pointer flex-col items-center rounded-2xl border border-dashed border-sky-400/70 bg-sky-400/[0.04] px-4 py-8 text-center"
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => {
-              e.preventDefault();
-              if (!uploading) onFiles(Array.from(e.dataTransfer.files));
-            }}
-          >
-            <span className="text-sky-300">↑</span>
-            <span className="mt-2 text-sm text-slate-200">
-              {uploading ? "Saving to your project folder…" : <>Drag & drop files here or <span className="text-sky-300 underline">browse</span></>}
-            </span>
-            <span className="mt-1 text-xs text-slate-500">PDF, JPG, PNG, Word, or Excel (Max 50 MB)</span>
-            <input
-              type="file"
-              multiple
-              accept={PORTAL_UPLOAD_ACCEPT}
-              className="sr-only"
-              disabled={uploading}
-              onChange={(e) => {
-                const files = Array.from(e.target.files ?? []);
-                onFiles(files);
-                e.target.value = "";
-              }}
-            />
-          </label>
           {uploadNote ? <p className="mt-3 text-sm text-slate-400">{uploadNote}</p> : null}
         </section>
       ) : (
@@ -1011,20 +1127,15 @@ function Actions({
           </ul>
         </section>
       )}
-
-      <section className={`${cardClass()} flex flex-wrap items-center justify-between gap-3 p-4`}>
-        <div className="flex items-center gap-3">
-          <span className="flex h-9 w-9 items-center justify-center rounded-full border border-sky-300/70 bg-sky-400/20 text-sky-200">?</span>
-          <div>
-            <p className="text-sm font-medium text-white">Have a question?</p>
-            <p className="text-xs text-slate-500">If you're unsure about anything or need more information, please reach out.</p>
-          </div>
-        </div>
-        <button type="button" onClick={onContact} className="rounded-xl border border-sky-400/40 px-3 py-2 text-sm text-white hover:bg-sky-400/10">
-          Contact BLOCHARCH
-        </button>
-      </section>
     </div>
+  );
+}
+
+function UploadActionIcon() {
+  return (
+    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.6} stroke="currentColor" aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+    </svg>
   );
 }
 

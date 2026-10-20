@@ -42,6 +42,13 @@ export async function PATCH(
   });
   if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  if (item.requiresUpload && body.confirmUpload !== true) {
+    return NextResponse.json(
+      { error: "This action needs a file upload before it can be completed." },
+      { status: 400 },
+    );
+  }
+
   const updated = await prisma.privateActionItem.update({
     where: { id: actionId },
     data: { completedAt: new Date() },
@@ -58,6 +65,7 @@ export async function PATCH(
     actionItem: {
       id: updated.id,
       title: updated.title,
+      requiresUpload: updated.requiresUpload,
       completedAt: updated.completedAt?.toISOString() ?? null,
     },
     update: {

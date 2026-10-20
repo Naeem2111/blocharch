@@ -236,12 +236,13 @@ export async function getPublicPrivateProjectBySlug(slug: string) {
     phaseGroups,
     actionItems: project.actionItems
       .filter((a) => !a.completedAt)
-      .map((a) => ({ id: a.id, title: a.title })),
+      .map((a) => ({ id: a.id, title: a.title, requiresUpload: a.requiresUpload })),
     completedActionItems: project.actionItems
       .filter((a) => a.completedAt)
       .map((a) => ({
         id: a.id,
         title: a.title,
+        requiresUpload: a.requiresUpload,
         completedAt: a.completedAt!.toISOString().slice(0, 10),
       })),
     updates: project.updates.map((u) => ({

@@ -128,6 +128,7 @@ export async function GET(
       id: a.id,
       title: a.title,
       clientFacing: a.clientFacing,
+      requiresUpload: a.requiresUpload,
       completedAt: a.completedAt?.toISOString() ?? null,
     })),
     documents: documents.map((d) => ({

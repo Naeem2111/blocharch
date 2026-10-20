@@ -23,11 +23,13 @@ export async function POST(
   if (!title) return NextResponse.json({ error: "Title required" }, { status: 400 });
 
   const clientFacing = body.clientFacing !== false;
+  const requiresUpload = Boolean(body.requiresUpload);
   const item = await prisma.privateActionItem.create({
     data: {
       projectId: params.id,
       title,
       clientFacing,
+      requiresUpload,
     },
   });
   if (clientFacing) {
@@ -45,6 +47,7 @@ export async function POST(
       id: item.id,
       title: item.title,
       clientFacing: item.clientFacing,
+      requiresUpload: item.requiresUpload,
       completedAt: null,
     },
   }, { status: 201 });
@@ -66,7 +69,12 @@ export async function PATCH(
   });
   if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const updateData: { completedAt?: Date | null; title?: string; clientFacing?: boolean } = {};
+  const updateData: {
+    completedAt?: Date | null;
+    title?: string;
+    clientFacing?: boolean;
+    requiresUpload?: boolean;
+  } = {};
 
   if (body.complete !== undefined) {
     updateData.completedAt = body.complete === false ? null : new Date();
@@ -80,6 +88,10 @@ export async function PATCH(
 
   if (body.clientFacing !== undefined) {
     updateData.clientFacing = Boolean(body.clientFacing);
+  }
+
+  if (body.requiresUpload !== undefined) {
+    updateData.requiresUpload = Boolean(body.requiresUpload);
   }
 
   if (Object.keys(updateData).length === 0) {
@@ -108,7 +120,8 @@ export async function PATCH(
   }
   if (
     (!item.clientFacing && updated.clientFacing) ||
-    (!item.completedAt && updated.completedAt && updated.clientFacing)
+    (!item.completedAt && updated.completedAt && updated.clientFacing) ||
+    item.requiresUpload !== updated.requiresUpload
   ) {
     const owner = await prisma.privateProject.findUnique({
       where: { id: params.id },
@@ -122,6 +135,7 @@ export async function PATCH(
       id: updated.id,
       title: updated.title,
       clientFacing: updated.clientFacing,
+      requiresUpload: updated.requiresUpload,
       completedAt: updated.completedAt?.toISOString() ?? null,
     },
   });

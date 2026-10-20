@@ -86,7 +86,13 @@ type Detail = {
     clientVisible: boolean;
     occurredAt: string;
   }>;
-  actionItems: Array<{ id: string; title: string; completedAt: string | null; clientFacing: boolean }>;
+  actionItems: Array<{
+    id: string;
+    title: string;
+    completedAt: string | null;
+    clientFacing: boolean;
+    requiresUpload: boolean;
+  }>;
   documents: Array<{
     id: string;
     title: string;
@@ -119,6 +125,7 @@ export function PrivateProjectDetailClient({
   const [itemLoading, setItemLoading] = useState<string | null>(null);
   const [editTitles, setEditTitles] = useState<Record<string, string>>({});
   const [actionFacing, setActionFacing] = useState(true);
+  const [actionRequiresUpload, setActionRequiresUpload] = useState(false);
   const [updateTitle, setUpdateTitle] = useState("");
   const [updateBody, setUpdateBody] = useState("");
   const [updateVisible, setUpdateVisible] = useState(false);
@@ -238,9 +245,14 @@ export function PrivateProjectDetailClient({
     await fetch(`/api/private/projects/${projectId}/actions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: actionTitle.trim(), clientFacing: actionFacing }),
+      body: JSON.stringify({
+        title: actionTitle.trim(),
+        clientFacing: actionFacing,
+        requiresUpload: actionRequiresUpload,
+      }),
     });
     setActionTitle("");
+    setActionRequiresUpload(false);
     setSaving(false);
     void load();
   }
@@ -289,6 +301,17 @@ export function PrivateProjectDetailClient({
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ actionItemId, clientFacing }),
+    });
+    setItemLoading(null);
+    void load();
+  }
+
+  async function toggleActionRequiresUpload(actionItemId: string, requiresUpload: boolean) {
+    setItemLoading(actionItemId);
+    await fetch(`/api/private/projects/${projectId}/actions`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ actionItemId, requiresUpload }),
     });
     setItemLoading(null);
     void load();
@@ -876,6 +899,16 @@ export function PrivateProjectDetailClient({
                       />
                       Show on portal
                     </label>
+                    <label className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-slate-500">
+                      <input
+                        type="checkbox"
+                        checked={a.requiresUpload}
+                        disabled={loading}
+                        onChange={(e) => void toggleActionRequiresUpload(a.id, e.target.checked)}
+                        className="h-3.5 w-3.5 accent-brand-400"
+                      />
+                      Require upload
+                    </label>
                     {titleChanged ? (
                       <button
                         type="button"
@@ -920,15 +953,26 @@ export function PrivateProjectDetailClient({
               Add
             </button>
           </div>
-          <label className="flex items-center gap-2 text-xs text-slate-500">
-            <input
-              type="checkbox"
-              checked={actionFacing}
-              onChange={(e) => setActionFacing(e.target.checked)}
-              className="h-3.5 w-3.5 accent-brand-400"
-            />
-            Show on client portal
-          </label>
+          <div className="flex flex-wrap gap-4">
+            <label className="flex items-center gap-2 text-xs text-slate-500">
+              <input
+                type="checkbox"
+                checked={actionFacing}
+                onChange={(e) => setActionFacing(e.target.checked)}
+                className="h-3.5 w-3.5 accent-brand-400"
+              />
+              Show on client portal
+            </label>
+            <label className="flex items-center gap-2 text-xs text-slate-500">
+              <input
+                type="checkbox"
+                checked={actionRequiresUpload}
+                onChange={(e) => setActionRequiresUpload(e.target.checked)}
+                className="h-3.5 w-3.5 accent-brand-400"
+              />
+              Require upload
+            </label>
+          </div>
         </div>
 
         {completedActions.length > 0 ? (
