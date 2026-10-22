@@ -6,8 +6,8 @@ export type PrivateAthleteNavItem = {
 };
 
 export const PRIVATE_ATHLETE_NAV: PrivateAthleteNavItem[] = [
-  { href: "/dashboard/athlete/private", label: "My projects" },
-  { href: "/dashboard/athlete/private/log", label: "Daily log" },
+  { href: "/dashboard/athlete/private", label: "Daily log" },
+  { href: "/dashboard/athlete/private/projects", label: "My projects" },
   { href: "/dashboard/athlete/private/archives", label: "Archives" },
 ];
 

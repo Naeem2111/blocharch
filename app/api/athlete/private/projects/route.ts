@@ -46,7 +46,20 @@ export async function GET(request: NextRequest) {
     orderBy: { updatedAt: "desc" },
   });
 
+  const ids = projects.map((project) => project.id);
+  const hourRows =
+    ids.length === 0
+      ? []
+      : await prisma.privateHourLog.groupBy({
+          by: ["projectId"],
+          where: { athleteId: gate.athlete.id, projectId: { in: ids } },
+          _sum: { hours: true },
+        });
+  const hoursByProject = new Map(hourRows.map((row) => [row.projectId, Number(row._sum.hours ?? 0)]));
+
   return NextResponse.json({
-    projects: projects.map((p) => serializePrivateProject(p)),
+    projects: projects.map((project) =>
+      serializePrivateProject(project, { hoursLifeToDate: hoursByProject.get(project.id) ?? 0 }),
+    ),
   });
 }

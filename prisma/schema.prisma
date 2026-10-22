@@ -1058,6 +1058,10 @@ model PrivateHourLog {
   workDate   DateTime @map("work_date") @db.Date
   hours      Decimal  @map("hours") @db.Decimal(5, 2)
   notes      String?  @db.Text
+  /** Design phase worked — the private workflow step, stored so a day can be reopened. */
+  designPhaseId String? @map("design_phase_id") @db.VarChar(80)
+  designPhaseLabel String? @map("design_phase_label") @db.VarChar(160)
+  completionPercent Int? @map("completion_percent")
   createdAt  DateTime @default(now()) @map("created_at")
 
   project PrivateProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
