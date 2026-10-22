@@ -800,6 +800,30 @@ model OpsCatalogWorkType {
   @@map("ops_catalog_work_types")
 }
 
+/** Private-project daily-log phases. Independent of the UK client catalog. */
+model PrivateCatalogPhase {
+  id         String   @id @default(uuid())
+  label      String
+  builtInKey String?  @unique @map("built_in_key") @db.VarChar(64)
+  hidden     Boolean  @default(false)
+  sortOrder  Int      @default(0) @map("sort_order")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("private_catalog_phases")
+}
+
+/** Private-project daily-log task types. Independent of the UK client catalog. */
+model PrivateCatalogWorkType {
+  id         String   @id @default(uuid())
+  label      String
+  builtInKey String?  @unique @map("built_in_key") @db.VarChar(64)
+  hidden     Boolean  @default(false)
+  sortOrder  Int      @default(0) @map("sort_order")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("private_catalog_work_types")
+}
+
 model OpsExchangeRate {
   id             String              @id @default(uuid())
   effectiveMonth DateTime            @map("effective_month") @db.Date

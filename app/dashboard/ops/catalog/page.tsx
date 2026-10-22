@@ -6,7 +6,7 @@ export default function OpsCatalogPage() {
     <>
       <PageHeader
         title="Phases & work types"
-        description="Add, rename, and reorder project phases / packages and daily-log work types. The daily log uses this order."
+        description="UK client phases and work types, and the private-project set, are edited on separate tabs."
         className="mb-8"
       />
       <OpsCatalogClient />

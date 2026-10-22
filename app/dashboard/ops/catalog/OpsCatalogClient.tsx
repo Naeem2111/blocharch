@@ -175,7 +175,10 @@ function CatalogList({
   );
 }
 
+type CatalogSet = "uk" | "private";
+
 export function OpsCatalogClient() {
+  const [catalogSet, setCatalogSet] = useState<CatalogSet>("uk");
   const [phases, setPhases] = useState<OpsCatalogOption[]>([]);
   const [workTypes, setWorkTypes] = useState<OpsCatalogOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -185,7 +188,8 @@ export function OpsCatalogClient() {
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
-    const r = await fetch("/api/ops/catalog");
+    const query = catalogSet === "private" ? "?set=private" : "";
+    const r = await fetch(`/api/ops/catalog${query}`);
     const j = await r.json();
     if (!r.ok) {
       setError(j.error || "Failed to load");
@@ -195,7 +199,7 @@ export function OpsCatalogClient() {
     setPhases(j.phases || []);
     setWorkTypes(j.workTypes || []);
     setLoading(false);
-  }, []);
+  }, [catalogSet]);
 
   useEffect(() => {
     void load();
@@ -209,7 +213,7 @@ export function OpsCatalogClient() {
     const r = await fetch("/api/ops/catalog", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind, label: trimmed }),
+      body: JSON.stringify({ kind, label: trimmed, set: catalogSet }),
     });
     const j = await r.json();
     setBusy(null);
@@ -233,6 +237,7 @@ export function OpsCatalogClient() {
         id: option.id,
         builtInKey: option.builtInKey,
         label: trimmed,
+        set: catalogSet,
       }),
     });
     const j = await r.json();
@@ -258,6 +263,7 @@ export function OpsCatalogClient() {
         kind,
         id: option.id,
         builtInKey: option.builtInKey,
+        set: catalogSet,
       }),
     });
     const j = await r.json();
@@ -283,7 +289,7 @@ export function OpsCatalogClient() {
     const r = await fetch("/api/ops/catalog", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind, order: values }),
+      body: JSON.stringify({ kind, order: values, set: catalogSet }),
     });
     const j = await r.json().catch(() => ({}));
     setBusy(null);
@@ -297,35 +303,84 @@ export function OpsCatalogClient() {
     if (Array.isArray(j.workTypes)) setWorkTypes(j.workTypes);
   }
 
-  if (loading) return <p className="text-sm text-slate-500">Loading catalog…</p>;
+  const privateSet = catalogSet === "private";
 
   return (
-    <div className="mx-auto grid max-w-5xl gap-6 lg:grid-cols-2">
-      {error ? <p className="text-sm text-red-300 lg:col-span-2">{error}</p> : null}
-      <CatalogList
-        title="Phases / packages"
-        description="Shown on the project tracker and daily log, in this order. Drag a row or use the arrows. Built-ins are hidden from pickers when removed."
-        addPlaceholder="e.g. Interior package, Measured survey"
-        kind="phase"
-        options={phases}
-        busy={busy}
-        onAdd={addItem}
-        onSave={saveItem}
-        onRemove={removeItem}
-        onReorder={reorderItems}
-      />
-      <CatalogList
-        title="Work types"
-        description="Task types athletes pick on the daily log, in this order. Drag a row or use the arrows. Built-ins are hidden from pickers when removed."
-        addPlaceholder="e.g. BIM coordination, Site visit"
-        kind="work_type"
-        options={workTypes}
-        busy={busy}
-        onAdd={addItem}
-        onSave={saveItem}
-        onRemove={removeItem}
-        onReorder={reorderItems}
-      />
+    <div className="mx-auto max-w-5xl">
+      <div className="mb-6 flex flex-wrap gap-2" role="tablist" aria-label="Catalog set">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={!privateSet}
+          onClick={() => {
+            setLoading(true);
+            setCatalogSet("uk");
+          }}
+          className={`rounded-lg px-3 py-1.5 text-xs font-medium ring-1 transition-colors ${
+            !privateSet
+              ? "bg-brand-500/20 text-brand-200 ring-brand-500/30"
+              : "bg-white/[0.04] text-slate-400 ring-white/[0.08] hover:bg-white/[0.07]"
+          }`}
+        >
+          UK clients
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={privateSet}
+          onClick={() => {
+            setLoading(true);
+            setCatalogSet("private");
+          }}
+          className={`rounded-lg px-3 py-1.5 text-xs font-medium ring-1 transition-colors ${
+            privateSet
+              ? "bg-sky-500/20 text-sky-200 ring-sky-400/30"
+              : "bg-white/[0.04] text-slate-400 ring-white/[0.08] hover:bg-white/[0.07]"
+          }`}
+        >
+          Private projects
+        </button>
+      </div>
+      {loading ? <p className="text-sm text-slate-500">Loading catalog…</p> : null}
+      {loading ? null : (
+        <div className="grid gap-6 lg:grid-cols-2">
+          {error ? <p className="text-sm text-red-300 lg:col-span-2">{error}</p> : null}
+          <CatalogList
+            key={`${catalogSet}-phase`}
+            title="Phases / packages"
+            description={
+              privateSet
+                ? "Private-project phases for the daily log, in this order. This list does not change the UK client phases."
+                : "Shown on the UK project tracker and daily log, in this order. Drag a row or use the arrows. Built-ins are hidden from pickers when removed."
+            }
+            addPlaceholder={privateSet ? "e.g. Interior design, Landscaping" : "e.g. Interior package, Measured survey"}
+            kind="phase"
+            options={phases}
+            busy={busy}
+            onAdd={addItem}
+            onSave={saveItem}
+            onRemove={removeItem}
+            onReorder={reorderItems}
+          />
+          <CatalogList
+            key={`${catalogSet}-work`}
+            title="Work types"
+            description={
+              privateSet
+                ? "Task types athletes pick on private project logs, in this order. This list does not change the UK work types."
+                : "Task types athletes pick on the UK daily log, in this order. Drag a row or use the arrows. Built-ins are hidden from pickers when removed."
+            }
+            addPlaceholder={privateSet ? "e.g. Specification, Site photos" : "e.g. BIM coordination, Site visit"}
+            kind="work_type"
+            options={workTypes}
+            busy={busy}
+            onAdd={addItem}
+            onSave={saveItem}
+            onRemove={removeItem}
+            onReorder={reorderItems}
+          />
+        </div>
+      )}
     </div>
   );
 }
