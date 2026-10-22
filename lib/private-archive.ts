@@ -34,7 +34,7 @@ function revalidatePrivateArchivePaths(projectId?: string, clientSlug?: string |
   revalidatePath("/dashboard/private/projects");
   revalidatePath("/dashboard/private/archives");
   revalidatePath("/dashboard/athlete/private");
-  revalidatePath("/dashboard/athlete/private/archives");
+  revalidatePath("/dashboard/athlete/projects/completed");
   if (projectId) revalidatePath(`/dashboard/private/projects/${projectId}`);
   if (clientSlug) revalidatePath(`/private/${clientSlug}`);
 }

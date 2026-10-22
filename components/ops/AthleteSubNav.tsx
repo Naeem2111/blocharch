@@ -29,6 +29,8 @@ export function AthleteSubNav({ pathname }: { pathname: string }) {
             : item.href === "/dashboard/athlete/private"
               ? pathname === "/dashboard/athlete/private" ||
                 pathname.startsWith("/dashboard/athlete/private/")
+              : item.href === "/dashboard/athlete/projects"
+                ? pathname === "/dashboard/athlete/projects"
               : item.href.startsWith("/dashboard/planner")
                 ? pathname.startsWith("/dashboard/planner")
                 : pathname === item.href || pathname.startsWith(`${item.href}/`);

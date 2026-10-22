@@ -169,7 +169,7 @@ export function AthleteDashboardClient() {
           Log today&apos;s work
         </Link>
         <Link
-          href="/dashboard/athlete/private/log"
+          href="/dashboard/athlete/submissions?stream=private"
           className="rounded-lg bg-white/[0.08] px-4 py-2 text-sm text-slate-200 ring-1 ring-white/[0.08] hover:bg-white/[0.12]"
         >
           Private work log

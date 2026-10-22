@@ -1,15 +1,15 @@
 import { PageHeader } from "@/components/PageHeader";
-import { AthletePrivateLogClient } from "./log/AthletePrivateLogClient";
+import { AthletePrivateProjectsClient } from "./AthletePrivateProjectsClient";
 
-export default function AthletePrivateLogPage() {
+export default function AthletePrivateProjectsPage() {
   return (
     <>
       <PageHeader
-        title="Daily log"
-        description="Submit one log per day. Each entry follows that project's design workflow — phase, hours, and what was completed."
+        title="My projects"
+        description="Private projects assigned to you."
         className="mb-8"
       />
-      <AthletePrivateLogClient />
+      <AthletePrivateProjectsClient scope="active" />
     </>
   );
 }

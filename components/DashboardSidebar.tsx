@@ -777,6 +777,7 @@ function navActive(pathname: string, href: string): boolean {
 	if (href === "/dashboard/athlete") return pathname === "/dashboard/athlete";
 	if (href === "/dashboard/athlete/private")
 		return pathname === "/dashboard/athlete/private" || pathname.startsWith("/dashboard/athlete/private/");
+	if (href === "/dashboard/athlete/projects") return pathname === "/dashboard/athlete/projects";
 	if (href.startsWith("/dashboard/planner"))
 		return pathname.startsWith("/dashboard/planner");
 	return pathname === href || pathname.startsWith(`${href}/`);

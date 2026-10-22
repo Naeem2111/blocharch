@@ -1,15 +1,5 @@
-import { PageHeader } from "@/components/PageHeader";
-import { AthletePrivateProjectsClient } from "../AthletePrivateProjectsClient";
+import { redirect } from "next/navigation";
 
-export default function AthletePrivateArchivesPage() {
-  return (
-    <>
-      <PageHeader
-        title="Completed projects"
-        description="Finished private projects assigned to you."
-        className="mb-8"
-      />
-      <AthletePrivateProjectsClient scope="completed" />
-    </>
-  );
+export default function AthletePrivateArchivesRedirect() {
+  redirect("/dashboard/athlete/projects/completed?set=private");
 }
