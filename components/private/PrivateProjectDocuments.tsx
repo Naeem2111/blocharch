@@ -32,6 +32,7 @@ export function PrivateProjectDocuments({
   const [uploading, setUploading] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [itemLoading, setItemLoading] = useState<string | null>(null);
+  const [open, setOpen] = useState(staff);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -187,8 +188,25 @@ export function PrivateProjectDocuments({
   }
 
   return (
-    <section id={staff ? "documents" : undefined} className={`${staff ? "card-tool scroll-mt-24" : "rounded-xl bg-white/[0.02]"} rounded-xl p-5`}>
-      <h2 className="text-sm font-semibold text-white">Documents</h2>
+    <section
+      id={staff ? "documents" : undefined}
+      className={`${staff ? "card-tool scroll-mt-24 p-5" : "rounded-xl bg-white/[0.02]"} rounded-xl`}
+    >
+      {staff ? (
+        <h2 className="text-sm font-semibold text-white">Documents</h2>
+      ) : (
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => setOpen((value) => !value)}
+          className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+        >
+          <span className="text-sm font-semibold text-white">Documents</span>
+          <span className="text-[11px] font-medium text-slate-500">{open ? "Hide" : "Show"}</span>
+        </button>
+      )}
+      {open ? (
+      <div className={staff ? undefined : "border-t border-white/[0.06] px-4 pb-4"}>
       <p className="mt-1 text-xs text-slate-500">
         {staff
           ? "Drop files here or browse. They stay hidden from the client portal until you publish them. PDF, image, Word, Excel, CSV, ZIP, or drawing — 50 MB max."
@@ -348,6 +366,8 @@ export function PrivateProjectDocuments({
         </div>
         {note ? <p className="text-xs text-slate-400">{note}</p> : null}
       </div>
+      </div>
+      ) : null}
     </section>
   );
 }

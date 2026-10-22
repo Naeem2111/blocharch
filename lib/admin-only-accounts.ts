@@ -1,5 +1,5 @@
-/** Admin accounts that stay admin-only — no athlete/manager staff profile. */
-const ADMIN_ONLY_USERNAMES = new Set(["naeem@eazithenga.com"]);
+/** Admin accounts that stay admin-only — no athlete portal and no staff athlete profile. */
+const ADMIN_ONLY_USERNAMES = new Set<string>([]);
 
 export function isAdminOnlyAccount(username: string): boolean {
 	return ADMIN_ONLY_USERNAMES.has(username.trim().toLowerCase());

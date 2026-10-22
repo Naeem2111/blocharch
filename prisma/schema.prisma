@@ -1085,6 +1085,8 @@ model PrivateHourLog {
   /** Design phase worked — the private workflow step, stored so a day can be reopened. */
   designPhaseId String? @map("design_phase_id") @db.VarChar(80)
   designPhaseLabel String? @map("design_phase_label") @db.VarChar(160)
+  taskTypes     String[] @default([]) @map("task_types")
+  taskTypeNote  String?  @map("task_type_note") @db.VarChar(500)
   completionPercent Int? @map("completion_percent")
   createdAt  DateTime @default(now()) @map("created_at")
 

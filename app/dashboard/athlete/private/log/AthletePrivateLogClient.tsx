@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { MiniMonthCalendar } from "@/components/MiniMonthCalendar";
 import { ProgressSlider } from "@/components/ProgressSlider";
 
-type PhaseChoice = { phaseId: string; label: string };
+type CatalogOption = { value: string; label: string };
 
 type ProjectOpt = {
   id: string;
@@ -14,13 +14,14 @@ type ProjectOpt = {
   designStageLabel: string;
   currentDesignPhaseId: string | null;
   progressPercent: number;
-  phases: PhaseChoice[];
 };
 
 type EntryForm = {
   key: string;
   projectId: string;
   designPhaseId: string;
+  taskTypes: string[];
+  taskTypeOther: string;
   hoursWorked: string;
   completionPercent: number;
   completedSummary: string;
@@ -33,6 +34,8 @@ type DayEntry = {
   clientName: string;
   designPhaseId: string;
   designPhaseLabel: string;
+  taskTypes: string[];
+  taskTypeNote: string;
   hours: number;
   completionPercent: number | null;
   completedSummary: string;
@@ -49,6 +52,8 @@ function emptyEntry(): EntryForm {
     key: crypto.randomUUID(),
     projectId: "",
     designPhaseId: "",
+    taskTypes: [],
+    taskTypeOther: "",
     hoursWorked: "",
     completionPercent: 0,
     completedSummary: "",
@@ -60,6 +65,8 @@ function formsFromDay(day: DayLog): EntryForm[] {
     key: entry.id,
     projectId: entry.projectId,
     designPhaseId: entry.designPhaseId,
+    taskTypes: entry.taskTypes ?? [],
+    taskTypeOther: entry.taskTypeNote ?? "",
     hoursWorked: String(entry.hours),
     completionPercent: entry.completionPercent ?? 0,
     completedSummary: entry.completedSummary,
@@ -89,19 +96,23 @@ function previousCompletions(days: DayLog[], projectId: string, excludeDate: str
   return options;
 }
 
-function entryError(entry: EntryForm, projects: ProjectOpt[]): string | null {
+function entryError(entry: EntryForm, projects: ProjectOpt[], phases: CatalogOption[], workTypes: CatalogOption[]): string | null {
   if (!entry.projectId) return "Select a project for this entry.";
   const project = projects.find((item) => item.id === entry.projectId);
   if (!project) return "Select a project assigned to you.";
-  if (!project.phases.some((phase) => phase.phaseId === entry.designPhaseId)) {
-    return "Choose a design phase for this entry.";
+  if (!phases.some((phase) => phase.value === entry.designPhaseId)) return "Choose a phase for this entry.";
+  if (entry.taskTypes.length === 0 || entry.taskTypes.some((value) => !workTypes.some((item) => item.value === value))) {
+    return "Choose a work type for this entry.";
   }
+  if (entry.taskTypes.includes("other") && !entry.taskTypeOther.trim()) return "Describe the Other work type.";
   if (Number(entry.hoursWorked) < 0.25) return "Enter hours worked for this entry.";
   return null;
 }
 
 export function AthletePrivateLogClient() {
   const [projects, setProjects] = useState<ProjectOpt[]>([]);
+  const [phases, setPhases] = useState<CatalogOption[]>([]);
+  const [workTypes, setWorkTypes] = useState<CatalogOption[]>([]);
   const [days, setDays] = useState<DayLog[]>([]);
   const [monthHours, setMonthHours] = useState(0);
   const [monthEarningsZar, setMonthEarningsZar] = useState(0);
@@ -140,6 +151,8 @@ export function AthletePrivateLogClient() {
       if (response.ok) {
         const nextDays: DayLog[] = body.days || [];
         setProjects(body.projects || []);
+        setPhases(body.phases || []);
+        setWorkTypes(body.workTypes || []);
         setDays(nextDays);
         setMonthHours(Number(body.monthHours) || 0);
         setMonthEarningsZar(Number(body.monthEarningsZar) || 0);
@@ -188,7 +201,7 @@ export function AthletePrivateLogClient() {
 
   function confirmDraft() {
     if (!draftEntry) return;
-    const validation = entryError(draftEntry, projects);
+    const validation = entryError(draftEntry, projects, phases, workTypes);
     if (validation) {
       setError(validation);
       return;
@@ -229,7 +242,7 @@ export function AthletePrivateLogClient() {
       return;
     }
     for (const line of entryLines) {
-      const validation = entryError(line, projects);
+      const validation = entryError(line, projects, phases, workTypes);
       if (validation) {
         setError(validation);
         return;
@@ -249,6 +262,8 @@ export function AthletePrivateLogClient() {
           entries: entryLines.map((line) => ({
             projectId: line.projectId,
             designPhaseId: line.designPhaseId,
+            taskTypes: line.taskTypes,
+            taskTypeOther: line.taskTypeOther,
             hours: Number(line.hoursWorked),
             completionPercent: line.completionPercent,
             completedSummary: line.completedSummary,
@@ -321,7 +336,7 @@ export function AthletePrivateLogClient() {
           <div>
             <h2 className="text-sm font-semibold text-white">Work entries</h2>
             <p className="mt-1 text-xs text-slate-500">
-              Confirm each entry before adding another. The phase list is that project&apos;s design workflow.
+              Confirm each entry before adding another. Phases and work types come from the private project set.
             </p>
           </div>
 
@@ -353,7 +368,10 @@ export function AthletePrivateLogClient() {
           {visibleLines.map((line, index) => {
             const isDraft = draftEntry?.key === line.key;
             const project = projects.find((item) => item.id === line.projectId);
-            const phases = project?.phases ?? [];
+            const phaseOptions =
+              line.designPhaseId && !phases.some((phase) => phase.value === line.designPhaseId)
+                ? [{ value: line.designPhaseId, label: "Saved phase" }, ...phases]
+                : phases;
             const previous = previousCompletions(days, line.projectId, selectedDate);
             return (
               <div
@@ -395,13 +413,8 @@ export function AthletePrivateLogClient() {
                     onChange={(event) => {
                       const projectId = event.target.value;
                       const next = projects.find((item) => item.id === projectId);
-                      const phaseId =
-                        next?.phases.find((phase) => phase.phaseId === next.currentDesignPhaseId)?.phaseId ??
-                        next?.phases[0]?.phaseId ??
-                        "";
                       updateLine(line.key, {
                         projectId,
-                        designPhaseId: phaseId,
                         completionPercent: next?.progressPercent ?? 0,
                       });
                     }}
@@ -419,7 +432,7 @@ export function AthletePrivateLogClient() {
                   <p className="text-[11px] text-slate-500 md:col-span-2">{project.address}</p>
                 ) : null}
                 <label className="text-xs text-slate-400 md:col-span-2">
-                  Design phase
+                  Phase
                   <select
                     required
                     value={line.designPhaseId}
@@ -427,13 +440,56 @@ export function AthletePrivateLogClient() {
                     className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
                   >
                     <option value="">Select phase…</option>
-                    {phases.map((phase) => (
-                      <option key={phase.phaseId} value={phase.phaseId}>
+                    {phaseOptions.map((phase) => (
+                      <option key={phase.value} value={phase.value}>
                         {phase.label}
                       </option>
                     ))}
                   </select>
                 </label>
+                <div className="text-xs text-slate-400 md:col-span-2">
+                  <p className="mb-2">Work types</p>
+                  {workTypes.length === 0 ? (
+                    <p className="text-sm text-slate-500">No work types are available yet.</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {workTypes.map((option) => {
+                        const checked = line.taskTypes.includes(option.value);
+                        return (
+                          <label
+                            key={option.value}
+                            className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 ring-1 ${
+                              checked
+                                ? "bg-sky-500/15 text-sky-200 ring-sky-400/30"
+                                : "bg-white/[0.03] text-slate-400 ring-white/[0.08]"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              className="sr-only"
+                              checked={checked}
+                              onChange={() => {
+                                const next = checked
+                                  ? line.taskTypes.filter((value) => value !== option.value)
+                                  : [...line.taskTypes, option.value];
+                                updateLine(line.key, { taskTypes: next });
+                              }}
+                            />
+                            {option.label}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {line.taskTypes.includes("other") ? (
+                    <input
+                      value={line.taskTypeOther}
+                      onChange={(event) => updateLine(line.key, { taskTypeOther: event.target.value })}
+                      placeholder="Describe the other work type"
+                      className="mt-2 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+                    />
+                  ) : null}
+                </div>
                 <label className="text-xs text-slate-400">
                   Hours worked
                   <input
@@ -601,6 +657,11 @@ export function AthletePrivateLogClient() {
                           <p className="text-xs text-slate-500">
                             {entry.clientName}
                             {entry.designPhaseLabel ? ` · ${entry.designPhaseLabel}` : ""}
+                            {entry.taskTypes?.length
+                              ? ` · ${entry.taskTypes
+                                  .map((value) => workTypes.find((item) => item.value === value)?.label ?? value)
+                                  .join(", ")}`
+                              : ""}
                           </p>
                           <p className="mt-2 text-xs text-slate-400">
                             {entry.hours}h

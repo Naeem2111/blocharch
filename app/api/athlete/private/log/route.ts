@@ -5,6 +5,7 @@ import { requirePrivateAthleteSession } from "@/lib/private-access";
 import { parseDateOnly } from "@/lib/ops-hours";
 import { privateAthleteHourlyRateZar, athletePrivateWorkEarnings } from "@/lib/private-athlete-earnings";
 import { archivePrivateProjectIfComplete } from "@/lib/private-archive";
+import { listPrivateCatalog } from "@/lib/private-catalog";
 import { serializePrivateProject } from "@/lib/private-serialize";
 import {
   activePrivateAthleteAssignmentsInclude,
@@ -57,7 +58,7 @@ export async function GET(request: NextRequest) {
   const gate = await requirePrivateAthleteSession(request);
   if (gate instanceof NextResponse) return gate;
 
-  const [projects, logs, earnings] = await Promise.all([
+  const [projects, logs, earnings, catalog] = await Promise.all([
     assignedProjects(gate.athlete.id),
     prisma.privateHourLog.findMany({
       where: { athleteId: gate.athlete.id },
@@ -68,6 +69,7 @@ export async function GET(request: NextRequest) {
       },
     }),
     athletePrivateWorkEarnings(gate.athlete.id, gate.athlete),
+    listPrivateCatalog(),
   ]);
 
   const days = new Map<
@@ -82,6 +84,8 @@ export async function GET(request: NextRequest) {
         clientName: string;
         designPhaseId: string;
         designPhaseLabel: string;
+        taskTypes: string[];
+        taskTypeNote: string;
         hours: number;
         completionPercent: number | null;
         completedSummary: string;
@@ -101,6 +105,8 @@ export async function GET(request: NextRequest) {
       clientName: log.project.client.name,
       designPhaseId: log.designPhaseId ?? "",
       designPhaseLabel: log.designPhaseLabel ?? "",
+      taskTypes: log.taskTypes ?? [],
+      taskTypeNote: log.taskTypeNote ?? "",
       hours,
       completionPercent: log.completionPercent,
       completedSummary: log.notes ?? "",
@@ -120,6 +126,8 @@ export async function GET(request: NextRequest) {
       progressPercent: project.progressPercent,
       phases: phaseChoices(project),
     })),
+    phases: catalog.phases,
+    workTypes: catalog.workTypes,
     days: Array.from(days.values()),
     monthHours: earnings.monthHours,
     monthEarningsZar: earnings.monthEarningsZar,
@@ -145,13 +153,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "A day can hold up to 20 entries." }, { status: 400 });
     }
 
-    const projects = await assignedProjects(gate.athlete.id);
+    const [projects, catalog] = await Promise.all([assignedProjects(gate.athlete.id), listPrivateCatalog()]);
     const byId = new Map(projects.map((project) => [project.id, project]));
+    const phaseByValue = new Map(catalog.phases.map((phase) => [phase.value, phase.label]));
+    const workTypeValues = new Set(catalog.workTypes.map((item) => item.value));
 
     const entries: Array<{
       projectId: string;
       designPhaseId: string;
       designPhaseLabel: string;
+      taskTypes: string[];
+      taskTypeNote: string | null;
       hours: number;
       completionPercent: number;
       notes: string | null;
@@ -170,9 +182,19 @@ export async function POST(request: NextRequest) {
       }
       totalHours += hours;
       const phaseId = String(raw?.designPhaseId || "").trim();
-      const phase = phaseChoices(project).find((choice) => choice.phaseId === phaseId);
-      if (!phase) {
-        return NextResponse.json({ error: "Choose a design phase for each entry." }, { status: 400 });
+      const phaseLabel = phaseByValue.get(phaseId);
+      if (!phaseLabel) {
+        return NextResponse.json({ error: "Choose a phase for each entry." }, { status: 400 });
+      }
+      const taskTypes = Array.isArray(raw?.taskTypes)
+        ? Array.from(new Set(raw.taskTypes.map((value: unknown) => String(value || "").trim()).filter(Boolean)))
+        : [];
+      if (taskTypes.length === 0 || taskTypes.some((value) => !workTypeValues.has(value))) {
+        return NextResponse.json({ error: "Choose a work type for each entry." }, { status: 400 });
+      }
+      const taskTypeNote = String(raw?.taskTypeOther || "").trim();
+      if (taskTypes.includes("other") && !taskTypeNote) {
+        return NextResponse.json({ error: "Describe the Other work type." }, { status: 400 });
       }
       const completion = Number(raw?.completionPercent);
       if (!Number.isFinite(completion) || completion < 0 || completion > 100) {
@@ -184,8 +206,10 @@ export async function POST(request: NextRequest) {
       }
       entries.push({
         projectId,
-        designPhaseId: phase.phaseId,
-        designPhaseLabel: phase.label,
+        designPhaseId: phaseId,
+        designPhaseLabel: phaseLabel,
+        taskTypes,
+        taskTypeNote: taskTypes.includes("other") ? taskTypeNote : null,
         hours,
         completionPercent: Math.round(completion),
         notes: notes || null,
@@ -234,6 +258,8 @@ export async function POST(request: NextRequest) {
           notes: entry.notes,
           designPhaseId: entry.designPhaseId,
           designPhaseLabel: entry.designPhaseLabel,
+          taskTypes: entry.taskTypes,
+          taskTypeNote: entry.taskTypeNote,
           completionPercent: entry.completionPercent,
         })),
       });
