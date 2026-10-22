@@ -186,9 +186,14 @@ export async function POST(request: NextRequest) {
       if (!phaseLabel) {
         return NextResponse.json({ error: "Choose a phase for each entry." }, { status: 400 });
       }
-      const taskTypes = Array.isArray(raw?.taskTypes)
-        ? Array.from(new Set(raw.taskTypes.map((value: unknown) => String(value || "").trim()).filter(Boolean)))
-        : [];
+      const seenTaskTypes = new Set<string>();
+      if (Array.isArray(raw?.taskTypes)) {
+        for (const item of raw.taskTypes as unknown[]) {
+          const value = String(item || "").trim();
+          if (value) seenTaskTypes.add(value);
+        }
+      }
+      const taskTypes = Array.from(seenTaskTypes);
       if (taskTypes.length === 0 || taskTypes.some((value) => !workTypeValues.has(value))) {
         return NextResponse.json({ error: "Choose a work type for each entry." }, { status: 400 });
       }
