@@ -18,6 +18,7 @@ import {
 } from "@/lib/client-portal-notifications";
 import { formatPortalHours } from "@/lib/client-portal-hours";
 import { daysUntilDueFromIso, projectDueColor } from "@/lib/project-color-scale";
+import { ClientPortalTimeZones } from "@/components/client-portal/ClientPortalTimeZones";
 import { PublicThemeToggle } from "@/components/client-portal/PublicThemeToggle";
 import type {
 	PublicClientPortalData,
@@ -783,7 +784,10 @@ export function ClientPortalClient({
 				<main className="flex-1 px-4 py-6 sm:px-8">
 					{page === "overview" ? (
 						<div className="grid gap-6 xl:grid-cols-[minmax(0,280px)_minmax(0,1fr)_minmax(0,300px)]">
-							{calendarPanel}
+							<div className="space-y-4">
+								{calendarPanel}
+								<ClientPortalTimeZones />
+							</div>
 							<div className="space-y-6">
 								<section>
 									<div className="flex items-center justify-between gap-3">

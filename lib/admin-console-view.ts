@@ -26,6 +26,7 @@ export const ADMIN_CONSOLE_VIEWS: {
 			"private_work",
 			"athlete_portal",
 			"planner",
+			"content",
 			"admin",
 		],
 		home: "/dashboard",
@@ -33,25 +34,25 @@ export const ADMIN_CONSOLE_VIEWS: {
 	{
 		id: "admin",
 		label: "Admin",
-		sections: ["onboarding", "ops", "private_work", "planner", "admin"],
+		sections: ["onboarding", "ops", "private_work", "planner", "content", "admin"],
 		home: "/dashboard/ops",
 	},
 	{
 		id: "manager",
 		label: "Manager",
-		sections: ["marketing", "ops"],
+		sections: ["marketing", "ops", "content"],
 		home: "/dashboard",
 	},
 	{
 		id: "sales",
 		label: "Sales",
-		sections: ["marketing"],
+		sections: ["marketing", "content"],
 		home: "/dashboard",
 	},
 	{
 		id: "athlete",
 		label: "Athlete",
-		sections: ["athlete_portal"],
+		sections: ["athlete_portal", "content"],
 		home: "/dashboard/athlete",
 	},
 ];

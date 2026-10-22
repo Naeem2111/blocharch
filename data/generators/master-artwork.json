@@ -1,0 +1,16 @@
+{
+  "id": "master-artwork",
+  "name": "Master Artwork",
+  "provider": "openai",
+  "model": "gpt-image-2",
+  "promptVersion": "2026-08-25.1",
+  "sourceNote": "The Phase 01 brief describes this prompt but does not include the verbatim text. This is the operational prompt built from those rules. Replace the prompt field and bump promptVersion to change it. Model, size, and quality can also be overridden with CONTENT_GENERATOR_MODEL, CONTENT_GENERATOR_SIZE, and CONTENT_GENERATOR_QUALITY.",
+  "prompt": "You are producing one BLOCHARCH Master Artwork from the attached architectural or site photograph.\n\nThe photograph is the only geometry reference. Preserve the real building exactly: architecture, proportions, massing, window sizes, openings, slab relationships, steps, visible furniture, camera position, perspective, and overall composition. Do not redesign, restyle the structure, move the camera, or reinterpret the building unless a later refinement instruction explicitly asks for that change.\n\nTranslate the photograph into a clean flat-colour architectural poster:\n- Flat colour blocks, not painterly rendering, not photorealism, not a 3D clay render, and not a sketch\n- Sharp, hard-edged shadows\n- Subtle outlines only where they clarify an edge\n- Simplified vegetation\n- Glass and water simplified into flat shapes that still read accurately\n- Clean graphic composition\n- No unnecessary distortion\n- No exaggerated cartoon look, no thick comic outlines, no people, no text, no watermark, no border, and no logo\n\nOutput one square image only.\n\nFollow the COLOUR TREATMENT section below exactly. It controls the palette for this request and overrides any general colour habit.",
+  "output": {
+    "type": "image",
+    "aspect": "1:1",
+    "size": "2048x2048",
+    "quality": "high",
+    "inputFidelity": "high"
+  }
+}

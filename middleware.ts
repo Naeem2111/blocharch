@@ -16,6 +16,7 @@ import {
   isOpsDashboardPath,
   isPlannerApiPath,
   isPlannerDashboardPath,
+  isContentGeneratorDashboardPath,
   isPrivateApiPath,
   isPrivateDashboardPath,
   isPrivatePublicApiPath,
@@ -96,6 +97,10 @@ export async function middleware(request: NextRequest) {
       }
       return NextResponse.redirect(new URL(defaultDashboardPath(role ?? "user", username), request.url));
     }
+  }
+
+  if (isContentGeneratorDashboardPath(path) && role && !canAccessModule(role, "content", username)) {
+    return NextResponse.redirect(new URL(defaultDashboardPath(role, username), request.url));
   }
 
   const publicPrivatePortalApi = isPrivatePublicApiPath(path);

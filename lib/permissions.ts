@@ -8,7 +8,8 @@ export type AppModule =
   | "admin"
   | "ops"
   | "athlete_portal"
-  | "private_work";
+  | "private_work"
+  | "content";
 
 const MODULE_ROLES: Record<AppModule, readonly UserRole[]> = {
   /** Lead directory, map, outreach — internal Blocharch staff only. */
@@ -23,6 +24,8 @@ const MODULE_ROLES: Record<AppModule, readonly UserRole[]> = {
   athlete_portal: ["admin", "user"],
   /** Private Cape Town projects — ops overview (/dashboard/private). */
   private_work: ["admin"],
+  /** Content Generator — any signed-in console user. */
+  content: ["admin", "manager", "sales", "user"],
 };
 
 export function canAccessModule(
@@ -149,4 +152,8 @@ export function isPrivateApiPath(path: string): boolean {
 /** Unauthenticated client-portal actions (complete approvals, etc.). */
 export function isPrivatePublicApiPath(path: string): boolean {
   return path.startsWith("/api/private/portal/");
+}
+
+export function isContentGeneratorDashboardPath(path: string): boolean {
+  return path === "/dashboard/content-generator" || path.startsWith("/dashboard/content-generator/");
 }

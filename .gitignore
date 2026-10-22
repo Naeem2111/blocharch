@@ -46,6 +46,9 @@ public/uploads/clients/*
 public/uploads/private/*
 !public/uploads/private/.gitkeep
 
+# Content Generator session images (temporary, 24h)
+data/content-generator-sessions/
+
 # Vercel
 .vercel
 .neon

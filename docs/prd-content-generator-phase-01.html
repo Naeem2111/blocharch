@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>BLOCHARCH Content Generator — Phase 01 PRD</title>
+  <style>
+    @page { size: A4; margin: 16mm 15mm 18mm; }
+    @page :first { margin: 0; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      font-size: 10.5pt;
+      line-height: 1.45;
+      color: #0f172a;
+      background: #fff;
+    }
+    h1, h2, h3, h4 { font-weight: 700; color: #020617; page-break-after: avoid; }
+    h2 { font-size: 15pt; margin: 22px 0 10px; padding-bottom: 6px; border-bottom: 2px solid #0ea5e9; }
+    h3 { font-size: 12pt; margin: 16px 0 8px; color: #0c4a6e; }
+    h4 { font-size: 10.5pt; margin: 12px 0 6px; }
+    p, li { orphans: 3; widows: 3; }
+    p { margin: 0 0 8px; }
+    ul, ol { margin: 0 0 10px; padding-left: 1.2rem; }
+    li { margin-bottom: 3px; }
+    strong { color: #020617; }
+    a { color: #0369a1; text-decoration: none; }
+    .cover {
+      page-break-after: always;
+      min-height: 297mm;
+      padding: 28mm 22mm;
+      background: #06101c;
+      color: #e2e8f0;
+      position: relative;
+    }
+    .cover::after {
+      content: "";
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      height: 8px;
+      background: #0ea5e9;
+    }
+    .eyebrow {
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      font-size: 9pt;
+      color: #7dd3fc;
+      font-weight: 600;
+    }
+    .cover h1 {
+      color: #fff;
+      font-size: 34pt;
+      line-height: 1.05;
+      margin: 18px 0 8px;
+      border: 0;
+      padding: 0;
+    }
+    .cover .phase {
+      font-size: 16pt;
+      color: #67e8f9;
+      font-weight: 600;
+      margin-bottom: 28px;
+    }
+    .cover-meta {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 36px;
+    }
+    .cover-meta th, .cover-meta td {
+      text-align: left;
+      padding: 7px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.12);
+      font-size: 10pt;
+    }
+    .cover-meta th { width: 38%; color: #94a3b8; font-weight: 600; }
+    .cover-meta td { color: #f8fafc; }
+    .cover-foot {
+      position: absolute;
+      left: 22mm; right: 22mm; bottom: 22mm;
+      font-size: 9pt;
+      color: #64748b;
+    }
+    .loop {
+      margin: 18px 0 8px;
+      padding: 12px 16px;
+      background: #0b1726;
+      color: #e0f2fe;
+      border-left: 4px solid #0ea5e9;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 9.5pt;
+      white-space: pre-wrap;
+    }
+    .callout {
+      background: #f0f9ff;
+      border: 1px solid #bae6fd;
+      border-left: 4px solid #0ea5e9;
+      padding: 10px 12px;
+      margin: 10px 0 14px;
+    }
+    .warn {
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      border-left: 4px solid #f97316;
+      padding: 10px 12px;
+      margin: 10px 0 14px;
+    }
+    table.data {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 8px 0 14px;
+      font-size: 9.5pt;
+      page-break-inside: auto;
+    }
+    table.data th, table.data td {
+      border: 1px solid #e2e8f0;
+      padding: 6px 8px;
+      vertical-align: top;
+      text-align: left;
+    }
+    table.data th {
+      background: #0b1726;
+      color: #f8fafc;
+      font-weight: 600;
+    }
+    table.data tr { page-break-inside: avoid; }
+    table.data tbody tr:nth-child(even) td { background: #f8fafc; }
+    .pill {
+      display: inline-block;
+      font-size: 8pt;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      padding: 1px 6px;
+      border-radius: 999px;
+      background: #0ea5e9;
+      color: #fff;
+    }
+    .pill.p1 { background: #0284c7; }
+    .pill.p2 { background: #64748b; }
+    .flow {
+      margin: 10px 0 16px;
+      padding: 4px 0 4px 16px;
+      border-left: 3px solid #0ea5e9;
+    }
+    .flow div {
+      margin: 0 0 6px;
+      position: relative;
+    }
+    .flow div::before {
+      content: "";
+      position: absolute;
+      left: -21px; top: 6px;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #0ea5e9;
+    }
+    .ui {
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 14px 16px;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 9pt;
+      white-space: pre-wrap;
+      margin: 8px 0 14px;
+    }
+    .check {
+      list-style: none;
+      padding-left: 0;
+    }
+    .check li {
+      padding-left: 22px;
+      position: relative;
+      margin-bottom: 5px;
+    }
+    .check li::before {
+      content: "";
+      position: absolute;
+      left: 0; top: 3px;
+      width: 11px; height: 11px;
+      border: 1.5px solid #0ea5e9;
+      border-radius: 2px;
+    }
+    .two { display: table; width: 100%; margin: 8px 0 14px; }
+    .two > div { display: table-cell; width: 50%; vertical-align: top; padding-right: 12px; }
+    .two > div:last-child { padding-right: 0; padding-left: 12px; }
+    .goal { background: #ecfeff; padding: 10px 12px; border-radius: 6px; }
+    .nogoal { background: #f8fafc; padding: 10px 12px; border-radius: 6px; }
+    .section { page-break-inside: avoid; }
+    footer.page {
+      display: none;
+    }
+    .toc a { color: #0f172a; }
+    .toc td { padding: 4px 0; border-bottom: 1px dotted #cbd5e1; }
+    .num { color: #0ea5e9; font-weight: 700; margin-right: 6px; }
+  </style>
+</head>
+<body>
+  <section class="cover">
+    <p class="eyebrow">Product Requirements Document</p>
+    <h1>BLOCHARCH<br>Content Generator</h1>
+    <p class="phase">Phase 01 — Master Artwork Generator</p>
+    <p style="max-width: 420px; color:#cbd5e1; font-size:12pt; line-height:1.4;">
+      Source image → colour treatment → hidden prompt → generation → review → refine → download.
+    </p>
+    <table class="cover-meta">
+      <tr><th>Product</th><td>BLOCHARCH Content Generator</td></tr>
+      <tr><th>Phase</th><td>01 — Master Artwork Generator</td></tr>
+      <tr><th>Status</th><td>Draft for build</td></tr>
+      <tr><th>Prepared for</th><td>Naeem</td></tr>
+      <tr><th>Brief date</th><td>25 August 2026</td></tr>
+      <tr><th>PRD date</th><td>10 September 2026</td></tr>
+      <tr><th>Primary AI provider</th><td>OpenAI</td></tr>
+      <tr><th>Host application</th><td>Blocharch Console (existing Next.js app)</td></tr>
+    </table>
+    <p class="cover-foot">Internal · From the Phase 01 Naeem brief · Not a live product spec for clients</p>
+  </section>
+
+  <h2>Contents</h2>
+  <table class="data toc">
+    <tr><td>1. Summary</td><td>2. Problem</td></tr>
+    <tr><td>3. Outcome</td><td>4. Users</td></tr>
+    <tr><td>5. Goals and non-goals</td><td>6. Product vision</td></tr>
+    <tr><td>7. User journey</td><td>8. Functional requirements</td></tr>
+    <tr><td>9. Interface requirements</td><td>10. Technical requirements</td></tr>
+    <tr><td>11. Non-functional requirements</td><td>12. Success criteria</td></tr>
+    <tr><td>13. Acceptance checklist</td><td>14. Out of scope</td></tr>
+    <tr><td>15. Open questions</td><td>16. Final principle</td></tr>
+  </table>
+
+  <h2><span class="num">1</span>Summary</h2>
+  <p>Phase 01 proves one BLOCHARCH workflow as a product, not a prompt:</p>
+  <div class="loop">Source image → colour treatment → hidden Master Artwork prompt → AI generation → review → regenerate / refine → download.</div>
+  <p>The operator never finds, copies, pastes, or edits the prompt. They never open ChatGPT. They never re-upload the same files just to try again.</p>
+  <p>This is not the full content platform. It is Generator 01 only. Later generators (captions, naming, sketches, other image types) are direction, not scope.</p>
+  <div class="callout">
+    <strong>Proof-of-concept question:</strong> can the existing Master Artwork prompt become a clean, reliable image generator that another BLOCHARCH person can use without knowing how the prompt works? If yes, Phase 01 is done. If no, do not add more generators.
+  </div>
+
+  <h2><span class="num">2</span>Problem</h2>
+  <p>Today, producing a BLOCHARCH Master Artwork requires a person to:</p>
+  <ol>
+    <li>Find the correct Master Artwork prompt</li>
+    <li>Copy and paste it into ChatGPT</li>
+    <li>Upload the source photograph</li>
+    <li>Explain colour treatment</li>
+    <li>Re-state artwork rules (flat colour, architectural accuracy, 1:1, etc.)</li>
+    <li>Re-upload and re-explain everything when regenerating</li>
+    <li>Start a new conversation to make a small adjustment</li>
+  </ol>
+  <p>That process is slow, inconsistent, and knowledge-locked to whoever remembers the prompt.</p>
+
+  <h2><span class="num">3</span>Outcome</h2>
+  <p>A BLOCHARCH team member who has never used the prompt can:</p>
+  <ol>
+    <li>Open the Content Generator</li>
+    <li>Select Master Artwork</li>
+    <li>Upload one architectural / site photograph</li>
+    <li>Choose a colour method</li>
+    <li>Generate artwork</li>
+    <li>Regenerate or refine without re-uploading</li>
+    <li>Download a high-resolution 1:1 Master Artwork</li>
+  </ol>
+
+  <h2><span class="num">4</span>Users</h2>
+  <table class="data">
+    <thead><tr><th>Role</th><th>Who</th><th>What they do in Phase 01</th></tr></thead>
+    <tbody>
+      <tr><td>Operator</td><td>BLOCHARCH team member producing artwork</td><td>Upload, choose colours, generate, review, refine, download</td></tr>
+      <tr><td>Prompt owner</td><td>Person who maintains the Master Artwork prompt</td><td>Update generator name, prompt text, prompt version, and AI provider in a simple config location</td></tr>
+      <tr><td>Developer</td><td>Naeem</td><td>Build and operate Generator 01 inside the existing console</td></tr>
+    </tbody>
+  </table>
+  <p>No client-facing portal. No public generator. No multi-tenant permissions beyond existing console login.</p>
+  <p><strong>Assumption:</strong> the generator lives behind the existing Blocharch Console login. Any signed-in internal user who can open the dashboard can use it unless product later restricts access.</p>
+
+  <h2><span class="num">5</span>Goals and non-goals</h2>
+  <div class="two">
+    <div class="goal">
+      <h3 style="margin-top:0">Goals (must ship)</h3>
+      <ol>
+        <li>One generator: <strong>Master Artwork</strong></li>
+        <li>Hidden, versioned Master Artwork prompt</li>
+        <li>Source image + four colour treatments</li>
+        <li>Generate, download, regenerate, refine, start again</li>
+        <li>Session context so the user does not re-upload or re-explain</li>
+        <li>Architecture that does not block Generator 02 later</li>
+      </ol>
+    </div>
+    <div class="nogoal">
+      <h3 style="margin-top:0">Non-goals (must not ship)</h3>
+      <ul>
+        <li>Instagram / LinkedIn caption generation</li>
+        <li>Social publishing</li>
+        <li>Permanent image library / recents</li>
+        <li>AI fine-tuning or continuous learning</li>
+        <li>Analytics / generator reporting</li>
+        <li>Full Generator Recipe / Builder</li>
+        <li>All existing BLOCHARCH prompts</li>
+        <li>Complex in-browser image editing</li>
+        <li>Automated project management</li>
+        <li>New permission systems</li>
+        <li>Forcing every future generator onto OpenAI</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2><span class="num">6</span>Product vision</h2>
+  <p><em>Out of Phase 01, in for architecture.</em> Long-term, BLOCHARCH wants one content-generation platform. Each generator already knows which prompt to use, what files / fields the user must supply, which AI provider to call, and what output to expect.</p>
+  <p>Future generators may include architectural images, project artwork, renders, sketches/models, material content, Instagram captions, LinkedIn captions, project naming (with duplicate-name checks), and other repeatable workflows.</p>
+  <div class="callout"><strong>Build rule:</strong> get Generator 01 right. Learn from Generator 02. Formalise a universal “generator recipe” only after several workflows exist. Do not over-engineer a builder now. Do not hard-code the prompt so deeply that evolving it requires a rebuild.</div>
+
+  <h2><span class="num">7</span>User journey</h2>
+  <div class="flow">
+    <div>Open Content Generator</div>
+    <div>Select Master Artwork</div>
+    <div>Upload source architectural image</div>
+    <div>Choose colour treatment</div>
+    <div>Supply colour inputs if required (hidden if not)</div>
+    <div>Generate</div>
+    <div>Review artwork</div>
+    <div>Download or Regenerate or Refine or Start again</div>
+    <div>If refine: type a natural-language instruction → apply → review</div>
+    <div>Repeat regenerate / refine until satisfied</div>
+    <div>Download final high-resolution artwork</div>
+    <div>Done</div>
+  </div>
+  <p>The underlying prompt, model call, and artwork rules stay hidden.</p>
+
+  <h2><span class="num">8</span>Functional requirements</h2>
+
+  <h3>8.1 Generator selection</h3>
+  <table class="data">
+    <thead><tr><th>ID</th><th>Requirement</th><th>Priority</th></tr></thead>
+    <tbody>
+      <tr><td>FR-01</td><td>The product is branded <strong>BLOCHARCH Content Generator</strong>.</td><td><span class="pill">P0</span></td></tr>
+      <tr><td>FR-02</td><td>Phase 01 exposes exactly one generator: <strong>Master Artwork</strong>.</td><td><span class="pill">P0</span></td></tr>
+      <tr><td>FR-03</td><td>The UI may show Master Artwork as a selectable generator (so later generators can appear beside it) without implementing those generators.</td><td><span class="pill p1">P1</span></td></tr>
+    </tbody>
+  </table>
+
+  <h3>8.2 Input 01 — source image</h3>
+  <table class="data">
+    <thead><tr><th>ID</th><th>Requirement</th><th>Priority</th></tr></thead>
+    <tbody>
+      <tr><td>FR-10</td><td>User uploads <strong>one</strong> architectural or site photograph.</td><td><span class="pill">P0</span></td></tr>
+      <tr><td>FR-11</td><td>The upload is the primary visual reference for generation.</td><td><span class="pill">P0</span></td></tr>
+      <tr><td>FR-12</td><td>Generated artwork <strong>must preserve</strong> architecture, proportions, massing, window sizes, openings, slab relationships, steps, visible furniture, camera position, perspective, and overall composition.</td><td><span class="pill">P0</span></td></tr>
+      <tr><td>FR-13</td><td>Must not redesign, distort, or reinterpret building geometry unless the user later asks for that in Refine.</td><td><span class="pill">P0</span></td></tr>
+      <tr><td>FR-14</td><td>Accept JPEG, PNG, WebP. Reject other types with a clear error.</td><td><span class="pill">P0</span></td></tr>
+      <tr><td>FR-15</td><td>Show a preview of the uploaded source image before generate.</td><td><span class="pill">P0</span></td></tr>
+      <tr><td>FR-16</td><td>Allow replacing the source image before first generate, or via Start Again after generate.</td><td><span class="pill">P0</span></td></tr>
+    </tbody>
+  </table>
+  <p><strong>Assumption:</strong> max upload size 20 MB unless OpenAI’s current image-input limit is lower; enforce the stricter limit and tell the user.</p>
+
+  <h3>8.3 Input 02 — colour treatment</h3>
+  <p>The user must choose <strong>exactly one</strong> of four methods.</p>
+  <table class="data">
+    <thead><tr><th>ID</th><th>Option</th><th>User supplies</th><th>Palette behaviour</th></tr></thead>
+    <tbody>
+      <tr><td>FR-20</td><td><strong>Upload colour samples</strong></td><td>Min 3 / max 5 swatch images</td><td>Artwork is limited to those colours. Do not invent unrelated colours.</td></tr>
+      <tr><td>FR-21</td><td><strong>Enter HEX codes</strong></td><td>Min 3 / max 5 HEX values</td><td>Same as FR-20. Example: <code>#0000DC</code>, <code>#D59FA0</code>, <code>#B7C8D0</code>.</td></tr>
+      <tr><td>FR-22</td><td><strong>Upload colour palette</strong></td><td>One palette image</td><td>System analyses the image, extracts intended colours, then treats them as the controlled palette.</td></tr>
+      <tr><td>FR-23</td><td><strong>Use colours from source image</strong></td><td>Nothing extra</td><td>Preserve natural colour character of architecture, materials, sky, landscape, water, vegetation, and surroundings. <strong>Do not</strong> force a 3–5 colour limit.</td></tr>
+    </tbody>
+  </table>
+  <table class="data">
+    <thead><tr><th>ID</th><th>Requirement</th><th>Priority</th></tr></thead>
+    <tbody>
+      <tr><td>FR-24</td><td>Only the fields for the selected option are visible. Option 4 shows no extra colour fields.</td><td><span class="pill">P0</span></td></tr>
+      <tr><td>FR-25</td><td>HEX inputs validate as <code>#RRGGBB</code> (case-insensitive). Invalid values block generate.</td><td><span class="pill">P0</span></td></tr>
+      <tr><td>FR-26</td><td>Colour sample uploads use the same image types as the source image.</td><td><span class="pill">P0</span></td></tr>
+      <tr><td>FR-27</td><td>For Options 1–3, generate is blocked until the minimum colour count is met.</td><td><span class="pill">P0</span></td></tr>
+      <tr><td>FR-28</td><td>For Options 1–3, the UI shows how many colours are currently supplied (e.g. 3/5).</td><td><span class="pill p1">P1</span></td></tr>
+      <tr><td>FR-29</td><td>For Option 3, show extracted colours before generate. If extraction fails, block generate and ask for another palette image or a different method.</td><td><span class="pill p1">P1</span></td></tr>
+    </tbody>
+  </table>
+
+  <h3>8.4 Conditional colour logic</h3>
+  <p>The embedded prompt <strong>must change behaviour</strong> by selected option. This is not optional styling.</p>
+  <div class="two">
+    <div class="goal">
+      <h4 style="margin-top:0">Options 1, 2, 3</h4>
+      <ul>
+        <li>Use the supplied / extracted palette only</li>
+        <li>Limit the artwork to that palette</li>
+        <li>Do not introduce unrelated colours</li>
+        <li>Translate the photograph into clean flat colour blocks</li>
+      </ul>
+    </div>
+    <div class="nogoal">
+      <h4 style="margin-top:0">Option 4</h4>
+      <ul>
+        <li>Analyse the source photograph</li>
+        <li>Preserve existing colour relationships</li>
+        <li>Simplify those colours into flat graphic blocks</li>
+        <li>Keep recognisable material and environmental differences</li>
+        <li>Do not invent unnecessary colours</li>
+        <li>Do not force a 3–5 colour restriction</li>
+      </ul>
+    </div>
+  </div>
+  <table class="data">
+    <thead><tr><th>ID</th><th>Requirement</th><th>Priority</th></tr></thead>
+    <tbody>
+      <tr><td>FR-30</td><td>The request sent to OpenAI includes the selected colour method and the colour inputs for that method.</td><td><span class="pill">P0</span></td></tr>
+      <tr><td>FR-31</td><td>Option 4 must not be implemented as “pick 3–5 colours from the photo.”</td><td><span class="pill">P0</span></td></tr>
+    </tbody>
+  </table>
+
+  <h3>8.5 Generation</h3>
+  <table class="data">
+    <thead><tr><th>ID</th><th>Requirement</th><th>Priority</th></tr></thead>
+    <tbody>
+      <tr><td>FR-40</td><td>A single primary action: <strong>Generate artwork</strong>.</td><td><span class="pill">P0</span></td></tr>
+      <tr><td>FR-41</td><td>Generate is disabled until a source image is present and the selected colour method is valid.</td><td><span class="pill">P0</span></td></tr>
+      <tr><td>FR-42</td><td>The system composes embedded Master Prompt + source image + colour method + colour inputs, then sends that to OpenAI.</td><td><span class="pill">P0</span></td></tr>
+      <tr><td>FR-43</td><td>The operator cannot view, copy, paste, or edit the prompt from the generator UI.</td><td><span class="pill">P0</span></td></tr>
+      <tr><td>FR-44</td><td>Show a clear in-progress state. Disable Generate / Refine / Regenerate while a job is running.</td><td><span class="pill">P0</span></td></tr>
+      <tr><td>FR-45</td><td>On failure, show a readable error and keep all inputs so the user can retry.</td><td><span class="pill">P0</span></td></tr>
+      <tr><td>FR-46</td><td>Produce <strong>one</strong> high-resolution BLOCHARCH Master Artwork per successful job.</td><td><span class="pill">P0</span></td></tr>
+    </tbody>
+  </table>
+
+  <h3>8.6 Output quality</h3>
+  <p>The output must maintain source architecture and perspective; flat colour treatment; sharp / hard-edged shadows; subtle outlines; simplified vegetation; simplified but accurate glass and water; clean graphic composition; no unnecessary distortion; no exaggerated cartoon appearance; <strong>1:1 square format</strong>; high-resolution output (do not downscale for download).</p>
+  <p>Visual benchmark: the 10 before/after examples in the source brief. Those examples are quality references only. They do not add features.</p>
+  <table class="data">
+    <thead><tr><th>ID</th><th>Requirement</th><th>Priority</th></tr></thead>
+    <tbody>
+      <tr><td>FR-50</td><td>Generated images are 1:1.</td><td><span class="pill">P0</span></td></tr>
+      <tr><td>FR-51</td><td>Download uses the highest available quality, not a compressed preview.</td><td><span class="pill">P0</span></td></tr>
+    </tbody>
+  </table>
+  <p>These quality rules live in the embedded prompt. Product success is judged by a BLOCHARCH reviewer against the brief examples, not by an automated vision score in Phase 01.</p>
+
+  <h3>8.7 Output controls</h3>
+  <p>After a successful generation, four controls are always available:</p>
+  <table class="data">
+    <thead><tr><th>Control</th><th>Meaning</th><th>Must retain</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Download</strong></td><td>Save the current artwork at full quality</td><td>Current image</td></tr>
+      <tr><td><strong>Regenerate</strong></td><td>Try again with <strong>exactly the same</strong> inputs</td><td>Source, colour method, colour inputs, prompt, settings</td></tr>
+      <tr><td><strong>Refine</strong></td><td>Current output is close; change something specific</td><td>All of the above <strong>plus</strong> current image, prior refinements, latest instruction</td></tr>
+      <tr><td><strong>Start again</strong></td><td>New job. Wipe session inputs and outputs</td><td>Nothing from the previous job</td></tr>
+    </tbody>
+  </table>
+  <table class="data">
+    <thead><tr><th>ID</th><th>Requirement</th><th>Priority</th></tr></thead>
+    <tbody>
+      <tr><td>FR-60</td><td>Download remains available after every generate and every refine.</td><td><span class="pill">P0</span></td></tr>
+      <tr><td>FR-61</td><td>Regenerate does not ask the user to re-upload anything.</td><td><span class="pill">P0</span></td></tr>
+      <tr><td>FR-62</td><td>Refine is a conversational bar under the generated image: “What would you like to change?” + <strong>Apply refinement</strong>.</td><td><span class="pill">P0</span></td></tr>
+      <tr><td>FR-63</td><td>Refine is an adjustment to the <strong>current</strong> artwork, not a new project.</td><td><span class="pill">P0</span></td></tr>
+      <tr><td>FR-64</td><td>Start Again returns the user to empty inputs.</td><td><span class="pill">P0</span></td></tr>
+      <tr><td>FR-65</td><td>Confirm Start Again if a generated image exists.</td><td><span class="pill p1">P1</span></td></tr>
+    </tbody>
+  </table>
+  <p><strong>Example refine instructions</strong> the system must handle as edits, not new generations: keep everything the same but make the sky blue; reduce the amount of green; do not change the architecture; restore original window proportions; make shadows stronger; keep the building white; reduce vegetation; use more pink in the background; make the artwork less cartoon-like; keep this composition and only adjust the colours.</p>
+
+  <h3>8.8 Session context</h3>
+  <table class="data">
+    <thead><tr><th>ID</th><th>Requirement</th><th>Priority</th></tr></thead>
+    <tbody>
+      <tr><td>FR-70</td><td>During the active session remember: original source image, original colour inputs, selected colour method, embedded prompt identity/version, current generated image, previous refinement requests, latest refinement instruction.</td><td><span class="pill">P0</span></td></tr>
+      <tr><td>FR-71</td><td>Phase 01 storage is <strong>temporary session storage only</strong>. No permanent library.</td><td><span class="pill">P0</span></td></tr>
+      <tr><td>FR-72</td><td>If useful, keep in-session versions of the current artwork. A user-facing history browser is optional (P2).</td><td><span class="pill p1">P1</span></td></tr>
+      <tr><td>FR-73</td><td>Closing the tab or choosing Start Again discards the session. No promise that artwork is kept after logout.</td><td><span class="pill">P0</span></td></tr>
+      <tr><td>FR-74</td><td>The user must not re-explain BLOCHARCH style, architectural accuracy, or output format on regenerate or refine.</td><td><span class="pill">P0</span></td></tr>
+    </tbody>
+  </table>
+
+  <h3>8.9 Prompt configuration</h3>
+  <p>A full Generator Builder is out of scope. The prompt must still be editable without a code rewrite of the whole app.</p>
+  <table class="data">
+    <thead><tr><th>ID</th><th>Requirement</th><th>Priority</th></tr></thead>
+    <tbody>
+      <tr><td>FR-80</td><td>Store generator config in a simple backend/config location, not buried only in a UI component.</td><td><span class="pill">P0</span></td></tr>
+      <tr><td>FR-81</td><td>Authorised config fields: generator name, embedded prompt, prompt version, AI provider, basic generator settings (e.g. size / quality).</td><td><span class="pill">P0</span></td></tr>
+      <tr><td>FR-82</td><td>Phase 01 config UI can be basic (file, env, or a small admin form). A visual builder is not required.</td><td><span class="pill">P0</span></td></tr>
+      <tr><td>FR-83</td><td>Each generation records which prompt version was used (for debugging; no analytics product).</td><td><span class="pill p1">P1</span></td></tr>
+    </tbody>
+  </table>
+
+  <h2><span class="num">9</span>Interface requirements</h2>
+  <p>Keep the UI extremely simple. Suggested Phase 01 layout:</p>
+  <div class="ui">BLOCHARCH Content Generator
+Master Artwork
+
+Source image
+  [ Upload image ]     (preview)
+
+Colour treatment
+  ( ) Upload colour samples
+  ( ) Enter HEX codes
+  ( ) Upload colour palette
+  ( ) Use colours from source image
+  [ only the matching fields for the selected option ]
+
+[ Generate artwork ]
+
+── after generate ──
+[ generated 1:1 artwork ]
+[ Download ]  [ Regenerate ]  [ Refine ]  [ Start again ]
+
+What would you like to change?
+[ Type your instruction here… ]  [ Apply refinement ]</div>
+  <table class="data">
+    <thead><tr><th>ID</th><th>Requirement</th><th>Priority</th></tr></thead>
+    <tbody>
+      <tr><td>UX-01</td><td>One screen, one flow. No wizard with many pages unless mobile layout requires stacking.</td><td><span class="pill">P0</span></td></tr>
+      <tr><td>UX-02</td><td>Colour fields are conditional. Never show HEX, swatches, and palette upload at the same time unless that option is selected.</td><td><span class="pill">P0</span></td></tr>
+      <tr><td>UX-03</td><td>Match existing Blocharch Console visual language (dashboard shell, typography, dark theme).</td><td><span class="pill p1">P1</span></td></tr>
+      <tr><td>UX-04</td><td>Loading, empty, error, and success states are explicit.</td><td><span class="pill">P0</span></td></tr>
+      <tr><td>UX-05</td><td>Do not expose model names, token counts, or prompt text to the operator.</td><td><span class="pill">P0</span></td></tr>
+    </tbody>
+  </table>
+
+  <h2><span class="num">10</span>Technical requirements</h2>
+  <h3>10.1 Placement</h3>
+  <p>Build inside the existing Blocharch Console (Next.js + current auth), as a new dashboard area, e.g. <code>/dashboard/content-generator</code>.</p>
+  <p>Rationale: operators already log in here; Phase 01 should not invent a second app, identity system, or design language.</p>
+
+  <h3>10.2 AI provider</h3>
+  <table class="data">
+    <thead><tr><th>ID</th><th>Requirement</th><th>Priority</th></tr></thead>
+    <tbody>
+      <tr><td>TR-01</td><td>Phase 01 uses <strong>OpenAI</strong> because that is where preferred Master Artwork quality is currently achieved.</td><td><span class="pill">P0</span></td></tr>
+      <tr><td>TR-02</td><td>Provider is a generator setting, not a hardcoded platform-wide choice. Future generators may use Gemini or others.</td><td><span class="pill">P0</span></td></tr>
+      <tr><td>TR-03</td><td>Output quality beats provider consistency.</td><td><span class="pill">P0</span></td></tr>
+      <tr><td>TR-04</td><td>API keys stay on the server. The browser never holds the OpenAI secret.</td><td><span class="pill">P0</span></td></tr>
+      <tr><td>TR-05</td><td>Use the current OpenAI image API that best preserves input-image fidelity. Confirm model at implementation time; store it in generator config.</td><td><span class="pill">P0</span></td></tr>
+    </tbody>
+  </table>
+
+  <h3>10.3 Recommended request composition</h3>
+  <p>Each generate / regenerate / refine call should send:</p>
+  <ol>
+    <li>Embedded Master Artwork prompt (current version)</li>
+    <li>Colour-method instructions (Options 1–3 vs Option 4)</li>
+    <li>Source image</li>
+    <li>Colour swatches / palette image / HEX list when applicable</li>
+    <li>For refine: current generated image + ordered refinement notes + latest instruction</li>
+  </ol>
+  <p>Regenerate = same payload as the last generate. Product default: <strong>same inputs as the original generate, ignoring refinements</strong>.</p>
+  <div class="warn"><strong>Open point:</strong> whether Regenerate after Refine should (A) replay the original generate, or (B) replay the latest refined state with no new instruction. Default for Phase 01: <strong>(A) original generate inputs</strong>, because the brief defines regenerate as “try again using exactly the same information.” Refine remains the path for incremental change. Document this in the UI with button helper text if it is unclear.</div>
+
+  <h3>10.4 Session storage</h3>
+  <p>Minimum viable: server-side generation job with a session id; store source bytes, colour assets, HEX list, method, latest output bytes, and refinement log in memory or a short-lived temp store; do not add a Prisma image-library table in Phase 01.</p>
+  <p>TTL assumption: keep session assets for <strong>24 hours</strong> or until Start Again / logout, whichever comes first.</p>
+
+  <h3>10.5 Future-proofing without a builder</h3>
+  <p>Use a small generator record, even if only one exists:</p>
+  <div class="ui">id: master-artwork
+name: Master Artwork
+provider: openai
+model: &lt;config&gt;
+prompt: &lt;text&gt;
+promptVersion: &lt;string&gt;
+output: { type: image, aspect: 1:1 }
+inputs: [sourceImage, colourTreatment]</div>
+  <p>Generator 02 should be addable as another record + UI later, not as a fork of the whole app.</p>
+
+  <h2><span class="num">11</span>Non-functional requirements</h2>
+  <table class="data">
+    <thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+    <tbody>
+      <tr><td>NFR-01</td><td>A non-technical BLOCHARCH teammate can complete the full journey without training on prompts.</td></tr>
+      <tr><td>NFR-02</td><td>Generate / refine should show progress immediately; typical OpenAI image jobs may take tens of seconds — communicate that, do not look frozen.</td></tr>
+      <tr><td>NFR-03</td><td>Failed API calls never lose the user’s uploads.</td></tr>
+      <tr><td>NFR-04</td><td>Downloads work in current Chrome / Edge / Safari.</td></tr>
+      <tr><td>NFR-05</td><td>Secrets, prompts, and uploaded images are not logged in full in client-side consoles or public error messages.</td></tr>
+      <tr><td>NFR-06</td><td>The UI stays usable on a laptop; mobile is acceptable stacked layout, not a design goal.</td></tr>
+      <tr><td>NFR-07</td><td>One concurrent job per session in Phase 01. No queue UI.</td></tr>
+    </tbody>
+  </table>
+
+  <h2><span class="num">12</span>Success criteria</h2>
+  <p>Phase 01 is successful when another BLOCHARCH team member can independently open the platform, select Master Artwork, upload an architectural image, choose the colour method, supply colour information where necessary, generate, regenerate if needed, explain corrections in the refinement bar, continue refining until satisfied, and download the final high-resolution artwork — <strong>without</strong> finding, copying, or pasting the prompt; opening ChatGPT; knowing prompt engineering; remembering artwork rules; re-uploading after every attempt; or starting a new conversation to make an adjustment.</p>
+  <h3>Development priority (build order)</h3>
+  <p>The brief’s five functions are the only P0 product bar:</p>
+  <ol>
+    <li><strong>Input</strong> — source image and colour treatment are easy to provide</li>
+    <li><strong>Generation</strong> — embedded prompt reliably produces Master Artwork</li>
+    <li><strong>Context</strong> — session retains enough to avoid re-upload</li>
+    <li><strong>Refinement</strong> — natural language adjusts the current artwork</li>
+    <li><strong>Download</strong> — user retrieves the final high-res file</li>
+  </ol>
+  <p>If those five work, Phase 01 is done.</p>
+
+  <h2><span class="num">13</span>Acceptance checklist</h2>
+  <h3>Setup</h3>
+  <ul class="check">
+    <li>Signed-in console user can open Content Generator</li>
+    <li>Only Master Artwork is usable</li>
+  </ul>
+  <h3>Inputs</h3>
+  <ul class="check">
+    <li>Source image upload + preview</li>
+    <li>Invalid file type rejected</li>
+    <li>Option 1: 3–5 swatches required</li>
+    <li>Option 2: 3–5 valid HEX codes required; invalid HEX blocked</li>
+    <li>Option 3: one palette image; extra colour fields for other options hidden</li>
+    <li>Option 4: no extra colour fields</li>
+    <li>Generate disabled until inputs are valid</li>
+  </ul>
+  <h3>Generate</h3>
+  <ul class="check">
+    <li>Prompt not visible in the UI</li>
+    <li>Loading state shown</li>
+    <li>One 1:1 image returned</li>
+    <li>Architecture / perspective still recognisable vs source (human review vs brief examples)</li>
+    <li>Options 1–3 stay on palette; Option 4 is not forced to 3–5 colours</li>
+  </ul>
+  <h3>After generate</h3>
+  <ul class="check">
+    <li>Download saves full-quality image</li>
+    <li>Regenerate keeps uploads and settings, produces a new image</li>
+    <li>Refine applies a natural-language change without new uploads</li>
+    <li>Further refines remember previous instructions</li>
+    <li>Start Again clears the job after confirm</li>
+    <li>Errors leave inputs intact</li>
+  </ul>
+  <h3>Config</h3>
+  <ul class="check">
+    <li>Prompt / version / provider can be changed without rewriting the generator UI</li>
+  </ul>
+
+  <h2><span class="num">14</span>Out of scope</h2>
+  <p>Do not build these in Phase 01, even if easy:</p>
+  <ul>
+    <li>Caption generators, social posting, project naming</li>
+    <li>Permanent BLOCHARCH image library or “Recent generations”</li>
+    <li>Fine-tuning, eval harnesses, analytics dashboards</li>
+    <li>Multi-image batch generate</li>
+    <li>In-canvas editing (brush, erase, crop as a product)</li>
+    <li>Client portal access</li>
+    <li>Gemini (or any second provider) for this generator</li>
+    <li>Full Generator Recipe Builder</li>
+  </ul>
+
+  <h2><span class="num">15</span>Open questions</h2>
+  <p>Resolve these during implementation if they block build. Defaults are listed so work can start.</p>
+  <table class="data">
+    <thead><tr><th>#</th><th>Question</th><th>Default if unanswered</th></tr></thead>
+    <tbody>
+      <tr><td>Q1</td><td>Exact OpenAI model for best Master Artwork fidelity?</td><td>Current best image-edit/generation model; store in config</td></tr>
+      <tr><td>Q2</td><td>Target pixel size (e.g. 1024, 1536, 2048)?</td><td>Highest square size the API allows without extra paid upscale product</td></tr>
+      <tr><td>Q3</td><td>Who may edit the embedded prompt?</td><td>Same people who can access existing admin / env config</td></tr>
+      <tr><td>Q4</td><td>After Refine, does Regenerate replay original generate or latest refine?</td><td>Original generate inputs (see §10.3)</td></tr>
+      <tr><td>Q5</td><td>Should extracted palette colours for Option 3 be editable before generate?</td><td>Display only in P1; editing is P2</td></tr>
+      <tr><td>Q6</td><td>Filename pattern for download?</td><td><code>blocharch-master-artwork-YYYYMMDD-HHMM.png</code></td></tr>
+      <tr><td>Q7</td><td>Is a sidebar nav item required in the console?</td><td>Yes: <strong>Content Generator</strong></td></tr>
+      <tr><td>Q8</td><td>Should the 10 brief examples appear in-app as a reference strip?</td><td>No for P0; optional help panel P2</td></tr>
+    </tbody>
+  </table>
+
+  <h2><span class="num">16</span>Final principle</h2>
+  <p>Phase 01 stays deliberately small.</p>
+  <div class="loop">Source image
+    → Colour treatment
+    → Master Artwork prompt
+    → AI generation
+    → Review
+    → Regenerate or refine
+    → Download</div>
+  <p>When that loop is reliable, it becomes the foundation for Generator 02. Do not build the rest of the BLOCHARCH AI ecosystem in this phase.</p>
+</body>
+</html>
