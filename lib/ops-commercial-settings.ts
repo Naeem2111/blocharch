@@ -9,7 +9,7 @@ export async function getCostConversionMode(): Promise<CostConversionMode> {
     where: { key: COST_RATE_MODE_KEY },
     select: { value: true },
   });
-  return row?.value === "live" ? "live" : "manual";
+  return row?.value === "manual" ? "manual" : "live";
 }
 
 export async function setCostConversionMode(mode: CostConversionMode): Promise<void> {

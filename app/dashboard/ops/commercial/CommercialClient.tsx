@@ -72,6 +72,7 @@ type CommercialData = {
   appliedRate: number;
   costConversionMode: "manual" | "live";
   liveRate: number | null;
+  rateAsOf: string | null;
   totalRevenueGbp: number;
   totalLaneRevenueGbp: number;
   totalOvertimeRevenueGbp: number;
@@ -260,9 +261,10 @@ export function CommercialClient() {
         ) : null}
         {ledger ? (
           <p className="pb-2 text-xs text-slate-500">
-            Athlete costs: £1 = R{ledger.appliedRate.toFixed(2)} (
-            {ledger.costConversionMode === "live" ? "live" : "manual reporting"})
-            {ledger.liveRate != null ? ` · Live ref R${ledger.liveRate.toFixed(2)}` : ""}
+            Athlete base pay converted at £1 = R{ledger.appliedRate.toFixed(2)}
+            {ledger.costConversionMode === "live"
+              ? ` (live${ledger.rateAsOf ? ` ${ledger.rateAsOf}` : ""})`
+              : " (manual reporting)"}
           </p>
         ) : null}
       </div>
@@ -290,8 +292,10 @@ export function CommercialClient() {
                 £{ledger.totalLaneCostGbp.toLocaleString()}
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                OT cost £{ledger.totalOvertimeCostGbp.toLocaleString()} · total £
-                {ledger.totalCostGbp.toLocaleString()}
+                Cost of sales £{ledger.totalCostGbp.toLocaleString()}
+                {ledger.totalOvertimeCostGbp > 0
+                  ? ` · includes OT £${ledger.totalOvertimeCostGbp.toLocaleString()}`
+                  : ""}
               </p>
             </div>
             <div className="card-tool rounded-xl p-4">
@@ -300,7 +304,8 @@ export function CommercialClient() {
                 £{ledger.grossMarginGbp.toLocaleString()} ({ledger.grossMarginPercent}%)
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                Total billed £{ledger.totalRevenueGbp.toLocaleString()}
+                Sales £{ledger.totalRevenueGbp.toLocaleString()} minus cost of sales £
+                {ledger.totalCostGbp.toLocaleString()}
               </p>
             </div>
           </div>
@@ -508,7 +513,7 @@ export function CommercialClient() {
         <div className="card-tool rounded-xl p-5">
           <h2 className="text-sm font-semibold text-white">Exchange rates</h2>
           <p className="mt-1 text-xs text-slate-500">
-            Choose manual reporting rate or live market rate when converting athlete ZAR pay to GBP.
+            Onboarded monthly pay in rand is converted to pounds at the live rate for that day. Manual reporting is only used if you switch it on.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <button

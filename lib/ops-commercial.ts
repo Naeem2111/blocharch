@@ -68,6 +68,7 @@ export type CommercialSummary = {
   appliedRate: number;
   costConversionMode: "manual" | "live";
   liveRate: number | null;
+  rateAsOf: string | null;
   totalRevenueGbp: number;
   totalLaneRevenueGbp: number;
   totalOvertimeRevenueGbp: number;
@@ -196,7 +197,7 @@ function dateOnlyUtc(date: Date): Date {
 export async function buildCommercialLedger(reference: Date): Promise<CommercialSummary> {
   const from = monthStartUtc(reference);
   const to = monthEndUtc(reference);
-  const { appliedRate, reportingRate, mode, liveRate } = await getCostConversionSnapshot(reference);
+  const { appliedRate, reportingRate, mode, liveRate, rateAsOf } = await getCostConversionSnapshot(reference);
 
   const [clients, lineItems, athletes] = await Promise.all([
     prisma.opsClient.findMany({
@@ -406,7 +407,8 @@ export async function buildCommercialLedger(reference: Date): Promise<Commercial
     if (athleteTotalsMap.has(athlete.id)) continue;
     const cost = athleteCostMap.get(athlete.id);
     const monthHours = cost?.monthHours ?? 0;
-    if (monthHours <= 0) continue;
+    const costGbp = cost?.costGbp ?? 0;
+    if (monthHours <= 0 && costGbp <= 0) continue;
     const profile = athleteProfileVisual(athlete);
     athleteTotalsMap.set(athlete.id, {
       athleteId: athlete.id,
@@ -448,13 +450,13 @@ export async function buildCommercialLedger(reference: Date): Promise<Commercial
     clientLanes.reduce((s, c) => s + c.totalClientRevenueGbp, 0)
   );
   const totalCostZar = round2(Array.from(athleteCostMap.values()).reduce((s, c) => s + c.costZar, 0));
-  const totalCostGbp = round2(totalCostZar / appliedRate);
   const totalLaneCostGbp = round2(
     Array.from(athleteCostMap.values()).reduce((s, c) => s + c.baseCostGbp, 0)
   );
   const totalOvertimeCostGbp = round2(
     Array.from(athleteCostMap.values()).reduce((s, c) => s + c.overtimeCostGbp, 0)
   );
+  const totalCostGbp = round2(totalLaneCostGbp + totalOvertimeCostGbp);
   const grossMarginGbp = round2(totalRevenueGbp - totalCostGbp);
 
   return {
@@ -463,6 +465,7 @@ export async function buildCommercialLedger(reference: Date): Promise<Commercial
     appliedRate,
     costConversionMode: mode,
     liveRate,
+    rateAsOf,
     totalRevenueGbp,
     totalLaneRevenueGbp,
     totalOvertimeRevenueGbp,
@@ -539,6 +542,7 @@ function mergeCommercialSummaries(base: CommercialSummary, add: CommercialSummar
     appliedRate: add.appliedRate,
     costConversionMode: add.costConversionMode,
     liveRate: add.liveRate,
+    rateAsOf: add.rateAsOf,
     totalRevenueGbp: round2(base.totalRevenueGbp + add.totalRevenueGbp),
     totalLaneRevenueGbp: round2(base.totalLaneRevenueGbp + add.totalLaneRevenueGbp),
     totalOvertimeRevenueGbp: round2(base.totalOvertimeRevenueGbp + add.totalOvertimeRevenueGbp),

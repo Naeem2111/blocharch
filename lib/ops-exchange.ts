@@ -1,8 +1,8 @@
 import type { OpsExchangeRateType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { fetchLiveGbpToZarQuote } from "@/lib/fx-live";
+import { fetchGbpToZarQuote, fetchLiveGbpToZarQuote } from "@/lib/fx-live";
 import { getCostConversionMode } from "@/lib/ops-commercial-settings";
-import { monthStartUtc } from "@/lib/ops-hours";
+import { monthEndUtc, monthStartUtc } from "@/lib/ops-hours";
 
 export function isOpsExchangeRateType(v: string): v is OpsExchangeRateType {
   return v === "live" || v === "reporting";
@@ -46,27 +46,42 @@ export type CostConversionSnapshot = {
   appliedRate: number;
   reportingRate: number;
   liveRate: number | null;
+  /** Day the live quote is for. Null when the quote could not be fetched. */
+  rateAsOf: string | null;
 };
+
+function isoDateUtc(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+/** Market GBP→ZAR for the month being viewed. The open month uses today's quote. */
+async function marketRateForMonth(reference: Date): Promise<{ rate: number; asOf: string } | null> {
+  const now = new Date();
+  const viewingCurrentMonth = effectiveMonthUtc(reference).getTime() === effectiveMonthUtc(now).getTime();
+  try {
+    const quote = viewingCurrentMonth
+      ? await fetchLiveGbpToZarQuote()
+      : await fetchGbpToZarQuote(isoDateUtc(monthEndUtc(reference)));
+    return { rate: quote.gbpToZarRate, asOf: quote.asOf };
+  } catch {
+    return null;
+  }
+}
 
 /** Rate used to convert athlete ZAR earnings → GBP on Commercial. */
 export async function getCostConversionSnapshot(reference: Date): Promise<CostConversionSnapshot> {
   const mode = await getCostConversionMode();
   const reportingRate = await getReportingRateOrDefault(reference);
-  let liveRate: number | null = await getActiveExchangeRate(reference, "live");
-  if (liveRate == null) {
-    try {
-      const quote = await fetchLiveGbpToZarQuote();
-      liveRate = quote.gbpToZarRate;
-    } catch {
-      liveRate = null;
-    }
-  }
+  const storedLive = await getActiveExchangeRate(reference, "live");
+  const market = await marketRateForMonth(reference);
+  const liveRate = market?.rate ?? storedLive;
   const appliedRate = mode === "live" ? (liveRate ?? reportingRate) : reportingRate;
   return {
     mode,
     appliedRate,
     reportingRate,
     liveRate,
+    rateAsOf: market?.asOf ?? null,
   };
 }
 
