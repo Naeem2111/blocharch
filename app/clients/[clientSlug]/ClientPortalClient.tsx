@@ -156,7 +156,7 @@ function DateRange({
 		return <span className="text-xs text-slate-500">Dates to be confirmed</span>;
 	}
 	return (
-		<p className="text-center text-xs tabular-nums text-slate-400">
+		<p className="text-left text-xs tabular-nums text-slate-400 sm:text-center">
 			{start ? formatShortDate(start) : "TBC"}
 			{" → "}
 			<span className="font-semibold" style={end && endColor ? { color: endColor } : undefined}>
@@ -200,7 +200,7 @@ function ProjectCard({
 				</div>
 				<StatusBadge label={project.statusBadge.label} color={project.statusBadge.color} />
 			</div>
-			<div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2 pl-1">
+			<div className="mt-3 flex flex-col gap-2 pl-1 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center">
 				<div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-slate-400">
 					<span>
 						Stage <span className="text-slate-300">{project.currentStageLabel}</span>
@@ -209,7 +209,7 @@ function ProjectCard({
 					<LanePill n={project.laneNumber} />
 				</div>
 				<DateRange start={project.startDate} end={project.dueDate} endColor={accent} />
-				<span aria-hidden />
+				<span className="hidden sm:block" aria-hidden />
 			</div>
 			{!compact ? (
 				<div className="mt-3 flex items-center gap-3 pl-1">
@@ -256,7 +256,7 @@ function PipelineCard({ project }: { project: PublicClientPortalPipelineProject 
 				</div>
 				<StatusBadge label="Planned" color={PIPELINE_PURPLE} />
 			</div>
-			<div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2 pl-1">
+			<div className="mt-3 flex flex-col gap-2 pl-1 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center">
 				<div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-slate-400">
 					{project.expectedStageLabel ? (
 						<span>
@@ -267,7 +267,7 @@ function PipelineCard({ project }: { project: PublicClientPortalPipelineProject 
 					)}
 				</div>
 				<DateRange start={project.targetStartDate} end={project.targetDueDate} endColor={PIPELINE_PURPLE} />
-				<span aria-hidden />
+				<span className="hidden sm:block" aria-hidden />
 			</div>
 			<div className="mt-4 flex flex-wrap items-center justify-between gap-3 pl-1">
 				<span className="text-xs text-slate-500">Lead assigned soon</span>
@@ -571,7 +571,7 @@ export function ClientPortalClient({
 								<button
 									type="button"
 									onClick={() => setDeadlineItem(item)}
-									className="flex w-full items-center gap-2 rounded-md px-1 py-1 text-left text-xs hover:bg-white/[0.05]"
+									className="flex w-full items-center gap-2 rounded-lg px-1 py-2.5 text-left text-sm hover:bg-white/[0.05]"
 								>
 									<span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: item.color }} />
 									<span className="w-14 shrink-0 tabular-nums text-slate-400">{formatShortDate(item.date)}</span>
@@ -681,7 +681,7 @@ export function ClientPortalClient({
 			</aside>
 
 			<div className="client-portal-main flex min-w-0 flex-1 flex-col">
-				<header className="client-portal-header border-b border-white/[0.06] px-4 py-5 sm:px-8">
+				<header className="client-portal-header border-b border-white/[0.06] px-4 py-4 pt-[max(1rem,env(safe-area-inset-top))] sm:px-8 lg:py-5 lg:pt-5">
 					<div className="flex flex-wrap items-start justify-between gap-4">
 						<div className="flex min-w-0 items-start gap-4">
 							<ClientAvatar
@@ -765,14 +765,14 @@ export function ClientPortalClient({
 							</div>
 						</div>
 					</div>
-					<div className="mt-4 flex flex-wrap gap-2 lg:hidden">
+					<div className="mt-4 grid grid-cols-2 gap-2 lg:hidden">
 						{navItems.map((item) => (
 							<button
 								key={item.id}
 								type="button"
 								onClick={() => setPage(item.id)}
-								className={`client-portal-nav inline-flex items-center rounded-lg px-3 py-1.5 text-xs ${
-									page === item.id ? "client-portal-nav-active bg-white/10 text-white" : "text-slate-500"
+								className={`client-portal-nav inline-flex items-center justify-center rounded-full px-3 py-2.5 text-center text-sm ${
+									page === item.id ? "client-portal-nav-active bg-white/10 text-white" : "bg-white/[0.04] text-slate-300"
 								}`}
 							>
 								{item.label}
@@ -932,7 +932,34 @@ export function ClientPortalClient({
 									: `${data.completedProjects.length} completed packs`}
 							</p>
 							{data.completedProjects.length > 0 ? (
-								<div className="client-portal-card mt-5 overflow-x-auto rounded-xl ring-1 ring-white/[0.06]">
+								<>
+								<ul className="mt-5 space-y-3 md:hidden">
+									{data.completedProjects.map((project) => (
+										<li key={project.id} className="client-portal-card rounded-xl border border-white/[0.08] bg-white/[0.03] p-4">
+											<p className="font-semibold text-white">{project.name}</p>
+											{project.address ? <p className="mt-0.5 text-xs text-slate-500">{project.address}</p> : null}
+											<dl className="mt-3 space-y-2 text-sm">
+												<div className="flex items-start justify-between gap-3">
+													<dt className="text-slate-500">Phase</dt>
+													<dd className="text-right text-slate-200">{project.currentStageLabel}</dd>
+												</div>
+												<div className="flex items-start justify-between gap-3">
+													<dt className="text-slate-500">Completed</dt>
+													<dd className="text-right text-slate-200">{formatDateOnly(project.completedAt)}</dd>
+												</div>
+												<div className="flex items-center justify-between gap-3">
+													<dt className="text-slate-500">Lead</dt>
+													<dd><LeadBlock name={project.leadName} showLabel={false} /></dd>
+												</div>
+												<div className="flex items-center justify-between gap-3">
+													<dt className="text-slate-500">Complexity</dt>
+													<dd><ComplexityBadge value={project.complexity} label={project.complexityLabel} /></dd>
+												</div>
+											</dl>
+										</li>
+									))}
+								</ul>
+								<div className="client-portal-card mt-5 hidden overflow-x-auto rounded-xl ring-1 ring-white/[0.06] md:block">
 									<table className="client-portal-completed-table w-full min-w-[44rem] text-left text-sm">
 										<thead className="bg-white/[0.03] text-[10px] uppercase tracking-wider text-slate-500">
 											<tr>
@@ -963,6 +990,7 @@ export function ClientPortalClient({
 										</tbody>
 									</table>
 								</div>
+								</>
 							) : (
 								<p className="mt-6 text-sm text-slate-500">No completed packs yet.</p>
 							)}

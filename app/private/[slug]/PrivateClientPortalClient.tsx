@@ -168,7 +168,7 @@ function RecentUpdates({ updates, limit }: { updates: PortalData["updates"]; lim
         const nextBlue = i + 1 >= blueFrom;
         const lineTone = nextBlue ? "bg-sky-400" : "bg-emerald-700";
         return (
-          <li key={update.id} className="flex items-center gap-3">
+          <li key={update.id} className="flex items-start gap-3 sm:items-center">
             <div className="relative flex w-5 shrink-0 justify-center self-stretch">
               {i < rows.length - 1 ? (
                 <span aria-hidden className={`absolute left-1/2 top-5 w-0.5 -translate-x-1/2 ${lineTone}`} style={{ bottom: "-0.35rem" }} />
@@ -177,9 +177,13 @@ function RecentUpdates({ updates, limit }: { updates: PortalData["updates"]; lim
                 className={`relative z-10 mt-3 size-3.5 shrink-0 rounded-full border-[2.5px] bg-white ${blue ? "border-sky-400" : "border-emerald-700"}`}
               />
             </div>
-            <p className="w-[7.25rem] shrink-0 py-2.5 text-sm text-white">{formatDate(update.occurredAt)}</p>
-            <p className="min-w-0 flex-1 py-2.5 text-sm text-white">{update.title}</p>
-            <span className="shrink-0 text-sm text-white/70" aria-hidden>
+            <div className="min-w-0 flex-1 py-2.5 sm:flex sm:items-center sm:gap-3">
+              <p className="text-xs text-slate-300 sm:w-[7.25rem] sm:shrink-0 sm:text-sm sm:text-white">
+                {formatDate(update.occurredAt)}
+              </p>
+              <p className="mt-0.5 text-sm text-white sm:mt-0">{update.title}</p>
+            </div>
+            <span className="shrink-0 self-center text-sm text-white/70" aria-hidden>
               ›
             </span>
           </li>
@@ -434,6 +438,7 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
       </aside>
 
       <div className="min-w-0 flex-1">
+        <div className="border-b border-white/[0.06] pt-[env(safe-area-inset-top)] lg:border-0 lg:pt-0">
         <header className="flex items-center justify-end gap-2 px-4 py-3 sm:px-8">
           <div className="relative">
             <button
@@ -500,17 +505,18 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
           </div>
         </header>
 
-        <div className="flex gap-2 overflow-x-auto px-4 pb-2 lg:hidden">
+        <div className="grid grid-cols-2 gap-2 px-4 pb-3 lg:hidden">
           {(["overview", "journey", "actions", "documents"] as const).map((id) => (
             <button
               key={id}
               type="button"
               onClick={() => setView(id)}
-              className={`rounded-full px-3 py-1.5 text-xs ${view === id ? "bg-sky-500 text-slate-950" : "bg-white/[0.04] text-slate-300"}`}
+              className={`rounded-full px-3 py-2.5 text-sm ${view === id ? "bg-sky-500 text-slate-950" : "bg-white/[0.06] text-slate-200"}`}
             >
               {id === "overview" ? "Overview" : id === "journey" ? "Journey" : id === "actions" ? "Actions" : "Documents"}
             </button>
           ))}
+        </div>
         </div>
 
         <main className="px-4 pb-16 sm:px-8">
@@ -721,9 +727,7 @@ function Overview({
               <p className="mt-1.5 text-base text-white">Target date: {next?.dateFrom ? formatDate(next.dateFrom) : "To be confirmed"}</p>
             </div>
           </div>
-          <div className="overflow-x-auto">
-            <StageRail stages={stages} />
-          </div>
+          <StageRail stages={stages} />
         </section>
       ) : null}
 
@@ -854,9 +858,9 @@ function Journey({
                 <StageDot stage={stage} />
               </div>
               <div className={`min-w-0 flex-1 ${stage.state === "current" ? "private-portal-timeline-current rounded-xl px-4 py-3" : "pt-0.5"}`}>
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex flex-col gap-0.5 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                   <p className={stage.state === "current" ? "font-bold text-white" : "font-medium text-white"}>{stage.label}</p>
-                  <p className={`shrink-0 text-xs ${stage.state === "current" ? "font-bold text-white" : "text-slate-400"}`}>
+                  <p className={`text-xs sm:shrink-0 ${stage.state === "current" ? "font-bold text-white" : "text-slate-400"}`}>
                     {stage.dateFrom ? formatDate(stage.dateFrom) : stage.state === "upcoming" ? "To be confirmed" : "—"}
                   </p>
                 </div>
@@ -1031,7 +1035,7 @@ function Actions({
                     <button
                       type="button"
                       onClick={() => setExpandedUploadId((id) => (id === action.id ? null : action.id))}
-                      className="flex w-full items-center gap-3 text-left"
+                      className="flex w-full items-start gap-3 text-left"
                       aria-expanded={open}
                     >
                       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-500/15 text-sky-200 ring-1 ring-sky-400/30">
@@ -1039,9 +1043,9 @@ function Actions({
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block text-sm font-medium text-white">{action.title}</span>
-                      </span>
-                      <span className="rounded-full border border-sky-400/50 px-2.5 py-0.5 text-[11px] font-medium text-sky-200">
-                        Upload requested
+                        <span className="mt-1 inline-flex rounded-full border border-sky-400/50 px-2.5 py-0.5 text-[11px] font-medium text-sky-200">
+                          Upload requested
+                        </span>
                       </span>
                       <span className={`text-slate-400 transition ${open ? "rotate-180" : ""}`} aria-hidden>
                         ▾
@@ -1126,8 +1130,11 @@ function Actions({
                     aria-label={`Mark ${action.title} complete`}
                     className="h-5 w-5 shrink-0 rounded-full border border-white hover:border-emerald-400 disabled:opacity-50"
                   />
-                  <span className="min-w-0 flex-1 text-sm font-medium text-white">{action.title}</span>
-                  <span className="shrink-0 text-xs text-slate-400">Tick to confirm</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium text-white">{action.title}</span>
+                    <span className="mt-0.5 block text-xs text-slate-400 sm:hidden">Tick to confirm</span>
+                  </span>
+                  <span className="hidden shrink-0 text-xs text-slate-400 sm:inline">Tick to confirm</span>
                 </li>
               );
             })}
@@ -1146,8 +1153,11 @@ function Actions({
                 <li key={action.id} className="rounded-2xl border border-white/[0.08] px-4 py-3">
                   <button type="button" onClick={() => onToggleCompleted(action.id)} className="flex w-full items-center gap-3 text-left">
                     <DoneMark />
-                    <span className="min-w-0 flex-1 text-sm font-medium text-white">{action.title}</span>
-                    <span className="rounded-full border border-white/10 px-2 py-1 text-[11px] text-slate-400">Completed {formatDate(action.completedAt)}</span>
+                    <span className="min-w-0 flex-1 text-left">
+                      <span className="block text-sm font-medium text-white">{action.title}</span>
+                      <span className="mt-0.5 block text-xs text-slate-400 sm:hidden">Completed {formatDate(action.completedAt)}</span>
+                    </span>
+                    <span className="hidden shrink-0 rounded-full border border-white/10 px-2 py-1 text-[11px] text-slate-400 sm:inline">Completed {formatDate(action.completedAt)}</span>
                     <span className="text-slate-500">{open ? "▴" : "▾"}</span>
                   </button>
                   {open ? (
@@ -1254,7 +1264,32 @@ function Documents({
           <option value="oldest">Date (oldest first)</option>
         </select>
       </div>
-      <div className={`${cardClass()} relative mt-4 overflow-x-auto`}>
+      <ul className="mt-4 space-y-2 md:hidden">
+        {docs.length === 0 ? (
+          <li className={`${cardClass()} px-4 py-8 text-sm text-slate-500`}>No documents match this view.</li>
+        ) : (
+          docs.map((doc) => (
+            <li key={doc.id} className={`${cardClass()} p-4`}>
+              <p className="break-words font-medium text-white">{doc.title}</p>
+              <p className="mt-1 text-xs text-slate-400">
+                {documentPhase(doc)} · {formatBytes(doc.sizeBytes)} · {formatDate(doc.createdAt)}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <a href={doc.fileUrl} download className="rounded-lg border border-white/10 px-3 py-2 text-sm text-slate-200">
+                  Download
+                </a>
+                <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-white/10 px-3 py-2 text-sm text-slate-200">
+                  Preview
+                </a>
+                <button type="button" onClick={() => onDetails(doc)} className="rounded-lg border border-white/10 px-3 py-2 text-sm text-slate-200">
+                  Details
+                </button>
+              </div>
+            </li>
+          ))
+        )}
+      </ul>
+      <div className={`${cardClass()} relative mt-4 hidden overflow-x-auto md:block`}>
         <table className="min-w-full text-left text-sm">
           <thead className="text-[10px] uppercase tracking-[0.14em] text-slate-500">
             <tr>
@@ -1332,7 +1367,23 @@ function Documents({
 
 function StageRail({ stages }: { stages: Stage[] }) {
   return (
-    <div className="mt-5 px-1 py-3">
+    <div className="mt-5">
+      <ol className="space-y-1 sm:hidden">
+        {stages.map((stage) => (
+          <li key={stage.key} className="flex items-center gap-3 py-1.5">
+            <StageDot stage={stage} />
+            <span className="min-w-0 flex-1 text-sm text-white">{stage.label}</span>
+            <span
+              className={`shrink-0 text-[11px] font-semibold uppercase tracking-wide ${
+                stage.state === "done" ? "text-emerald-300" : stage.state === "current" ? "text-sky-300" : "text-slate-500"
+              }`}
+            >
+              {stage.state === "done" ? "Done" : stage.state === "current" ? "Now" : "Next"}
+            </span>
+          </li>
+        ))}
+      </ol>
+      <div className="hidden overflow-x-auto px-1 py-3 sm:block">
       <div className="flex min-w-[36rem] items-start">
         {stages.map((stage, i) => (
           <div key={stage.key} className="flex min-w-0 flex-1 flex-col items-center">
@@ -1377,6 +1428,7 @@ function StageRail({ stages }: { stages: Stage[] }) {
             )}
           </div>
         ))}
+      </div>
       </div>
     </div>
   );
