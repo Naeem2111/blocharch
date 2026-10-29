@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MAP_PRACTICE_DISPLAY_LIMIT, type MapPracticeStage } from "@/lib/map-practices";
 import { LEAD_STAGES } from "@/lib/leads";
 import { LEAD_STAGE_COLORS, LEAD_STAGE_LABELS } from "@/lib/lead-stage-ui";
+import { PRACTICE_TYPES, type PracticeTypeValue } from "@/lib/practice-types";
 
 import { hubUsesIconStudio, type MapHubAnchor } from "@/lib/map-hub";
 
@@ -27,7 +28,32 @@ const LeafletMap = dynamic(async () => (await import("@/components/LeafletMap"))
   ),
 });
 
-type Practice = { name: string; address: string; slug: string; stage: MapPracticeStage };
+type Practice = {
+  name: string;
+  address: string;
+  slug: string;
+  stage: MapPracticeStage;
+  practiceType: PracticeTypeValue;
+};
+
+const TYPE_TAB_STYLE: Record<PracticeTypeValue | "all", { on: string; dot: string }> = {
+  all: {
+    on: "border-white/30 bg-white/15 text-white",
+    dot: "bg-white",
+  },
+  architecture_firm: {
+    on: "border-sky-400/50 bg-sky-500/20 text-sky-50",
+    dot: "bg-sky-400",
+  },
+  interior_design: {
+    on: "border-amber-300/55 bg-amber-400/20 text-amber-50",
+    dot: "bg-amber-300",
+  },
+  development: {
+    on: "border-emerald-400/50 bg-emerald-500/20 text-emerald-50",
+    dot: "bg-emerald-400",
+  },
+};
 
 const MAP_FOCAL_SYNTHETIC_ID = "__blocharch_map_focal__";
 
@@ -60,6 +86,9 @@ export function MapClient({
 
   const [pinSearchInput, setPinSearchInput] = useState("");
   const [pinFilter, setPinFilter] = useState("");
+  const [visibleTypes, setVisibleTypes] = useState<Set<PracticeTypeValue>>(
+    () => new Set(PRACTICE_TYPES.map((type) => type.value)),
+  );
   const [stageBySlug, setStageBySlug] = useState<Record<string, MapPracticeStage>>({});
   const [stageError, setStageError] = useState<string | null>(null);
   const [removedSlugs, setRemovedSlugs] = useState<Record<string, true>>({});
@@ -277,16 +306,36 @@ export function MapClient({
     return list;
   }, [markersBase, focalAnchor]);
 
+  const practiceTypeBySlug = useMemo(() => {
+    const types = new Map<string, PracticeTypeValue>();
+    for (const practice of practices) {
+      types.set(practice.slug, practice.practiceType || "architecture_firm");
+    }
+    return types;
+  }, [practices]);
+
+  const showAllTypes = useCallback(() => {
+    setVisibleTypes(new Set(PRACTICE_TYPES.map((type) => type.value)));
+  }, []);
+
+  const toggleType = useCallback((type: PracticeTypeValue) => {
+    setVisibleTypes((current) => {
+      const next = new Set(current);
+      if (next.has(type)) next.delete(type);
+      else next.add(type);
+      return next;
+    });
+  }, []);
+
+  const allTypesOn = visibleTypes.size === PRACTICE_TYPES.length;
+
   const filteredMarkers = useMemo(() => {
     const t = pinFilter.trim().toLowerCase();
-    if (!t) return markers;
-    return markers.filter((m) => {
+    const matchesSearch = (m: (typeof markers)[number]) => {
+      if (!t) return true;
       const nameOk = m.name.toLowerCase().includes(t);
       const subOk = (m.subtitle ?? "").toLowerCase().includes(t);
-      const idOk =
-        typeof m.id === "string"
-          ? m.id.toLowerCase().includes(t.replace(/\s+/g, ""))
-          : false;
+      const idOk = m.id.toLowerCase().includes(t.replace(/\s+/g, ""));
       if (nameOk || subOk || idOk) return true;
       if (m.id === MAP_FOCAL_SYNTHETIC_ID) {
         const hubName = focalAnchor.name.toLowerCase();
@@ -294,8 +343,28 @@ export function MapClient({
         return hubName.includes(t) || hubSlug.includes(t.replace(/\s+/g, ""));
       }
       return false;
+    };
+    const typeFiltered = markers.filter((m) => {
+      if (m.id === MAP_FOCAL_SYNTHETIC_ID) return true;
+      const type = practiceTypeBySlug.get(m.id) ?? "architecture_firm";
+      return visibleTypes.has(type);
     });
-  }, [markers, pinFilter, focalAnchor.name, focalAnchor.slug]);
+    const list = typeFiltered.filter(matchesSearch);
+    const hubRemovedByType = hubUsesIconStudio(focalAnchor) && !typeFiltered.some((m) => m.hub);
+    if (hubRemovedByType && !list.some((m) => m.id === MAP_FOCAL_SYNTHETIC_ID)) {
+      list.unshift({
+        id: MAP_FOCAL_SYNTHETIC_ID,
+        name: focalAnchor.name,
+        lat: focalAnchor.lat,
+        lng: focalAnchor.lng,
+        stage: "cold",
+        hub: true,
+        hubDetail: "5 Plato Place, 72–74 St Dionis Road, London SW6 4TU · Blocharch hub",
+        href: "https://www.icon-architects.com/",
+      });
+    }
+    return list;
+  }, [markers, pinFilter, focalAnchor, practiceTypeBySlug, visibleTypes]);
 
   const initialZoom = hubUsesIconStudio(focalAnchor) ? 13 : 11;
 
@@ -333,7 +402,20 @@ export function MapClient({
 
   const pinCount = markers.filter((m) => m.id !== MAP_FOCAL_SYNTHETIC_ID).length;
   const visiblePinCount = filteredMarkers.filter((m) => m.id !== MAP_FOCAL_SYNTHETIC_ID).length;
-  const hasActiveFilter = pinFilter.trim().length > 0;
+  const typeFilterActive = !allTypesOn;
+  const hasActiveFilter = pinFilter.trim().length > 0 || typeFilterActive;
+  const typeCounts = useMemo(() => {
+    const counts = Object.fromEntries(PRACTICE_TYPES.map((type) => [type.value, 0])) as Record<
+      PracticeTypeValue,
+      number
+    >;
+    for (const marker of markers) {
+      if (marker.id === MAP_FOCAL_SYNTHETIC_ID) continue;
+      const type = practiceTypeBySlug.get(marker.id) ?? "architecture_firm";
+      counts[type] += 1;
+    }
+    return counts;
+  }, [markers, practiceTypeBySlug]);
 
   const applyPinFilter = () => {
     setPinFilter(pinSearchInput.trim());
@@ -379,6 +461,42 @@ export function MapClient({
             {MAP_ICON}
           </button>
         </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Lead types">
+        <button
+          type="button"
+          aria-pressed={allTypesOn}
+          onClick={showAllTypes}
+          className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+            allTypesOn
+              ? TYPE_TAB_STYLE.all.on
+              : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06] hover:text-slate-200"
+          }`}
+        >
+          <span className={`h-2 w-2 rounded-full ${allTypesOn ? TYPE_TAB_STYLE.all.dot : "bg-slate-600"}`} />
+          All
+        </button>
+        {PRACTICE_TYPES.map((type) => {
+          const on = visibleTypes.has(type.value);
+          return (
+            <button
+              key={type.value}
+              type="button"
+              aria-pressed={on}
+              onClick={() => toggleType(type.value)}
+              className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                on
+                  ? TYPE_TAB_STYLE[type.value].on
+                  : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06] hover:text-slate-200"
+              }`}
+            >
+              <span className={`h-2 w-2 rounded-full ${on ? TYPE_TAB_STYLE[type.value].dot : "bg-slate-600"}`} />
+              {type.label}
+              <span className={on ? "opacity-70" : "text-slate-500"}>{typeCounts[type.value]}</span>
+            </button>
+          );
+        })}
       </div>
 
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
@@ -434,18 +552,33 @@ export function MapClient({
       {hasActiveFilter && filteredMarkers.length === 0 ? (
         <div className="card-tool flex h-[520px] flex-col items-center justify-center rounded-2xl ring-1 ring-white/[0.06] px-6 text-center">
           <p className="text-slate-400 text-sm">
-            No practices match “{pinFilter.trim()}”. Clear or change the search to see pins.
+            {pinFilter.trim()
+              ? `No practices match “${pinFilter.trim()}”.`
+              : "Every lead type is hidden."}
           </p>
-          <button
-            type="button"
-            className="mt-4 rounded-lg border border-white/10 bg-white/[0.06] px-4 py-2 text-sm font-medium text-slate-200 hover:bg-white/[0.09]"
-            onClick={() => {
-              setPinSearchInput("");
-              setPinFilter("");
-            }}
-          >
-            Clear search
-          </button>
+          <div className="mt-4 flex flex-wrap justify-center gap-2">
+            {pinFilter.trim() ? (
+              <button
+                type="button"
+                className="rounded-lg border border-white/10 bg-white/[0.06] px-4 py-2 text-sm font-medium text-slate-200 hover:bg-white/[0.09]"
+                onClick={() => {
+                  setPinSearchInput("");
+                  setPinFilter("");
+                }}
+              >
+                Clear search
+              </button>
+            ) : null}
+            {typeFilterActive ? (
+              <button
+                type="button"
+                className="rounded-lg border border-white/10 bg-white/[0.06] px-4 py-2 text-sm font-medium text-slate-200 hover:bg-white/[0.09]"
+                onClick={showAllTypes}
+              >
+                Show all types
+              </button>
+            ) : null}
+          </div>
         </div>
       ) : (
         <div className="relative">

@@ -3,6 +3,7 @@ import { computeEffectiveStage } from "@/lib/lead-outreach";
 import { normalizeLeadStage } from "@/lib/leads";
 import { prisma } from "@/lib/prisma";
 import { getMapFocalAnchor, type MapAnchorRow, type MapHubAnchor } from "@/lib/map-hub";
+import { isPracticeType, type PracticeTypeValue } from "@/lib/practice-types";
 
 import type { LeadStage } from "@/lib/leads";
 
@@ -13,6 +14,7 @@ export type MapPractice = {
   address: string;
   slug: string;
   stage: MapPracticeStage;
+  practiceType: PracticeTypeValue;
 };
 
 /**
@@ -29,8 +31,16 @@ function resolveMapDisplayLimit(): number {
 export const MAP_PRACTICE_DISPLAY_LIMIT = resolveMapDisplayLimit();
 
 function slugFromUrl(url: string): string {
-  const m = url.match(/\/practice\/([^/]+)\/?$/);
-  return m ? m[1] : "";
+  const directory = url.match(/\/practice\/([^/]+)\/?$/);
+  if (directory?.[1]) return directory[1];
+  const parts = url.split("/").filter(Boolean);
+  const last = parts[parts.length - 1] ?? "";
+  if (!last || last.includes(":")) return url;
+  try {
+    return decodeURIComponent(last);
+  } catch {
+    return last;
+  }
 }
 
 function haversineKm(originLat: number, originLng: number, lat: number, lng: number): number {
@@ -95,6 +105,7 @@ export async function loadPracticesForMap(): Promise<{
       name: true,
       address: true,
       description: true,
+      practiceType: true,
       latitude: true,
       longitude: true,
       lead: { select: { stage: true, followUpDueAt: true } },
@@ -128,6 +139,7 @@ export async function loadPracticesForMap(): Promise<{
         address: addr,
         slug: slugFromUrl(r.url),
         stage,
+        practiceType: isPracticeType(r.practiceType) ? r.practiceType : "architecture_firm",
       },
       lat,
       lng,
