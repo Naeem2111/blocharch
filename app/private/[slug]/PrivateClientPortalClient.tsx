@@ -513,13 +513,13 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
 
       <div className="min-w-0 flex-1">
         <div className="border-b border-white/[0.06] lg:border-0">
-        <div className="flex items-stretch gap-3 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] lg:hidden">
-          <div className="aspect-square w-[40%] max-w-[9.75rem] shrink-0">
-            <ProjectArt src={project.sidebarImageUrl} placement="side" />
-          </div>
-          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-            <div className="flex justify-end">{renderNotices()}</div>
-            <nav className="grid min-h-0 flex-1 grid-cols-2 grid-rows-2 gap-1.5" aria-label="Project sections">
+        <div className="px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] lg:hidden">
+          <div className="grid grid-cols-[minmax(0,46%)_minmax(0,1fr)] items-stretch gap-3">
+            <div className="h-full min-h-[9.75rem] min-w-0 overflow-hidden">
+              <ProjectArt src={project.sidebarImageUrl} placement="side" />
+            </div>
+            <div className="flex min-h-[9.75rem] min-w-0 items-stretch gap-1.5">
+            <nav className="grid min-h-0 min-w-0 flex-1 grid-cols-2 grid-rows-2 gap-1.5" aria-label="Project sections">
               {(["overview", "journey", "actions", "documents"] as const).map((id) => (
                 <button
                   key={id}
@@ -531,6 +531,8 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
                 </button>
               ))}
             </nav>
+            <div className="flex shrink-0 items-start">{renderNotices()}</div>
+            </div>
           </div>
         </div>
         <header className="hidden items-center justify-end gap-2 px-8 py-3 lg:flex">
@@ -858,13 +860,13 @@ function Journey({
 }) {
   const focus = STAGE_FOCUS[project.designStage] ?? [];
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(18rem,0.9fr)]">
-      <section className={`${cardClass()} p-5 sm:p-6`}>
-        <h2 className="text-lg font-semibold text-white">Project timeline</h2>
-        <p className="mt-1 text-sm text-slate-500">A step-by-step guide to your project journey.</p>
-        <ol className="mt-6">
+    <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(18rem,0.9fr)]">
+      <section className={`${cardClass()} min-w-0 p-4 sm:p-6`}>
+        <h2 className="text-base font-semibold text-white sm:text-lg">Project timeline</h2>
+        <p className="mt-1 text-xs text-slate-500 sm:text-sm">A step-by-step guide to your project journey.</p>
+        <ol className="mt-4 sm:mt-6">
           {stages.map((stage, i) => (
-            <li key={stage.key} className="flex gap-4 pb-5 last:pb-0">
+            <li key={stage.key} className="flex gap-3 pb-4 last:pb-0 sm:gap-4 sm:pb-5">
               <div className="relative w-8 shrink-0 self-stretch">
                 {i < stages.length - 1 ? (
                   <span
@@ -907,7 +909,7 @@ function Journey({
         </ol>
       </section>
       <div className="space-y-4">
-        <section className="private-portal-hero rounded-2xl p-6 sm:p-7">
+        <section className="private-portal-hero min-w-0 rounded-2xl p-4 sm:p-7">
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-sky-300 [text-shadow:0_0_18px_rgba(56,189,248,0.55)]">
               Current stage details
@@ -916,7 +918,7 @@ function Journey({
               In progress
             </span>
           </div>
-          <h2 className="mt-3 text-3xl font-bold text-white">{current.label}</h2>
+          <h2 className="mt-3 break-words text-xl font-bold leading-tight text-white sm:text-3xl">{current.label}</h2>
           <p className="mt-1.5 text-sm text-white">Step {current.number} of {stages.length}</p>
           <p className="mt-3 text-sm leading-relaxed text-slate-200">{stageBody(project.designStage)}</p>
           {focus.length > 0 ? (
@@ -1391,27 +1393,11 @@ function Documents({
 
 function StageRail({ stages }: { stages: Stage[] }) {
   return (
-    <div className="mt-5">
-      <ol className="space-y-1 sm:hidden">
-        {stages.map((stage) => (
-          <li key={stage.key} className="flex items-center gap-3 py-1.5">
-            <StageDot stage={stage} />
-            <span className="min-w-0 flex-1 text-sm text-white">{stage.label}</span>
-            <span
-              className={`shrink-0 text-[11px] font-semibold uppercase tracking-wide ${
-                stage.state === "done" ? "text-emerald-300" : stage.state === "current" ? "text-sky-300" : "text-slate-500"
-              }`}
-            >
-              {stage.state === "done" ? "Done" : stage.state === "current" ? "Now" : "Next"}
-            </span>
-          </li>
-        ))}
-      </ol>
-      <div className="hidden overflow-x-auto px-1 py-3 sm:block">
-      <div className="flex min-w-[36rem] items-start">
+    <div className="mt-5 overflow-hidden">
+      <div className="flex items-start">
         {stages.map((stage, i) => (
-          <div key={stage.key} className="flex min-w-0 flex-1 flex-col items-center">
-            <div className="relative flex h-11 w-full items-center justify-center">
+          <div key={stage.key} className="flex min-w-0 flex-1 flex-col items-center overflow-hidden">
+            <div className="relative flex h-8 w-full items-center justify-center sm:h-11">
               {i > 0 ? (
                 <span
                   className={`absolute left-0 right-1/2 top-1/2 h-[3px] -translate-y-1/2 ${
@@ -1428,7 +1414,7 @@ function StageRail({ stages }: { stages: Stage[] }) {
               ) : null}
               <div className="relative z-10 shrink-0">
                 <div
-                  className={`flex size-11 items-center justify-center rounded-full text-sm font-semibold leading-none ${
+                  className={`flex size-7 items-center justify-center rounded-full text-[11px] font-semibold leading-none sm:size-11 sm:text-sm ${
                     stage.state === "done"
                       ? "bg-emerald-900 text-white shadow-[0_0_0_3px_rgba(52,211,153,0.95),0_0_14px_rgba(16,185,129,0.55)]"
                       : stage.state === "current"
@@ -1440,19 +1426,11 @@ function StageRail({ stages }: { stages: Stage[] }) {
                 </div>
               </div>
             </div>
-            {stage.state === "done" ? (
-              <div className="mt-3 max-w-full px-1 text-center text-white">
-                <p className="text-sm font-bold leading-tight">{stage.number}</p>
-                <p className="mt-0.5 text-[10px] leading-tight">{stage.label}</p>
-              </div>
-            ) : (
-              <p className={`mt-3 max-w-full px-1 text-center text-[10px] leading-tight text-white ${stage.state === "current" ? "font-bold" : ""}`}>
-                {stage.label}
-              </p>
-            )}
+            <p className={`mt-2 w-full px-0.5 text-center text-[8px] leading-[1.15] text-white [overflow-wrap:anywhere] sm:mt-3 sm:text-[10px] ${stage.state === "current" || stage.state === "done" ? "font-bold" : ""}`}>
+              {stage.label}
+            </p>
           </div>
         ))}
-      </div>
       </div>
     </div>
   );
@@ -1574,7 +1552,7 @@ function ProjectArt({ src, placement = "sidebar" }: { src: string | null; placem
       <div className={`${frame} overflow-hidden rounded-2xl bg-[#10192b]`}>
         {/* User-uploaded project photo served by this app. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt="" className="h-full w-full object-contain" onError={() => setFailed(true)} />
+        <img src={src} alt="" className={`h-full w-full ${placement === "side" ? "object-cover" : "object-contain"}`} onError={() => setFailed(true)} />
       </div>
     );
   }

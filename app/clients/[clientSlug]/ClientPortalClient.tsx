@@ -697,7 +697,18 @@ export function ClientPortalClient({
 								<p className="mt-0.5 text-sm text-slate-400">Live view of active project status and deadlines.</p>
 							</div>
 						</div>
-						<div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
+						<div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:flex-nowrap">
+							<div className="flex flex-wrap items-center gap-2">
+								<span className="client-portal-badge rounded-lg border border-white/[0.1] bg-white/[0.04] px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-300">
+									Active lanes {data.client.activeLaneCount}
+								</span>
+								<span className="client-portal-badge client-portal-badge-brand rounded-lg border border-brand-500/40 bg-brand-500/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-brand-200">
+									Client view
+								</span>
+							</div>
+							<div className="shrink-0 lg:hidden">
+								<PublicThemeToggle />
+							</div>
 							<div className="relative shrink-0" ref={bellRef}>
 								<button
 									type="button"
@@ -761,17 +772,6 @@ export function ClientPortalClient({
 										) : null}
 									</div>
 								) : null}
-							</div>
-							<div className="order-3 flex w-full flex-wrap items-center gap-2 sm:order-none sm:w-auto">
-								<span className="client-portal-badge rounded-lg border border-white/[0.1] bg-white/[0.04] px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-300">
-									Active lanes {data.client.activeLaneCount}
-								</span>
-								<span className="client-portal-badge client-portal-badge-brand rounded-lg border border-brand-500/40 bg-brand-500/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-brand-200">
-									Client view
-								</span>
-							</div>
-							<div className="ml-auto shrink-0 sm:ml-0 lg:hidden">
-								<PublicThemeToggle />
 							</div>
 						</div>
 					</div>

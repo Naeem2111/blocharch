@@ -19,6 +19,61 @@ import { resolvePrivateProjectTypeLabel } from "@/lib/private-project-types";
 import { isGoogleDriveConfigured } from "@/lib/google-drive";
 import { portalDocumentPath, syncClientDriveDocuments } from "@/lib/private-drive-documents";
 import { hasSidebarImage, portalSidebarImagePath } from "@/lib/private-sidebar-image";
+import { listPrivatePhaseOptions } from "@/lib/private-catalog";
+import type { StageDateMap } from "@/lib/private-stage-dates";
+import type { PrivateDesignStage } from "@prisma/client";
+
+async function catalogPortalStages(
+  projectId: string,
+  designStage: PrivateDesignStage,
+  stageDates: StageDateMap,
+) {
+  const [catalogPhases, latestLog] = await Promise.all([
+    listPrivatePhaseOptions(),
+    prisma.privateHourLog.findFirst({
+      where: { projectId, designPhaseId: { not: null } },
+      orderBy: [{ workDate: "desc" }, { createdAt: "desc" }],
+      select: { designPhaseId: true },
+    }),
+  ]);
+  if (catalogPhases.length === 0) return null;
+
+  const logged = latestLog?.designPhaseId?.trim() || "";
+  let currentIndex = catalogPhases.findIndex(
+    (phase) => phase.value === logged || phase.builtInKey === logged,
+  );
+  if (currentIndex < 0) {
+    currentIndex = catalogPhases.findIndex((phase) => phase.builtInKey === designStage);
+  }
+
+  const stages = catalogPhases.map((phase, index) => {
+    const range = (phase.builtInKey ? stageDates[phase.builtInKey] : undefined) ?? stageDates[phase.value];
+    const state =
+      currentIndex < 0
+        ? index === 0
+          ? "current"
+          : "upcoming"
+        : index < currentIndex
+          ? "done"
+          : index === currentIndex
+            ? "current"
+            : "upcoming";
+    return {
+      key: phase.value,
+      label: phase.label,
+      number: index + 1,
+      state: state as "done" | "current" | "upcoming",
+      dateFrom: range?.from ?? null,
+      dateTo: range?.to ?? null,
+      assignedDate: range?.from ?? null,
+    };
+  });
+
+  return {
+    stages,
+    currentLabel: (currentIndex >= 0 ? catalogPhases[currentIndex]?.label : null) ?? catalogPhases[0]?.label ?? null,
+  };
+}
 
 export async function getPublicPrivateProjectBySlug(slug: string) {
   const client = await prisma.privateClient.findFirst({
@@ -156,7 +211,7 @@ export async function getPublicPrivateProjectBySlug(slug: string) {
 
   const allPhases = allDesignPhases(phaseStructure);
   const currentPhaseId = currentPhase?.id ?? null;
-  const stages =
+  let stages =
     allPhases.length > 0
       ? allPhases.map((phase, i) => {
           const range = stageDates[phase.builtInKey ?? phase.id] ?? stageDates[phase.id];
@@ -206,6 +261,13 @@ export async function getPublicPrivateProjectBySlug(slug: string) {
           };
         });
 
+  let designStageLabel = currentPhase?.name ?? PRIVATE_STAGE_LABELS[project.designStage];
+  const catalogStages = await catalogPortalStages(project.id, project.designStage, stageDates);
+  if (catalogStages) {
+    stages = catalogStages.stages;
+    if (catalogStages.currentLabel) designStageLabel = catalogStages.currentLabel;
+  }
+
   let estCouncilDecision: string | null = null;
   if (project.councilSubmittedAt && project.designStage === "council_review") {
     const d = new Date(project.councilSubmittedAt);
@@ -220,7 +282,7 @@ export async function getPublicPrivateProjectBySlug(slug: string) {
       name: project.name,
       address: project.address ?? project.name,
       designStage: project.designStage,
-      designStageLabel: currentPhase?.name ?? PRIVATE_STAGE_LABELS[project.designStage],
+      designStageLabel,
       progressPercent,
       stageMeta: meta,
       quietExplanation: meta.quietExplanation,

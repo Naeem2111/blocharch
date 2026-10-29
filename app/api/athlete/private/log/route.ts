@@ -5,7 +5,8 @@ import { requirePrivateAthleteSession } from "@/lib/private-access";
 import { parseDateOnly } from "@/lib/ops-hours";
 import { privateAthleteHourlyRateZar, athletePrivateWorkEarnings } from "@/lib/private-athlete-earnings";
 import { archivePrivateProjectIfComplete } from "@/lib/private-archive";
-import { listPrivateCatalog } from "@/lib/private-catalog";
+import { isPrivateCatalogPhaseKey, listPrivateCatalog } from "@/lib/private-catalog";
+import type { PrivateDesignStage } from "@prisma/client";
 import { serializePrivateProject } from "@/lib/private-serialize";
 import {
   activePrivateAthleteAssignmentsInclude,
@@ -268,6 +269,20 @@ export async function POST(request: NextRequest) {
           completionPercent: entry.completionPercent,
         })),
       });
+
+      for (const projectId of Array.from(new Set(entries.map((entry) => entry.projectId)))) {
+        const latest = await tx.privateHourLog.findFirst({
+          where: { projectId, designPhaseId: { not: null } },
+          orderBy: [{ workDate: "desc" }, { createdAt: "desc" }],
+          select: { designPhaseId: true },
+        });
+        const phaseId = latest?.designPhaseId?.trim() || "";
+        if (!isPrivateCatalogPhaseKey(phaseId)) continue;
+        await tx.privateProject.update({
+          where: { id: projectId },
+          data: { designStage: phaseId as PrivateDesignStage },
+        });
+      }
 
     for (const [projectId, completionPercent] of Array.from(progressByProject.entries())) {
         await tx.privateProject.update({
