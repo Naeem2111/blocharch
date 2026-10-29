@@ -10,6 +10,7 @@
     "build:full": "prisma generate && next build",
     "start": "next start",
     "scrape": "python scrape_architects.py",
+    "scrape:uk": "python scrape_uk_practices.py",
     "db:migrate": "prisma migrate deploy",
     "db:push": "prisma db push",
     "db:seed": "node prisma/seed.mjs",

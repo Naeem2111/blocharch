@@ -40,19 +40,19 @@ export const ADMIN_CONSOLE_VIEWS: {
 	{
 		id: "manager",
 		label: "Manager",
-		sections: ["marketing", "ops", "content"],
+		sections: ["marketing", "ops"],
 		home: "/dashboard",
 	},
 	{
 		id: "sales",
 		label: "Sales",
-		sections: ["marketing", "content"],
+		sections: ["marketing"],
 		home: "/dashboard",
 	},
 	{
 		id: "athlete",
 		label: "Athlete",
-		sections: ["athlete_portal", "content"],
+		sections: ["athlete_portal"],
 		home: "/dashboard/athlete",
 	},
 ];

@@ -24,8 +24,8 @@ const MODULE_ROLES: Record<AppModule, readonly UserRole[]> = {
   athlete_portal: ["admin", "user"],
   /** Private Cape Town projects — ops overview (/dashboard/private). */
   private_work: ["admin"],
-  /** Content Generator — any signed-in console user. */
-  content: ["admin", "manager", "sales", "user"],
+  /** Content Generator — admins only. */
+  content: ["admin"],
 };
 
 export function canAccessModule(
