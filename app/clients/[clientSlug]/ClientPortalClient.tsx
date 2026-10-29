@@ -444,6 +444,7 @@ export function ClientPortalClient({
 	const [calendarMonth, setCalendarMonth] = useState(() => new Date().toISOString().slice(0, 7));
 	const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(() => new Set());
 	const [bellOpen, setBellOpen] = useState(false);
+	const [bellPanelTop, setBellPanelTop] = useState<number | null>(null);
 	const [overtimeOpen, setOvertimeOpen] = useState(data.hours.overtimeHours > 0);
 	const [deadlineItem, setDeadlineItem] = useState<UpcomingDeadline | null>(null);
 	const bellRef = useRef<HTMLDivElement>(null);
@@ -696,12 +697,16 @@ export function ClientPortalClient({
 								<p className="mt-0.5 text-sm text-slate-400">Live view of active project status and deadlines.</p>
 							</div>
 						</div>
-						<div className="flex flex-wrap items-center gap-2">
-							<div className="relative" ref={bellRef}>
+						<div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
+							<div className="relative shrink-0" ref={bellRef}>
 								<button
 									type="button"
 									aria-label="Notifications"
-									onClick={() => setBellOpen((v) => !v)}
+									onClick={() => {
+										const bottom = bellRef.current?.getBoundingClientRect().bottom;
+										setBellPanelTop(bottom != null ? bottom + 8 : null);
+										setBellOpen((v) => !v);
+									}}
 									className="relative rounded-lg border border-white/[0.1] bg-white/[0.04] px-2.5 py-1.5 text-slate-300 hover:bg-white/[0.08]"
 								>
 									<span aria-hidden>🔔</span>
@@ -712,7 +717,10 @@ export function ClientPortalClient({
 									) : null}
 								</button>
 								{bellOpen ? (
-									<div className="absolute right-0 z-30 mt-2 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-white/[0.1] bg-[#0b1220] shadow-2xl">
+									<div
+										className="fixed left-4 right-4 top-[var(--bell-top)] z-40 overflow-hidden rounded-xl border border-white/[0.1] bg-[#0b1220] shadow-2xl sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-[min(24rem,calc(100vw-2rem))]"
+										style={{ ["--bell-top" as string]: bellPanelTop != null ? `${bellPanelTop}px` : "5.5rem" }}
+									>
 										<div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
 											<div className="flex items-center gap-2">
 												<p className="text-sm font-semibold text-white">Notifications</p>
@@ -754,13 +762,15 @@ export function ClientPortalClient({
 									</div>
 								) : null}
 							</div>
-							<span className="client-portal-badge rounded-lg border border-white/[0.1] bg-white/[0.04] px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-300">
-								Active lanes {data.client.activeLaneCount}
-							</span>
-							<span className="client-portal-badge client-portal-badge-brand rounded-lg border border-brand-500/40 bg-brand-500/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-brand-200">
-								Client view
-							</span>
-							<div className="lg:hidden">
+							<div className="order-3 flex w-full flex-wrap items-center gap-2 sm:order-none sm:w-auto">
+								<span className="client-portal-badge rounded-lg border border-white/[0.1] bg-white/[0.04] px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-300">
+									Active lanes {data.client.activeLaneCount}
+								</span>
+								<span className="client-portal-badge client-portal-badge-brand rounded-lg border border-brand-500/40 bg-brand-500/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-brand-200">
+									Client view
+								</span>
+							</div>
+							<div className="ml-auto shrink-0 sm:ml-0 lg:hidden">
 								<PublicThemeToggle />
 							</div>
 						</div>

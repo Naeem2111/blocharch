@@ -205,6 +205,7 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
   const [openCompleted, setOpenCompleted] = useState<string | null>(completedActionItems[0]?.id ?? null);
   const [showCompletedOnOverview, setShowCompletedOnOverview] = useState(false);
   const [noticesOpen, setNoticesOpen] = useState(false);
+  const [noticeTop, setNoticeTop] = useState(96);
   const [docQuery, setDocQuery] = useState("");
   const [docFilter, setDocFilter] = useState("All documents");
   const [docSort, setDocSort] = useState<"newest" | "oldest">("newest");
@@ -438,13 +439,20 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
       </aside>
 
       <div className="min-w-0 flex-1">
-        <div className="border-b border-white/[0.06] pt-[env(safe-area-inset-top)] lg:border-0 lg:pt-0">
+        <div className="border-b border-white/[0.06] lg:border-0">
+        <div className="px-4 pt-[max(0.75rem,env(safe-area-inset-top))] lg:hidden">
+          <ProjectArt src={project.sidebarImageUrl} placement="banner" />
+        </div>
         <header className="flex items-center justify-end gap-2 px-4 py-3 sm:px-8">
           <div className="relative">
             <button
               type="button"
               aria-label={unread.length > 0 ? `Notifications, ${unread.length} unread` : "Notifications"}
-              onClick={() => setNoticesOpen((open) => !open)}
+              onClick={(event) => {
+                const bottom = event.currentTarget.getBoundingClientRect().bottom;
+                setNoticeTop(bottom + 8);
+                setNoticesOpen((open) => !open);
+              }}
               className={
                 unread.length > 0
                   ? "portal-bell-live relative rounded-full p-2.5"
@@ -457,7 +465,10 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
               ) : null}
             </button>
             {noticesOpen ? (
-              <div className="absolute right-0 z-30 mt-2 w-[min(24rem,calc(100vw-2rem))] rounded-2xl border border-white/[0.08] bg-[#0c1422] p-4 shadow-2xl">
+              <div
+                className="fixed left-4 right-4 z-40 max-h-[70vh] overflow-y-auto rounded-2xl border border-white/[0.08] bg-[#0c1422] p-4 shadow-2xl top-[var(--notice-top)] sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:max-h-none sm:w-[min(24rem,calc(100vw-2rem))]"
+                style={{ ["--notice-top" as string]: `${noticeTop}px` }}
+              >
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-sm font-semibold text-white">
                     Notifications{" "}
@@ -598,7 +609,7 @@ function PageHeading({
   return (
     <div className="mb-5">
       {label ? <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-sky-300">{label}</p> : null}
-      <h1 className="text-[1.7rem] font-semibold tracking-tight text-white sm:text-[2rem]">{displayAddress(address)}</h1>
+      <h1 className="text-xl font-semibold leading-tight tracking-tight text-white sm:text-[2rem]">{displayAddress(address)}</h1>
       <p className="mt-1 text-sm text-slate-400">{subtitle}</p>
     </div>
   );
@@ -710,11 +721,11 @@ function Overview({
       </div>
 
       {current ? (
-        <section className="private-portal-hero min-w-0 overflow-hidden rounded-2xl p-6 sm:p-8">
-          <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_1px_15rem] sm:gap-0 sm:items-stretch">
+        <section className="private-portal-hero min-w-0 overflow-hidden rounded-2xl p-4 sm:p-8">
+          <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_1px_15rem] sm:gap-0 sm:items-stretch">
             <div className="sm:pr-7">
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-sky-300 [text-shadow:0_0_18px_rgba(56,189,248,0.55)]">Current stage</p>
-              <h2 className="mt-2 text-3xl font-bold text-white sm:text-4xl">{current.label}</h2>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-300 sm:text-sm sm:tracking-[0.2em] [text-shadow:0_0_18px_rgba(56,189,248,0.55)]">Current stage</p>
+              <h2 className="mt-2 text-2xl font-bold leading-tight text-white sm:text-4xl">{current.label}</h2>
               <div className="mt-3 flex flex-wrap items-center gap-2.5 text-sm">
                 <span className="rounded-full bg-sky-500/20 px-3 py-1 text-sky-100 ring-1 ring-sky-400/40 shadow-[0_0_16px_rgba(56,189,248,0.35)]">In progress</span>
                 <span className="text-white">Step {current.number} of {stages.length}</span>
@@ -1456,7 +1467,7 @@ function Metric({ icon, label, value, hint, emphasis }: { icon: "cal" | "dot"; l
       </span>
       <span className="min-w-0">
         <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-white">{label}</span>
-        <span className={`block truncate text-sm text-white ${emphasis ? "font-bold" : "font-semibold"}`}>{value}</span>
+        <span className={`block text-sm leading-snug text-white ${emphasis ? "font-bold" : "font-semibold"}`}>{value}</span>
         {hint ? <span className="block truncate text-xs text-white">{hint}</span> : null}
       </span>
     </div>
@@ -1536,11 +1547,15 @@ function Count({ n, hot }: { n: number; hot?: boolean }) {
   return <span className={`ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] text-white ${hot ? "bg-red-500" : "bg-white/10"}`}>{n}</span>;
 }
 
-function ProjectArt({ src }: { src: string | null }) {
+function ProjectArt({ src, placement = "sidebar" }: { src: string | null; placement?: "sidebar" | "banner" }) {
   const [failed, setFailed] = useState(false);
+  const frame =
+    placement === "banner"
+      ? "aspect-[16/10] max-h-52 w-full"
+      : "mx-4 mt-2 aspect-square";
   if (src && !failed) {
     return (
-      <div className="mx-4 mt-2 aspect-square overflow-hidden rounded-2xl bg-[#10192b]">
+      <div className={`${frame} overflow-hidden rounded-2xl bg-[#10192b]`}>
         {/* User-uploaded project photo served by this app. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={src} alt="" className="h-full w-full object-contain" onError={() => setFailed(true)} />
@@ -1548,16 +1563,16 @@ function ProjectArt({ src }: { src: string | null }) {
     );
   }
   return (
-    <div className="mx-4 mt-2 overflow-hidden rounded-2xl" aria-hidden>
-      <svg viewBox="0 0 280 150" className="h-[7.25rem] w-full">
+    <div className={`${placement === "banner" ? "w-full" : "mx-4 mt-2"} overflow-hidden rounded-2xl`} aria-hidden>
+      <svg viewBox="0 0 280 150" className="h-auto w-full">
         <defs>
-          <linearGradient id="portal-sky" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id={placement === "banner" ? "portal-sky-banner" : "portal-sky"} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#7eb6e8" />
             <stop offset="55%" stopColor="#c5d7ea" />
             <stop offset="100%" stopColor="#e7eef4" />
           </linearGradient>
         </defs>
-        <rect width="280" height="150" fill="url(#portal-sky)" />
+        <rect width="280" height="150" fill={`url(#${placement === "banner" ? "portal-sky-banner" : "portal-sky"})`} />
         <rect x="0" y="118" width="280" height="32" fill="#d5ddd4" />
         <rect x="36" y="62" width="168" height="72" fill="#f4f7fb" />
         <rect x="36" y="54" width="168" height="12" fill="#ffffff" />
