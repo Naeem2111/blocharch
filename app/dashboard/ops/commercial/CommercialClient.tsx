@@ -116,7 +116,7 @@ export function CommercialClient() {
   const [rates, setRates] = useState<ExchangeRate[]>([]);
   const [fxSettings, setFxSettings] = useState<CommercialSettings | null>(null);
   const [loading, setLoading] = useState(true);
-  const [rateForm, setRateForm] = useState({ effectiveMonth: currentMonth(), gbpToZarRate: "24", rateType: "reporting" });
+  const [rateForm, setRateForm] = useState({ effectiveMonth: currentMonth(), gbpToZarRate: "24" });
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
 
@@ -152,9 +152,9 @@ export function CommercialClient() {
     const q = new URLSearchParams({ month });
     if (clientId) q.set("clientId", clientId);
     const [cr, rr, fx] = await Promise.all([
-      fetch(`/api/ops/commercial?${q}`),
-      fetch("/api/ops/exchange-rates"),
-      fetch("/api/ops/commercial-settings"),
+      fetch(`/api/ops/commercial?${q}`, { cache: "no-store" }),
+      fetch("/api/ops/exchange-rates", { cache: "no-store" }),
+      fetch("/api/ops/commercial-settings", { cache: "no-store" }),
     ]);
     const cj = await cr.json();
     const rj = await rr.json();
@@ -168,6 +168,10 @@ export function CommercialClient() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    setRateForm((form) => (form.effectiveMonth === month ? form : { ...form, effectiveMonth: month }));
+  }, [month]);
 
   const selectedClient = useMemo(
     () => clients.find((c) => c.id === clientId) ?? null,
@@ -206,7 +210,7 @@ export function CommercialClient() {
       body: JSON.stringify({
         effectiveMonth: rateForm.effectiveMonth,
         gbpToZarRate: Number(rateForm.gbpToZarRate),
-        rateType: rateForm.rateType,
+        rateType: "reporting",
       }),
     });
     const j = await r.json();
@@ -214,7 +218,23 @@ export function CommercialClient() {
       setError(j.error || "Could not save rate");
       return;
     }
-    setMsg("Exchange rate saved.");
+    const mode = "manual";
+    const modeResponse = await fetch("/api/ops/commercial-settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ costConversionMode: mode }),
+    });
+    const modeBody = await modeResponse.json().catch(() => ({}));
+    if (!modeResponse.ok) {
+      setError(modeBody.error || "Rate saved, but the conversion mode did not update");
+      void load();
+      return;
+    }
+    setMsg(
+      mode === "live"
+        ? "Using the live market rate for athlete costs."
+        : `Using the manual rate for ${rateForm.effectiveMonth}.`
+    );
     void load();
   }
 
@@ -292,7 +312,7 @@ export function CommercialClient() {
                 £{ledger.totalLaneCostGbp.toLocaleString()}
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                Cost of sales £{ledger.totalCostGbp.toLocaleString()}
+                Cost of sales £{ledger.totalCostGbp.toLocaleString()} at £1 = R{ledger.appliedRate.toFixed(2)}
                 {ledger.totalOvertimeCostGbp > 0
                   ? ` · includes OT £${ledger.totalOvertimeCostGbp.toLocaleString()}`
                   : ""}
@@ -513,7 +533,7 @@ export function CommercialClient() {
         <div className="card-tool rounded-xl p-5">
           <h2 className="text-sm font-semibold text-white">Exchange rates</h2>
           <p className="mt-1 text-xs text-slate-500">
-            Onboarded monthly pay in rand is converted to pounds at the live rate for that day. Manual reporting is only used if you switch it on.
+            Manual uses the reporting rate saved for this month. Live uses the market rate for that day. Athlete costs reload from the rate you pick.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <button
@@ -574,17 +594,6 @@ export function CommercialClient() {
                 onChange={(e) => setRateForm((f) => ({ ...f, gbpToZarRate: e.target.value }))}
                 className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
               />
-            </label>
-            <label className="text-xs text-slate-400 sm:col-span-2">
-              Type
-              <select
-                value={rateForm.rateType}
-                onChange={(e) => setRateForm((f) => ({ ...f, rateType: e.target.value }))}
-                className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"
-              >
-                <option value="reporting">Reporting (ledger)</option>
-                <option value="live">Live (reference)</option>
-              </select>
             </label>
             <button
               type="submit"

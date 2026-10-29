@@ -22,13 +22,16 @@ export async function GET(request: NextRequest) {
     liveQuote = null;
   }
 
-  return NextResponse.json({
-    costConversionMode: snapshot.mode,
-    appliedRate: snapshot.appliedRate,
-    reportingRate: snapshot.reportingRate,
-    storedLiveRate: snapshot.liveRate,
-    liveQuote,
-  });
+  return NextResponse.json(
+    {
+      costConversionMode: snapshot.mode,
+      appliedRate: snapshot.appliedRate,
+      reportingRate: snapshot.reportingRate,
+      storedLiveRate: snapshot.liveRate,
+      liveQuote,
+    },
+    { headers: { "Cache-Control": "no-store" } }
+  );
 }
 
 export async function PATCH(request: NextRequest) {
@@ -46,12 +49,15 @@ export async function PATCH(request: NextRequest) {
     }
     await setCostConversionMode(modeRaw as CostConversionMode);
     const snapshot = await getCostConversionSnapshot(new Date());
-    return NextResponse.json({
-      costConversionMode: snapshot.mode,
-      appliedRate: snapshot.appliedRate,
-      reportingRate: snapshot.reportingRate,
-      storedLiveRate: snapshot.liveRate,
-    });
+    return NextResponse.json(
+      {
+        costConversionMode: snapshot.mode,
+        appliedRate: snapshot.appliedRate,
+        reportingRate: snapshot.reportingRate,
+        storedLiveRate: snapshot.liveRate,
+      },
+      { headers: { "Cache-Control": "no-store" } }
+    );
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }

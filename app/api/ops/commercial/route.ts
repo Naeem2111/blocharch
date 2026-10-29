@@ -17,5 +17,7 @@ export async function GET(request: NextRequest) {
   const clientId = request.nextUrl.searchParams.get("clientId")?.trim() || null;
   let ledger = await buildCommercialLedger(monthFromQuery(request));
   if (clientId) ledger = filterCommercialLedgerByClient(ledger, clientId);
-  return NextResponse.json(ledger);
+  return NextResponse.json(ledger, {
+    headers: { "Cache-Control": "no-store" },
+  });
 }

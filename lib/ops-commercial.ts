@@ -199,7 +199,7 @@ export async function buildCommercialLedger(reference: Date): Promise<Commercial
   const to = monthEndUtc(reference);
   const { appliedRate, reportingRate, mode, liveRate, rateAsOf } = await getCostConversionSnapshot(reference);
 
-  const [clients, lineItems, athletes] = await Promise.all([
+  const [clients, lineItems, athletes, openAssignments, openPrimaryProjects] = await Promise.all([
     prisma.opsClient.findMany({
       include: {
         commercial: true,
@@ -219,7 +219,27 @@ export async function buildCommercialLedger(reference: Date): Promise<Commercial
       },
     }),
     listReportingAthletes({ status: "active" }),
+    prisma.opsProjectAthleteAssignment.findMany({
+      where: {
+        removedAt: null,
+        project: { currentStatus: { notIn: ["completed", "handed_over"] } },
+      },
+      select: { athleteId: true },
+    }),
+    prisma.opsProject.findMany({
+      where: {
+        assignedAthleteId: { not: null },
+        currentStatus: { notIn: ["completed", "handed_over"] },
+      },
+      select: { assignedAthleteId: true },
+    }),
   ]);
+
+  const allocatedAthleteIds = new Set<string>();
+  for (const row of openAssignments) allocatedAthleteIds.add(row.athleteId);
+  for (const row of openPrimaryProjects) {
+    if (row.assignedAthleteId) allocatedAthleteIds.add(row.assignedAthleteId);
+  }
 
   const hoursByClient = new Map<string, number>();
   const hoursByAthleteClient = new Map<string, number>();
@@ -333,6 +353,8 @@ export async function buildCommercialLedger(reference: Date): Promise<Commercial
       _sum: { totalHours: true },
     });
     const monthHours = Number(monthHoursAgg._sum.totalHours ?? 0);
+    // Base pay only counts when the athlete logged hours or still has open project work.
+    if (monthHours <= 0 && !allocatedAthleteIds.has(athlete.id)) continue;
     const summary = computeMonthlyHoursSummary({
       monthHours,
       monthlyHourCap: athlete.monthlyHourCap,
@@ -349,7 +371,9 @@ export async function buildCommercialLedger(reference: Date): Promise<Commercial
     });
   }
 
-  const rows = Array.from(rowMap.values());
+  const rows = Array.from(rowMap.values()).filter(
+    (row) => row.hoursWorked > 0 || allocatedAthleteIds.has(row.athleteId)
+  );
   const athleteHoursTotal = new Map<string, number>();
   for (const row of rows) {
     athleteHoursTotal.set(row.athleteId, (athleteHoursTotal.get(row.athleteId) ?? 0) + row.hoursWorked);

@@ -14,16 +14,19 @@ export async function GET(request: NextRequest) {
     take: 48,
   });
 
-  return NextResponse.json({
-    rates: rates.map((r) => ({
-      id: r.id,
-      effectiveMonth: r.effectiveMonth.toISOString().slice(0, 7),
-      gbpToZarRate: Number(r.gbpToZarRate),
-      rateType: r.rateType,
-      activeFlag: r.activeFlag,
-      createdAt: r.createdAt.toISOString(),
-    })),
-  });
+  return NextResponse.json(
+    {
+      rates: rates.map((r) => ({
+        id: r.id,
+        effectiveMonth: r.effectiveMonth.toISOString().slice(0, 7),
+        gbpToZarRate: Number(r.gbpToZarRate),
+        rateType: r.rateType,
+        activeFlag: r.activeFlag,
+        createdAt: r.createdAt.toISOString(),
+      })),
+    },
+    { headers: { "Cache-Control": "no-store" } }
+  );
 }
 
 export async function POST(request: NextRequest) {
