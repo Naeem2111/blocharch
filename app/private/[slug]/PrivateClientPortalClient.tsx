@@ -1281,7 +1281,12 @@ function Documents({
         ) : (
           docs.map((doc) => (
             <li key={doc.id} className={`${cardClass()} p-4`}>
-              <p className="break-words font-medium text-white">{doc.title}</p>
+              <div className="flex items-start gap-3">
+                <span className="mt-0.5 shrink-0">
+                  <PdfBadge />
+                </span>
+                <p className="min-w-0 break-words font-medium text-white">{doc.title}</p>
+              </div>
               <p className="mt-1 text-xs text-slate-400">
                 {documentPhase(doc)} · {formatBytes(doc.sizeBytes)} · {formatDate(doc.createdAt)}
               </p>
