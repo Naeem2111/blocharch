@@ -412,6 +412,79 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
     return okCount > 0 && okCount === queue.length;
   }
 
+  const renderNotices = () => (
+    <div className="relative">
+      <button
+        type="button"
+        aria-label={unread.length > 0 ? `Notifications, ${unread.length} unread` : "Notifications"}
+        onClick={(event) => {
+          const bottom = event.currentTarget.getBoundingClientRect().bottom;
+          setNoticeTop(bottom + 8);
+          setNoticesOpen((open) => !open);
+        }}
+        className={
+          unread.length > 0
+            ? "portal-bell-live relative rounded-full p-2.5"
+            : "relative rounded-full p-2 text-slate-300 hover:bg-white/[0.06]"
+        }
+      >
+        <BellIcon />
+        {unread.length > 0 ? (
+          <span className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-red-500 shadow-[0_0_8px_rgb(239,68,68,0.95)]" />
+        ) : null}
+      </button>
+      {noticesOpen ? (
+        <div
+          className="fixed left-4 right-4 top-[var(--notice-top)] z-40 max-h-[70vh] overflow-y-auto rounded-2xl border border-white/[0.08] bg-[#0c1422] p-4 shadow-2xl sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:max-h-none sm:w-[min(24rem,calc(100vw-2rem))]"
+          style={{ ["--notice-top" as string]: `${noticeTop}px` }}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-semibold text-white">
+              Notifications{" "}
+              {unread.length > 0 ? (
+                <span className="ml-1 rounded-full bg-sky-500/20 px-2 py-0.5 text-[11px] text-sky-300">
+                  {unread.length} new
+                </span>
+              ) : null}
+            </p>
+            <div className="flex items-center gap-3 text-xs">
+              <button
+                type="button"
+                className="text-sky-300 hover:underline"
+                onClick={() => setReadIds(notices.map((item) => item.id))}
+              >
+                Mark all as read
+              </button>
+              <button type="button" className="text-slate-400" onClick={() => setNoticesOpen(false)} aria-label="Close">
+                ×
+              </button>
+            </div>
+          </div>
+          <ul className="mt-3 space-y-2">
+            {notices.length === 0 ? (
+              <li className="py-4 text-sm text-slate-500">No notifications yet.</li>
+            ) : (
+              notices.map((item) => (
+                <li key={item.id} className="rounded-xl border border-white/[0.1] bg-white/[0.03] px-3 py-2.5">
+                  <div className="flex items-start gap-3">
+                    <NoticeIcon kind={item.kind} unread={!readIds.includes(item.id)} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-white">{item.title}</p>
+                      <p className="text-xs text-slate-500">{item.detail}</p>
+                    </div>
+                    <button type="button" className="shrink-0 text-xs text-sky-300 hover:underline" onClick={() => openNotice(item)}>
+                      {item.cta} →
+                    </button>
+                  </div>
+                </li>
+              ))
+            )}
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  );
+
   return (
     <div className="flex min-h-screen bg-[#071018] text-slate-100">
       <aside className="sticky top-0 hidden h-screen w-[16.5rem] shrink-0 flex-col border-r border-white/[0.06] bg-[#08101c] lg:flex">
@@ -440,94 +513,29 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
 
       <div className="min-w-0 flex-1">
         <div className="border-b border-white/[0.06] lg:border-0">
-        <div className="px-4 pt-[max(0.75rem,env(safe-area-inset-top))] lg:hidden">
-          <ProjectArt src={project.sidebarImageUrl} placement="banner" />
-        </div>
-        <header className="flex items-center justify-end gap-2 px-4 py-3 sm:px-8">
-          <div className="relative">
-            <button
-              type="button"
-              aria-label={unread.length > 0 ? `Notifications, ${unread.length} unread` : "Notifications"}
-              onClick={(event) => {
-                const bottom = event.currentTarget.getBoundingClientRect().bottom;
-                setNoticeTop(bottom + 8);
-                setNoticesOpen((open) => !open);
-              }}
-              className={
-                unread.length > 0
-                  ? "portal-bell-live relative rounded-full p-2.5"
-                  : "relative rounded-full p-2 text-slate-300 hover:bg-white/[0.06]"
-              }
-            >
-              <BellIcon />
-              {unread.length > 0 ? (
-                <span className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-red-500 shadow-[0_0_8px_rgb(239,68,68,0.95)]" />
-              ) : null}
-            </button>
-            {noticesOpen ? (
-              <div
-                className="fixed left-4 right-4 z-40 max-h-[70vh] overflow-y-auto rounded-2xl border border-white/[0.08] bg-[#0c1422] p-4 shadow-2xl top-[var(--notice-top)] sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:max-h-none sm:w-[min(24rem,calc(100vw-2rem))]"
-                style={{ ["--notice-top" as string]: `${noticeTop}px` }}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold text-white">
-                    Notifications{" "}
-                    {unread.length > 0 ? (
-                      <span className="ml-1 rounded-full bg-sky-500/20 px-2 py-0.5 text-[11px] text-sky-300">
-                        {unread.length} new
-                      </span>
-                    ) : null}
-                  </p>
-                  <div className="flex items-center gap-3 text-xs">
-                    <button
-                      type="button"
-                      className="text-sky-300 hover:underline"
-                      onClick={() => setReadIds(notices.map((item) => item.id))}
-                    >
-                      Mark all as read
-                    </button>
-                    <button type="button" className="text-slate-400" onClick={() => setNoticesOpen(false)} aria-label="Close">
-                      ×
-                    </button>
-                  </div>
-                </div>
-                <ul className="mt-3 space-y-2">
-                  {notices.length === 0 ? (
-                    <li className="py-4 text-sm text-slate-500">No notifications yet.</li>
-                  ) : (
-                    notices.map((item) => (
-                      <li key={item.id} className="rounded-xl border border-white/[0.1] bg-white/[0.03] px-3 py-2.5">
-                        <div className="flex items-start gap-3">
-                        <NoticeIcon kind={item.kind} unread={!readIds.includes(item.id)} />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-white">{item.title}</p>
-                          <p className="text-xs text-slate-500">{item.detail}</p>
-                        </div>
-                        <button type="button" className="shrink-0 text-xs text-sky-300 hover:underline" onClick={() => openNotice(item)}>
-                          {item.cta} →
-                        </button>
-                        </div>
-                      </li>
-                    ))
-                  )}
-                </ul>
-              </div>
-            ) : null}
+        <div className="flex items-stretch gap-3 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] lg:hidden">
+          <div className="aspect-square w-[40%] max-w-[9.75rem] shrink-0">
+            <ProjectArt src={project.sidebarImageUrl} placement="side" />
           </div>
-        </header>
-
-        <div className="grid grid-cols-2 gap-2 px-4 pb-3 lg:hidden">
-          {(["overview", "journey", "actions", "documents"] as const).map((id) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setView(id)}
-              className={`rounded-full px-3 py-2.5 text-sm ${view === id ? "bg-sky-500 text-slate-950" : "bg-white/[0.06] text-slate-200"}`}
-            >
-              {id === "overview" ? "Overview" : id === "journey" ? "Journey" : id === "actions" ? "Actions" : "Documents"}
-            </button>
-          ))}
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+            <div className="flex justify-end">{renderNotices()}</div>
+            <nav className="grid min-h-0 flex-1 grid-cols-2 grid-rows-2 gap-1.5" aria-label="Project sections">
+              {(["overview", "journey", "actions", "documents"] as const).map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setView(id)}
+                  className={`flex items-center justify-center rounded-full px-2 text-center text-xs leading-tight ${view === id ? "bg-sky-500 text-slate-950" : "bg-white/[0.06] text-slate-200"}`}
+                >
+                  {id === "overview" ? "Overview" : id === "journey" ? "Journey" : id === "actions" ? "Actions" : "Documents"}
+                </button>
+              ))}
+            </nav>
+          </div>
         </div>
+        <header className="hidden items-center justify-end gap-2 px-8 py-3 lg:flex">
+          {renderNotices()}
+        </header>
         </div>
 
         <main className="px-4 pb-16 sm:px-8">
@@ -1552,12 +1560,15 @@ function Count({ n, hot }: { n: number; hot?: boolean }) {
   return <span className={`ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] text-white ${hot ? "bg-red-500" : "bg-white/10"}`}>{n}</span>;
 }
 
-function ProjectArt({ src, placement = "sidebar" }: { src: string | null; placement?: "sidebar" | "banner" }) {
+function ProjectArt({ src, placement = "sidebar" }: { src: string | null; placement?: "sidebar" | "banner" | "side" }) {
   const [failed, setFailed] = useState(false);
   const frame =
-    placement === "banner"
-      ? "aspect-[16/10] max-h-52 w-full"
-      : "mx-4 mt-2 aspect-square";
+    placement === "side"
+      ? "h-full w-full"
+      : placement === "banner"
+        ? "aspect-[16/10] max-h-52 w-full"
+        : "mx-4 mt-2 aspect-square";
+  const skyId = placement === "sidebar" ? "portal-sky" : `portal-sky-${placement}`;
   if (src && !failed) {
     return (
       <div className={`${frame} overflow-hidden rounded-2xl bg-[#10192b]`}>
@@ -1568,16 +1579,16 @@ function ProjectArt({ src, placement = "sidebar" }: { src: string | null; placem
     );
   }
   return (
-    <div className={`${placement === "banner" ? "w-full" : "mx-4 mt-2"} overflow-hidden rounded-2xl`} aria-hidden>
-      <svg viewBox="0 0 280 150" className="h-auto w-full">
+    <div className={`${placement === "sidebar" ? "mx-4 mt-2" : "h-full w-full"} overflow-hidden rounded-2xl`} aria-hidden>
+      <svg viewBox="0 0 280 150" className={placement === "side" ? "h-full w-full" : "h-auto w-full"}>
         <defs>
-          <linearGradient id={placement === "banner" ? "portal-sky-banner" : "portal-sky"} x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id={skyId} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#7eb6e8" />
             <stop offset="55%" stopColor="#c5d7ea" />
             <stop offset="100%" stopColor="#e7eef4" />
           </linearGradient>
         </defs>
-        <rect width="280" height="150" fill={`url(#${placement === "banner" ? "portal-sky-banner" : "portal-sky"})`} />
+        <rect width="280" height="150" fill={`url(#${skyId})`} />
         <rect x="0" y="118" width="280" height="32" fill="#d5ddd4" />
         <rect x="36" y="62" width="168" height="72" fill="#f4f7fb" />
         <rect x="36" y="54" width="168" height="12" fill="#ffffff" />
