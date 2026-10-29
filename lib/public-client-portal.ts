@@ -89,7 +89,7 @@ function clientStatusBadge(
   }
   switch (status) {
     case "waiting_on_feedback":
-      return { label: PROJECT_STATUS_LABELS.waiting_on_feedback, color: "#3b82f6" };
+      return { label: PROJECT_STATUS_LABELS.waiting_on_feedback, color: "#eab308" };
     case "zoom_required":
       return { label: "Zoom required", color: "#a855f7" };
     case "in_progress":
