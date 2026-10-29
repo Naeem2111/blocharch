@@ -514,24 +514,24 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
       <div className="min-w-0 flex-1">
         <div className="border-b border-white/[0.06] lg:border-0">
         <div className="px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] lg:hidden">
-          <div className="grid grid-cols-[minmax(0,46%)_minmax(0,1fr)] items-stretch gap-3">
-            <div className="h-full min-h-[9.75rem] min-w-0 overflow-hidden">
+          <div className="grid grid-cols-[minmax(0,42%)_minmax(0,1fr)] items-start gap-3">
+            <div className="aspect-square min-w-0 overflow-hidden">
               <ProjectArt src={project.sidebarImageUrl} placement="side" />
             </div>
-            <div className="flex min-h-[9.75rem] min-w-0 items-stretch gap-1.5">
-            <nav className="grid min-h-0 min-w-0 flex-1 grid-cols-2 grid-rows-2 gap-1.5" aria-label="Project sections">
-              {(["overview", "journey", "actions", "documents"] as const).map((id) => (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setView(id)}
-                  className={`flex items-center justify-center rounded-full px-2 text-center text-xs leading-tight ${view === id ? "bg-sky-500 text-slate-950" : "bg-white/[0.06] text-slate-200"}`}
-                >
-                  {id === "overview" ? "Overview" : id === "journey" ? "Journey" : id === "actions" ? "Actions" : "Documents"}
-                </button>
-              ))}
-            </nav>
-            <div className="flex shrink-0 items-start">{renderNotices()}</div>
+            <div className="flex min-w-0 flex-col gap-2">
+              <nav className="grid grid-cols-2 gap-1.5" aria-label="Project sections">
+                {(["overview", "journey", "actions", "documents"] as const).map((id) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setView(id)}
+                    className={`flex min-h-[2.75rem] items-center justify-center rounded-lg px-2 py-2 text-center text-[11px] leading-tight ${view === id ? "bg-sky-500 text-slate-950" : "bg-white/[0.06] text-slate-200"}`}
+                  >
+                    {id === "overview" ? "Overview" : id === "journey" ? "Project Journey" : id === "actions" ? "Actions" : "Documents"}
+                  </button>
+                ))}
+              </nav>
+              <div className="flex justify-end">{renderNotices()}</div>
             </div>
           </div>
         </div>
