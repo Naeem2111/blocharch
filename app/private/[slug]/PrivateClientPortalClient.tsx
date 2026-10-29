@@ -518,17 +518,17 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
       <div className="min-w-0 flex-1">
         <div className="border-b border-white/[0.06] lg:border-0">
         <div className="px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] lg:hidden">
-          <div className="grid grid-cols-[minmax(0,34%)_minmax(0,1fr)] items-start gap-x-2.5 gap-y-1.5">
+          <div className="grid grid-cols-[minmax(0,34%)_minmax(0,1fr)] gap-x-2.5 gap-y-1.5">
             <div className="row-start-1 h-full min-h-[4.75rem] min-w-0 overflow-hidden">
               <ProjectArt src={project.sidebarImageUrl} placement="side" />
             </div>
-            <nav className="row-start-1 grid min-w-0 grid-cols-2 gap-1.5" aria-label="Project sections">
+            <nav className="row-start-1 grid min-w-0 grid-cols-1 gap-1.5" aria-label="Project sections">
               {(["overview", "journey", "actions", "documents"] as const).map((id) => (
                 <button
                   key={id}
                   type="button"
                   onClick={() => setView(id)}
-                  className={`flex h-11 min-w-0 items-center justify-center rounded-lg px-2 text-center text-[11px] font-medium leading-none whitespace-nowrap ${view === id ? "bg-sky-500 text-slate-950" : "bg-white/[0.08] text-slate-100"}`}
+                  className={`flex h-10 min-w-0 items-center justify-center rounded-lg px-3 text-center text-xs font-medium leading-none whitespace-nowrap ${view === id ? "bg-sky-500 text-slate-950" : "bg-white/[0.08] text-slate-100"}`}
                 >
                   {id === "overview" ? "Overview" : id === "journey" ? "Project Journey" : id === "actions" ? "Actions" : "Documents"}
                 </button>
