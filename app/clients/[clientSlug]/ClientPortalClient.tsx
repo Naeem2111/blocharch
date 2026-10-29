@@ -683,7 +683,7 @@ export function ClientPortalClient({
 
 			<div className="client-portal-main flex min-w-0 flex-1 flex-col">
 				<header className="client-portal-header border-b border-white/[0.06] px-4 py-4 pt-[max(1rem,env(safe-area-inset-top))] sm:px-8 lg:py-5 lg:pt-5">
-					<div className="flex flex-wrap items-start justify-between gap-4">
+					<div className="flex items-start justify-between gap-3">
 						<div className="flex min-w-0 items-start gap-4">
 							<ClientAvatar
 								name={data.client.name}
@@ -692,24 +692,12 @@ export function ClientPortalClient({
 								textTone={asAvatarTextTone(data.client.logoTextTone)}
 								size={48}
 							/>
-							<div>
+							<div className="min-w-0">
 								<h1 className="text-xl font-semibold text-white sm:text-2xl">{data.client.name}</h1>
 								<p className="mt-0.5 text-sm text-slate-400">Live view of active project status and deadlines.</p>
 							</div>
 						</div>
-						<div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:flex-nowrap">
-							<div className="flex flex-wrap items-center gap-2">
-								<span className="client-portal-badge rounded-lg border border-white/[0.1] bg-white/[0.04] px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-300">
-									Active lanes {data.client.activeLaneCount}
-								</span>
-								<span className="client-portal-badge client-portal-badge-brand rounded-lg border border-brand-500/40 bg-brand-500/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-brand-200">
-									Client view
-								</span>
-							</div>
-							<div className="shrink-0 lg:hidden">
-								<PublicThemeToggle />
-							</div>
-							<div className="relative shrink-0" ref={bellRef}>
+						<div className="relative ml-auto shrink-0" ref={bellRef}>
 								<button
 									type="button"
 									aria-label="Notifications"
@@ -773,6 +761,16 @@ export function ClientPortalClient({
 									</div>
 								) : null}
 							</div>
+					</div>
+					<div className="mt-3 flex flex-wrap items-center gap-2">
+						<span className="client-portal-badge rounded-lg border border-white/[0.1] bg-white/[0.04] px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-300">
+							Active lanes {data.client.activeLaneCount}
+						</span>
+						<span className="client-portal-badge client-portal-badge-brand rounded-lg border border-brand-500/40 bg-brand-500/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-brand-200">
+							Client view
+						</span>
+						<div className="shrink-0 lg:hidden">
+							<PublicThemeToggle />
 						</div>
 					</div>
 					<div className="mt-4 grid grid-cols-2 gap-2 lg:hidden">
