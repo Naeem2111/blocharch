@@ -218,11 +218,10 @@ export function CommercialClient() {
       setError(j.error || "Could not save rate");
       return;
     }
-    const mode = "manual";
     const modeResponse = await fetch("/api/ops/commercial-settings", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ costConversionMode: mode }),
+      body: JSON.stringify({ costConversionMode: "manual" }),
     });
     const modeBody = await modeResponse.json().catch(() => ({}));
     if (!modeResponse.ok) {
@@ -230,11 +229,7 @@ export function CommercialClient() {
       void load();
       return;
     }
-    setMsg(
-      mode === "live"
-        ? "Using the live market rate for athlete costs."
-        : `Using the manual rate for ${rateForm.effectiveMonth}.`
-    );
+    setMsg(`Using the manual rate for ${rateForm.effectiveMonth}.`);
     void load();
   }
 
