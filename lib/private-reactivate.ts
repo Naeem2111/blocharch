@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { restorePrivateProjectTeam } from "@/lib/private-project-assignments";
 import { revalidatePath } from "next/cache";
 
 /** Progress when a completed private project is moved back to active work. */
@@ -26,6 +27,7 @@ export async function reactivatePrivateProject(projectId: string): Promise<
     };
   }
 
+  await restorePrivateProjectTeam(projectId);
   await prisma.privateProject.update({
     where: { id: projectId },
     data: {

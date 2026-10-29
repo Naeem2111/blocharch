@@ -133,6 +133,49 @@ export async function ensureProjectAssignmentRows(projectId: string) {
   });
 }
 
+/**
+ * People who should still be on a project when it leaves the archive.
+ * Active rows stay. Rows removed at or after completion are restored too,
+ * so an archive save that only kept the primary does not drop the rest of the team.
+ */
+export async function projectTeamForReactivation(projectId: string): Promise<{
+  athleteIds: string[];
+  primaryAthleteId: string | null;
+}> {
+  const [project, rows] = await Promise.all([
+    prisma.opsProject.findUnique({
+      where: { id: projectId },
+      select: { assignedAthleteId: true, completedAt: true },
+    }),
+    prisma.opsProjectAthleteAssignment.findMany({
+      where: { projectId },
+      orderBy: [{ isPrimary: "desc" }, { assignedAt: "asc" }],
+    }),
+  ]);
+
+  const completedAt = project?.completedAt?.getTime() ?? null;
+  const keep = new Set<string>();
+  for (const row of rows) {
+    if (!row.removedAt) {
+      keep.add(row.athleteId);
+      continue;
+    }
+    if (completedAt != null && row.removedAt.getTime() >= completedAt - 2 * 60 * 1000) {
+      keep.add(row.athleteId);
+    }
+  }
+  if (project?.assignedAthleteId) keep.add(project.assignedAthleteId);
+
+  const athleteIds = Array.from(keep);
+  const primaryFromRows = rows.find((row) => row.isPrimary && keep.has(row.athleteId))?.athleteId ?? null;
+  const primaryAthleteId =
+    project?.assignedAthleteId && keep.has(project.assignedAthleteId)
+      ? project.assignedAthleteId
+      : primaryFromRows ?? athleteIds[0] ?? null;
+
+  return { athleteIds, primaryAthleteId };
+}
+
 /** Sync join table and denormalized primary athlete on OpsProject. */
 export async function applyProjectAthleteAssignments(
   projectId: string,

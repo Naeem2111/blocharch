@@ -64,14 +64,24 @@ export async function syncProjectAfterOpsUpdate(
 
   const wasActive = isActiveProjectStatus(prev.currentStatus);
   const nowInactive = !isActiveProjectStatus(next.currentStatus);
-  if (wasActive && nowInactive && next.assignedAthleteId) {
-    await createAthleteNotification({
-      athleteId: next.assignedAthleteId,
-      type: "project_completed",
-      title: `Project completed: ${next.name}`,
-      message: "This project has moved to your Completed Projects list.",
-      linkPath: "/dashboard/athlete/projects/completed",
-    }).catch(() => {});
+  if (wasActive && nowInactive) {
+    const assignees = await prisma.opsProjectAthleteAssignment.findMany({
+      where: { projectId, removedAt: null },
+      select: { athleteId: true },
+    });
+    const athleteIds = new Set(assignees.map((row) => row.athleteId));
+    if (next.assignedAthleteId) athleteIds.add(next.assignedAthleteId);
+    await Promise.all(
+      Array.from(athleteIds).map((athleteId) =>
+        createAthleteNotification({
+          athleteId,
+          type: "project_completed",
+          title: `Project completed: ${next.name}`,
+          message: "This project has moved to your Completed Projects list.",
+          linkPath: "/dashboard/athlete/projects/completed",
+        }).catch(() => {})
+      )
+    );
   }
 
   const wasInactive = !isActiveProjectStatus(prev.currentStatus);

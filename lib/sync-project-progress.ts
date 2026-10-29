@@ -1,5 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import {
+  applyProjectAthleteAssignments,
+  projectTeamForReactivation,
+} from "@/lib/ops-project-assignments";
+import {
   computeDeadlineBeatMetrics,
   projectCompletionFromLog,
 } from "@/lib/project-completion";
@@ -18,16 +22,32 @@ type LatestCompletionLog = {
   isBackloggedSession: boolean;
 };
 
+async function assignedAthleteIds(projectId: string): Promise<string[]> {
+  const [project, rows] = await Promise.all([
+    prisma.opsProject.findUnique({
+      where: { id: projectId },
+      select: { assignedAthleteId: true },
+    }),
+    prisma.opsProjectAthleteAssignment.findMany({
+      where: { projectId, removedAt: null },
+      select: { athleteId: true },
+    }),
+  ]);
+  const ids = new Set(rows.map((row) => row.athleteId));
+  if (project?.assignedAthleteId) ids.add(project.assignedAthleteId);
+  return Array.from(ids);
+}
+
 async function latestCompletionLogForProject(
   projectId: string,
-  athleteId?: string | null
+  athleteIds?: string[] | null
 ): Promise<LatestCompletionLog | null> {
   const latest = await prisma.opsSubmissionLineItem.findFirst({
     where: {
       projectId,
       completionPercent: { not: null },
-      ...(athleteId
-        ? { submission: { athleteId } }
+      ...(athleteIds && athleteIds.length > 0
+        ? { submission: { athleteId: { in: athleteIds } } }
         : {}),
     },
     orderBy: [{ submission: { submissionDate: "desc" } }, { submission: { updatedAt: "desc" } }],
@@ -92,7 +112,10 @@ export async function reactivateProjectOnAthleteReassign(
   if (!nextAthleteId || nextAthleteId === previousAthleteId) return null;
   if (!INACTIVE_PROJECT_STATUSES.has(currentStatus)) return null;
 
-  const latestForAssignee = await latestCompletionLogForProject(projectId, nextAthleteId);
+  const latestForAssignee = await latestCompletionLogForProject(
+    projectId,
+    nextAthleteId ? [nextAthleteId] : null
+  );
   const progressPercent = latestForAssignee?.progressPercent ?? 0;
 
   return {
@@ -129,29 +152,21 @@ export async function reactivateArchivedOpsProject(projectId: string): Promise<
     };
   }
 
-  const latestLine =
-    (project.assignedAthleteId
-      ? await prisma.opsSubmissionLineItem.findFirst({
-          where: {
-            projectId,
-            completionPercent: { not: null },
-            submission: { athleteId: project.assignedAthleteId },
-          },
-          orderBy: [
-            { submission: { submissionDate: "desc" } },
-            { submission: { updatedAt: "desc" } },
-          ],
-          select: { id: true },
-        })
-      : null) ??
-    (await prisma.opsSubmissionLineItem.findFirst({
-      where: { projectId, completionPercent: { not: null } },
-      orderBy: [
-        { submission: { submissionDate: "desc" } },
-        { submission: { updatedAt: "desc" } },
-      ],
-      select: { id: true },
-    }));
+  const team = await projectTeamForReactivation(projectId);
+  const latestLine = await prisma.opsSubmissionLineItem.findFirst({
+    where: {
+      projectId,
+      completionPercent: { not: null },
+      ...(team.athleteIds.length > 0
+        ? { submission: { athleteId: { in: team.athleteIds } } }
+        : {}),
+    },
+    orderBy: [
+      { submission: { submissionDate: "desc" } },
+      { submission: { updatedAt: "desc" } },
+    ],
+    select: { id: true },
+  });
 
   const updated = await prisma.$transaction(async (tx) => {
     if (latestLine) {
@@ -178,6 +193,10 @@ export async function reactivateArchivedOpsProject(projectId: string): Promise<
     });
   });
 
+  if (team.athleteIds.length > 0) {
+    await applyProjectAthleteAssignments(projectId, team);
+  }
+
   await syncProjectAfterOpsUpdate(
     projectId,
     {
@@ -186,7 +205,7 @@ export async function reactivateArchivedOpsProject(projectId: string): Promise<
       name: project.name,
     },
     {
-      assignedAthleteId: updated.assignedAthleteId,
+      assignedAthleteId: team.primaryAthleteId ?? updated.assignedAthleteId,
       currentStatus: updated.currentStatus,
       name: updated.name,
     },
@@ -195,7 +214,7 @@ export async function reactivateArchivedOpsProject(projectId: string): Promise<
   return { ok: true };
 }
 
-/** Recalculate project progress from the primary assignee's daily log entries. */
+/** Recalculate project progress from any assigned athlete's daily log entries. */
 export async function syncProjectProgressForProjects(projectIds: string[]) {
   const uniqueIds = Array.from(new Set(projectIds.filter(Boolean)));
   for (const projectId of uniqueIds) {
@@ -213,16 +232,17 @@ export async function syncProjectProgressForProjects(projectIds: string[]) {
     if (!before) continue;
     if (before.portalDisplayLocked) continue;
 
+    const athleteIds = await assignedAthleteIds(projectId);
     const latestLog = await latestCompletionLogForProject(
       projectId,
-      before.assignedAthleteId
+      athleteIds.length > 0 ? athleteIds : null
     );
     const progressPercent = latestLog?.progressPercent ?? 0;
 
     const wasCompleted =
       before.currentStatus === "completed" || before.currentStatus === "handed_over";
 
-    if (progressPercent >= 100 && isActiveProjectStatus(before.currentStatus) && before.assignedAthleteId) {
+    if (progressPercent >= 100 && isActiveProjectStatus(before.currentStatus)) {
       // Archives / beat metrics need a due date — carry from pipeline, planner, or outbox if unset.
       const dueDate = await ensureOpsProjectDueDate(projectId);
       const { completedAt, deadlineBeatenDays, deadlineBeatenMinutes } = completionMetrics(

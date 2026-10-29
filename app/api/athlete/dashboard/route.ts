@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
   });
   const completedProjects = await prisma.opsProject.count({
     where: {
-      assignedAthleteId: athlete.id,
+      ...athleteProjectsWhere,
       currentStatus: { in: ["completed", "handed_over"] },
     },
   });
@@ -90,8 +90,10 @@ export async function GET(request: NextRequest) {
   });
 
   const beatenWhere = {
-    assignedAthleteId: athlete.id,
-    OR: [{ deadlineBeatenMinutes: { gt: 0 } }, { deadlineBeatenDays: { gt: 0 } }],
+    AND: [
+      athleteProjectsWhere,
+      { OR: [{ deadlineBeatenMinutes: { gt: 0 } }, { deadlineBeatenDays: { gt: 0 } }] },
+    ],
   };
 
   const [beatenCount, beatenDeadlineProjects] = await Promise.all([

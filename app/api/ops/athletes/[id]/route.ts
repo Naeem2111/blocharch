@@ -31,6 +31,17 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       athleteData.fullName = fullName;
     }
     if (body.email !== undefined) athleteData.email = body.email ? String(body.email).trim() : null;
+    if (body.athleteCode != null) {
+      const athleteCode = String(body.athleteCode).trim().toUpperCase();
+      if (athleteCode.length < 2) {
+        return NextResponse.json({ error: "Athlete code required" }, { status: 400 });
+      }
+      if (athleteCode !== existing.athleteCode) {
+        const taken = await prisma.opsAthlete.findUnique({ where: { athleteCode } });
+        if (taken) return NextResponse.json({ error: "Athlete code already exists" }, { status: 400 });
+      }
+      athleteData.athleteCode = athleteCode;
+    }
     if (body.status === "active" || body.status === "inactive") athleteData.status = body.status;
     if (body.baseMonthlyPayZar != null) athleteData.baseMonthlyPayZar = Math.max(0, Number(body.baseMonthlyPayZar) || 0);
     if (body.monthlyHourCap != null)

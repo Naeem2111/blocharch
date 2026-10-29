@@ -43,6 +43,7 @@ export function OpsAthletesClient() {
   });
   const [editForm, setEditForm] = useState({
     fullName: "",
+    athleteCode: "",
     email: "",
     status: "active",
     baseMonthlyPayZar: "20000",
@@ -105,6 +106,7 @@ export function OpsAthletesClient() {
     setEditingId(a.id);
     setEditForm({
       fullName: a.fullName,
+      athleteCode: a.athleteCode,
       email: a.email ?? "",
       status: a.status,
       baseMonthlyPayZar: String(a.baseMonthlyPayZar),
@@ -125,6 +127,7 @@ export function OpsAthletesClient() {
     setError("");
     const body: Record<string, unknown> = {
       fullName: editForm.fullName,
+      athleteCode: editForm.athleteCode,
       email: editForm.email || null,
       status: editForm.status,
       baseMonthlyPayZar: Number(editForm.baseMonthlyPayZar),
@@ -222,6 +225,7 @@ export function OpsAthletesClient() {
                   uploadPath={`/api/ops/athletes/${a.id}/photo`}
                 />
                 <label className="text-xs text-slate-400">Full name<input value={editForm.fullName} onChange={(e) => setEditForm((f) => ({ ...f, fullName: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
+                <label className="text-xs text-slate-400">Athlete code<input required value={editForm.athleteCode} onChange={(e) => setEditForm((f) => ({ ...f, athleteCode: e.target.value.toUpperCase() }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
                 <label className="text-xs text-slate-400">Status<select value={editForm.status} onChange={(e) => setEditForm((f) => ({ ...f, status: e.target.value }))} className="select-console mt-1 block w-full rounded-md px-3 py-2 text-sm"><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
                 <label className="text-xs text-slate-400">Email<input value={editForm.email} onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
                 <label className="text-xs text-slate-400">Start date<input type="date" value={editForm.blocharchStartDate} onChange={(e) => setEditForm((f) => ({ ...f, blocharchStartDate: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>

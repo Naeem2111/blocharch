@@ -60,6 +60,51 @@ function assignmentTitle(titles: Record<string, string>, athleteId: string): str
   return title ? title.slice(0, 80) : null;
 }
 
+/** Restore the team that was on a private project when it was archived. */
+export async function restorePrivateProjectTeam(projectId: string): Promise<void> {
+  const [project, rows] = await Promise.all([
+    prisma.privateProject.findUnique({
+      where: { id: projectId },
+      select: { assignedAthleteId: true, completedAt: true },
+    }),
+    prisma.privateProjectAthleteAssignment.findMany({
+      where: { projectId },
+      orderBy: [{ isPrimary: "desc" }, { assignedAt: "asc" }],
+    }),
+  ]);
+
+  const completedAt = project?.completedAt?.getTime() ?? null;
+  const keep = new Set<string>();
+  for (const row of rows) {
+    if (!row.removedAt) {
+      keep.add(row.athleteId);
+      continue;
+    }
+    if (completedAt != null && row.removedAt.getTime() >= completedAt - 2 * 60 * 1000) {
+      keep.add(row.athleteId);
+    }
+  }
+  if (project?.assignedAthleteId) keep.add(project.assignedAthleteId);
+  const athleteIds = Array.from(keep);
+  if (athleteIds.length === 0) return;
+
+  const primaryFromRows = rows.find((row) => row.isPrimary && keep.has(row.athleteId))?.athleteId ?? null;
+  const primaryAthleteId =
+    project?.assignedAthleteId && keep.has(project.assignedAthleteId)
+      ? project.assignedAthleteId
+      : primaryFromRows ?? athleteIds[0] ?? null;
+  const athleteTitles: Record<string, string> = {};
+  for (const row of rows) {
+    if (keep.has(row.athleteId) && row.title) athleteTitles[row.athleteId] = row.title;
+  }
+
+  await applyPrivateProjectAthleteAssignments(projectId, {
+    athleteIds,
+    primaryAthleteId,
+    athleteTitles,
+  });
+}
+
 export async function applyPrivateProjectAthleteAssignments(
   projectId: string,
   input: { athleteIds: string[]; primaryAthleteId: string | null; athleteTitles?: Record<string, string> },

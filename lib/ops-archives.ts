@@ -28,7 +28,14 @@ export async function buildOpsArchives(filters: OpsArchivesFilters = {}) {
   const projectWhere = {
     currentStatus: { in: COMPLETED_PROJECT_STATUSES },
     ...(clientId ? { clientId } : {}),
-    ...(athleteId ? { assignedAthleteId: athleteId } : {}),
+    ...(athleteId
+      ? {
+          OR: [
+            { assignedAthleteId: athleteId },
+            { athleteAssignments: { some: { athleteId, removedAt: null } } },
+          ],
+        }
+      : {}),
   };
 
   const [projects, boards, clients, athletes] = await Promise.all([
