@@ -412,7 +412,7 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
     return okCount > 0 && okCount === queue.length;
   }
 
-  const renderNotices = () => (
+  const renderNotices = (shape: "round" | "square" = "round") => (
     <div className="relative">
       <button
         type="button"
@@ -423,9 +423,13 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
           setNoticesOpen((open) => !open);
         }}
         className={
-          unread.length > 0
-            ? "portal-bell-live relative rounded-full p-2.5"
-            : "relative rounded-full p-2 text-slate-300 hover:bg-white/[0.06]"
+          shape === "square"
+            ? unread.length > 0
+              ? "portal-bell-live relative flex h-8 w-8 items-center justify-center rounded-md p-0 [&_svg]:!h-4 [&_svg]:!w-4"
+              : "relative flex h-8 w-8 items-center justify-center rounded-md p-0 text-slate-300 hover:bg-white/[0.06] [&_svg]:h-4 [&_svg]:w-4"
+            : unread.length > 0
+              ? "portal-bell-live relative rounded-full p-2.5"
+              : "relative rounded-full p-2 text-slate-300 hover:bg-white/[0.06]"
         }
       >
         <BellIcon />
@@ -514,25 +518,23 @@ export function PrivateClientPortalClient({ slug, data }: { slug: string; data: 
       <div className="min-w-0 flex-1">
         <div className="border-b border-white/[0.06] lg:border-0">
         <div className="px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] lg:hidden">
-          <div className="grid grid-cols-[minmax(0,42%)_minmax(0,1fr)] items-start gap-3">
-            <div className="aspect-square min-w-0 overflow-hidden">
+          <div className="grid grid-cols-[minmax(0,34%)_minmax(0,1fr)] items-start gap-x-2.5 gap-y-1.5">
+            <div className="row-start-1 h-full min-h-[4.75rem] min-w-0 overflow-hidden">
               <ProjectArt src={project.sidebarImageUrl} placement="side" />
             </div>
-            <div className="flex min-w-0 flex-col gap-2">
-              <nav className="grid grid-cols-2 gap-1.5" aria-label="Project sections">
-                {(["overview", "journey", "actions", "documents"] as const).map((id) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setView(id)}
-                    className={`flex min-h-[2.75rem] items-center justify-center rounded-lg px-2 py-2 text-center text-[11px] leading-tight ${view === id ? "bg-sky-500 text-slate-950" : "bg-white/[0.06] text-slate-200"}`}
-                  >
-                    {id === "overview" ? "Overview" : id === "journey" ? "Project Journey" : id === "actions" ? "Actions" : "Documents"}
-                  </button>
-                ))}
-              </nav>
-              <div className="flex justify-end">{renderNotices()}</div>
-            </div>
+            <nav className="row-start-1 grid min-w-0 grid-cols-2 gap-1.5" aria-label="Project sections">
+              {(["overview", "journey", "actions", "documents"] as const).map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setView(id)}
+                  className={`flex h-11 min-w-0 items-center justify-center rounded-lg px-2 text-center text-[11px] font-medium leading-none whitespace-nowrap ${view === id ? "bg-sky-500 text-slate-950" : "bg-white/[0.08] text-slate-100"}`}
+                >
+                  {id === "overview" ? "Overview" : id === "journey" ? "Project Journey" : id === "actions" ? "Actions" : "Documents"}
+                </button>
+              ))}
+            </nav>
+            <div className="col-start-2 flex justify-end">{renderNotices("square")}</div>
           </div>
         </div>
         <header className="hidden items-center justify-end gap-2 px-8 py-3 lg:flex">
