@@ -8,7 +8,7 @@ import {
 } from "@/lib/ops-constants";
 import { requireOpsSession } from "@/lib/ops-access";
 import { parseDateOnly } from "@/lib/ops-hours";
-import { parseProjectDueInput } from "@/lib/project-deadline";
+import { parseDualProjectDeadlines } from "@/lib/project-deadline";
 import { serializeOpsProjectRow } from "@/lib/ops-project-serialize";
 import {
   hoursLoggedByProjectIds,
@@ -190,7 +190,13 @@ export async function POST(request: NextRequest) {
         customStageId,
         currentStatus,
         startDate: body.startDate ? parseDateOnly(String(body.startDate)) : null,
-        dueDate: parseProjectDueInput(body),
+        ...(() => {
+          const deadlines = parseDualProjectDeadlines(body, { autoAthleteFromClient: true });
+          return {
+            dueDate: deadlines.clientDueDate ?? null,
+            athleteDueDate: deadlines.athleteDueDate ?? null,
+          };
+        })(),
         handoverDate: body.handoverDate ? parseDateOnly(String(body.handoverDate)) : null,
         notes: body.notes ? String(body.notes).trim() : null,
       },

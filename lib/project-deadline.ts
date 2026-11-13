@@ -196,3 +196,88 @@ export function hoursUntilDueFromIso(dueAt: string | null, now = new Date()): nu
   if (Number.isNaN(due.getTime())) return null;
   return (due.getTime() - now.getTime()) / 3600000;
 }
+
+/** Default internal buffer: athlete deadline is this many weekdays before the client deadline. */
+export const DEFAULT_ATHLETE_DEADLINE_WORKING_DAYS_BEFORE = 3;
+
+/** Move a UTC instant backward by N Mon–Fri days (weekends skipped; holidays are manual). */
+export function subtractWorkingDays(from: Date, workingDays: number): Date {
+  const out = new Date(from.getTime());
+  let left = Math.max(0, Math.floor(workingDays));
+  while (left > 0) {
+    out.setUTCDate(out.getUTCDate() - 1);
+    const day = out.getUTCDay(); // 0 Sun … 6 Sat
+    if (day !== 0 && day !== 6) left -= 1;
+  }
+  return out;
+}
+
+/** Suggest athlete deadline ≈ 3 working days before client deadline, same wall-clock time. */
+export function defaultAthleteDueFromClientDue(
+  clientDue: Date,
+  workingDays = DEFAULT_ATHLETE_DEADLINE_WORKING_DAYS_BEFORE
+): Date {
+  return subtractWorkingDays(clientDue, workingDays);
+}
+
+/** Deadline used for beat metrics / athlete urgency: athlete due, else client due. */
+export function resolveInternalDueDate(project: {
+  athleteDueDate?: Date | null;
+  dueDate?: Date | null;
+}): Date | null {
+  return project.athleteDueDate ?? project.dueDate ?? null;
+}
+
+export function parseNamedProjectDueInput(
+  body: Record<string, unknown>,
+  prefix: "due" | "athleteDue" | "clientDue"
+): Date | null | undefined {
+  const atKey = prefix === "due" ? "dueAt" : `${prefix}At`;
+  const dateKey = prefix === "due" ? "dueDate" : `${prefix}Date`;
+  const timeKey = prefix === "due" ? "dueTime" : `${prefix}Time`;
+  const ampmKey = prefix === "due" ? "dueAmPm" : `${prefix}AmPm`;
+
+  const hasField =
+    body[atKey] !== undefined ||
+    body[dateKey] !== undefined ||
+    body[timeKey] !== undefined ||
+    body[ampmKey] !== undefined;
+  if (!hasField) return undefined;
+
+  return parseProjectDueInput({
+    dueAt: body[atKey],
+    dueDate: body[dateKey],
+    dueTime: body[timeKey],
+    dueAmPm: body[ampmKey],
+  });
+}
+
+/**
+ * Resolve client + athlete deadlines from a create/edit body.
+ * - `dueDate` / `dueTime` / `dueAmPm` / `dueAt` map to the **client** deadline (legacy keys).
+ * - `clientDue*` aliases are also accepted.
+ * - `athleteDue*` sets the athlete deadline.
+ * - On create (or when athlete fields are omitted and `autoAthleteFromClient` is true),
+ *   athlete defaults to 3 working days before client when client is set and athlete is empty.
+ */
+export function parseDualProjectDeadlines(
+  body: Record<string, unknown>,
+  opts: { autoAthleteFromClient?: boolean } = {}
+): { clientDueDate: Date | null | undefined; athleteDueDate: Date | null | undefined } {
+  const fromClientAlias = parseNamedProjectDueInput(body, "clientDue");
+  const fromLegacy = parseNamedProjectDueInput(body, "due");
+  const clientDueDate =
+    fromClientAlias !== undefined ? fromClientAlias : fromLegacy !== undefined ? fromLegacy : undefined;
+
+  let athleteDueDate = parseNamedProjectDueInput(body, "athleteDue");
+
+  if (
+    opts.autoAthleteFromClient &&
+    athleteDueDate === undefined &&
+    clientDueDate instanceof Date
+  ) {
+    athleteDueDate = defaultAthleteDueFromClientDue(clientDueDate);
+  }
+
+  return { clientDueDate, athleteDueDate };
+}

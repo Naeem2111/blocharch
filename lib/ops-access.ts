@@ -174,6 +174,7 @@ export const athleteProjectSelect = {
   complexity: true,
   startDate: true,
   dueDate: true,
+  athleteDueDate: true,
   currentStage: true,
   customStageId: true,
   customStage: { select: { id: true, label: true } },
@@ -196,7 +197,8 @@ export const athleteProjectSelect = {
 
 export function serializeProjectForAthlete(project: Prisma.OpsProjectGetPayload<{ select: typeof athleteProjectSelect }>) {
   const { displayTitle, stageLabel } = projectDisplayFields(project);
-  const due = serializeProjectDueAt(project.dueDate);
+  // Athletes only see the athlete deadline (falls back to client due for older rows).
+  const due = serializeProjectDueAt(project.athleteDueDate ?? project.dueDate);
   return {
     ...project,
     displayTitle,
@@ -204,6 +206,9 @@ export function serializeProjectForAthlete(project: Prisma.OpsProjectGetPayload<
     startDate: project.startDate?.toISOString().slice(0, 10) ?? null,
     dueDate: due.dueDate,
     dueAt: due.dueAt,
+    athleteDueDate: due.dueDate,
+    athleteDueAt: due.dueAt,
+    dueLabel: "Athlete deadline",
     updatedAt: project.updatedAt.toISOString(),
   };
 }

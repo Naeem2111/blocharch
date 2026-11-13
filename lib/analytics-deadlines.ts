@@ -32,6 +32,7 @@ export type BeatenDeadlinesByAthlete = {
 function resolveBeatenMinutes(
   project: {
     dueDate: Date;
+    athleteDueDate?: Date | null;
     completedAt: Date | null;
     updatedAt: Date;
     deadlineBeatenMinutes: number | null;
@@ -45,7 +46,8 @@ function resolveBeatenMinutes(
   if (project.deadlineBeatenDays != null && project.deadlineBeatenDays > 0) {
     return project.deadlineBeatenDays * 1440;
   }
-  const beat = computeDeadlineBeat(project.dueDate, completed);
+  const dueForBeat = project.athleteDueDate ?? project.dueDate;
+  const beat = computeDeadlineBeat(dueForBeat, completed);
   return beat.minutes;
 }
 
@@ -96,6 +98,7 @@ export async function buildBeatenDeadlines(
     const minutesBeaten = resolveBeatenMinutes(
       {
         dueDate,
+        athleteDueDate: p.athleteDueDate,
         completedAt: p.completedAt,
         updatedAt: p.updatedAt,
         deadlineBeatenMinutes: p.deadlineBeatenMinutes,

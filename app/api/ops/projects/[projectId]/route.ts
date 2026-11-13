@@ -17,7 +17,11 @@ import { computeDeadlineBeatMetrics } from "@/lib/project-completion";
 import { normalizeAthleteProjectCode } from "@/lib/ops-project-code";
 import { validateProjectLeadContactDb } from "@/lib/ops-project-lead";
 import { deleteProjectAndSyncSubmissions } from "@/lib/sync-submission-totals";
-import { parseProjectDueInput } from "@/lib/project-deadline";
+import {
+  defaultAthleteDueFromClientDue,
+  parseDualProjectDeadlines,
+  resolveInternalDueDate,
+} from "@/lib/project-deadline";
 import { ensureOpsProjectDueDate } from "@/lib/project-due-sources";
 import { serializeOpsProjectRow } from "@/lib/ops-project-serialize";
 import {
@@ -244,13 +248,18 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
 
     if (body.startDate !== undefined) data.startDate = body.startDate ? parseDateOnly(String(body.startDate)) : null;
-    if (body.dueDate !== undefined || body.dueAt !== undefined || body.dueTime !== undefined || body.dueAmPm !== undefined) {
-      data.dueDate = parseProjectDueInput({
-        dueAt: body.dueAt,
-        dueDate: body.dueDate,
-        dueTime: body.dueTime,
-        dueAmPm: body.dueAmPm,
-      });
+    {
+      const deadlines = parseDualProjectDeadlines(body, { autoAthleteFromClient: false });
+      if (deadlines.clientDueDate !== undefined) data.dueDate = deadlines.clientDueDate;
+      if (deadlines.athleteDueDate !== undefined) data.athleteDueDate = deadlines.athleteDueDate;
+      // When client deadline is set/changed and athlete deadline is still empty, seed the 3-day buffer.
+      if (
+        deadlines.clientDueDate instanceof Date &&
+        deadlines.athleteDueDate === undefined &&
+        !existing.athleteDueDate
+      ) {
+        data.athleteDueDate = defaultAthleteDueFromClientDue(deadlines.clientDueDate);
+      }
     }
     if (body.handoverDate !== undefined) data.handoverDate = body.handoverDate ? parseDateOnly(String(body.handoverDate)) : null;
 
@@ -279,8 +288,13 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (enteringArchive && data.completedAt === undefined && !existing.completedAt) {
       const completedAt = new Date();
       data.completedAt = completedAt;
-      const dueForBeat =
-        data.dueDate !== undefined ? (data.dueDate as Date | null) : existing.dueDate;
+      const dueForBeat = resolveInternalDueDate({
+        athleteDueDate:
+          data.athleteDueDate !== undefined
+            ? (data.athleteDueDate as Date | null)
+            : existing.athleteDueDate,
+        dueDate: data.dueDate !== undefined ? (data.dueDate as Date | null) : existing.dueDate,
+      });
       if (dueForBeat) {
         const beat = computeDeadlineBeatMetrics(dueForBeat, completedAt);
         if (body.deadlineBeatenDays === undefined) data.deadlineBeatenDays = beat.deadlineBeatenDays;

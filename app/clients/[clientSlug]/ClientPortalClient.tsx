@@ -147,22 +147,31 @@ function DateRange({
 	start,
 	end,
 	endColor,
+	endLabel,
 }: {
 	start: string | null;
 	end: string | null;
 	endColor?: string;
+	endLabel?: string;
 }) {
 	if (!start && !end) {
 		return <span className="text-xs text-slate-500">Dates to be confirmed</span>;
 	}
 	return (
-		<p className="text-left text-xs tabular-nums text-slate-400 sm:text-center">
-			{start ? formatShortDate(start) : "TBC"}
-			{" → "}
-			<span className="font-semibold" style={end && endColor ? { color: endColor } : undefined}>
-				{end ? formatShortDate(end) : "TBC"}
-			</span>
-		</p>
+		<div className="text-left text-xs tabular-nums text-slate-400 sm:text-center">
+			<p>
+				{start ? formatShortDate(start) : "TBC"}
+				{" → "}
+				<span className="font-semibold" style={end && endColor ? { color: endColor } : undefined}>
+					{end ? formatShortDate(end) : "TBC"}
+				</span>
+			</p>
+			{endLabel ? (
+				<p className="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-slate-500">
+					{endLabel}
+				</p>
+			) : null}
+		</div>
 	);
 }
 
@@ -208,7 +217,12 @@ function ProjectCard({
 					<span className="text-slate-600">·</span>
 					<LanePill n={project.laneNumber} />
 				</div>
-				<DateRange start={project.startDate} end={project.dueDate} endColor={accent} />
+				<DateRange
+					start={project.startDate}
+					end={project.dueDate}
+					endColor={accent}
+					endLabel="Client deadline"
+				/>
 				<span className="hidden sm:block" aria-hidden />
 			</div>
 			{!compact ? (
@@ -302,7 +316,7 @@ function DeadlineDetailModal({
 				<div className="flex items-start justify-between gap-3">
 					<div className="min-w-0">
 						<p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-							Upcoming deadline
+							Client deadline
 						</p>
 						<h2 id="deadline-dialog-title" className="mt-1 text-lg font-semibold leading-snug text-white">
 							{item.name}
