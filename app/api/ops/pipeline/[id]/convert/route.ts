@@ -8,7 +8,7 @@ import {
 } from "@/lib/ops-constants";
 import { requireOpsPipelineSession } from "@/lib/ops-access";
 import { parseDateOnly } from "@/lib/ops-hours";
-import { parseProjectDueInput } from "@/lib/project-deadline";
+import { defaultAthleteDueFromClientDue, parseProjectDueInput } from "@/lib/project-deadline";
 import { serializeOpsProjectRow } from "@/lib/ops-project-serialize";
 import { syncProjectBoardOnAssign } from "@/lib/planner-project-sync";
 import { normalizeAthleteProjectCode } from "@/lib/ops-project-code";
@@ -77,6 +77,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       body.dueDate || body.dueTime
         ? parseProjectDueInput(body)
         : pipeline.targetDueDate;
+    const athleteDueDate = dueDate ? defaultAthleteDueFromClientDue(dueDate) : null;
 
     const project = await prisma.$transaction(async (tx) => {
       const created = await tx.opsProject.create({
@@ -92,6 +93,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
           currentStatus,
           startDate,
           dueDate,
+          athleteDueDate,
           clientDescription: pipeline.description,
           notes: pipeline.notes,
         },

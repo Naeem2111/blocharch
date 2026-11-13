@@ -522,7 +522,10 @@ model OpsProject {
   projectLead       String?             @map("project_lead")
   complexity        OpsProjectComplexity @default(medium)
   startDate         DateTime?           @map("start_date") @db.Date
+  /** Client deadline — shown on the client portal (date + time). */
   dueDate           DateTime?           @map("due_date")
+  /** Athlete deadline — internal buffer before client delivery (date + time). */
+  athleteDueDate    DateTime?           @map("athlete_due_date")
   handoverDate      DateTime?           @map("handover_date") @db.Date
   currentStage      OpsProjectPhase     @default(survey_conversion) @map("current_stage")
   /** When currentStage is custom, this is the catalog phase/package. */

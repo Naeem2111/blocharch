@@ -18,8 +18,8 @@ import { parseClientDeliverables, type ClientPortalDeliverable } from "@/lib/cli
 import { formatHoursCompact } from "@/lib/ops-project-hours";
 import { dueAtFallbackForDateOnly, splitProjectDueAtWallClock } from "@/lib/project-deadline";
 import {
-  emptyProjectDueFields,
-  ProjectDueDateTimeFields,
+  DualProjectDeadlinesFields,
+  emptyDualProjectDeadlines,
 } from "@/components/ops/ProjectDueDateTimeFields";
 
 type ClientContactOption = { id: string; name: string; email: string | null };
@@ -66,6 +66,11 @@ type ProjectRow = {
   startDate: string | null;
   dueDate: string | null;
   dueAt: string | null;
+  clientDueDate?: string | null;
+  clientDueAt?: string | null;
+  athleteDueDate?: string | null;
+  athleteDueAt?: string | null;
+  showBothDeadlines?: boolean;
   notes: string | null;
   progressPercent: number | null;
   hoursLogged?: number;
@@ -86,7 +91,7 @@ const emptyCreate = {
   currentStage: "survey_conversion",
   complexity: "medium",
   quotedHours: "",
-  ...emptyProjectDueFields(),
+  ...emptyDualProjectDeadlines(),
 };
 
 const inputClass =
@@ -191,7 +196,7 @@ export function OpsProjectsClient() {
     currentStage: "survey_conversion",
     currentStatus: "not_started",
     startDate: "",
-    ...emptyProjectDueFields(),
+    ...emptyDualProjectDeadlines(),
     notes: "",
     clientDescription: "",
     quotedHours: "",
@@ -262,9 +267,12 @@ export function OpsProjectsClient() {
         ...form,
         ...assignment,
         projectLeadContactId: form.projectLeadContactId || null,
-        dueDate: form.dueDate || null,
-        dueTime: form.dueTime || null,
-        dueAmPm: form.dueAmPm,
+        dueDate: form.clientDueDate || null,
+        dueTime: form.clientDueTime || null,
+        dueAmPm: form.clientDueAmPm,
+        athleteDueDate: form.athleteDueDate || null,
+        athleteDueTime: form.athleteDueTime || null,
+        athleteDueAmPm: form.athleteDueAmPm,
         quotedHours: form.quotedHours.trim() === "" ? null : Number(form.quotedHours),
       }),
     });
@@ -290,7 +298,13 @@ export function OpsProjectsClient() {
       p.assignedAthleteId ??
       assignedAthleteIds[0] ??
       "";
-    const due = splitProjectDueAtWallClock(p.dueAt ?? (p.dueDate ? dueAtFallbackForDateOnly(p.dueDate) : null));
+    const clientIso =
+      p.clientDueAt ?? p.dueAt ?? (p.clientDueDate || p.dueDate ? dueAtFallbackForDateOnly(p.clientDueDate || p.dueDate!) : null);
+    const athleteIso =
+      p.athleteDueAt ?? (p.athleteDueDate ? dueAtFallbackForDateOnly(p.athleteDueDate) : null);
+    const client = splitProjectDueAtWallClock(clientIso);
+    const athlete = splitProjectDueAtWallClock(athleteIso);
+    const empty = emptyDualProjectDeadlines();
     setEditingId(p.id);
     setEditForm({
       clientId: p.clientId,
@@ -304,9 +318,12 @@ export function OpsProjectsClient() {
       currentStage: p.customStageId ? catalogValueFromId(p.customStageId) : p.currentStage,
       currentStatus: p.currentStatus,
       startDate: p.startDate ?? "",
-      dueDate: due.date,
-      dueTime: due.time || emptyProjectDueFields().dueTime,
-      dueAmPm: due.ampm,
+      clientDueDate: client.date,
+      clientDueTime: client.time || empty.clientDueTime,
+      clientDueAmPm: client.ampm,
+      athleteDueDate: athlete.date,
+      athleteDueTime: athlete.time || empty.athleteDueTime,
+      athleteDueAmPm: athlete.ampm,
       notes: p.notes ?? "",
       clientDescription: p.clientDescription ?? "",
       quotedHours: p.quotedHours != null ? String(p.quotedHours) : "",
@@ -333,9 +350,12 @@ export function OpsProjectsClient() {
         currentStage: editForm.currentStage,
         currentStatus: editForm.currentStatus,
         startDate: editForm.startDate || null,
-        dueDate: editForm.dueDate || null,
-        dueTime: editForm.dueTime || null,
-        dueAmPm: editForm.dueAmPm,
+        dueDate: editForm.clientDueDate || null,
+        dueTime: editForm.clientDueTime || null,
+        dueAmPm: editForm.clientDueAmPm,
+        athleteDueDate: editForm.athleteDueDate || null,
+        athleteDueTime: editForm.athleteDueTime || null,
+        athleteDueAmPm: editForm.athleteDueAmPm,
         notes: editForm.notes || null,
         quotedHours: editForm.quotedHours.trim() === "" ? null : Number(editForm.quotedHours),
         clientDescription: editForm.clientDescription.trim() || null,
@@ -371,29 +391,54 @@ export function OpsProjectsClient() {
     return projects.filter((p) => p.clientId === clientFilterId);
   }, [projects, clientFilterId]);
 
-  const calendarProjects = useMemo(
-    () =>
-      filteredProjects
-        .filter(
-          (p) =>
-            p.dueDate &&
-            p.currentStatus !== "completed" &&
-            p.currentStatus !== "handed_over"
-        )
-        .map((p) => ({
-          id: p.id,
-          name: p.displayTitle ?? p.name,
+  const calendarProjects = useMemo(() => {
+    const rows: Array<{
+      id: string;
+      name: string;
+      clientName: string;
+      clientLogoUrl: string | null;
+      clientLogoBgColor: string | null;
+      clientLogoTextTone: string | null;
+      dueDate: string;
+      dueAt: string | null;
+      progressPercent: number;
+      assignedAthleteName: string | null;
+    }> = [];
+    for (const p of filteredProjects) {
+      if (p.currentStatus === "completed" || p.currentStatus === "handed_over") continue;
+      const athleteDate = p.athleteDueDate;
+      const clientDate = p.clientDueDate ?? p.dueDate;
+      if (athleteDate) {
+        rows.push({
+          id: `${p.id}-athlete`,
+          name: `${p.displayTitle ?? p.name} (athlete)`,
           clientName: p.clientName,
           clientLogoUrl: p.clientLogoUrl,
           clientLogoBgColor: p.clientLogoBgColor,
           clientLogoTextTone: p.clientLogoTextTone,
-          dueDate: p.dueDate!,
-          dueAt: p.dueAt,
+          dueDate: athleteDate,
+          dueAt: p.athleteDueAt ?? null,
           progressPercent: p.progressPercent ?? 0,
           assignedAthleteName: p.assignedAthleteName,
-        })),
-    [filteredProjects]
-  );
+        });
+      }
+      if (clientDate) {
+        rows.push({
+          id: `${p.id}-client`,
+          name: `${p.displayTitle ?? p.name} (client)`,
+          clientName: p.clientName,
+          clientLogoUrl: p.clientLogoUrl,
+          clientLogoBgColor: p.clientLogoBgColor,
+          clientLogoTextTone: p.clientLogoTextTone,
+          dueDate: clientDate,
+          dueAt: p.clientDueAt ?? p.dueAt,
+          progressPercent: p.progressPercent ?? 0,
+          assignedAthleteName: p.assignedAthleteName,
+        });
+      }
+    }
+    return rows;
+  }, [filteredProjects]);
 
   const projectsByClient = useMemo(() => {
     const groups = new Map<
@@ -439,7 +484,11 @@ export function OpsProjectsClient() {
 
   function renderProjectCard(p: ProjectRow) {
     return (
-      <OpsProjectCardFrame key={p.id} dueDate={p.dueDate} dueAt={p.dueAt}>
+      <OpsProjectCardFrame
+        key={p.id}
+        dueDate={p.athleteDueDate ?? p.dueDate}
+        dueAt={p.athleteDueAt ?? p.dueAt}
+      >
         {editingId === p.id ? (
           <div className="grid gap-3 md:grid-cols-2">
             <label className="text-xs text-slate-400">
@@ -587,12 +636,15 @@ export function OpsProjectsClient() {
                 className={inputClass}
               />
             </label>
-            <ProjectDueDateTimeFields
+            <DualProjectDeadlinesFields
               className="md:col-span-2"
               value={{
-                dueDate: editForm.dueDate,
-                dueTime: editForm.dueTime,
-                dueAmPm: editForm.dueAmPm,
+                clientDueDate: editForm.clientDueDate,
+                clientDueTime: editForm.clientDueTime,
+                clientDueAmPm: editForm.clientDueAmPm,
+                athleteDueDate: editForm.athleteDueDate,
+                athleteDueTime: editForm.athleteDueTime,
+                athleteDueAmPm: editForm.athleteDueAmPm,
               }}
               onChange={(due) => setEditForm((f) => ({ ...f, ...due }))}
             />
@@ -723,9 +775,10 @@ export function OpsProjectsClient() {
   return (
     <div className="space-y-6">
       <div className="card-tool rounded-xl p-5 md:p-6">
-        <h2 className="text-base font-semibold text-white">Due date calendar</h2>
+        <h2 className="text-base font-semibold text-white">Deadline calendar</h2>
         <p className="mt-1.5 text-sm text-slate-500">
-          Active projects with due dates — browse by month. Respects the client filter below.
+          Active projects with athlete and client deadlines — browse by month. Respects the client
+          filter below.
         </p>
         <div className="mt-5">
           <label className="mb-4 block text-xs text-slate-400">
@@ -909,12 +962,15 @@ export function OpsProjectsClient() {
               className={inputClass}
             />
           </label>
-          <ProjectDueDateTimeFields
+          <DualProjectDeadlinesFields
             className="md:col-span-2"
             value={{
-              dueDate: form.dueDate,
-              dueTime: form.dueTime,
-              dueAmPm: form.dueAmPm,
+              clientDueDate: form.clientDueDate,
+              clientDueTime: form.clientDueTime,
+              clientDueAmPm: form.clientDueAmPm,
+              athleteDueDate: form.athleteDueDate,
+              athleteDueTime: form.athleteDueTime,
+              athleteDueAmPm: form.athleteDueAmPm,
             }}
             onChange={(due) => setForm((f) => ({ ...f, ...due }))}
           />

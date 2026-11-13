@@ -45,6 +45,9 @@ type ProjectRow = {
   startDate: string | null;
   dueDate: string | null;
   dueAt?: string | null;
+  dueLabel?: string | null;
+  athleteDueDate?: string | null;
+  athleteDueAt?: string | null;
   progressPercent: number | null;
   notes: string | null;
   laneNumber?: number | null;
@@ -155,7 +158,7 @@ export function AthleteProjectsClient() {
   return (
     <div className="space-y-6">
       <div className="card-tool rounded-xl p-5 md:p-6">
-        <h2 className="text-base font-semibold text-white">Due date calendar</h2>
+        <h2 className="text-base font-semibold text-white">Athlete deadline calendar</h2>
         <p className="mt-1.5 text-sm text-slate-500">
           Active projects with due dates — browse by month. Respects the client filter below.
         </p>
