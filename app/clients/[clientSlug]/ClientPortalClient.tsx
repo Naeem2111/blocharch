@@ -404,7 +404,7 @@ const NOTIFICATION_ICON: Record<
 > = {
 	deadline_beaten: { glyph: "★", bg: "rgba(234,179,8,0.15)", color: "#facc15" },
 	project_completed: { glyph: "✓", bg: "rgba(34,197,94,0.18)", color: "#4ade80" },
-	pipeline_added: { glyph: "+", bg: "rgba(59,130,246,0.18)", color: "#60a5fa" },
+	pipeline_added: { glyph: "", bg: "transparent", color: "#c084fc" },
 	hours_warning: { glyph: "!", bg: "rgba(245,158,11,0.18)", color: "#fbbf24" },
 	hours_cap: { glyph: "!", bg: "rgba(239,68,68,0.18)", color: "#f87171" },
 	overtime: { glyph: "£", bg: "rgba(6,182,212,0.15)", color: "#22d3ee" },
@@ -442,6 +442,16 @@ function NotificationRow({
 							strokeWidth="1.2"
 						/>
 						<path d="M8 1.8V5h3.2" fill="none" stroke="currentColor" strokeWidth="1.2" />
+					</svg>
+				) : notification.kind === "pipeline_added" ? (
+					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+						<path
+							stroke="currentColor"
+							strokeWidth="1.6"
+							strokeLinecap="round"
+							strokeLinejoin="round"
+							d="M7.2 10.9a2.25 2.25 0 1 0 0 2.2m0-2.2c.18.32.28.7.28 1.1s-.1.77-.28 1.1m0-2.2 9.6-5.3m-9.6 7.5 9.6 5.3m0 0a2.25 2.25 0 1 0 3.9 2.2 2.25 2.25 0 0 0-3.9-2.2Zm0-12.8a2.25 2.25 0 1 0 3.9-2.2 2.25 2.25 0 0 0-3.9 2.2Z"
+						/>
 					</svg>
 				) : (
 					icon.glyph
@@ -870,6 +880,7 @@ export function ClientPortalClient({
 							<div className="space-y-4">
 								{calendarPanel}
 								<ClientPortalTimeZones />
+								<PortalQuickLinks links={data.client.links} />
 							</div>
 							<div className="space-y-6">
 								<section>
@@ -927,7 +938,6 @@ export function ClientPortalClient({
 								</section>
 							</div>
 							<div className="space-y-4">
-								<PortalQuickLinks links={data.client.links} />
 								<section className="client-portal-card rounded-xl border border-white/[0.08] bg-white/[0.03] p-5">
 									<p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Completed packs</p>
 									<p className="mt-2 text-4xl font-semibold tabular-nums text-white">{data.completedProjects.length}</p>

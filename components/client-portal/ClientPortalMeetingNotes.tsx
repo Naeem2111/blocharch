@@ -93,6 +93,8 @@ export function ClientPortalMeetingNotes({
   const [notes, setNotes] = useState(initialNotes);
   const [discussedOpen, setDiscussedOpen] = useState(true);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [leavingId, setLeavingId] = useState<string | null>(null);
+  const [arrivedId, setArrivedId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ id: string } | null>(null);
   const [error, setError] = useState("");
   const chain = useRef(Promise.resolve());
@@ -186,12 +188,23 @@ export function ClientPortalMeetingNotes({
   }
 
   function markDiscussed(id: string) {
-    setToast({ id });
-    const current = notesRef.current;
-    sync(
-      { action: "discuss", id },
-      current.map((note) => (note.id === id ? { ...note, discussedAt: new Date().toISOString() } : note))
-    );
+    if (leavingId === id) return;
+    const finish = () => {
+      setLeavingId(null);
+      setArrivedId(id);
+      setToast({ id });
+      const current = notesRef.current;
+      sync(
+        { action: "discuss", id },
+        current.map((note) => (note.id === id ? { ...note, discussedAt: new Date().toISOString() } : note))
+      );
+    };
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      finish();
+      return;
+    }
+    setLeavingId(id);
+    window.setTimeout(finish, 320);
   }
 
   function reopen(id: string) {
@@ -249,7 +262,7 @@ export function ClientPortalMeetingNotes({
                     }}
                     className={`client-portal-card relative overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.03] ${
                       draggingId === note.id ? "opacity-60" : ""
-                    }`}
+                    } ${leavingId === note.id ? "portal-note-leaving" : ""}`}
                   >
                     <span className="absolute bottom-0 left-0 top-0 w-1 bg-amber-400" aria-hidden />
                     <div className="flex flex-col gap-3 py-3 pl-4 pr-3 sm:flex-row sm:items-center sm:gap-4 sm:pr-4">
@@ -298,7 +311,16 @@ export function ClientPortalMeetingNotes({
                         onClick={() => markDiscussed(note.id)}
                         className="inline-flex shrink-0 items-center gap-2 self-start rounded-lg border border-brand-400/50 px-3 py-2 text-sm text-slate-200 hover:bg-brand-500/10 sm:self-center"
                       >
-                        <span className="h-4 w-4 rounded border border-slate-400" aria-hidden />
+                        <span
+                          className={`inline-flex h-4 w-4 items-center justify-center rounded border ${
+                            leavingId === note.id
+                              ? "portal-discussed-toast-check border-emerald-400 bg-emerald-400 text-[10px] font-bold text-slate-950"
+                              : "border-slate-400"
+                          }`}
+                          aria-hidden
+                        >
+                          {leavingId === note.id ? "✓" : ""}
+                        </span>
                         Mark as discussed
                       </button>
                     </div>
@@ -332,7 +354,9 @@ export function ClientPortalMeetingNotes({
                         {group.notes.map((note) => (
                           <li
                             key={note.id}
-                            className="client-portal-card relative overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.03]"
+                            className={`client-portal-card relative overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.03] ${
+                              arrivedId === note.id ? "portal-note-arrived" : ""
+                            }`}
                           >
                             <span className="absolute bottom-0 left-0 top-0 w-1 bg-emerald-400" aria-hidden />
                             <div className="flex flex-col gap-3 py-3 pl-4 pr-4 sm:flex-row sm:items-center sm:justify-between">
@@ -366,9 +390,9 @@ export function ClientPortalMeetingNotes({
       )}
 
       {toast ? (
-        <div className="fixed bottom-5 right-4 z-50 flex items-center gap-4 rounded-xl border border-white/[0.1] bg-[#0e1726] px-4 py-3 shadow-2xl sm:right-8">
+        <div className="portal-discussed-toast fixed bottom-5 right-4 z-50 flex items-center gap-4 rounded-xl border border-white/[0.1] bg-[#0e1726] px-4 py-3 shadow-2xl sm:right-8">
           <p className="inline-flex items-center gap-2 text-sm font-medium text-white">
-            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-400 text-[11px] font-bold text-slate-950">
+            <span className="portal-discussed-toast-check inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-400 text-[11px] font-bold text-slate-950">
               ✓
             </span>
             Marked as discussed

@@ -960,6 +960,52 @@ html[data-theme="light"] .client-portal-shell .text-slate-600 {
   }
 }
 
+@keyframes portal-note-leave {
+  to {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+}
+
+.portal-note-leaving {
+  animation: portal-note-leave 320ms ease forwards;
+  pointer-events: none;
+}
+
+@keyframes portal-note-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.portal-note-arrived {
+  animation: portal-note-arrive 280ms ease;
+}
+
+@keyframes portal-discussed-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.portal-discussed-toast {
+  animation: portal-discussed-toast-in 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.portal-discussed-toast-check {
+  animation: planner-done-pop 420ms cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
 @keyframes portal-bell-swing {
   0%,
   62%,
@@ -984,6 +1030,10 @@ html[data-theme="light"] .client-portal-shell .text-slate-600 {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .portal-note-leaving,
+  .portal-note-arrived,
+  .portal-discussed-toast,
+  .portal-discussed-toast-check,
   .portal-bell-live,
   .portal-bell-live svg {
     animation: none;
