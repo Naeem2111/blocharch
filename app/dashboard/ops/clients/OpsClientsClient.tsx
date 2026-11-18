@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ClientMeetingNotesEditor } from "@/components/ops/ClientMeetingNotesEditor";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
 import { AvatarColorPicker } from "@/components/ops/AvatarColorPicker";
 import { AvatarTextTonePicker } from "@/components/ops/AvatarTextTonePicker";
@@ -580,7 +579,6 @@ export function OpsClientsClient() {
                     </button>
                   </div>
                 ) : null}
-                <ClientMeetingNotesEditor clientId={c.id} contacts={editForm.contacts} />
                 <label className="text-xs text-slate-400 md:col-span-2">
                   Notes
                   <textarea

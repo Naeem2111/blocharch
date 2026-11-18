@@ -238,6 +238,28 @@ function ProjectCard({
 				<LeadBlock name={project.leadName} />
 				<AthleteAssigned assigned={!!project.assignedAthleteName} />
 			</div>
+			{project.clientDeliverables.length > 0 ? (
+				<ul className="mt-4 space-y-2 pl-1">
+					{project.clientDeliverables.map((link) => (
+						<li key={`${link.label}-${link.url ?? ""}`}>
+							{link.url ? (
+								<a
+									href={link.url}
+									target="_blank"
+									rel="noopener noreferrer"
+									className="flex items-center gap-3 rounded-xl border border-white/[0.1] bg-white/[0.03] px-3 py-2.5 text-sm font-medium text-brand-200 hover:bg-white/[0.06]"
+								>
+									{link.label}
+								</a>
+							) : (
+								<span className="flex items-center gap-3 rounded-xl border border-white/[0.1] bg-white/[0.03] px-3 py-2.5 text-sm text-slate-300">
+									{link.label}
+								</span>
+							)}
+						</li>
+					))}
+				</ul>
+			) : null}
 			{project.documents.length > 0 ? (
 				<ul className="mt-4 space-y-2 pl-1">
 					{project.documents.map((doc) => (

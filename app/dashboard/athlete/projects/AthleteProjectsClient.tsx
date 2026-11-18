@@ -304,7 +304,10 @@ export function AthleteProjectsClient() {
                       </div>
                     ) : (
                       <>
-                        <OpsProjectCardBody project={p} onEdit={() => startEdit(p)} emphasizeDeadlines />
+                        <OpsProjectCardBody
+                          project={{ ...p, showBothDeadlines: true }}
+                          onEdit={() => startEdit(p)}
+                        />
                         {p.notes ? (
                           <p className="mt-3 pl-1 text-sm text-slate-400">
                             <span className="text-slate-500">Notes: </span>
