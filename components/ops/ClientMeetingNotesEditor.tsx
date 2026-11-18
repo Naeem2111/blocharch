@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { ClientMeetingNote, MeetingNoteProjectOption } from "@/lib/client-meeting-notes";
+import { MeetingNoteProjectChip } from "@/components/client-portal/MeetingNoteProjectChip";
 
 type ContactOption = { name: string };
 
@@ -182,31 +183,24 @@ export function ClientMeetingNotesEditor({
           {projectOptions.length === 0 ? (
             <p className="text-xs text-slate-500">This client has no projects to reference yet.</p>
           ) : (
-            <div className="max-h-40 space-y-1 overflow-y-auto rounded-md border border-white/[0.06] p-2">
+            <div className="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto rounded-md border border-white/[0.06] p-2">
               {projectOptions.map((project) => {
                 const checked = draft.projectIds.includes(project.id);
-                const done = project.currentStatus === "completed" || project.currentStatus === "handed_over";
                 return (
-                  <label key={project.id} className="flex items-start gap-2 text-sm text-slate-200">
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() =>
-                        setDraft((current) => ({
-                          ...current,
-                          projectIds: checked
-                            ? current.projectIds.filter((id) => id !== project.id)
-                            : [...current.projectIds, project.id],
-                        }))
-                      }
-                      className="mt-1 rounded border-white/20"
-                    />
-                    <span>
-                      {project.name}
-                      {project.address ? <span className="text-slate-500"> · {project.address}</span> : null}
-                      {done ? <span className="text-slate-500"> · Completed</span> : null}
-                    </span>
-                  </label>
+                  <MeetingNoteProjectChip
+                    key={project.id}
+                    name={project.name}
+                    dueDate={project.dueDate}
+                    selected={checked}
+                    onClick={() =>
+                      setDraft((current) => ({
+                        ...current,
+                        projectIds: checked
+                          ? current.projectIds.filter((id) => id !== project.id)
+                          : [...current.projectIds, project.id],
+                      }))
+                    }
+                  />
                 );
               })}
             </div>
@@ -250,9 +244,15 @@ export function ClientMeetingNotesEditor({
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-white">{note.title}</p>
-                  <p className="text-xs text-slate-500">
+                  {note.projects.length > 0 ? (
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {note.projects.map((project) => (
+                        <MeetingNoteProjectChip key={project.id} name={project.name} dueDate={project.dueDate} />
+                      ))}
+                    </div>
+                  ) : null}
+                  <p className="mt-1 text-xs text-slate-500">
                     {note.people.length > 0 ? `For ${note.people.join(", ")} · ` : ""}
-                    {note.projects.length > 0 ? `${note.projects.map((project) => project.name).join(", ")} · ` : ""}
                     {note.discussedAt ? "Discussed" : "To discuss"}
                   </p>
                 </div>

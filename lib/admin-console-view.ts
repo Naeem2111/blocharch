@@ -21,6 +21,7 @@ export const ADMIN_CONSOLE_VIEWS: {
 		label: "Show all",
 		sections: [
 			"marketing",
+			"recruitment",
 			"onboarding",
 			"ops",
 			"private_work",
@@ -40,13 +41,13 @@ export const ADMIN_CONSOLE_VIEWS: {
 	{
 		id: "manager",
 		label: "Manager",
-		sections: ["marketing", "ops"],
+		sections: ["marketing", "recruitment", "ops"],
 		home: "/dashboard",
 	},
 	{
 		id: "sales",
 		label: "Sales",
-		sections: ["marketing"],
+		sections: ["marketing", "recruitment"],
 		home: "/dashboard",
 	},
 	{

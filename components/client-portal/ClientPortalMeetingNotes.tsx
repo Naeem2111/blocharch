@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ClientMeetingNote } from "@/lib/client-meeting-notes";
+import { MeetingNoteProjectChip } from "@/components/client-portal/MeetingNoteProjectChip";
 
 function openNotes(notes: ClientMeetingNote[]) {
   return notes.filter((note) => !note.discussedAt).sort((a, b) => a.sortOrder - b.sortOrder || a.createdAt.localeCompare(b.createdAt));
@@ -54,9 +55,11 @@ function NoteContent({ note }: { note: ClientMeetingNote }) {
     <div className="min-w-0">
       <p className="font-semibold text-white">{note.title}</p>
       {note.projects.length > 0 ? (
-        <p className="mt-1 text-sm font-bold text-white">
-          {note.projects.map((project) => project.name).join(" · ")}
-        </p>
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {note.projects.map((project) => (
+            <MeetingNoteProjectChip key={project.id} name={project.name} dueDate={project.dueDate} />
+          ))}
+        </div>
       ) : null}
       {note.body ? <p className="mt-0.5 text-sm text-slate-400">{note.body}</p> : null}
       {note.people.length > 0 ? (

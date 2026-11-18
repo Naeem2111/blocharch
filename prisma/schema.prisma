@@ -1168,3 +1168,126 @@ model PrivateProjectExpense {
   @@index([athleteId, expenseDate])
   @@map("private_project_expenses")
 }
+
+enum RecruitmentStatus {
+  to_review
+  potential
+  shortlisted
+  onboarding
+  on_bench
+  live_active
+  archived
+}
+
+enum RecruitmentAvailability {
+  full_time
+  part_time
+  after_hours
+  unavailable
+  needs_confirmation
+}
+
+enum RecruitmentExperience {
+  under_3
+  from_3_under_5
+  from_5_under_10
+  ten_plus
+  not_specified
+}
+
+enum RecruitmentArchiveReason {
+  not_suitable
+  withdrew
+  no_longer_interested
+  duplicate
+  other
+}
+
+/** One Google Form submission. Status, comments and confirmed availability stay here and are not overwritten by a Sheet refresh. */
+model RecruitmentApplication {
+  id                          String                      @id @default(uuid())
+  sourceApplicationId         String                      @unique @map("source_application_id")
+  status                      RecruitmentStatus           @default(to_review)
+  previousStatus              RecruitmentStatus?          @map("previous_status")
+  fullName                    String                      @map("full_name")
+  email                       String?
+  phoneRaw                    String?                     @map("phone_raw")
+  phoneE164                   String?                     @map("phone_e164")
+  location                    String?
+  software                    String[]                    @default([])
+  softwareRaw                 String?                     @map("software_raw") @db.Text
+  experience                  RecruitmentExperience       @default(not_specified)
+  experienceRaw               String?                     @map("experience_raw")
+  experienceYears             Decimal?                    @map("experience_years") @db.Decimal(4, 1)
+  availabilitySubmitted       String?                     @map("availability_submitted") @db.Text
+  confirmedAvailability       RecruitmentAvailability     @default(needs_confirmation) @map("confirmed_availability")
+  availabilityNote            String?                     @map("availability_note")
+  availabilityUpdatedAt       DateTime?                   @map("availability_updated_at")
+  availabilityUpdatedByName   String?                     @map("availability_updated_by_name")
+  services                    String?                     @db.Text
+  answers                     Json
+  documents                   Json
+  submittedAt                 DateTime?                   @map("submitted_at")
+  archivedAt                  DateTime?                   @map("archived_at")
+  archiveReason               RecruitmentArchiveReason?   @map("archive_reason")
+  archiveComment              String?                     @map("archive_comment") @db.Text
+  archivedByName              String?                     @map("archived_by_name")
+  removedFromSourceAt         DateTime?                   @map("removed_from_source_at")
+  createdAt                   DateTime                    @default(now()) @map("created_at")
+  updatedAt                   DateTime                    @updatedAt @map("updated_at")
+
+  comments RecruitmentComment[]
+  activity RecruitmentActivity[]
+
+  @@index([status, submittedAt])
+  @@index([removedFromSourceAt])
+  @@map("recruitment_applications")
+}
+
+model RecruitmentComment {
+  id            String   @id @default(uuid())
+  applicationId String   @map("application_id")
+  authorName    String   @map("author_name")
+  body          String   @db.Text
+  fileLabel     String?  @map("file_label")
+  filePage      Int?     @map("file_page")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  application RecruitmentApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId, createdAt])
+  @@map("recruitment_comments")
+}
+
+model RecruitmentActivity {
+  id            String   @id @default(uuid())
+  applicationId String   @map("application_id")
+  actorName     String   @map("actor_name")
+  action        String
+  detail        String?  @db.Text
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  application RecruitmentApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId, createdAt])
+  @@map("recruitment_activity")
+}
+
+/** Source ids that must not be imported again after a permanent deletion. */
+model RecruitmentSuppression {
+  sourceApplicationId String   @id @map("source_application_id")
+  deletedAt           DateTime @default(now()) @map("deleted_at")
+  deletedByName       String?  @map("deleted_by_name")
+
+  @@map("recruitment_suppressions")
+}
+
+model RecruitmentSyncState {
+  id            String    @id @default("default")
+  status        String    @default("disconnected")
+  lastSuccessAt DateTime? @map("last_success_at")
+  lastError     String?   @map("last_error") @db.Text
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@map("recruitment_sync_state")
+}

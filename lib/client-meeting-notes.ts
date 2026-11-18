@@ -4,6 +4,8 @@ export type ClientMeetingNoteProject = {
   id: string;
   name: string;
   address: string | null;
+  /** Client deadline, used to colour the project chip the same way as the project card. */
+  dueDate: string | null;
 };
 
 export type ClientMeetingNote = {
@@ -38,7 +40,7 @@ type NoteRow = {
   discussedAt: Date | null;
   createdAt: Date;
   projects: {
-    project: { id: string; name: string; address: string | null };
+    project: { id: string; name: string; address: string | null; dueDate: Date | null };
   }[];
 };
 
@@ -46,7 +48,12 @@ export function serializeClientMeetingNote(note: NoteRow): ClientMeetingNote {
   const stored = note.people.map((name) => name.trim()).filter(Boolean);
   const people = stored.length > 0 ? stored : note.forName?.trim() ? [note.forName.trim()] : [];
   const projects = note.projects
-    .map((link) => link.project)
+    .map((link) => ({
+      id: link.project.id,
+      name: link.project.name,
+      address: link.project.address,
+      dueDate: link.project.dueDate?.toISOString() ?? null,
+    }))
     .sort((a, b) => a.name.localeCompare(b.name));
   return {
     id: note.id,
@@ -63,7 +70,7 @@ export function serializeClientMeetingNote(note: NoteRow): ClientMeetingNote {
 const noteInclude = {
   projects: {
     include: {
-      project: { select: { id: true, name: true, address: true } },
+      project: { select: { id: true, name: true, address: true, dueDate: true } },
     },
   },
 } as const;
@@ -84,7 +91,7 @@ function projectIsCompleted(status: string): boolean {
 export async function listClientMeetingNoteProjects(clientId: string): Promise<MeetingNoteProjectOption[]> {
   const rows = await prisma.opsProject.findMany({
     where: { clientId },
-    select: { id: true, name: true, address: true, currentStatus: true, completedAt: true },
+    select: { id: true, name: true, address: true, currentStatus: true, completedAt: true, dueDate: true },
   });
   rows.sort((a, b) => {
     const aDone = projectIsCompleted(a.currentStatus);
@@ -101,6 +108,7 @@ export async function listClientMeetingNoteProjects(clientId: string): Promise<M
     id: project.id,
     name: project.name,
     address: project.address,
+    dueDate: project.dueDate?.toISOString() ?? null,
     currentStatus: project.currentStatus,
   }));
 }

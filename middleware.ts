@@ -148,6 +148,7 @@ export const config = {
     "/api/n8n/:path*",
     "/api/geocode/:path*",
     "/api/marketing/:path*",
+    "/api/recruitment/:path*",
     "/api/me",
     "/api/me/preferences",
     "/api/admin/:path*",

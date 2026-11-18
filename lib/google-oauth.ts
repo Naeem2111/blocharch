@@ -4,6 +4,7 @@ export const GOOGLE_OAUTH_SCOPES = [
   "https://www.googleapis.com/auth/calendar",
   "https://www.googleapis.com/auth/calendar.events",
   "https://www.googleapis.com/auth/drive",
+  "https://www.googleapis.com/auth/spreadsheets",
 ];
 
 export const GOOGLE_OAUTH_STATE_COOKIE = "blocharch_google_oauth";
