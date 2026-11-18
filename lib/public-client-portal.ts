@@ -63,6 +63,7 @@ export type PublicClientPortalPipelineProject = {
   expectedStageLabel: string | null;
   targetStartDate: string | null;
   targetDueDate: string | null;
+  createdAt: string | null;
 };
 
 export type PublicClientPortalData = {

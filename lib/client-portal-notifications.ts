@@ -1,4 +1,4 @@
-import type { PublicClientPortalProject } from "@/lib/public-client-portal";
+import type { PublicClientPortalPipelineProject, PublicClientPortalProject } from "@/lib/public-client-portal";
 import type { ClientMeetingNote } from "@/lib/client-meeting-notes";
 import type { ClientPortalHours } from "@/lib/client-portal-hours";
 import {
@@ -8,6 +8,8 @@ import {
 
 export type ClientPortalNotificationKind =
   | "deadline_beaten"
+  | "project_completed"
+  | "pipeline_added"
   | "hours_warning"
   | "hours_cap"
   | "overtime"
@@ -22,8 +24,16 @@ export type ClientPortalNotification = {
   /** When the event happened. The bell sorts by this, newest first. */
   occurredAt: string;
   projectId: string;
-  action?: "overtime" | "meeting_note";
+  action?: "overtime" | "meeting_note" | "pipeline" | "completed";
 };
+
+const RECENT_MS = 14 * 24 * 60 * 60 * 1000;
+
+function isRecent(iso: string | null | undefined, windowMs = RECENT_MS): boolean {
+  if (!iso) return false;
+  const time = new Date(iso).getTime();
+  return Number.isFinite(time) && Date.now() - time <= windowMs && time <= Date.now() + 60_000;
+}
 
 function relativeLabelFromIso(iso: string | null, fallback = "Recently"): string {
   if (!iso) return fallback;
@@ -84,6 +94,40 @@ function meetingNoteTimeLabel(iso: string): string {
   return relativeLabelFromIso(iso.slice(0, 10));
 }
 
+function buildPipelineNotifications(
+  pipeline: PublicClientPortalPipelineProject[]
+): ClientPortalNotification[] {
+  return pipeline
+    .filter((project) => isRecent(project.createdAt))
+    .map((project) => ({
+      id: `pipeline-${project.id}`,
+      kind: "pipeline_added" as const,
+      title: "New pipeline added",
+      description: project.name,
+      timeLabel: meetingNoteTimeLabel(project.createdAt!),
+      occurredAt: project.createdAt!,
+      projectId: project.id,
+      action: "pipeline" as const,
+    }));
+}
+
+function buildCompletedNotifications(
+  completedProjects: PublicClientPortalProject[]
+): ClientPortalNotification[] {
+  return completedProjects
+    .filter((project) => isRecent(project.completedAt))
+    .map((project) => ({
+      id: `${project.id}-completed`,
+      kind: "project_completed" as const,
+      title: "Project completed",
+      description: project.name,
+      timeLabel: meetingNoteTimeLabel(project.completedAt!),
+      occurredAt: project.completedAt!,
+      projectId: project.id,
+      action: "completed" as const,
+    }));
+}
+
 function buildMeetingNoteNotifications(notes: ClientMeetingNote[]): ClientPortalNotification[] {
   const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
   return notes
@@ -105,7 +149,8 @@ export function buildClientPortalNotifications(
   _activeProjects: PublicClientPortalProject[],
   completedProjects: PublicClientPortalProject[],
   hours?: ClientPortalHours,
-  meetingNotes: ClientMeetingNote[] = []
+  meetingNotes: ClientMeetingNote[] = [],
+  pipelineProjects: PublicClientPortalPipelineProject[] = []
 ): ClientPortalNotification[] {
   const beaten = completedProjects
     .filter((p) => clientPortalProjectBeatDeadline(p))
@@ -126,11 +171,14 @@ export function buildClientPortalNotifications(
       timeLabel: relativeLabelFromIso(completedDay, "Recently"),
       occurredAt: p.completedAt ?? "",
       projectId: p.id,
+      action: "completed" as const,
     };
   });
 
   const items = [
     ...buildMeetingNoteNotifications(meetingNotes),
+    ...buildPipelineNotifications(pipelineProjects),
+    ...buildCompletedNotifications(completedProjects),
     ...(hours ? buildHoursNotifications(hours) : []),
     ...deadlineItems,
   ];

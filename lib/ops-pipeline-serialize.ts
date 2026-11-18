@@ -15,6 +15,7 @@ type PipelineRow = {
   visibleToClient: boolean;
   convertedProjectId: string | null;
   convertedAt: Date | null;
+  createdAt?: Date | null;
   updatedAt: Date;
   client?: {
     name: string;
@@ -58,5 +59,6 @@ export function serializePublicPipelineRow(row: PipelineRow) {
     expectedStageLabel: row.expectedStage ? displayProjectStageLabel(row.expectedStage) : null,
     targetStartDate: row.targetStartDate?.toISOString().slice(0, 10) ?? null,
     targetDueDate: row.targetDueDate?.toISOString().slice(0, 10) ?? null,
+    createdAt: row.createdAt?.toISOString() ?? null,
   };
 }

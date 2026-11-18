@@ -49,26 +49,28 @@ function Chevron({ dir }: { dir: "up" | "down" }) {
   );
 }
 
-function NoteMeta({ note }: { note: ClientMeetingNote }) {
-  if (note.people.length === 0 && note.projects.length === 0) return null;
+function NoteContent({ note }: { note: ClientMeetingNote }) {
   return (
-    <div className="mt-2 flex flex-wrap gap-1.5">
-      {note.people.map((name) => (
-        <span
-          key={name}
-          className="inline-flex rounded-full bg-white/[0.08] px-2.5 py-0.5 text-[11px] font-medium text-slate-300"
-        >
-          For: {name}
-        </span>
-      ))}
-      {note.projects.map((project) => (
-        <span
-          key={project.id}
-          className="inline-flex rounded-full border border-brand-400/30 bg-brand-500/10 px-2.5 py-0.5 text-[11px] font-medium text-brand-200"
-        >
-          {project.name}
-        </span>
-      ))}
+    <div className="min-w-0">
+      <p className="font-semibold text-white">{note.title}</p>
+      {note.projects.length > 0 ? (
+        <p className="mt-1 text-sm font-bold text-white">
+          {note.projects.map((project) => project.name).join(" · ")}
+        </p>
+      ) : null}
+      {note.body ? <p className="mt-0.5 text-sm text-slate-400">{note.body}</p> : null}
+      {note.people.length > 0 ? (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {note.people.map((name) => (
+            <span
+              key={name}
+              className="inline-flex rounded-full bg-white/[0.08] px-2.5 py-0.5 text-[11px] font-medium text-slate-300"
+            >
+              For: {name}
+            </span>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -286,11 +288,7 @@ export function ClientPortalMeetingNotes({
                             <Chevron dir="down" />
                           </button>
                         </span>
-                        <div className="min-w-0">
-                          <p className="font-semibold text-white">{note.title}</p>
-                          <p className="mt-0.5 text-sm text-slate-400">{note.body}</p>
-                          <NoteMeta note={note} />
-                        </div>
+                        <NoteContent note={note} />
                       </div>
                       <button
                         type="button"
@@ -335,11 +333,7 @@ export function ClientPortalMeetingNotes({
                           >
                             <span className="absolute bottom-0 left-0 top-0 w-1 bg-emerald-400" aria-hidden />
                             <div className="flex flex-col gap-3 py-3 pl-4 pr-4 sm:flex-row sm:items-center sm:justify-between">
-                              <div className="min-w-0">
-                                <p className="font-semibold text-white">{note.title}</p>
-                                <p className="mt-0.5 text-sm text-slate-400">{note.body}</p>
-                                <NoteMeta note={note} />
-                              </div>
+                              <NoteContent note={note} />
                               <div className="shrink-0 text-left sm:text-right">
                                 <p className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-300">
                                   <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-emerald-400 text-[10px] font-bold text-slate-950">

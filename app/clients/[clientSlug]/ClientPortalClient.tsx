@@ -402,6 +402,8 @@ const NOTIFICATION_ICON: Record<
 	{ glyph: string; bg: string; color: string }
 > = {
 	deadline_beaten: { glyph: "★", bg: "rgba(234,179,8,0.15)", color: "#facc15" },
+	project_completed: { glyph: "✓", bg: "rgba(34,197,94,0.18)", color: "#4ade80" },
+	pipeline_added: { glyph: "+", bg: "rgba(59,130,246,0.18)", color: "#60a5fa" },
 	hours_warning: { glyph: "!", bg: "rgba(245,158,11,0.18)", color: "#fbbf24" },
 	hours_cap: { glyph: "!", bg: "rgba(239,68,68,0.18)", color: "#f87171" },
 	overtime: { glyph: "£", bg: "rgba(6,182,212,0.15)", color: "#22d3ee" },
@@ -413,11 +415,15 @@ function NotificationRow({
 	unread,
 	onOvertime,
 	onOpenNote,
+	onOpenPipeline,
+	onOpenCompleted,
 }: {
 	notification: ClientPortalNotification;
 	unread: boolean;
 	onOvertime?: () => void;
 	onOpenNote?: () => void;
+	onOpenPipeline?: () => void;
+	onOpenCompleted?: () => void;
 }) {
 	const icon = NOTIFICATION_ICON[notification.kind];
 	return (
@@ -461,6 +467,24 @@ function NotificationRow({
 						View note →
 					</button>
 				) : null}
+				{notification.action === "pipeline" && onOpenPipeline ? (
+					<button
+						type="button"
+						onClick={onOpenPipeline}
+						className="mt-1.5 text-xs font-medium text-brand-300 hover:text-brand-200"
+					>
+						View pipeline →
+					</button>
+				) : null}
+				{notification.action === "completed" && onOpenCompleted ? (
+					<button
+						type="button"
+						onClick={onOpenCompleted}
+						className="mt-1.5 text-xs font-medium text-brand-300 hover:text-brand-200"
+					>
+						View project →
+					</button>
+				) : null}
 			</div>
 			<div className="flex shrink-0 flex-col items-end gap-1 pt-0.5">
 				<span className="text-[11px] text-slate-500">{notification.timeLabel}</span>
@@ -489,8 +513,15 @@ export function ClientPortalClient({
 	const bellRef = useRef<HTMLDivElement>(null);
 
 	const notifications = useMemo(
-		() => buildClientPortalNotifications(data.activeProjects, data.completedProjects, data.hours, data.meetingNotes),
-		[data.activeProjects, data.completedProjects, data.hours, data.meetingNotes],
+		() =>
+			buildClientPortalNotifications(
+				data.activeProjects,
+				data.completedProjects,
+				data.hours,
+				data.meetingNotes,
+				data.pipelineProjects,
+			),
+		[data.activeProjects, data.completedProjects, data.hours, data.meetingNotes, data.pipelineProjects],
 	);
 	const unreadCount = notifications.filter((n) => !readNotificationIds.has(n.id)).length;
 	const laneCaptions = useMemo(() => laneHoursCaption(data.hours), [data.hours]);
@@ -784,6 +815,8 @@ export function ClientPortalClient({
 														unread={!readNotificationIds.has(n.id)}
 														onOvertime={openOvertime}
 														onOpenNote={() => go("notes")}
+														onOpenPipeline={() => go("pipeline")}
+														onOpenCompleted={() => go("completed")}
 													/>
 												))
 											)}

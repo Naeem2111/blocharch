@@ -118,13 +118,16 @@ export function ClientMeetingNotesEditor({
           placeholder="Title"
           className="block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
         />
-        <textarea
-          value={draft.body}
-          onChange={(event) => setDraft((current) => ({ ...current, body: event.target.value }))}
-          placeholder="What to discuss"
-          rows={2}
-          className="block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
-        />
+        <label className="block text-[11px] text-slate-500">
+          Discussion, optional
+          <textarea
+            value={draft.body}
+            onChange={(event) => setDraft((current) => ({ ...current, body: event.target.value }))}
+            placeholder="Add a note if you need one"
+            rows={2}
+            className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+          />
+        </label>
         <div className="space-y-2">
           <p className="text-[11px] text-slate-500">People are optional. Add another when a point is for more than one person.</p>
           {draft.people.map((name, index) => (

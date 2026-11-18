@@ -77,13 +77,32 @@ export async function listClientMeetingNotes(clientId: string): Promise<ClientMe
   return rows.map(serializeClientMeetingNote);
 }
 
+function projectIsCompleted(status: string): boolean {
+  return status === "completed" || status === "handed_over";
+}
+
 export async function listClientMeetingNoteProjects(clientId: string): Promise<MeetingNoteProjectOption[]> {
   const rows = await prisma.opsProject.findMany({
     where: { clientId },
-    orderBy: [{ name: "asc" }],
-    select: { id: true, name: true, address: true, currentStatus: true },
+    select: { id: true, name: true, address: true, currentStatus: true, completedAt: true },
   });
-  return rows;
+  rows.sort((a, b) => {
+    const aDone = projectIsCompleted(a.currentStatus);
+    const bDone = projectIsCompleted(b.currentStatus);
+    if (aDone !== bDone) return aDone ? 1 : -1;
+    if (aDone && bDone) {
+      const aTime = a.completedAt?.getTime() ?? 0;
+      const bTime = b.completedAt?.getTime() ?? 0;
+      if (aTime !== bTime) return bTime - aTime;
+    }
+    return a.name.localeCompare(b.name);
+  });
+  return rows.map((project) => ({
+    id: project.id,
+    name: project.name,
+    address: project.address,
+    currentStatus: project.currentStatus,
+  }));
 }
 
 export function parseMeetingNoteFields(input: {
@@ -93,7 +112,7 @@ export function parseMeetingNoteFields(input: {
   const title = String(input.title ?? "").trim();
   const body = String(input.body ?? "").trim();
   if (!title || title.length > TITLE_MAX) return { ok: false, error: "Add a short title." };
-  if (!body || body.length > BODY_MAX) return { ok: false, error: "Add what you want to discuss." };
+  if (body.length > BODY_MAX) return { ok: false, error: "Shorten the discussion." };
   return { ok: true, title, body };
 }
 
