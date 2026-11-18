@@ -5,7 +5,7 @@ import Link from "next/link";
 import { AddPracticeForm } from "@/components/practices/AddPracticeForm";
 import { EditPracticeModal } from "@/components/practices/EditPracticeModal";
 import { PracticeTypeSelect } from "@/components/practices/PracticeTypeSelect";
-import { practiceTypeLabel, type PracticeTypeValue } from "@/lib/practice-types";
+import { isPracticeType, PRACTICE_TYPES, practiceTypeLabel, type PracticeTypeValue } from "@/lib/practice-types";
 import { getBestAddressFromFields } from "@/lib/address-display";
 import { gmailComposeUrl } from "@/lib/gmail-compose";
 
@@ -104,6 +104,7 @@ export function PracticesClient() {
 	const [tab, setTab] = useState<"active" | "deleted">("active");
 	const [q, setQ] = useState("");
 	const [query, setQuery] = useState("");
+	const [practiceType, setPracticeType] = useState<"" | PracticeTypeValue>("");
 	const [page, setPage] = useState(1);
 	const [data, setData] = useState<{
 		items: Architect[];
@@ -141,6 +142,7 @@ export function PracticesClient() {
 		setRestoreError(null);
 		const params = new URLSearchParams();
 		if (query) params.set("q", query);
+		if (practiceType) params.set("type", practiceType);
 		params.set("page", String(page));
 		params.set("perPage", "25");
 		if (tab === "deleted") params.set("deleted", "1");
@@ -148,7 +150,7 @@ export function PracticesClient() {
 			.then((r) => r.json())
 			.then(setData)
 			.finally(() => setLoading(false));
-	}, [query, page, refreshKey, tab]);
+	}, [query, page, practiceType, refreshKey, tab]);
 
 	const switchTab = (next: "active" | "deleted") => {
 		setTab(next);
@@ -315,6 +317,23 @@ export function PracticesClient() {
 				</p>
 			) : null}
 			<div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-start sm:gap-3">
+				<select
+					value={practiceType}
+					onChange={(event) => {
+						const value = event.target.value;
+						setPracticeType(isPracticeType(value) ? value : "");
+						setPage(1);
+					}}
+					aria-label="Filter by practice type"
+					className="select-console rounded-lg px-3 py-2.5 text-sm sm:w-52"
+				>
+					<option value="">All types</option>
+					{PRACTICE_TYPES.map((type) => (
+						<option key={type.value} value={type.value}>
+							{type.label}
+						</option>
+					))}
+				</select>
 				<input
 					type="search"
 					value={q}

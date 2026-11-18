@@ -4,6 +4,7 @@ import { createManualPractice, searchArchitects, searchDeletedArchitects } from 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const q = searchParams.get("q") || undefined;
+  const practiceType = searchParams.get("type") || undefined;
   const page = parseInt(searchParams.get("page") || "1", 10);
   const perPage = parseInt(searchParams.get("perPage") || "25", 10);
   const deleted =
@@ -11,8 +12,8 @@ export async function GET(request: NextRequest) {
     searchParams.get("deleted") === "true";
 
   const result = deleted
-    ? await searchDeletedArchitects({ q, page, perPage })
-    : await searchArchitects({ q, page, perPage });
+    ? await searchDeletedArchitects({ q, page, perPage, practiceType })
+    : await searchArchitects({ q, page, perPage, practiceType });
   return Response.json(result);
 }
 

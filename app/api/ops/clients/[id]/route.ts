@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { OpsPricingTier } from "@prisma/client";
 import {
@@ -19,6 +20,8 @@ import {
 	parseContactsFromBody,
 } from "@/lib/ops-client-api";
 import { resolveUniqueClientSlug, slugifyClientName } from "@/lib/client-slug";
+import { normalizeClientDeliverablesForSave } from "@/lib/client-portal-deliverables";
+import { revalidateClientPortalByClientId } from "@/lib/revalidate-client-portal";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -46,6 +49,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 			slug?: string | null;
 			publicPortalEnabled?: boolean;
 			notes?: string | null;
+			clientLinks?: Prisma.InputJsonValue | typeof Prisma.JsonNull;
 			logoUrl?: string | null;
 			logoBgColor?: string | null;
 			logoTextTone?: string | null;
@@ -75,6 +79,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 			clientData.country = body.country ? String(body.country).trim() : null;
 		if (body.notes !== undefined)
 			clientData.notes = body.notes ? String(body.notes).trim() : null;
+		if (body.clientLinks !== undefined) {
+			const links = normalizeClientDeliverablesForSave(body.clientLinks);
+			clientData.clientLinks = links === null ? Prisma.JsonNull : links;
+		}
 		if (body.status === "active" || body.status === "inactive")
 			clientData.status = body.status;
 
@@ -237,6 +245,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 			});
 		});
 
+		await revalidateClientPortalByClientId(id);
 		return NextResponse.json({ client: mapClientToJson(client) });
 	} catch {
 		return NextResponse.json({ error: "Invalid request" }, { status: 400 });

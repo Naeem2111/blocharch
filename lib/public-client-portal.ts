@@ -74,6 +74,7 @@ export type PublicClientPortalData = {
     logoBgColor: string | null;
     logoTextTone: string | null;
     activeLaneCount: number;
+    links: ClientPortalDeliverable[];
   };
   pipelineProjects: PublicClientPortalPipelineProject[];
   activeProjects: PublicClientPortalProject[];
@@ -321,6 +322,7 @@ export async function getPublicClientPortal(clientSlug: string): Promise<PublicC
       logoBgColor: client.logoBgColor,
       logoTextTone: client.logoTextTone,
       activeLaneCount,
+      links: parseClientDeliverables(client.clientLinks),
     },
     pipelineProjects: pipelineRows.map(serializePublicPipelineRow),
     activeProjects: mapped.filter(isClientPortalActiveProject),

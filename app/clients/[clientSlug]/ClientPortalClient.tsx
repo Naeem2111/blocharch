@@ -20,6 +20,7 @@ import { formatPortalHours } from "@/lib/client-portal-hours";
 import { daysUntilDueFromIso, projectDueColor } from "@/lib/project-color-scale";
 import { ClientPortalMeetingNotes } from "@/components/client-portal/ClientPortalMeetingNotes";
 import { ClientPortalTimeZones } from "@/components/client-portal/ClientPortalTimeZones";
+import { PortalQuickLinks } from "@/components/client-portal/PortalQuickLinks";
 import { PublicThemeToggle } from "@/components/client-portal/PublicThemeToggle";
 import type {
 	PublicClientPortalData,
@@ -168,7 +169,7 @@ function DateRange({
 				</span>
 			</p>
 			{endLabel ? (
-				<p className="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-slate-500">
+				<p className="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-white">
 					{endLabel}
 				</p>
 			) : null}
@@ -238,28 +239,6 @@ function ProjectCard({
 				<LeadBlock name={project.leadName} />
 				<AthleteAssigned assigned={!!project.assignedAthleteName} />
 			</div>
-			{project.clientDeliverables.length > 0 ? (
-				<ul className="mt-4 space-y-2 pl-1">
-					{project.clientDeliverables.map((link) => (
-						<li key={`${link.label}-${link.url ?? ""}`}>
-							{link.url ? (
-								<a
-									href={link.url}
-									target="_blank"
-									rel="noopener noreferrer"
-									className="flex items-center gap-3 rounded-xl border border-white/[0.1] bg-white/[0.03] px-3 py-2.5 text-sm font-medium text-brand-200 hover:bg-white/[0.06]"
-								>
-									{link.label}
-								</a>
-							) : (
-								<span className="flex items-center gap-3 rounded-xl border border-white/[0.1] bg-white/[0.03] px-3 py-2.5 text-sm text-slate-300">
-									{link.label}
-								</span>
-							)}
-						</li>
-					))}
-				</ul>
-			) : null}
 			{project.documents.length > 0 ? (
 				<ul className="mt-4 space-y-2 pl-1">
 					{project.documents.map((doc) => (
@@ -948,6 +927,7 @@ export function ClientPortalClient({
 								</section>
 							</div>
 							<div className="space-y-4">
+								<PortalQuickLinks links={data.client.links} />
 								<section className="client-portal-card rounded-xl border border-white/[0.08] bg-white/[0.03] p-5">
 									<p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Completed packs</p>
 									<p className="mt-2 text-4xl font-semibold tabular-nums text-white">{data.completedProjects.length}</p>

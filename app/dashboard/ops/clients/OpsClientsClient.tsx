@@ -9,6 +9,7 @@ import type { AvatarTextTone } from "@/lib/avatar-text-tone";
 import { asAvatarTextTone, DEFAULT_AVATAR_TEXT_TONE } from "@/lib/avatar-text-tone";
 import { DEFAULT_AVATAR_BG } from "@/lib/hex-color";
 import { clientPortalPath } from "@/lib/client-slug";
+import { parseClientDeliverables, type ClientPortalDeliverable } from "@/lib/client-portal-deliverables";
 
 type ClientContact = { id?: string; name: string; email: string };
 
@@ -24,6 +25,7 @@ type ClientRow = {
   slug: string | null;
   publicPortalEnabled: boolean;
   notes: string | null;
+  clientLinks?: unknown;
   logoUrl: string | null;
   logoBgColor: string | null;
   logoTextTone: string | null;
@@ -179,6 +181,7 @@ export function OpsClientsClient() {
     slug: "",
     publicPortalEnabled: false,
     notes: "",
+    clientLinks: [] as ClientPortalDeliverable[],
     tierPercent: "30",
     laneCostGbp: "2041",
     activeLaneCount: "1",
@@ -255,6 +258,7 @@ export function OpsClientsClient() {
       slug: c.slug ?? "",
       publicPortalEnabled: c.publicPortalEnabled,
       notes: c.notes ?? "",
+      clientLinks: parseClientDeliverables(c.clientLinks),
       tierPercent: String(c.commercial?.tierPercent ?? 30),
       laneCostGbp: String(c.commercial?.laneCostGbp ?? 2041),
       activeLaneCount: String(c.commercial?.activeLaneCount ?? 1),
@@ -282,6 +286,7 @@ export function OpsClientsClient() {
         slug: editForm.slug.trim() || null,
         publicPortalEnabled: editForm.publicPortalEnabled,
         notes: editForm.notes,
+        clientLinks: editForm.clientLinks,
         tierPercent: Number(editForm.tierPercent),
         laneCostGbp: Number(editForm.laneCostGbp),
         activeLaneCount: Number(editForm.activeLaneCount),
@@ -579,6 +584,66 @@ export function OpsClientsClient() {
                     </button>
                   </div>
                 ) : null}
+                <div className="md:col-span-2">
+                  <p className="text-xs text-slate-400">Portal links</p>
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    Zoom and other links this client sees on their portal.
+                  </p>
+                  <ul className="mt-2 space-y-2">
+                    {editForm.clientLinks.map((link, index) => (
+                      <li key={index} className="flex flex-wrap gap-2">
+                        <input
+                          value={link.label}
+                          onChange={(event) =>
+                            setEditForm((current) => {
+                              const next = [...current.clientLinks];
+                              next[index] = { ...next[index]!, label: event.target.value };
+                              return { ...current, clientLinks: next };
+                            })
+                          }
+                          placeholder="e.g. BLOCHARCH | Client Meetings — Dedicated Zoom Link"
+                          className="min-w-[10rem] flex-1 rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+                        />
+                        <input
+                          value={link.url ?? ""}
+                          onChange={(event) =>
+                            setEditForm((current) => {
+                              const next = [...current.clientLinks];
+                              next[index] = { ...next[index]!, url: event.target.value.trim() || null };
+                              return { ...current, clientLinks: next };
+                            })
+                          }
+                          placeholder="https://…"
+                          className="min-w-[12rem] flex-[2] rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setEditForm((current) => ({
+                              ...current,
+                              clientLinks: current.clientLinks.filter((_, item) => item !== index),
+                            }))
+                          }
+                          className="text-xs text-red-400 hover:underline"
+                        >
+                          Remove
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setEditForm((current) => ({
+                        ...current,
+                        clientLinks: [...current.clientLinks, { label: "", url: null }],
+                      }))
+                    }
+                    className="mt-2 text-xs text-brand-300 hover:underline"
+                  >
+                    + Add link
+                  </button>
+                </div>
                 <label className="text-xs text-slate-400 md:col-span-2">
                   Notes
                   <textarea

@@ -397,6 +397,8 @@ model OpsClient {
   slug                 String? @unique
   publicPortalEnabled  Boolean @default(false) @map("public_portal_enabled")
   notes       String?         @db.Text
+  /** Client-facing links (Zoom and others) shown on the public portal. */
+  clientLinks Json?           @map("client_links")
   /** Google Drive folder for this UK client's shared files. Separate from private clients. */
   googleDriveFolderId String? @map("google_drive_folder_id")
   createdAt   DateTime        @default(now()) @map("created_at")

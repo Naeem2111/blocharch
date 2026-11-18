@@ -5,7 +5,6 @@ import Link from "next/link";
 export const ONBOARDING_NAV = [
   { href: "/dashboard/ops/clients", label: "Clients" },
   { href: "/dashboard/ops/meeting-notes", label: "Meeting notes" },
-  { href: "/dashboard/ops/project-links", label: "Project links" },
   { href: "/dashboard/ops/athletes", label: "Athletes" },
   { href: "/dashboard/ops/calculator", label: "Calculator" },
 ] as const;

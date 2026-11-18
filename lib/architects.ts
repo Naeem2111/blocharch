@@ -51,6 +51,11 @@ export async function getArchitectById(id: string): Promise<Architect | undefine
   return idx >= 0 ? architects[idx] : undefined;
 }
 
+function filterArchitectsByType(architects: Architect[], practiceType?: string): Architect[] {
+  if (!practiceType || !isPracticeType(practiceType)) return architects;
+  return architects.filter((architect) => (architect.practice_type || "architecture_firm") === practiceType);
+}
+
 function filterArchitectsByQuery(architects: Architect[], qRaw?: string): Architect[] {
   const q = (qRaw || "").trim().toLowerCase();
   if (!q) return architects;
@@ -82,8 +87,12 @@ export async function searchArchitects(params: {
   q?: string;
   page?: number;
   perPage?: number;
+  practiceType?: string;
 }): Promise<{ items: Architect[]; total: number; page: number; totalPages: number }> {
-  const architects = filterArchitectsByQuery(await loadArchitects(), params.q);
+  const architects = filterArchitectsByType(
+    filterArchitectsByQuery(await loadArchitects(), params.q),
+    params.practiceType
+  );
   return paginateArchitects(architects, params);
 }
 
@@ -104,10 +113,11 @@ export async function searchDeletedArchitects(params: {
   q?: string;
   page?: number;
   perPage?: number;
+  practiceType?: string;
 }): Promise<{ items: DeletedArchitect[]; total: number; page: number; totalPages: number }> {
-  const architects = filterArchitectsByQuery(
-    await loadDeletedArchitects(),
-    params.q
+  const architects = filterArchitectsByType(
+    filterArchitectsByQuery(await loadDeletedArchitects(), params.q),
+    params.practiceType
   ) as DeletedArchitect[];
   return paginateArchitects(architects, params) as {
     items: DeletedArchitect[];

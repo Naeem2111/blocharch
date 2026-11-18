@@ -182,6 +182,9 @@ export function OpsProjectCardBody({
   });
   const athletes = assignedAthleteRows(project);
   const dueLabel = project.dueLabel?.trim() || null;
+  const athleteDueColor = projectDueColor(daysUntilDueFromIso(athleteDueIso));
+  const clientDueColor = projectDueColor(daysUntilDueFromIso(clientDueIso));
+  const primaryDueColor = projectDueColor(daysUntilDueFromIso(primaryDueIso));
 
   return (
     <div className="pl-1">
@@ -237,23 +240,27 @@ export function OpsProjectCardBody({
           {showDual ? (
             <div className="space-y-1">
               <p>
-                <span className="text-[10px] uppercase tracking-wider text-slate-500">Athlete </span>
-                <span className="font-semibold text-white">{formatShortDate(athleteDueIso)}</span>
+                <span className="text-[10px] uppercase tracking-wider text-white">Athlete </span>
+                <span className="font-semibold" style={{ color: athleteDueColor }}>
+                  {formatShortDate(athleteDueIso)}
+                </span>
               </p>
               <p>
-                <span className="text-[10px] uppercase tracking-wider text-slate-500">Client </span>
-                <span className="font-semibold text-white">{formatShortDate(clientDueIso)}</span>
+                <span className="text-[10px] uppercase tracking-wider text-white">Client </span>
+                <span className="font-semibold" style={{ color: clientDueColor }}>
+                  {formatShortDate(clientDueIso)}
+                </span>
               </p>
             </div>
           ) : project.startDate || primaryDueIso ? (
             <p>
               {project.startDate ? formatShortDate(project.startDate) : "TBC"}
               {" — "}
-              <span className="font-semibold text-white">
+              <span className="font-semibold" style={{ color: primaryDueColor }}>
                 {primaryDueIso ? formatShortDate(primaryDueIso) : "TBC"}
               </span>
               {dueLabel ? (
-                <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-wider text-slate-500">
+                <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-wider text-white">
                   {dueLabel}
                 </span>
               ) : null}

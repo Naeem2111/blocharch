@@ -1,5 +1,7 @@
 /** Shared ops client contact parsing and API response shape. */
 
+import { parseClientDeliverables } from "@/lib/client-portal-deliverables";
+
 export type ClientContactInput = { name: string; email: string | null };
 
 export type ClientContactRow = {
@@ -83,6 +85,7 @@ type ClientWithRelations = {
 	slug: string | null;
 	publicPortalEnabled: boolean;
 	notes: string | null;
+	clientLinks?: unknown;
 	contacts: {
 		id: string;
 		name: string;
@@ -119,6 +122,7 @@ export function mapClientToJson(c: ClientWithRelations) {
 		slug: c.slug ?? null,
 		publicPortalEnabled: c.publicPortalEnabled ?? false,
 		notes: c.notes,
+		clientLinks: parseClientDeliverables(c.clientLinks),
 		projectCount: c._count.projects,
 		commercial: c.commercial
 			? {
