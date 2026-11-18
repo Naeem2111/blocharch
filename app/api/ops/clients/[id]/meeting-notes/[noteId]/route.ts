@@ -1,6 +1,12 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { listClientMeetingNotes, parseMeetingNoteFields } from "@/lib/client-meeting-notes";
+import {
+  listClientMeetingNotes,
+  parseMeetingNoteFields,
+  parseMeetingNotePeople,
+  parseMeetingNoteProjectIds,
+  replaceMeetingNoteProjects,
+} from "@/lib/client-meeting-notes";
 import { requireOpsSession } from "@/lib/ops-access";
 import { prisma } from "@/lib/prisma";
 import { revalidateClientPortalByClientId } from "@/lib/revalidate-client-portal";
@@ -21,30 +27,56 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     title?: unknown;
     body?: unknown;
     forName?: unknown;
+    people?: unknown;
+    projectIds?: unknown;
     discussed?: unknown;
   } | null;
 
-  const data: { title?: string; body?: string; forName?: string; discussedAt?: Date | null } = {};
-  if (body && (body.title !== undefined || body.body !== undefined || body.forName !== undefined)) {
+  const data: {
+    title?: string;
+    body?: string;
+    forName?: string | null;
+    people?: string[];
+    discussedAt?: Date | null;
+  } = {};
+  const editingFields =
+    body != null &&
+    (body.title !== undefined || body.body !== undefined || body.people !== undefined || body.forName !== undefined);
+  if (editingFields && body) {
     const current = await prisma.opsClientMeetingNote.findUnique({ where: { id: noteId } });
     const parsed = parseMeetingNoteFields({
       title: body.title !== undefined ? body.title : current?.title,
       body: body.body !== undefined ? body.body : current?.body,
-      forName: body.forName !== undefined ? body.forName : current?.forName,
     });
     if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
+    const people = parseMeetingNotePeople(
+      body.people !== undefined ? body.people : current?.people?.length ? current.people : undefined,
+      body.people !== undefined ? undefined : current?.forName
+    );
+    if (!people.ok) return NextResponse.json({ error: people.error }, { status: 400 });
     data.title = parsed.title;
     data.body = parsed.body;
-    data.forName = parsed.forName;
+    data.people = people.people;
+    data.forName = people.people[0] ?? null;
   }
   if (body && typeof body.discussed === "boolean") {
     data.discussedAt = body.discussed ? new Date() : null;
   }
-  if (Object.keys(data).length === 0) {
+  const projectIds = body && body.projectIds !== undefined ? parseMeetingNoteProjectIds(body.projectIds) : null;
+  if (projectIds && !projectIds.ok) return NextResponse.json({ error: projectIds.error }, { status: 400 });
+  if (Object.keys(data).length === 0 && !projectIds) {
     return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
   }
 
-  await prisma.opsClientMeetingNote.update({ where: { id: noteId }, data });
+  try {
+    if (Object.keys(data).length > 0) {
+      await prisma.opsClientMeetingNote.update({ where: { id: noteId }, data });
+    }
+    if (projectIds?.ok) await replaceMeetingNoteProjects(noteId, id, projectIds.projectIds);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not update that note.";
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
   await revalidateClientPortalByClientId(id);
   const notes = await listClientMeetingNotes(id);
   return NextResponse.json({ notes });

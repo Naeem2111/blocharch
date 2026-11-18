@@ -49,6 +49,30 @@ function Chevron({ dir }: { dir: "up" | "down" }) {
   );
 }
 
+function NoteMeta({ note }: { note: ClientMeetingNote }) {
+  if (note.people.length === 0 && note.projects.length === 0) return null;
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5">
+      {note.people.map((name) => (
+        <span
+          key={name}
+          className="inline-flex rounded-full bg-white/[0.08] px-2.5 py-0.5 text-[11px] font-medium text-slate-300"
+        >
+          For: {name}
+        </span>
+      ))}
+      {note.projects.map((project) => (
+        <span
+          key={project.id}
+          className="inline-flex rounded-full border border-brand-400/30 bg-brand-500/10 px-2.5 py-0.5 text-[11px] font-medium text-brand-200"
+        >
+          {project.name}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function applyOrder(notes: ClientMeetingNote[], ids: string[]) {
   const rank = new Map(ids.map((id, index) => [id, index]));
   return notes.map((note) => (rank.has(note.id) ? { ...note, sortOrder: rank.get(note.id)! } : note));
@@ -265,9 +289,7 @@ export function ClientPortalMeetingNotes({
                         <div className="min-w-0">
                           <p className="font-semibold text-white">{note.title}</p>
                           <p className="mt-0.5 text-sm text-slate-400">{note.body}</p>
-                          <p className="mt-2 inline-flex rounded-full bg-white/[0.08] px-2.5 py-0.5 text-[11px] font-medium text-slate-300">
-                            For: {note.forName}
-                          </p>
+                          <NoteMeta note={note} />
                         </div>
                       </div>
                       <button
@@ -316,9 +338,7 @@ export function ClientPortalMeetingNotes({
                               <div className="min-w-0">
                                 <p className="font-semibold text-white">{note.title}</p>
                                 <p className="mt-0.5 text-sm text-slate-400">{note.body}</p>
-                                <p className="mt-2 inline-flex rounded-full bg-white/[0.08] px-2.5 py-0.5 text-[11px] font-medium text-slate-300">
-                                  For: {note.forName}
-                                </p>
+                                <NoteMeta note={note} />
                               </div>
                               <div className="shrink-0 text-left sm:text-right">
                                 <p className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-300">

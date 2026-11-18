@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { ClientMeetingNote } from "@/lib/client-meeting-notes";
+import type { ClientMeetingNote, MeetingNoteProjectOption } from "@/lib/client-meeting-notes";
 
 type ContactOption = { name: string };
 
-const emptyDraft = { title: "", body: "", forName: "" };
+const emptyDraft = { title: "", body: "", people: [""], projectIds: [] as string[] };
 
 export function ClientMeetingNotesEditor({
   clientId,
@@ -15,6 +15,7 @@ export function ClientMeetingNotesEditor({
   contacts: ContactOption[];
 }) {
   const [notes, setNotes] = useState<ClientMeetingNote[]>([]);
+  const [projectOptions, setProjectOptions] = useState<MeetingNoteProjectOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState(emptyDraft);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -23,13 +24,18 @@ export function ClientMeetingNotesEditor({
 
   const load = useCallback(async () => {
     const response = await fetch(`/api/ops/clients/${clientId}/meeting-notes`);
-    const payload = (await response.json().catch(() => null)) as { notes?: ClientMeetingNote[]; error?: string } | null;
+    const payload = (await response.json().catch(() => null)) as {
+      notes?: ClientMeetingNote[];
+      projects?: MeetingNoteProjectOption[];
+      error?: string;
+    } | null;
     if (!response.ok) {
       setError(payload?.error || "Could not load meeting notes.");
       setLoading(false);
       return;
     }
     setNotes(payload?.notes ?? []);
+    setProjectOptions(payload?.projects ?? []);
     setLoading(false);
   }, [clientId]);
 
@@ -47,7 +53,12 @@ export function ClientMeetingNotesEditor({
       {
         method: editingId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(draft),
+        body: JSON.stringify({
+          title: draft.title,
+          body: draft.body,
+          people: draft.people.map((name) => name.trim()).filter(Boolean),
+          projectIds: draft.projectIds,
+        }),
       }
     );
     const payload = (await response.json().catch(() => null)) as { notes?: ClientMeetingNote[]; error?: string } | null;
@@ -114,20 +125,90 @@ export function ClientMeetingNotesEditor({
           rows={2}
           className="block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
         />
-        <input
-          value={draft.forName}
-          onChange={(event) => setDraft((current) => ({ ...current, forName: event.target.value }))}
-          placeholder="For"
-          list={`meeting-note-people-${clientId}`}
-          className="block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
-        />
-        {names.length > 0 ? (
-          <datalist id={`meeting-note-people-${clientId}`}>
-            {names.map((name) => (
-              <option key={name} value={name} />
-            ))}
-          </datalist>
-        ) : null}
+        <div className="space-y-2">
+          <p className="text-[11px] text-slate-500">People are optional. Add another when a point is for more than one person.</p>
+          {draft.people.map((name, index) => (
+            <div key={index} className="flex gap-2">
+              <input
+                value={name}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    people: current.people.map((person, personIndex) =>
+                      personIndex === index ? event.target.value : person
+                    ),
+                  }))
+                }
+                placeholder={index === 0 ? "Person (optional)" : "Another person"}
+                list={`meeting-note-people-${clientId}`}
+                className="block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+              />
+              {draft.people.length > 1 ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setDraft((current) => ({
+                      ...current,
+                      people: current.people.filter((_, personIndex) => personIndex !== index),
+                    }))
+                  }
+                  className="shrink-0 text-xs text-slate-500 hover:text-slate-200"
+                >
+                  Remove
+                </button>
+              ) : null}
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => setDraft((current) => ({ ...current, people: [...current.people, ""] }))}
+            className="text-xs text-brand-300 hover:text-brand-200"
+          >
+            Add another person
+          </button>
+          {names.length > 0 ? (
+            <datalist id={`meeting-note-people-${clientId}`}>
+              {names.map((name) => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
+          ) : null}
+        </div>
+        <fieldset className="space-y-1.5">
+          <legend className="text-[11px] text-slate-500">Projects, optional</legend>
+          {projectOptions.length === 0 ? (
+            <p className="text-xs text-slate-500">This client has no projects to reference yet.</p>
+          ) : (
+            <div className="max-h-40 space-y-1 overflow-y-auto rounded-md border border-white/[0.06] p-2">
+              {projectOptions.map((project) => {
+                const checked = draft.projectIds.includes(project.id);
+                const done = project.currentStatus === "completed" || project.currentStatus === "handed_over";
+                return (
+                  <label key={project.id} className="flex items-start gap-2 text-sm text-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() =>
+                        setDraft((current) => ({
+                          ...current,
+                          projectIds: checked
+                            ? current.projectIds.filter((id) => id !== project.id)
+                            : [...current.projectIds, project.id],
+                        }))
+                      }
+                      className="mt-1 rounded border-white/20"
+                    />
+                    <span>
+                      {project.name}
+                      {project.address ? <span className="text-slate-500"> · {project.address}</span> : null}
+                      {done ? <span className="text-slate-500"> · Completed</span> : null}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          )}
+        </fieldset>
         <div className="flex gap-2">
           <button
             type="button"
@@ -167,8 +248,8 @@ export function ClientMeetingNotesEditor({
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-white">{note.title}</p>
                   <p className="text-xs text-slate-500">
-                    For {note.forName}
-                    {" · "}
+                    {note.people.length > 0 ? `For ${note.people.join(", ")} · ` : ""}
+                    {note.projects.length > 0 ? `${note.projects.map((project) => project.name).join(", ")} · ` : ""}
                     {note.discussedAt ? "Discussed" : "To discuss"}
                   </p>
                 </div>
@@ -177,7 +258,12 @@ export function ClientMeetingNotesEditor({
                     type="button"
                     onClick={() => {
                       setEditingId(note.id);
-                      setDraft({ title: note.title, body: note.body, forName: note.forName });
+                      setDraft({
+                        title: note.title,
+                        body: note.body,
+                        people: note.people.length ? note.people : [""],
+                        projectIds: note.projects.map((project) => project.id),
+                      });
                     }}
                     className="text-brand-300 hover:text-brand-200"
                   >

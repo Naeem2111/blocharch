@@ -433,16 +433,32 @@ model OpsClientMeetingNote {
   clientId    String    @map("client_id")
   title       String    @db.VarChar(160)
   body        String    @db.Text
-  forName     String    @map("for_name") @db.VarChar(120)
+  /** First person, kept for older rows. The full optional list is `people`. */
+  forName     String?   @map("for_name") @db.VarChar(120)
+  /** Optional people this point is for. Empty means nobody is named. */
+  people      String[]  @default([])
   sortOrder   Int       @default(0) @map("sort_order")
   discussedAt DateTime? @map("discussed_at")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
-  client OpsClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client   OpsClient                      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  projects OpsClientMeetingNoteProject[]
 
   @@index([clientId, sortOrder])
   @@map("ops_client_meeting_notes")
+}
+
+model OpsClientMeetingNoteProject {
+  noteId    String @map("note_id")
+  projectId String @map("project_id")
+
+  note    OpsClientMeetingNote @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  project OpsProject           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([noteId, projectId])
+  @@index([projectId])
+  @@map("ops_client_meeting_note_projects")
 }
 
 model OpsClientCommercialProfile {
@@ -584,6 +600,7 @@ model OpsProject {
   pipelineSource  OpsPipelineProject?
   customStage     OpsCatalogPhase?      @relation("ProjectCustomStage", fields: [customStageId], references: [id], onDelete: SetNull)
   documents       OpsProjectDocument[]
+  meetingNotes    OpsClientMeetingNoteProject[]
 
   @@index([clientId, projectNumber])
   @@index([assignedAthleteId])

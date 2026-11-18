@@ -1,6 +1,13 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { listClientMeetingNotes, parseMeetingNoteFields } from "@/lib/client-meeting-notes";
+import {
+  listClientMeetingNoteProjects,
+  listClientMeetingNotes,
+  parseMeetingNoteFields,
+  parseMeetingNotePeople,
+  parseMeetingNoteProjectIds,
+  replaceMeetingNoteProjects,
+} from "@/lib/client-meeting-notes";
 import { requireOpsSession } from "@/lib/ops-access";
 import { prisma } from "@/lib/prisma";
 import { revalidateClientPortalByClientId } from "@/lib/revalidate-client-portal";
@@ -17,8 +24,11 @@ export async function GET(request: NextRequest, context: RouteContext) {
   const { id } = await context.params;
   const client = await existingClient(id);
   if (!client) return NextResponse.json({ error: "Client not found" }, { status: 404 });
-  const notes = await listClientMeetingNotes(client.id);
-  return NextResponse.json({ notes });
+  const [notes, projects] = await Promise.all([
+    listClientMeetingNotes(client.id),
+    listClientMeetingNoteProjects(client.id),
+  ]);
+  return NextResponse.json({ notes, projects });
 }
 
 export async function POST(request: NextRequest, context: RouteContext) {
@@ -32,9 +42,15 @@ export async function POST(request: NextRequest, context: RouteContext) {
     title?: unknown;
     body?: unknown;
     forName?: unknown;
+    people?: unknown;
+    projectIds?: unknown;
   } | null;
   const parsed = parseMeetingNoteFields(body ?? {});
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
+  const people = parseMeetingNotePeople(body?.people, body?.forName);
+  if (!people.ok) return NextResponse.json({ error: people.error }, { status: 400 });
+  const projectIds = parseMeetingNoteProjectIds(body?.projectIds);
+  if (!projectIds.ok) return NextResponse.json({ error: projectIds.error }, { status: 400 });
 
   const last = await prisma.opsClientMeetingNote.findFirst({
     where: { clientId: client.id, discussedAt: null },
@@ -42,15 +58,22 @@ export async function POST(request: NextRequest, context: RouteContext) {
     select: { sortOrder: true },
   });
 
-  await prisma.opsClientMeetingNote.create({
-    data: {
-      clientId: client.id,
-      title: parsed.title,
-      body: parsed.body,
-      forName: parsed.forName,
-      sortOrder: (last?.sortOrder ?? -1) + 1,
-    },
-  });
+  try {
+    const created = await prisma.opsClientMeetingNote.create({
+      data: {
+        clientId: client.id,
+        title: parsed.title,
+        body: parsed.body,
+        people: people.people,
+        forName: people.people[0] ?? null,
+        sortOrder: (last?.sortOrder ?? -1) + 1,
+      },
+    });
+    await replaceMeetingNoteProjects(created.id, client.id, projectIds.projectIds);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not save that note.";
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
   await revalidateClientPortalByClientId(client.id);
   const notes = await listClientMeetingNotes(client.id);
   return NextResponse.json({ notes });
