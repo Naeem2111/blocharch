@@ -12,6 +12,7 @@ import { ensureOpsProjectDueDates } from "@/lib/project-due-sources";
 import { serializePublicPipelineRow } from "@/lib/ops-pipeline-serialize";
 import { PROJECT_STATUS_LABELS, COMPLEXITY_LABELS, displayProjectStageLabel } from "@/lib/ops-constants";
 import { getClientPortalHours, getClientPortalPhaseAverages, type ClientPortalHours, type ClientPortalPhaseAverage } from "@/lib/client-portal-hours";
+import { listClientMeetingNotes, type ClientMeetingNote } from "@/lib/client-meeting-notes";
 
 export type PublicClientPortalTask = {
   id: string;
@@ -78,6 +79,7 @@ export type PublicClientPortalData = {
   completedProjects: PublicClientPortalProject[];
   hours: ClientPortalHours;
   phaseAverages: ClientPortalPhaseAverage[];
+  meetingNotes: ClientMeetingNote[];
 };
 
 function clientStatusBadge(
@@ -308,6 +310,7 @@ export async function getPublicClientPortal(clientSlug: string): Promise<PublicC
     overtimeRateGbp: Number(client.commercial?.overtimeBillingGbp ?? 20),
   });
   const phaseAverages = await getClientPortalPhaseAverages(completedProjects);
+  const meetingNotes = await listClientMeetingNotes(client.id);
 
   return {
     client: {
@@ -323,5 +326,6 @@ export async function getPublicClientPortal(clientSlug: string): Promise<PublicC
     completedProjects,
     hours,
     phaseAverages,
+    meetingNotes,
   };
 }

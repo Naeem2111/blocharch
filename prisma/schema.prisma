@@ -407,6 +407,7 @@ model OpsClient {
   projects   OpsProject[]
   pipelineProjects OpsPipelineProject[]
   lineItems  OpsSubmissionLineItem[]
+  meetingNotes OpsClientMeetingNote[]
 
   @@map("ops_clients")
 }
@@ -424,6 +425,24 @@ model OpsClientContact {
 
   @@index([clientId])
   @@map("ops_client_contacts")
+}
+
+/** Agenda points on the public client portal Meeting Notes page. */
+model OpsClientMeetingNote {
+  id          String    @id @default(uuid())
+  clientId    String    @map("client_id")
+  title       String    @db.VarChar(160)
+  body        String    @db.Text
+  forName     String    @map("for_name") @db.VarChar(120)
+  sortOrder   Int       @default(0) @map("sort_order")
+  discussedAt DateTime? @map("discussed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  client OpsClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, sortOrder])
+  @@map("ops_client_meeting_notes")
 }
 
 model OpsClientCommercialProfile {

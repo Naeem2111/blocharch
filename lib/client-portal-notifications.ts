@@ -1,4 +1,5 @@
 import type { PublicClientPortalProject } from "@/lib/public-client-portal";
+import type { ClientMeetingNote } from "@/lib/client-meeting-notes";
 import type { ClientPortalHours } from "@/lib/client-portal-hours";
 import {
   clientPortalDeadlineBeatDescription,
@@ -9,7 +10,8 @@ export type ClientPortalNotificationKind =
   | "deadline_beaten"
   | "hours_warning"
   | "hours_cap"
-  | "overtime";
+  | "overtime"
+  | "meeting_note";
 
 export type ClientPortalNotification = {
   id: string;
@@ -18,7 +20,7 @@ export type ClientPortalNotification = {
   description: string;
   timeLabel: string;
   projectId: string;
-  action?: "overtime";
+  action?: "overtime" | "meeting_note";
 };
 
 function relativeLabelFromIso(iso: string | null, fallback = "Recently"): string {
@@ -70,10 +72,35 @@ export function buildHoursNotifications(hours: ClientPortalHours): ClientPortalN
   return items;
 }
 
+function meetingNoteTimeLabel(iso: string): string {
+  const created = new Date(iso);
+  if (Number.isNaN(created.getTime())) return "Recently";
+  const diffMs = Date.now() - created.getTime();
+  if (diffMs >= 0 && diffMs < 60 * 60 * 1000) return "Just now";
+  return relativeLabelFromIso(iso.slice(0, 10));
+}
+
+function buildMeetingNoteNotifications(notes: ClientMeetingNote[]): ClientPortalNotification[] {
+  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  return notes
+    .filter((note) => !note.discussedAt && new Date(note.createdAt).getTime() >= weekAgo)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .map((note) => ({
+      id: `meeting-note-${note.id}`,
+      kind: "meeting_note" as const,
+      title: "New meeting note",
+      description: note.title,
+      timeLabel: meetingNoteTimeLabel(note.createdAt),
+      projectId: note.id,
+      action: "meeting_note" as const,
+    }));
+}
+
 export function buildClientPortalNotifications(
   _activeProjects: PublicClientPortalProject[],
   completedProjects: PublicClientPortalProject[],
-  hours?: ClientPortalHours
+  hours?: ClientPortalHours,
+  meetingNotes: ClientMeetingNote[] = []
 ): ClientPortalNotification[] {
   const beaten = completedProjects
     .filter((p) => clientPortalProjectBeatDeadline(p))
@@ -96,7 +123,7 @@ export function buildClientPortalNotifications(
     };
   });
 
-  return [...(hours ? buildHoursNotifications(hours) : []), ...deadlineItems];
+  return [...buildMeetingNoteNotifications(meetingNotes), ...(hours ? buildHoursNotifications(hours) : []), ...deadlineItems];
 }
 
 export function laneHoursCaption(

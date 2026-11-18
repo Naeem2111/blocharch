@@ -18,6 +18,7 @@ import {
 } from "@/lib/client-portal-notifications";
 import { formatPortalHours } from "@/lib/client-portal-hours";
 import { daysUntilDueFromIso, projectDueColor } from "@/lib/project-color-scale";
+import { ClientPortalMeetingNotes } from "@/components/client-portal/ClientPortalMeetingNotes";
 import { ClientPortalTimeZones } from "@/components/client-portal/ClientPortalTimeZones";
 import { PublicThemeToggle } from "@/components/client-portal/PublicThemeToggle";
 import type {
@@ -26,7 +27,7 @@ import type {
 	PublicClientPortalProject,
 } from "@/lib/public-client-portal";
 
-type PortalPage = "overview" | "tracker" | "pipeline" | "completed";
+type PortalPage = "overview" | "tracker" | "pipeline" | "completed" | "notes";
 
 type UpcomingDeadline =
 	| {
@@ -404,16 +405,19 @@ const NOTIFICATION_ICON: Record<
 	hours_warning: { glyph: "!", bg: "rgba(245,158,11,0.18)", color: "#fbbf24" },
 	hours_cap: { glyph: "!", bg: "rgba(239,68,68,0.18)", color: "#f87171" },
 	overtime: { glyph: "£", bg: "rgba(6,182,212,0.15)", color: "#22d3ee" },
+	meeting_note: { glyph: "☰", bg: "rgba(6,182,212,0.15)", color: "#22d3ee" },
 };
 
 function NotificationRow({
 	notification,
 	unread,
 	onOvertime,
+	onOpenNote,
 }: {
 	notification: ClientPortalNotification;
 	unread: boolean;
 	onOvertime?: () => void;
+	onOpenNote?: () => void;
 }) {
 	const icon = NOTIFICATION_ICON[notification.kind];
 	return (
@@ -422,7 +426,19 @@ function NotificationRow({
 				className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold"
 				style={{ backgroundColor: icon.bg, color: icon.color }}
 			>
-				{icon.glyph}
+				{notification.kind === "meeting_note" ? (
+					<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden>
+						<path
+							d="M3 1.5h5.2L11.5 4.8V12.5H3z"
+							fill="none"
+							stroke="currentColor"
+							strokeWidth="1.2"
+						/>
+						<path d="M8 1.8V5h3.2" fill="none" stroke="currentColor" strokeWidth="1.2" />
+					</svg>
+				) : (
+					icon.glyph
+				)}
 			</span>
 			<div className="min-w-0 flex-1">
 				<p className="text-sm font-semibold text-white">{notification.title}</p>
@@ -434,6 +450,15 @@ function NotificationRow({
 						className="mt-1.5 text-xs font-medium text-brand-300 hover:text-brand-200"
 					>
 						View overtime breakdown →
+					</button>
+				) : null}
+				{notification.action === "meeting_note" && onOpenNote ? (
+					<button
+						type="button"
+						onClick={onOpenNote}
+						className="mt-1.5 text-xs font-medium text-brand-300 hover:text-brand-200"
+					>
+						View note →
 					</button>
 				) : null}
 			</div>
@@ -464,8 +489,8 @@ export function ClientPortalClient({
 	const bellRef = useRef<HTMLDivElement>(null);
 
 	const notifications = useMemo(
-		() => buildClientPortalNotifications(data.activeProjects, data.completedProjects, data.hours),
-		[data.activeProjects, data.completedProjects, data.hours],
+		() => buildClientPortalNotifications(data.activeProjects, data.completedProjects, data.hours, data.meetingNotes),
+		[data.activeProjects, data.completedProjects, data.hours, data.meetingNotes],
 	);
 	const unreadCount = notifications.filter((n) => !readNotificationIds.has(n.id)).length;
 	const laneCaptions = useMemo(() => laneHoursCaption(data.hours), [data.hours]);
@@ -546,6 +571,7 @@ export function ClientPortalClient({
 		{ id: "tracker", label: "Project Tracker" },
 		{ id: "pipeline", label: "Pipeline Tracker" },
 		{ id: "completed", label: "Completed Projects" },
+		{ id: "notes", label: "Meeting Notes" },
 	];
 
 	function go(next: PortalPage) {
@@ -757,6 +783,7 @@ export function ClientPortalClient({
 														notification={n}
 														unread={!readNotificationIds.has(n.id)}
 														onOvertime={openOvertime}
+														onOpenNote={() => go("notes")}
 													/>
 												))
 											)}
@@ -943,6 +970,10 @@ export function ClientPortalClient({
 								)}
 							</section>
 						</div>
+					) : null}
+
+					{page === "notes" ? (
+						<ClientPortalMeetingNotes slug={slug} initialNotes={data.meetingNotes} />
 					) : null}
 
 					{page === "completed" ? (
