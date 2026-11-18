@@ -31,6 +31,13 @@ export type OpsProjectCardProject = {
   startDate: string | null;
   dueDate: string | null;
   dueAt?: string | null;
+  /** When set (admin ops), show both deadlines on the card. */
+  athleteDueDate?: string | null;
+  athleteDueAt?: string | null;
+  clientDueDate?: string | null;
+  clientDueAt?: string | null;
+  dueLabel?: string | null;
+  showBothDeadlines?: boolean;
   progressPercent: number | null;
   laneNumber?: number | null;
   hoursLogged?: number;
@@ -162,12 +169,20 @@ export function OpsProjectCardBody({
   project: OpsProjectCardProject;
   onEdit?: () => void;
 }) {
+  const clientDueIso = project.clientDueAt ?? project.clientDueDate ?? null;
+  const athleteDueIso = project.athleteDueAt ?? project.athleteDueDate ?? null;
+  const showDual =
+    Boolean(project.showBothDeadlines) && Boolean(athleteDueIso) && Boolean(clientDueIso);
+  const primaryDueIso = showDual
+    ? athleteDueIso
+    : project.dueAt ?? project.dueDate ?? athleteDueIso ?? clientDueIso;
   const timeline = computeProjectTimeline({
     startDate: project.startDate,
-    dueDate: project.dueDate,
+    dueDate: (primaryDueIso ?? project.dueDate)?.slice(0, 10) ?? null,
   });
-  const accent = projectDueColor(daysUntilDueFromIso(project.dueAt ?? project.dueDate));
+  const accent = projectDueColor(daysUntilDueFromIso(primaryDueIso));
   const athletes = assignedAthleteRows(project);
+  const dueLabel = project.dueLabel?.trim() || null;
 
   return (
     <div className="pl-1">
@@ -219,19 +234,37 @@ export function OpsProjectCardBody({
             </>
           ) : null}
         </div>
-        <p className="text-center text-xs tabular-nums text-slate-400">
-          {project.startDate || project.dueDate || project.dueAt ? (
-            <>
+        <div className="text-center text-xs tabular-nums text-slate-400">
+          {showDual ? (
+            <div className="space-y-1">
+              <p>
+                <span className="text-[10px] uppercase tracking-wider text-slate-500">Athlete </span>
+                <span className="font-semibold" style={{ color: accent }}>
+                  {formatShortDate(athleteDueIso)}
+                </span>
+              </p>
+              <p>
+                <span className="text-[10px] uppercase tracking-wider text-slate-500">Client </span>
+                <span className="font-medium text-slate-300">{formatShortDate(clientDueIso)}</span>
+              </p>
+            </div>
+          ) : project.startDate || primaryDueIso ? (
+            <p>
               {project.startDate ? formatShortDate(project.startDate) : "TBC"}
               {" — "}
               <span className="font-semibold" style={{ color: accent }}>
-                {project.dueDate || project.dueAt ? formatShortDate(project.dueAt ?? project.dueDate) : "TBC"}
+                {primaryDueIso ? formatShortDate(primaryDueIso) : "TBC"}
               </span>
-            </>
+              {dueLabel ? (
+                <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-wider text-slate-500">
+                  {dueLabel}
+                </span>
+              ) : null}
+            </p>
           ) : (
             <span className="text-slate-500">Dates to be confirmed</span>
           )}
-        </p>
+        </div>
         <span className="hidden sm:block" aria-hidden />
       </div>
 

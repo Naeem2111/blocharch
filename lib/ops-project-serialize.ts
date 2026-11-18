@@ -14,6 +14,7 @@ type ProjectLike = {
   complexity: string;
   startDate: Date | null;
   dueDate: Date | null;
+  athleteDueDate?: Date | null;
   currentStage: OpsProjectPhase;
   customStageId?: string | null;
   customStage?: { label: string } | null;
@@ -36,7 +37,8 @@ export function serializeOpsProjectRow<T extends ProjectLike>(
   extras: Record<string, unknown> = {}
 ) {
   const { displayTitle, stageLabel } = projectDisplayFields(project);
-  const due = serializeProjectDueAt(project.dueDate);
+  const clientDue = serializeProjectDueAt(project.dueDate);
+  const athleteDue = serializeProjectDueAt(project.athleteDueDate ?? null);
   return {
     id: project.id,
     clientId: project.clientId,
@@ -50,8 +52,14 @@ export function serializeOpsProjectRow<T extends ProjectLike>(
     projectLead: project.projectLead,
     complexity: project.complexity,
     startDate: project.startDate?.toISOString().slice(0, 10) ?? null,
-    dueDate: due.dueDate,
-    dueAt: due.dueAt,
+    /** Client deadline (legacy keys kept for portal / calendars). */
+    dueDate: clientDue.dueDate,
+    dueAt: clientDue.dueAt,
+    clientDueDate: clientDue.dueDate,
+    clientDueAt: clientDue.dueAt,
+    athleteDueDate: athleteDue.dueDate,
+    athleteDueAt: athleteDue.dueAt,
+    showBothDeadlines: true,
     currentStage: project.currentStage,
     customStageId: project.customStageId ?? null,
     currentStatus: project.currentStatus,

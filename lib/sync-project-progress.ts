@@ -226,6 +226,7 @@ export async function syncProjectProgressForProjects(projectIds: string[]) {
         name: true,
         progressPercent: true,
         dueDate: true,
+        athleteDueDate: true,
         portalDisplayLocked: true,
       },
     });
@@ -244,7 +245,8 @@ export async function syncProjectProgressForProjects(projectIds: string[]) {
 
     if (progressPercent >= 100 && isActiveProjectStatus(before.currentStatus)) {
       // Archives / beat metrics need a due date — carry from pipeline, planner, or outbox if unset.
-      const dueDate = await ensureOpsProjectDueDate(projectId);
+      const clientDue = await ensureOpsProjectDueDate(projectId);
+      const dueDate = before.athleteDueDate ?? clientDue;
       const { completedAt, deadlineBeatenDays, deadlineBeatenMinutes } = completionMetrics(
         dueDate,
         latestLog
@@ -283,7 +285,8 @@ export async function syncProjectProgressForProjects(projectIds: string[]) {
     }
 
     if (wasCompleted && progressPercent >= 100) {
-      const dueDate = await ensureOpsProjectDueDate(projectId);
+      const clientDue = await ensureOpsProjectDueDate(projectId);
+      const dueDate = before.athleteDueDate ?? clientDue;
       const { completedAt, deadlineBeatenDays, deadlineBeatenMinutes } = completionMetrics(
         dueDate,
         latestLog

@@ -771,17 +771,21 @@ export async function buildAnalytics(
     ...(clientId ? { clientId } : {}),
     ...(athleteId ? { assignedAthleteId: athleteId } : {}),
   };
+  const riskHorizon = new Date(now.getTime() + 14 * 86400000);
   const riskProjects = await prisma.opsProject.findMany({
     where: {
-      dueDate: { not: null, lte: new Date(now.getTime() + 14 * 86400000) },
       currentStatus: { notIn: ["completed", "handed_over"] },
+      OR: [
+        { athleteDueDate: { not: null, lte: riskHorizon } },
+        { athleteDueDate: null, dueDate: { not: null, lte: riskHorizon } },
+      ],
       ...projectFilter,
     },
     include: {
       client: { select: { name: true, logoUrl: true, logoBgColor: true, logoTextTone: true } },
       assignedAthlete: { select: { fullName: true } },
     },
-    orderBy: { dueDate: "asc" },
+    orderBy: [{ athleteDueDate: "asc" }, { dueDate: "asc" }],
     take: 20,
   });
 
@@ -912,7 +916,7 @@ export async function buildAnalytics(
       }))
       .sort((a, b) => b.hours - a.hours),
     dueDateRisk: riskProjects.map((p) => {
-      const due = p.dueDate!;
+      const due = p.athleteDueDate ?? p.dueDate!;
       const daysUntilDue = Math.ceil((due.getTime() - now.getTime()) / 86400000);
       const { displayTitle } = projectDisplayFields(p);
       return {
