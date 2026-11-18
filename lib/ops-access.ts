@@ -197,17 +197,20 @@ export const athleteProjectSelect = {
 
 export function serializeProjectForAthlete(project: Prisma.OpsProjectGetPayload<{ select: typeof athleteProjectSelect }>) {
   const { displayTitle, stageLabel } = projectDisplayFields(project);
-  // Athletes only see the athlete deadline (falls back to client due for older rows).
-  const due = serializeProjectDueAt(project.athleteDueDate ?? project.dueDate);
+  // Calendar and progress still key off the athlete deadline (falls back to client due).
+  const athleteDue = serializeProjectDueAt(project.athleteDueDate ?? project.dueDate);
+  const clientDue = serializeProjectDueAt(project.dueDate);
   return {
     ...project,
     displayTitle,
     stageLabel,
     startDate: project.startDate?.toISOString().slice(0, 10) ?? null,
-    dueDate: due.dueDate,
-    dueAt: due.dueAt,
-    athleteDueDate: due.dueDate,
-    athleteDueAt: due.dueAt,
+    dueDate: athleteDue.dueDate,
+    dueAt: athleteDue.dueAt,
+    athleteDueDate: athleteDue.dueDate,
+    athleteDueAt: athleteDue.dueAt,
+    clientDueDate: clientDue.dueDate,
+    clientDueAt: clientDue.dueAt,
     dueLabel: "Athlete deadline",
     updatedAt: project.updatedAt.toISOString(),
   };

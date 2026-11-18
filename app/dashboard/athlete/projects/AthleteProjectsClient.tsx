@@ -48,6 +48,8 @@ type ProjectRow = {
   dueLabel?: string | null;
   athleteDueDate?: string | null;
   athleteDueAt?: string | null;
+  clientDueDate?: string | null;
+  clientDueAt?: string | null;
   progressPercent: number | null;
   notes: string | null;
   laneNumber?: number | null;
@@ -302,7 +304,7 @@ export function AthleteProjectsClient() {
                       </div>
                     ) : (
                       <>
-                        <OpsProjectCardBody project={p} onEdit={() => startEdit(p)} />
+                        <OpsProjectCardBody project={p} onEdit={() => startEdit(p)} emphasizeDeadlines />
                         {p.notes ? (
                           <p className="mt-3 pl-1 text-sm text-slate-400">
                             <span className="text-slate-500">Notes: </span>

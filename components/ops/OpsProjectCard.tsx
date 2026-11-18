@@ -162,12 +162,26 @@ function ProjectHoursCorner({
   );
 }
 
+function EmphasizedDeadline({ label, iso }: { label: string; iso: string | null }) {
+  return (
+    <p className="text-white">
+      <span className="block text-sm font-semibold uppercase tracking-wide text-white">{label}</span>
+      <span className="mt-0.5 block text-lg font-semibold tabular-nums text-white">
+        {iso ? formatShortDate(iso) : "TBC"}
+      </span>
+    </p>
+  );
+}
+
 export function OpsProjectCardBody({
   project,
   onEdit,
+  emphasizeDeadlines = false,
 }: {
   project: OpsProjectCardProject;
   onEdit?: () => void;
+  /** My Projects: athlete and client deadlines in white, larger type. */
+  emphasizeDeadlines?: boolean;
 }) {
   const clientDueIso = project.clientDueAt ?? project.clientDueDate ?? null;
   const athleteDueIso = project.athleteDueAt ?? project.athleteDueDate ?? null;
@@ -234,19 +248,16 @@ export function OpsProjectCardBody({
             </>
           ) : null}
         </div>
-        <div className="text-center text-xs tabular-nums text-slate-400">
-          {showDual ? (
-            <div className="space-y-1">
-              <p>
-                <span className="text-[10px] uppercase tracking-wider text-slate-500">Athlete </span>
-                <span className="font-semibold" style={{ color: accent }}>
-                  {formatShortDate(athleteDueIso)}
-                </span>
-              </p>
-              <p>
-                <span className="text-[10px] uppercase tracking-wider text-slate-500">Client </span>
-                <span className="font-medium text-slate-300">{formatShortDate(clientDueIso)}</span>
-              </p>
+        <div className={emphasizeDeadlines ? "text-center" : "text-center text-xs tabular-nums text-slate-400"}>
+          {emphasizeDeadlines ? (
+            <div className="space-y-2">
+              <EmphasizedDeadline label="Athlete deadline" iso={athleteDueIso ?? primaryDueIso} />
+              <EmphasizedDeadline label="Client deadline" iso={clientDueIso} />
+            </div>
+          ) : showDual ? (
+            <div className="space-y-2">
+              <EmphasizedDeadline label="Athlete deadline" iso={athleteDueIso} />
+              <EmphasizedDeadline label="Client deadline" iso={clientDueIso} />
             </div>
           ) : project.startDate || primaryDueIso ? (
             <p>
