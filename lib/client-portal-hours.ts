@@ -40,6 +40,10 @@ export type ClientPortalLaneHours = {
   hoursRemaining: number;
   warning: boolean;
   allowanceReached: boolean;
+  /** When logged hours first crossed the warning line this month. */
+  warningAt: string | null;
+  /** When logged hours first reached the included allowance this month. */
+  allowanceReachedAt: string | null;
 };
 
 export type ClientPortalPhaseAverage = {
@@ -152,22 +156,18 @@ export async function getClientPortalHours(input: {
     const warning = !allowanceReached && hoursUsed >= LANE_HOURS_WARNING;
     const laneNumber = index + 1;
 
-    lanes.push({
-      laneNumber,
-      laneLabel: `Lane ${laneNumber}`,
-      athleteId,
-      athleteName: bucket.name,
-      hoursUsed,
-      overtimeHours,
-      hoursRemaining,
-      warning,
-      allowanceReached,
-    });
-
     let running = 0;
+    let warningAt: string | null = null;
+    let allowanceReachedAt: string | null = null;
     for (const item of bucket.items) {
       const h = Number(item.hoursWorked);
+      const before = running;
       running += h;
+      const at = item.submission.submissionDate.toISOString();
+      if (warningAt == null && before < LANE_HOURS_WARNING && running >= LANE_HOURS_WARNING) warningAt = at;
+      if (allowanceReachedAt == null && before < LANE_MONTHLY_HOURS && running >= LANE_MONTHLY_HOURS) {
+        allowanceReachedAt = at;
+      }
       const overtimeOnItem = round2(Math.max(0, Math.min(h, running - LANE_MONTHLY_HOURS)));
       if (overtimeOnItem <= 0) continue;
       overtimeEntries.push({
@@ -180,6 +180,20 @@ export async function getClientPortalHours(input: {
         laneNumber,
       });
     }
+
+    lanes.push({
+      laneNumber,
+      laneLabel: `Lane ${laneNumber}`,
+      athleteId,
+      athleteName: bucket.name,
+      hoursUsed,
+      overtimeHours,
+      hoursRemaining,
+      warning,
+      allowanceReached,
+      warningAt,
+      allowanceReachedAt,
+    });
   });
 
   const hoursUsed = round2(lanes.reduce((sum, lane) => sum + lane.hoursUsed, 0));

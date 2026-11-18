@@ -19,6 +19,8 @@ export type ClientPortalNotification = {
   title: string;
   description: string;
   timeLabel: string;
+  /** When the event happened. The bell sorts by this, newest first. */
+  occurredAt: string;
   projectId: string;
   action?: "overtime" | "meeting_note";
 };
@@ -51,6 +53,7 @@ export function buildHoursNotifications(hours: ClientPortalHours): ClientPortalN
         title: `${lane.laneLabel} · Allowance reached`,
         description: `Your included allowance has been reached. Additional time is now logged at £${rate}/hour.`,
         timeLabel: "This month",
+        occurredAt: lane.allowanceReachedAt ?? new Date().toISOString(),
         projectId: `lane-${lane.laneNumber}`,
         action: "overtime",
       });
@@ -64,6 +67,7 @@ export function buildHoursNotifications(hours: ClientPortalHours): ClientPortalN
         title: `${lane.laneLabel} · ${remaining} hour${remaining === 1 ? "" : "s"} remaining`,
         description: `You have ${remaining} included hour${remaining === 1 ? "" : "s"} remaining this month. Additional time is billed at £${rate}/hour once your allowance is reached.`,
         timeLabel: "This month",
+        occurredAt: lane.warningAt ?? new Date().toISOString(),
         projectId: `lane-${lane.laneNumber}`,
       });
     }
@@ -91,6 +95,7 @@ function buildMeetingNoteNotifications(notes: ClientMeetingNote[]): ClientPortal
       title: "New meeting note",
       description: note.title,
       timeLabel: meetingNoteTimeLabel(note.createdAt),
+      occurredAt: note.createdAt,
       projectId: note.id,
       action: "meeting_note" as const,
     }));
@@ -119,11 +124,22 @@ export function buildClientPortalNotifications(
       title: copy.title,
       description: copy.description,
       timeLabel: relativeLabelFromIso(completedDay, "Recently"),
+      occurredAt: p.completedAt ?? "",
       projectId: p.id,
     };
   });
 
-  return [...buildMeetingNoteNotifications(meetingNotes), ...(hours ? buildHoursNotifications(hours) : []), ...deadlineItems];
+  const items = [
+    ...buildMeetingNoteNotifications(meetingNotes),
+    ...(hours ? buildHoursNotifications(hours) : []),
+    ...deadlineItems,
+  ];
+  return items.sort((a, b) => {
+    const aTime = a.occurredAt ? new Date(a.occurredAt).getTime() : 0;
+    const bTime = b.occurredAt ? new Date(b.occurredAt).getTime() : 0;
+    if (aTime !== bTime) return bTime - aTime;
+    return a.id.localeCompare(b.id);
+  });
 }
 
 export function laneHoursCaption(
