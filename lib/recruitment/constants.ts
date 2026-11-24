@@ -64,6 +64,60 @@ export function archiveReasonLabel(value: string): string {
   return ARCHIVE_REASONS.find((item) => item.value === value)?.label ?? value;
 }
 
+/** Column titles from Architecture Athlete Recruitment Form (Responses), in sheet order. */
+export const RECRUITMENT_FORM_COLUMNS = [
+  "Timestamp",
+  "Full name",
+  "Email Address",
+  "Phone Number",
+  "Physical Address",
+  "City & Country",
+  "Linkedin Handle",
+  "Instagram Handle",
+  "Please upload your portfolio",
+  "Please upload a copy of your ID/Passport",
+  "Please upload your CV",
+  "Do you have at least 3-5 years of experience in architectural documentation, design, drafting, modelling and rending?",
+  "How many years of experience do you have?",
+  "What services can you confidently deliver?",
+  "What software are you proficient in?",
+  "Specify Other",
+  "Have you worked remotely before?",
+  "What motivates you to do your best work—even when no one is watching?",
+  "Describe a moment in your career where you went above and beyond.",
+  "How do you handle a situation where a client changes direction halfway through a project?",
+  "What kind of architectural work makes you feel alive?",
+  "What is your typical monthly availability?",
+  "Are you available fulltime 160hrs per month? 8hrs per day",
+  "When could you realistically start if contacted?",
+  "Do you have your own computer, software licenses, and stable internet and wifi?",
+  "What computer are you currently using? Please provide spec.",
+  "Are you comfortable receiving markups, coaching notes, and ongoing feedback?",
+  "Email address",
+  "How proficient are you in the above-mentioned software?",
+  "Reference",
+  "What AI software are you proficient in?",
+  "Your Current Professional Position",
+  "Do you own a tablet (e.g. iPad or similar)? If yes, please state the make and model.",
+  "Age",
+  "Note:",
+] as const;
+
+export function formAnswersInSheetOrder(answers: RecruitmentAnswer[]): RecruitmentAnswer[] {
+  const byQuestion = new Map(answers.map((answer) => [answer.question.trim(), answer.answer]));
+  const known = new Set<string>(RECRUITMENT_FORM_COLUMNS);
+  const ordered: RecruitmentAnswer[] = RECRUITMENT_FORM_COLUMNS.map((question) => ({
+    question,
+    answer: byQuestion.get(question) ?? "",
+  }));
+  for (const answer of answers) {
+    const question = answer.question.trim();
+    if (!question || known.has(question) || question.toLowerCase() === "application id") continue;
+    ordered.push({ question, answer: answer.answer });
+  }
+  return ordered;
+}
+
 export type RecruitmentAnswer = { question: string; answer: string };
 
 export type RecruitmentDocument = {

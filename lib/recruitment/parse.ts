@@ -133,10 +133,21 @@ const HEADER_ALIASES: Record<string, string> = {
 };
 
 export function headerKey(header: string): string | null {
-  const normalised = header.trim().toLowerCase().replace(/\s+/g, " ").replace(/[?:*]+$/g, "");
+  const normalised = header.trim().toLowerCase().replace(/\s+/g, " ").replace(/[?:*]+$/g, "").trim();
   if (/^application id$/.test(normalised)) return "applicationId";
   if (/^timestamp$|^submitted/.test(normalised)) return "submittedAt";
-  return HEADER_ALIASES[normalised] ?? null;
+  const alias = HEADER_ALIASES[normalised];
+  if (alias) return alias;
+  // The live form uses full questions, not the short labels above.
+  if (/city\s*&\s*country/.test(normalised)) return "location";
+  if (/what software are you proficient in/.test(normalised)) return "software";
+  if (/how many years of experience/.test(normalised)) return "experience";
+  if (/what services can you confidently deliver/.test(normalised)) return "services";
+  if (/typical monthly availability/.test(normalised)) return "availability";
+  if (/available fulltime|160\s*hrs/.test(normalised)) return "fullTime";
+  if (/realistically start/.test(normalised)) return "start";
+  if (/current professional position/.test(normalised)) return "position";
+  return null;
 }
 
 export function answersFromRow(headers: string[], row: string[]): RecruitmentAnswer[] {

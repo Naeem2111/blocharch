@@ -7,6 +7,17 @@ import { ACTIVE_RECRUITMENT_STATUSES } from "@/lib/recruitment/constants";
 import { whatsAppHref } from "@/lib/recruitment/parse";
 import { recruitmentSyncSummary, syncRecruitmentSheet } from "@/lib/recruitment/sync";
 
+function asAnswers(value: unknown): { question: string; answer: string }[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const question = "question" in item ? String(item.question ?? "").trim() : "";
+    const answer = "answer" in item ? String(item.answer ?? "") : "";
+    if (!question) return [];
+    return [{ question, answer }];
+  });
+}
+
 const STATUSES = new Set<string>([
   "to_review",
   "potential",
@@ -35,7 +46,7 @@ export async function GET(request: NextRequest) {
   const match = params.get("match") === "all" ? "all" : "any";
   const software = params.getAll("software").map((item) => item.trim()).filter(Boolean);
   const page = Math.max(1, Number(params.get("page")) || 1);
-  const perPage = 25;
+  const perPage = 500;
 
   const where: Prisma.RecruitmentApplicationWhereInput = { removedFromSourceAt: null };
   if (status === "all_active") where.status = { in: ACTIVE_RECRUITMENT_STATUSES };
@@ -60,7 +71,7 @@ export async function GET(request: NextRequest) {
     prisma.recruitmentApplication.count({ where }),
     prisma.recruitmentApplication.findMany({
       where,
-      orderBy: [{ submittedAt: "desc" }, { createdAt: "desc" }],
+      orderBy: [{ submittedAt: { sort: "asc", nulls: "last" } }, { createdAt: "asc" }],
       skip: (page - 1) * perPage,
       take: perPage,
     }),
@@ -92,6 +103,7 @@ export async function GET(request: NextRequest) {
       location: row.location,
       software: row.software,
       experience: row.experience,
+      experienceRaw: row.experienceRaw,
       experienceYears: row.experienceYears == null ? null : Number(row.experienceYears),
       confirmedAvailability: row.confirmedAvailability,
       availabilityNote: row.availabilityNote,
@@ -101,6 +113,7 @@ export async function GET(request: NextRequest) {
       submittedAt: row.submittedAt?.toISOString() ?? null,
       archivedAt: row.archivedAt?.toISOString() ?? null,
       archiveReason: row.archiveReason,
+      answers: asAnswers(row.answers),
     })),
   });
 }

@@ -259,21 +259,33 @@ export async function syncRecruitmentSheet(options?: { force?: boolean }) {
       const email = fieldFromAnswers(answers, "email");
       const phoneRaw = fieldFromAnswers(answers, "phone");
       const phone = parsePhone(phoneRaw);
-      const softwareRaw = fieldFromAnswers(answers, "software");
+      const specifyOther = answers.find((answer) => /^specify other$/i.test(answer.question.trim()))?.answer ?? null;
+      const softwareRaw = [fieldFromAnswers(answers, "software"), specifyOther]
+        .map((part) => part?.trim() ?? "")
+        .filter((part) => part && !/^n\/?a$|^-$/i.test(part))
+        .join(", ");
       const experienceRaw = fieldFromAnswers(answers, "experience");
       const experience = parseExperience(experienceRaw);
+      const availabilitySubmitted = [
+        fieldFromAnswers(answers, "fullTime"),
+        fieldFromAnswers(answers, "availability"),
+        fieldFromAnswers(answers, "start"),
+      ]
+        .map((part) => part?.trim() ?? "")
+        .filter(Boolean)
+        .join(" · ");
       const imported = {
         fullName: name.slice(0, 200),
         email: email?.slice(0, 200) ?? null,
         phoneRaw: phoneRaw?.slice(0, 80) ?? null,
         phoneE164: phone.e164,
         location: fieldFromAnswers(answers, "location")?.slice(0, 200) ?? null,
-        software: normaliseSoftware(softwareRaw),
-        softwareRaw,
+        software: normaliseSoftware(softwareRaw || null),
+        softwareRaw: softwareRaw || null,
         experience: experience.band,
         experienceRaw,
         experienceYears: experience.years,
-        availabilitySubmitted: fieldFromAnswers(answers, "availability"),
+        availabilitySubmitted: availabilitySubmitted || null,
         services: fieldFromAnswers(answers, "services"),
         answers,
         documents: documentsFromAnswers(answers),

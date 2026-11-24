@@ -4,11 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Avatar, SoftwarePills, experienceText } from "@/components/recruitment/TalentChrome";
+import { headerKey } from "@/lib/recruitment/parse";
 import {
   ARCHIVE_REASONS,
   RECRUITMENT_AVAILABILITY,
   RECRUITMENT_STATUSES,
   archiveReasonLabel,
+  formAnswersInSheetOrder,
   recruitmentAvailabilityLabel,
   recruitmentExperienceLabel,
   recruitmentStatusLabel,
@@ -109,14 +111,9 @@ export function TalentProfileClient({ id }: { id: string }) {
   const file = application?.documents[selectedFile] ?? null;
   const previewUrl = file?.fileId ? `/api/recruitment/files/${file.fileId}` : null;
   const skillAnswers = useMemo(
-    () => (application?.answers ?? []).filter((answer) => /software|experience|service|tool|setup|hardware|internet/i.test(answer.question)),
+    () => (application?.answers ?? []).filter((answer) => /software|experience|service|tool|setup|hardware|internet|fulltime|160/i.test(answer.question)),
     [application],
   );
-  const characterAnswers = useMemo(() => {
-    return (application?.answers ?? []).filter(
-      (answer) => !/email|phone|mobile|location|software|experience|availab|service|name|timestamp/i.test(answer.question),
-    );
-  }, [application]);
 
   async function patch(body: Record<string, unknown>) {
     setError("");
@@ -156,8 +153,19 @@ export function TalentProfileClient({ id }: { id: string }) {
 
   if (!application) return <p className="text-sm text-slate-500">{error || "Loading profile…"}</p>;
 
-  const referral = answerFor(application.answers, /referral|how did you hear|source/i);
-  const position = answerFor(application.answers, /position|role|job title|current title/i);
+  const referral = answerFor(application.answers, /referral|how did you hear|^reference$/i);
+  const position = answerFor(application.answers, /current professional position|current position|job title|current title/i) || answerFor(application.answers, /position|role/i);
+  const emails = Array.from(
+    new Set(
+      application.answers
+        .filter((answer) => headerKey(answer.question) === "email")
+        .map((answer) => answer.answer.trim())
+        .filter(Boolean),
+    ),
+  );
+  if (application.email && !emails.some((email) => email.toLowerCase() === application.email?.toLowerCase())) {
+    emails.unshift(application.email);
+  }
   const latestMove = application.activity.find((item) => item.detail?.startsWith("Status") || item.detail?.startsWith("Restored") || item.detail?.startsWith("Archived"));
 
   return (
@@ -258,7 +266,7 @@ export function TalentProfileClient({ id }: { id: string }) {
           <section className="rounded-2xl border border-white/[0.08] bg-[#0c1526] p-5">
             <h2 className="font-semibold text-white">Personal details</h2>
             <dl className="mt-4 space-y-3 text-sm">
-              <Detail label="Email" value={application.email} />
+              <Detail label="Email" value={emails.length > 0 ? emails.join(" · ") : application.email} />
               <Detail label="Location" value={application.location} />
               <Detail label="Cellphone" value={application.phoneE164 || application.phoneRaw} href={application.whatsApp} />
               <Detail label="Referral" value={referral} />
@@ -308,8 +316,8 @@ export function TalentProfileClient({ id }: { id: string }) {
             </button>
           </section>
           <section className="rounded-2xl border border-white/[0.08] bg-[#0c1526] p-5">
-            <h2 className="font-semibold text-white">Character & fit</h2>
-            <AnswerList answers={characterAnswers.length > 0 ? characterAnswers : application.answers} />
+            <h2 className="font-semibold text-white">Form answers</h2>
+            <AnswerList answers={formAnswersInSheetOrder(application.answers)} />
           </section>
           <CommentPanel
             comments={application.comments}
@@ -512,7 +520,13 @@ function AnswerList({ answers }: { answers: RecruitmentAnswer[] }) {
       {answers.map((answer) => (
         <li key={answer.question}>
           <p className="text-sm font-medium text-white">{answer.question}</p>
-          <p className="mt-1 whitespace-pre-wrap text-sm text-slate-300">{answer.answer}</p>
+          {/^https?:\/\/\S+$/.test(answer.answer.trim()) ? (
+            <a href={answer.answer.trim()} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-sm text-cyan-300 hover:text-cyan-200">
+              Open
+            </a>
+          ) : (
+            <p className="mt-1 whitespace-pre-wrap text-sm text-slate-300">{answer.answer.trim() || "—"}</p>
+          )}
         </li>
       ))}
     </ul>
