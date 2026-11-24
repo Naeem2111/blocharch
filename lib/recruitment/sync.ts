@@ -89,12 +89,75 @@ async function readGrid(token: string, config: SheetConfig): Promise<string[][]>
   return values.map((row) => (Array.isArray(row) ? row.map((cell) => String(cell ?? "")) : []));
 }
 
+function columnIndex(letters: string): number {
+  let index = 0;
+  for (const char of letters.toUpperCase()) {
+    index = index * 26 + (char.charCodeAt(0) - 64);
+  }
+  return index;
+}
+
+/** A form-response tab is only as wide as its questions. Writing Application ID past that edge fails until the grid grows. */
+async function ensureGridCovers(
+  token: string,
+  config: SheetConfig,
+  updates: { range: string; values: string[][] }[],
+) {
+  let maxRow = 1;
+  let maxCol = 1;
+  for (const update of updates) {
+    const start = (update.range.split(":")[0] ?? update.range).replace(/[^A-Z0-9]/gi, "");
+    const match = start.match(/^([A-Z]+)(\d+)$/i);
+    if (!match) continue;
+    const height = Math.max(update.values.length, 1);
+    const width = update.values.reduce((widest, line) => Math.max(widest, line.length), 1);
+    maxRow = Math.max(maxRow, Number(match[2]) + height - 1);
+    maxCol = Math.max(maxCol, columnIndex(match[1]) + width - 1);
+  }
+
+  const meta = await sheetsFetch(
+    token,
+    `https://sheets.googleapis.com/v4/spreadsheets/${config.sheetId}?fields=sheets.properties(sheetId,title,gridProperties(rowCount,columnCount))`,
+  );
+  const sheets = Array.isArray(meta.sheets) ? meta.sheets : [];
+  const wanted = config.tab.trim();
+  const match =
+    sheets.find((sheet) => {
+      const title = (sheet as { properties?: { title?: string } }).properties?.title ?? "";
+      return wanted ? title === wanted : true;
+    }) ?? sheets[0];
+  const properties = (match as {
+    properties?: { sheetId?: number; gridProperties?: { rowCount?: number; columnCount?: number } };
+  })?.properties;
+  if (!properties || typeof properties.sheetId !== "number") return;
+
+  const rowCount = properties.gridProperties?.rowCount ?? 0;
+  const columnCount = properties.gridProperties?.columnCount ?? 0;
+  const requests: Record<string, unknown>[] = [];
+  if (maxCol > columnCount) {
+    requests.push({
+      appendDimension: { sheetId: properties.sheetId, dimension: "COLUMNS", length: maxCol - columnCount },
+    });
+  }
+  if (maxRow > rowCount) {
+    requests.push({
+      appendDimension: { sheetId: properties.sheetId, dimension: "ROWS", length: maxRow - rowCount },
+    });
+  }
+  if (requests.length === 0) return;
+  await sheetsFetch(token, `https://sheets.googleapis.com/v4/spreadsheets/${config.sheetId}:batchUpdate`, {
+    method: "POST",
+    body: JSON.stringify({ requests }),
+  });
+}
+
 async function writeCells(
   token: string,
   config: SheetConfig,
   updates: { range: string; values: string[][] }[],
 ) {
   if (updates.length === 0) return;
+  await ensureGridCovers(token, config, updates);
   await sheetsFetch(
     token,
     `https://sheets.googleapis.com/v4/spreadsheets/${config.sheetId}/values:batchUpdate`,
