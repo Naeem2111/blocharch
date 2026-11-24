@@ -32,6 +32,7 @@ const scope = [
   "https://www.googleapis.com/auth/calendar",
   "https://www.googleapis.com/auth/calendar.events",
   "https://www.googleapis.com/auth/drive",
+  "https://www.googleapis.com/auth/spreadsheets",
 ].join(" ");
 
 if (!clientId || !clientSecret) {

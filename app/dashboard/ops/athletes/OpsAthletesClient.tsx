@@ -6,6 +6,7 @@ import { AvatarUploadField } from "@/components/ops/AvatarUploadField";
 import type { AvatarTextTone } from "@/lib/avatar-text-tone";
 import { asAvatarTextTone, DEFAULT_AVATAR_TEXT_TONE } from "@/lib/avatar-text-tone";
 import { DEFAULT_AVATAR_BG } from "@/lib/hex-color";
+import { RECRUIT_DRAFT_KEY, type RecruitDraft } from "@/lib/recruitment-draft";
 
 type AthleteRow = {
   id: string;
@@ -36,6 +37,7 @@ export function OpsAthletesClient() {
     username: "",
     password: "",
     email: "",
+    phone: "",
     blocharchStartDate: new Date().toISOString().slice(0, 10),
     profilePhotoUrl: "",
     profilePhotoBgColor: DEFAULT_AVATAR_BG,
@@ -57,6 +59,20 @@ export function OpsAthletesClient() {
   });
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
+  const [fromRecruitment, setFromRecruitment] = useState(false);
+
+  const emptyForm = () => ({
+    fullName: "",
+    athleteCode: "",
+    username: "",
+    password: "",
+    email: "",
+    phone: "",
+    blocharchStartDate: new Date().toISOString().slice(0, 10),
+    profilePhotoUrl: "",
+    profilePhotoBgColor: DEFAULT_AVATAR_BG,
+    profilePhotoTextTone: DEFAULT_AVATAR_TEXT_TONE as AvatarTextTone,
+  });
 
   const load = useCallback(async () => {
     const r = await fetch("/api/ops/athletes");
@@ -68,6 +84,27 @@ export function OpsAthletesClient() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    const raw = sessionStorage.getItem(RECRUIT_DRAFT_KEY);
+    if (!raw) return;
+    sessionStorage.removeItem(RECRUIT_DRAFT_KEY);
+    try {
+      const draft = JSON.parse(raw) as RecruitDraft;
+      setForm((current) => ({
+        ...current,
+        fullName: draft.fullName || "",
+        email: draft.email || "",
+        phone: draft.phone || "",
+        athleteCode: draft.athleteCode || "",
+        username: draft.username || "",
+      }));
+      setFromRecruitment(true);
+      setOpen(true);
+    } catch {
+      setFromRecruitment(false);
+    }
+  }, []);
 
   async function createAthlete(e: React.FormEvent) {
     e.preventDefault();
@@ -88,17 +125,8 @@ export function OpsAthletesClient() {
       return;
     }
     setOpen(false);
-    setForm({
-      fullName: "",
-      athleteCode: "",
-      username: "",
-      password: "",
-      email: "",
-      blocharchStartDate: new Date().toISOString().slice(0, 10),
-      profilePhotoUrl: "",
-      profilePhotoBgColor: DEFAULT_AVATAR_BG,
-      profilePhotoTextTone: DEFAULT_AVATAR_TEXT_TONE as AvatarTextTone,
-    });
+    setFromRecruitment(false);
+    setForm(emptyForm());
     await load();
   }
 
@@ -193,7 +221,11 @@ export function OpsAthletesClient() {
           <label className="text-xs text-slate-400">Username<input required value={form.username} onChange={(e) => setForm((f) => ({ ...f, username: e.target.value.toLowerCase() }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
           <label className="text-xs text-slate-400">Password<input required type="password" minLength={6} value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
           <label className="text-xs text-slate-400">Email<input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
+          <label className="text-xs text-slate-400">Phone<input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
           <label className="text-xs text-slate-400">Start date<input type="date" required value={form.blocharchStartDate} onChange={(e) => setForm((f) => ({ ...f, blocharchStartDate: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
+          {fromRecruitment ? (
+            <p className="text-xs text-sky-300 md:col-span-2">Brought across from recruitment. Set a password, check the athlete code, then create the account.</p>
+          ) : null}
           {error ? <p className="text-sm text-red-400 md:col-span-2">{error}</p> : null}
           <div className="flex gap-2 md:col-span-2">
             <button type="submit" className="btn-brand-primary rounded-lg px-4 py-2 text-sm">Create athlete</button>

@@ -41,7 +41,7 @@ function oauthConfig() {
   return { clientId, clientSecret, refreshToken };
 }
 
-async function accessToken(): Promise<string> {
+export async function googleAccessToken(): Promise<string> {
   const config = oauthConfig();
   if (!config) throw new Error("Google Drive is not configured");
   if (cachedAccessToken && cachedAccessToken.expiresAt > Date.now() + 60_000) {
@@ -69,7 +69,7 @@ async function accessToken(): Promise<string> {
 }
 
 async function driveFetch(url: string, init?: RequestInit): Promise<Response> {
-  const token = await accessToken();
+  const token = await googleAccessToken();
   const headers = new Headers(init?.headers);
   headers.set("Authorization", `Bearer ${token}`);
   return fetch(url, { ...init, headers });
