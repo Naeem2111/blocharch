@@ -284,7 +284,7 @@ export async function syncRecruitmentSheet(options?: { force?: boolean }) {
         softwareRaw: softwareRaw || null,
         experience: experience.band,
         experienceRaw,
-        experienceYears: experience.years,
+        experienceYears: experience.years != null && experience.years < 1000 ? experience.years : null,
         availabilitySubmitted: availabilitySubmitted || null,
         services: fieldFromAnswers(answers, "services"),
         answers,

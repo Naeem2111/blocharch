@@ -38,6 +38,10 @@ export function parsePhone(raw: string | null | undefined): {
       return { e164: `+${international}`, ambiguous: false };
     }
   }
+  const compact = text.replace(/[\s().-]/g, "");
+  if (/^0(?!0)\d{8,12}$/.test(compact)) {
+    return { e164: `+27${compact.slice(1)}`, ambiguous: false };
+  }
   return { e164: null, ambiguous: digits.length > 0 };
 }
 
@@ -59,13 +63,13 @@ export function parseExperience(raw: string | null | undefined): {
 } {
   const text = raw?.trim() ?? "";
   if (!text) return { band: "not_specified", years: null };
-  const numbers = Array.from(text.matchAll(/(\d+(?:\.\d+)?)/g)).map((match) => Number(match[1]));
-  if (numbers.length === 0 || numbers.some((value) => !Number.isFinite(value))) {
-    return { band: "not_specified", years: null };
-  }
+  const numbers = Array.from(text.matchAll(/(\d+(?:\.\d+)?)/g))
+    .map((match) => Number(match[1]))
+    .filter((value) => Number.isFinite(value) && value >= 0 && value < 80);
+  if (numbers.length === 0) return { band: "not_specified", years: null };
   const bands = numbers.map(experienceBand);
   if (new Set(bands).size > 1) return { band: "not_specified", years: null };
-  return { band: bands[0]!, years: Math.min(...numbers) };
+  return { band: bands[0]!, years: Math.round(Math.min(...numbers) * 10) / 10 };
 }
 
 export function normaliseSoftware(raw: string | null | undefined): string[] {

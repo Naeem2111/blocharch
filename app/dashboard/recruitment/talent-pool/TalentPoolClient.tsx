@@ -3,19 +3,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Avatar, relativeSync, statusDot } from "@/components/recruitment/TalentChrome";
+import { Avatar, SoftwarePills, WhatsAppLink, availabilityDot, experienceText, relativeSync, statusDot } from "@/components/recruitment/TalentChrome";
 import {
   ARCHIVE_REASONS,
   RECRUITMENT_AVAILABILITY,
   RECRUITMENT_EXPERIENCE,
-  RECRUITMENT_FORM_COLUMNS,
   RECRUITMENT_STATUSES,
   archiveReasonLabel,
-  formAnswersInSheetOrder,
   recruitmentAvailabilityLabel,
   recruitmentExperienceLabel,
   recruitmentStatusLabel,
-  type RecruitmentAnswer,
 } from "@/lib/recruitment/constants";
 
 type Row = {
@@ -31,13 +28,13 @@ type Row = {
   experienceRaw: string | null;
   experienceYears: number | null;
   availabilitySubmitted: string | null;
+  availabilityNote: string | null;
   confirmedAvailability: string;
   status: string;
   previousStatus: string | null;
   submittedAt: string | null;
   archivedAt: string | null;
   archiveReason: string | null;
-  answers: RecruitmentAnswer[];
 };
 
 type SyncState = {
@@ -159,7 +156,7 @@ export function TalentPoolClient() {
           <p className="mt-1 text-sm text-slate-400">
             {archivedView
               ? "Archived athletes are excluded from the active talent pool."
-              : "Each row is one response from the recruitment form, in the same column order."}
+              : "Review and organise your Architecture Athlete talent pool."}
           </p>
         </div>
         <div className="flex items-center gap-3 text-sm text-slate-300">
@@ -389,34 +386,120 @@ export function TalentPoolClient() {
       )}
 
       <p className="text-sm text-slate-400">
-        {loading ? "Loading…" : `${total} form response${total === 1 ? "" : "s"}`}
+        {loading
+          ? "Loading…"
+          : archivedView
+            ? `${total} archived athlete${total === 1 ? "" : "s"}`
+            : selectedSoftware.length > 0 || experience !== "all" || availability !== "all" || status !== "all_active"
+              ? `${total} matching athlete${total === 1 ? "" : "s"}`
+              : `${total} athlete${total === 1 ? "" : "s"} found`}
       </p>
 
-      <SheetTable
-        rows={rows}
-        loading={loading}
-        configured={Boolean(sync?.configured)}
-        archivedView={archivedView}
-        profileHref={profileHref}
-        onStatus={(row, next) => {
-          if (next === "archived") {
-            setReason("no_longer_interested");
-            setComment("");
-            setArchiveFor(row);
-            return;
-          }
-          if (row.status === "archived") {
-            setRestoreStatus(next);
-            setRestoreFor(row);
-            return;
-          }
-          void patch(row.id, { status: next });
-        }}
-        onRestore={(row) => {
-          setRestoreStatus(row.previousStatus && row.previousStatus !== "archived" ? row.previousStatus : "potential");
-          setRestoreFor(row);
-        }}
-      />
+      <div className="overflow-x-auto rounded-2xl border border-white/[0.08] bg-[#0b1220]">
+        <table className="min-w-full text-left text-sm">
+          <thead className="text-[11px] uppercase tracking-wide text-slate-500">
+            <tr>
+              <th className="px-4 py-3 font-medium">Athlete</th>
+              <th className="px-4 py-3 font-medium">Contact</th>
+              <th className="px-4 py-3 font-medium">Software</th>
+              <th className="px-4 py-3 font-medium">Experience</th>
+              {archivedView ? <th className="px-4 py-3 font-medium">Archive reason</th> : <th className="px-4 py-3 font-medium">Availability</th>}
+              {archivedView ? <th className="px-4 py-3 font-medium">Archived on</th> : <th className="px-4 py-3 font-medium">Status</th>}
+              <th className="px-4 py-3 font-medium">{archivedView ? "Actions" : ""}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && !loading ? (
+              <tr>
+                <td colSpan={7} className="px-4 py-10 text-center text-slate-500">
+                  {sync?.configured ? "No athletes match these filters." : "Connect the recruitment Google Sheet to import applications."}
+                </td>
+              </tr>
+            ) : null}
+            {rows.map((row) => {
+              const availabilityView = availabilityViewFor(row);
+              return (
+                <tr key={row.id} className="border-t border-white/[0.05]">
+                  <td className="px-4 py-3">
+                    <span className="flex items-center gap-3">
+                      <Avatar name={row.fullName} />
+                      <span className="font-medium text-white">{row.fullName}</span>
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <WhatsAppLink href={row.whatsApp} number={row.phoneE164 || row.phoneRaw} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <SoftwarePills items={row.software} />
+                  </td>
+                  <td className="px-4 py-3 text-slate-300">{experienceText(row.experienceYears, recruitmentExperienceLabel(row.experience))}</td>
+                  {archivedView ? (
+                    <td className="px-4 py-3 text-slate-300">{row.archiveReason ? archiveReasonLabel(row.archiveReason) : "—"}</td>
+                  ) : (
+                    <td className="px-4 py-3">
+                      <span className="inline-flex items-center gap-2 text-slate-200">
+                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: availabilityView.color }} />
+                        {availabilityView.text}
+                      </span>
+                    </td>
+                  )}
+                  {archivedView ? (
+                    <td className="px-4 py-3 text-slate-300">
+                      {row.archivedAt
+                        ? new Date(row.archivedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+                        : "—"}
+                    </td>
+                  ) : (
+                    <td className="px-4 py-3">
+                      <span className="inline-flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: statusDot(row.status) }} />
+                        <select
+                          value={row.status}
+                          onChange={(event) => {
+                            const next = event.target.value;
+                            if (next === "archived") {
+                              setReason("no_longer_interested");
+                              setComment("");
+                              setArchiveFor(row);
+                              return;
+                            }
+                            void patch(row.id, { status: next });
+                          }}
+                          className="select-console rounded-full border border-white/[0.08] bg-transparent px-2 py-1 text-xs text-white"
+                        >
+                          {RECRUITMENT_STATUSES.filter((item) => item.value !== "archived").map((item) => (
+                            <option key={item.value} value={item.value}>
+                              {item.label}
+                            </option>
+                          ))}
+                          <option value="archived">Archived</option>
+                        </select>
+                      </span>
+                    </td>
+                  )}
+                  <td className="px-4 py-3">
+                    <Link href={profileHref(row.id)} className="text-sm font-medium text-cyan-300 hover:text-cyan-200">
+                      View profile
+                    </Link>
+                    {row.status === "archived" ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRestoreStatus(row.previousStatus && row.previousStatus !== "archived" ? row.previousStatus : "potential");
+                          setRestoreFor(row);
+                        }}
+                        className="ml-3 text-sm text-slate-300 hover:text-white"
+                      >
+                        Restore
+                      </button>
+                    ) : null}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
 
       <div className="flex items-center justify-between text-sm text-slate-400">
         <button type="button" disabled={page <= 1} onClick={() => replaceParams((params) => params.set("page", String(page - 1)))} className="disabled:opacity-40">
@@ -533,150 +616,10 @@ function FilterChip({ label, onRemove }: { label: string; onRemove: () => void }
   );
 }
 
-function sheetColumns(rows: Row[]): string[] {
-  const known = new Set<string>(RECRUITMENT_FORM_COLUMNS);
-  const extras: string[] = [];
-  for (const row of rows) {
-    for (const answer of row.answers || []) {
-      const question = answer.question.trim();
-      if (!question || known.has(question) || question.toLowerCase() === "application id" || extras.includes(question)) continue;
-      extras.push(question);
-    }
+function availabilityViewFor(row: Row): { text: string; color: string } {
+  if (row.confirmedAvailability === "needs_confirmation") {
+    return { text: "Needs confirmation", color: "#eab308" };
   }
-  return [...RECRUITMENT_FORM_COLUMNS, ...extras];
-}
-
-function SheetTable({
-  rows,
-  loading,
-  configured,
-  archivedView,
-  profileHref,
-  onStatus,
-  onRestore,
-}: {
-  rows: Row[];
-  loading: boolean;
-  configured: boolean;
-  archivedView: boolean;
-  profileHref: (id: string) => string;
-  onStatus: (row: Row, next: string) => void;
-  onRestore: (row: Row) => void;
-}) {
-  const columns = sheetColumns(rows);
-  const extra = archivedView ? 3 : 2;
-  return (
-    <div className="overflow-x-auto rounded-2xl border border-white/[0.08] bg-[#0b1220]">
-      <table className="min-w-max border-separate border-spacing-0 text-left">
-        <thead>
-          <tr>
-            {columns.map((question, index) => (
-              <th
-                key={question}
-                className={`sticky top-0 min-w-[11rem] max-w-[18rem] border-b border-white/[0.08] bg-[#0b1220] px-3 py-2 text-left text-[11px] font-medium text-slate-400 ${index === 1 ? "left-0 z-20" : "z-10"}`}
-              >
-                {question}
-              </th>
-            ))}
-            {archivedView ? (
-              <th className="sticky top-0 z-10 min-w-[9rem] border-b border-l border-white/[0.08] bg-[#10192b] px-3 py-2 text-[11px] font-medium text-slate-400">
-                Archive reason
-              </th>
-            ) : null}
-            <th className={`sticky top-0 z-10 min-w-[9rem] border-b border-white/[0.08] bg-[#10192b] px-3 py-2 text-[11px] font-medium text-slate-400 ${archivedView ? "" : "border-l"}`}>
-              Status
-            </th>
-            <th className="sticky top-0 z-10 min-w-[8rem] border-b border-white/[0.08] bg-[#10192b] px-3 py-2 text-[11px] font-medium text-slate-400">
-              Profile
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.length === 0 && !loading ? (
-            <tr>
-              <td colSpan={columns.length + extra} className="px-4 py-10 text-center text-sm text-slate-500">
-                {configured ? "No responses match these filters." : "Connect the recruitment Google Sheet to import applications."}
-              </td>
-            </tr>
-          ) : null}
-          {rows.map((row) => {
-            const answers = formAnswersInSheetOrder(row.answers || []);
-            const byQuestion = new Map(answers.map((answer) => [answer.question, answer.answer]));
-            return (
-              <tr key={row.id} className="align-top">
-                {columns.map((question, index) => (
-                  <SheetCell
-                    key={question}
-                    value={question === "Full name" ? byQuestion.get(question) || row.fullName : byQuestion.get(question) || ""}
-                    sticky={index === 1}
-                    href={question === "Full name" ? profileHref(row.id) : null}
-                  />
-                ))}
-                {archivedView ? (
-                  <td className="border-l border-t border-white/[0.05] bg-[#10192b] px-3 py-2 text-xs text-slate-300">
-                    {row.archiveReason ? archiveReasonLabel(row.archiveReason) : "—"}
-                  </td>
-                ) : null}
-                <td className={`border-t border-white/[0.05] bg-[#10192b] px-3 py-2 ${archivedView ? "" : "border-l"}`}>
-                  <select
-                    value={row.status}
-                    onChange={(event) => onStatus(row, event.target.value)}
-                    className="select-console rounded-full border border-white/[0.08] bg-transparent px-2 py-1 text-xs text-white"
-                  >
-                    {RECRUITMENT_STATUSES.filter((item) => item.value !== "archived").map((item) => (
-                      <option key={item.value} value={item.value}>
-                        {item.label}
-                      </option>
-                    ))}
-                    <option value="archived">Archived</option>
-                  </select>
-                </td>
-                <td className="border-t border-white/[0.05] bg-[#10192b] px-3 py-2">
-                  <Link href={profileHref(row.id)} className="text-xs font-medium text-cyan-300 hover:text-cyan-200">
-                    Open
-                  </Link>
-                  {row.status === "archived" ? (
-                    <button type="button" onClick={() => onRestore(row)} className="ml-3 text-xs text-slate-300 hover:text-white">
-                      Restore
-                    </button>
-                  ) : null}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function SheetCell({ value, sticky, href }: { value: string; sticky?: boolean; href?: string | null }) {
-  const text = value.trim();
-  const className = `max-w-[18rem] min-w-[11rem] border-t border-white/[0.05] px-3 py-2 align-top text-xs text-slate-200 ${sticky ? "sticky left-0 z-10 border-r border-white/[0.08] bg-[#0b1220]" : ""}`;
-  if (!text) return <td className={`${className} text-slate-600`}>—</td>;
-  if (href) {
-    return (
-      <td className={className}>
-        <Link href={href} className="font-medium text-white hover:text-cyan-200">
-          {text}
-        </Link>
-      </td>
-    );
-  }
-  if (/^https?:\/\/\S+$/.test(text)) {
-    return (
-      <td className={className}>
-        <a href={text} target="_blank" rel="noopener noreferrer" className="text-cyan-300 hover:text-cyan-200">
-          Open
-        </a>
-      </td>
-    );
-  }
-  return (
-    <td className={className}>
-      <span className="line-clamp-4 whitespace-pre-wrap" title={text}>
-        {text}
-      </span>
-    </td>
-  );
+  if (row.availabilityNote?.trim()) return { text: row.availabilityNote.trim(), color: "#4ade80" };
+  return { text: recruitmentAvailabilityLabel(row.confirmedAvailability), color: availabilityDot(row.confirmedAvailability) };
 }

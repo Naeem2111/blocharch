@@ -10,7 +10,6 @@ import {
   RECRUITMENT_AVAILABILITY,
   RECRUITMENT_STATUSES,
   archiveReasonLabel,
-  formAnswersInSheetOrder,
   recruitmentAvailabilityLabel,
   recruitmentExperienceLabel,
   recruitmentStatusLabel,
@@ -316,8 +315,8 @@ export function TalentProfileClient({ id }: { id: string }) {
             </button>
           </section>
           <section className="rounded-2xl border border-white/[0.08] bg-[#0c1526] p-5">
-            <h2 className="font-semibold text-white">Form answers</h2>
-            <AnswerList answers={formAnswersInSheetOrder(application.answers)} />
+            <h2 className="font-semibold text-white">Character & fit</h2>
+            <CharacterList answers={application.answers} />
           </section>
           <CommentPanel
             comments={application.comments}
@@ -510,6 +509,30 @@ function Detail({ label, value, href }: { label: string; value: string | null; h
         )}
       </dd>
     </div>
+  );
+}
+
+const CHARACTER_PROMPTS: { title: string; pattern: RegExp }[] = [
+  { title: "Approach to documentation", pattern: /motivates you|documentation/i },
+  { title: "Handling design changes", pattern: /changes direction|design change/i },
+  { title: "Preferred work", pattern: /feel alive|preferred work|architectural work/i },
+];
+
+function CharacterList({ answers }: { answers: RecruitmentAnswer[] }) {
+  const items = CHARACTER_PROMPTS.flatMap((prompt) => {
+    const answer = answers.find((item) => prompt.pattern.test(item.question) && item.answer.trim());
+    return answer ? [{ title: prompt.title, body: answer.answer.trim() }] : [];
+  });
+  if (items.length === 0) return <p className="mt-3 text-sm text-slate-500">No written answers were submitted for this section.</p>;
+  return (
+    <ul className="mt-4 space-y-4">
+      {items.map((item) => (
+        <li key={item.title}>
+          <p className="text-sm font-medium text-white">{item.title}</p>
+          <p className="mt-1 whitespace-pre-wrap text-sm text-slate-300">{item.body}</p>
+        </li>
+      ))}
+    </ul>
   );
 }
 
