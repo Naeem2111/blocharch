@@ -251,7 +251,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 						});
 					}
 				}
-				const removedIds = [...existingIds].filter((contactId) => !keptIds.has(contactId));
+				const removedIds = Array.from(existingIds).filter((contactId) => !keptIds.has(contactId));
 				if (removedIds.length > 0) {
 					await tx.opsClientContact.deleteMany({
 						where: { clientId: id, id: { in: removedIds } },
