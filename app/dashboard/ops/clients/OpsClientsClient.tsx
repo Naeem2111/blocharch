@@ -217,6 +217,7 @@ export function OpsClientsClient() {
     return rows
       .filter((c) => c.name.trim() || c.email.trim() || c.title.trim())
       .map((c) => ({
+        id: c.id,
         name: c.name.trim(),
         title: c.title.trim() || null,
         email: c.email.trim() || null,
@@ -705,13 +706,32 @@ export function OpsClientsClient() {
                   {c.contacts.length > 0 ? (
                     <p className="mt-1 text-[10px] uppercase tracking-wide text-slate-600">Office leads</p>
                   ) : null}
-                  {c.contacts.map((ct) => (
-                    <p key={ct.id ?? ct.name} className="text-xs text-slate-500">
-                      <span className="text-slate-300">{ct.name}</span>
-                      {ct.title ? <span className="block text-slate-400">{ct.title}</span> : null}
-                      {ct.email ? <span className="block">{ct.email}</span> : null}
-                    </p>
-                  ))}
+                  {c.contacts.map((ct) => {
+                    const letters = ct.name
+                      .split(/\s+/)
+                      .filter(Boolean)
+                      .slice(0, 2)
+                      .map((word) => word[0]?.toUpperCase() ?? "")
+                      .join("");
+                    return (
+                      <div key={ct.id ?? ct.name} className="mt-1">
+                        <p className="flex flex-wrap items-center gap-1.5">
+                          <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/[0.08] text-[10px] font-semibold text-slate-300">
+                            {letters}
+                          </span>
+                          <span className="rounded-full border border-white/[0.1] bg-white/[0.06] px-2.5 py-0.5 text-xs text-slate-100">
+                            {ct.name}
+                          </span>
+                          {ct.title ? (
+                            <span className="rounded-full border border-white/[0.1] bg-white/[0.06] px-2.5 py-0.5 text-[11px] text-slate-300">
+                              {ct.title}
+                            </span>
+                          ) : null}
+                        </p>
+                        {ct.email ? <p className="mt-0.5 pl-8 text-xs text-slate-500">{ct.email}</p> : null}
+                      </div>
+                    );
+                  })}
                   {c.publicPortalEnabled && c.slug ? (
                     <p className="mt-2 text-xs text-brand-300">
                       <a

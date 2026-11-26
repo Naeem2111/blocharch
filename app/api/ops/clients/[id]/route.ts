@@ -219,16 +219,42 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 			});
 
 			if (contacts !== undefined) {
-				await tx.opsClientContact.deleteMany({ where: { clientId: id } });
-				if (contacts.length > 0) {
-					await tx.opsClientContact.createMany({
-						data: contacts.map((c, i) => ({
-							clientId: id,
-							name: c.name,
-							title: c.title,
-							email: c.email,
-							sortOrder: i,
-						})),
+				const existingContacts = await tx.opsClientContact.findMany({
+					where: { clientId: id },
+					select: { id: true },
+				});
+				const existingIds = new Set(existingContacts.map((contact) => contact.id));
+				const keptIds = new Set<string>();
+				for (let index = 0; index < contacts.length; index += 1) {
+					const contact = contacts[index];
+					const contactId = contact.id && existingIds.has(contact.id) ? contact.id : null;
+					if (contactId) {
+						keptIds.add(contactId);
+						await tx.opsClientContact.update({
+							where: { id: contactId },
+							data: {
+								name: contact.name,
+								title: contact.title,
+								email: contact.email,
+								sortOrder: index,
+							},
+						});
+					} else {
+						await tx.opsClientContact.create({
+							data: {
+								clientId: id,
+								name: contact.name,
+								title: contact.title,
+								email: contact.email,
+								sortOrder: index,
+							},
+						});
+					}
+				}
+				const removedIds = [...existingIds].filter((contactId) => !keptIds.has(contactId));
+				if (removedIds.length > 0) {
+					await tx.opsClientContact.deleteMany({
+						where: { clientId: id, id: { in: removedIds } },
 					});
 				}
 			}

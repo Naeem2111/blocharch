@@ -2,7 +2,12 @@
 
 import { parseClientDeliverables } from "@/lib/client-portal-deliverables";
 
-export type ClientContactInput = { name: string; title: string | null; email: string | null };
+export type ClientContactInput = {
+	id?: string;
+	name: string;
+	title: string | null;
+	email: string | null;
+};
 
 export type ClientContactRow = {
 	id: string;
@@ -22,6 +27,8 @@ export function parseContactsFromBody(
 	const out: ClientContactInput[] = [];
 	for (const row of raw) {
 		if (row == null || typeof row !== "object") continue;
+		const idRaw = (row as { id?: unknown }).id;
+		const id = typeof idRaw === "string" && idRaw.trim() ? idRaw.trim() : undefined;
 		const name = String((row as { name?: unknown }).name ?? "").trim();
 		const titleRaw = (row as { title?: unknown }).title;
 		const title =
@@ -34,7 +41,7 @@ export function parseContactsFromBody(
 				? String(emailRaw).trim()
 				: null;
 		if (!name && !email && !title) continue;
-		out.push({ name: name || "Office lead", title, email });
+		out.push({ id, name: name || "Office lead", title, email });
 	}
 	return out;
 }

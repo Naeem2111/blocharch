@@ -258,9 +258,15 @@ export function ClientMeetingNotesEditor({
                   {note.people.length > 0 ? (
                     <div className="mt-1 space-y-1">
                       {note.people.map((person, index) => (
-                        <p key={`${person.name}-${index}`} className="text-xs text-slate-500">
-                          <span>For {person.name}</span>
-                          {person.title ? <span className="block text-slate-400">{person.title}</span> : null}
+                        <p key={`${person.name}-${index}`} className="flex flex-wrap items-center gap-1.5 text-xs text-slate-400">
+                          <span className="rounded-full border border-white/[0.1] bg-white/[0.06] px-2 py-0.5 text-slate-100">
+                            {person.name}
+                          </span>
+                          {person.title ? (
+                            <span className="rounded-full border border-white/[0.1] bg-white/[0.06] px-2 py-0.5 text-slate-300">
+                              {person.title}
+                            </span>
+                          ) : null}
                         </p>
                       ))}
                     </div>

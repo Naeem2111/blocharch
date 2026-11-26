@@ -1029,48 +1029,17 @@ html[data-theme="light"] .client-portal-shell .text-slate-600 {
   }
 }
 
-.client-portal-progress-fill {
-  position: relative;
-  overflow: hidden;
-  animation: client-portal-progress-pulse 2.2s ease-in-out infinite;
-}
-
-.client-portal-progress-fill::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    100deg,
-    transparent 0%,
-    rgb(255 255 255 / 0.15) 40%,
-    rgb(255 255 255 / 0.7) 50%,
-    rgb(255 255 255 / 0.15) 60%,
-    transparent 100%
-  );
-  transform: translateX(-120%);
-  animation: client-portal-progress-sheen 1.8s ease-in-out infinite;
-}
-
-.client-portal-progress-idle {
+.client-portal-progress-rest {
   animation: client-portal-progress-pulse 2.2s ease-in-out infinite;
 }
 
 @keyframes client-portal-progress-pulse {
   0%,
   100% {
-    opacity: 0.55;
+    opacity: 0.12;
   }
   50% {
-    opacity: 1;
-  }
-}
-
-@keyframes client-portal-progress-sheen {
-  0% {
-    transform: translateX(-130%);
-  }
-  100% {
-    transform: translateX(130%);
+    opacity: 0.9;
   }
 }
 
@@ -1081,10 +1050,9 @@ html[data-theme="light"] .client-portal-shell .text-slate-600 {
   .portal-discussed-toast-check,
   .portal-bell-live,
   .portal-bell-live svg,
-  .client-portal-progress-fill,
-  .client-portal-progress-fill::after,
-  .client-portal-progress-idle {
+  .client-portal-progress-rest {
     animation: none;
+    opacity: 0.35;
   }
   .portal-bell-live {
     box-shadow: 0 0 16px 2px rgb(56 189 248 / 0.55);
