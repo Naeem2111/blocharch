@@ -77,6 +77,7 @@ export function TalentPoolClient() {
   const page = Math.max(1, Number(searchParams.get("page")) || 1);
   const selectedSoftware = searchParams.getAll("software");
   const archivedView = status === "archived";
+  const liveView = status === "live_active";
 
   const replaceParams = useCallback(
     (mutate: (params: URLSearchParams) => void) => {
@@ -174,6 +175,33 @@ export function TalentPoolClient() {
             ↻ Refresh
           </button>
         </div>
+      </div>
+
+      <div className="flex gap-6 border-b border-white/[0.06]">
+        <button
+          type="button"
+          onClick={() =>
+            replaceParams((params) => {
+              params.set("status", "all_active");
+              params.set("page", "1");
+            })
+          }
+          className={`pb-2 text-sm ${status === "all_active" ? "border-b-2 border-cyan-300 text-white" : "text-slate-400"}`}
+        >
+          All
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            replaceParams((params) => {
+              params.set("status", "live_active");
+              params.set("page", "1");
+            })
+          }
+          className={`pb-2 text-sm ${liveView ? "border-b-2 border-emerald-400 text-white" : "text-slate-400"}`}
+        >
+          Live / Active
+        </button>
       </div>
 
       {sync?.lastError ? <p className="text-sm text-red-300">{sync.lastError}</p> : null}
@@ -388,7 +416,9 @@ export function TalentPoolClient() {
       <p className="text-sm text-slate-400">
         {loading
           ? "Loading…"
-          : archivedView
+          : liveView
+            ? `${total} live / active athlete${total === 1 ? "" : "s"}`
+            : archivedView
             ? `${total} archived athlete${total === 1 ? "" : "s"}`
             : selectedSoftware.length > 0 || experience !== "all" || availability !== "all" || status !== "all_active"
               ? `${total} matching athlete${total === 1 ? "" : "s"}`
@@ -419,14 +449,18 @@ export function TalentPoolClient() {
             {rows.map((row) => {
               const availabilityView = availabilityViewFor(row);
               return (
-                <tr key={row.id} className="border-t border-white/[0.05]">
+                <tr
+                  key={row.id}
+                  onClick={() => router.push(profileHref(row.id))}
+                  className={`cursor-pointer border-t border-white/[0.05] hover:bg-white/[0.04] ${row.status === "live_active" ? "bg-emerald-700/35 hover:bg-emerald-700/45" : ""}`}
+                >
                   <td className="px-4 py-3">
                     <span className="flex items-center gap-3">
                       <Avatar name={row.fullName} />
                       <span className="font-medium text-white">{row.fullName}</span>
                     </span>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
                     <WhatsAppLink href={row.whatsApp} number={row.phoneE164 || row.phoneRaw} />
                   </td>
                   <td className="px-4 py-3">
@@ -450,7 +484,7 @@ export function TalentPoolClient() {
                         : "—"}
                     </td>
                   ) : (
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
                       <span className="inline-flex items-center gap-2">
                         <span className="h-2 w-2 rounded-full" style={{ backgroundColor: statusDot(row.status) }} />
                         <select
@@ -484,7 +518,8 @@ export function TalentPoolClient() {
                     {row.status === "archived" ? (
                       <button
                         type="button"
-                        onClick={() => {
+                        onClick={(event) => {
+                          event.stopPropagation();
                           setRestoreStatus(row.previousStatus && row.previousStatus !== "archived" ? row.previousStatus : "potential");
                           setRestoreFor(row);
                         }}

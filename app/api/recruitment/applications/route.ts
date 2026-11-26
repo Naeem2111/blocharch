@@ -67,13 +67,11 @@ export async function GET(request: NextRequest) {
     ];
   }
 
-  const [total, rows, softwareRows, sync] = await Promise.all([
+  const [total, fetched, softwareRows, sync] = await Promise.all([
     prisma.recruitmentApplication.count({ where }),
     prisma.recruitmentApplication.findMany({
       where,
       orderBy: [{ submittedAt: { sort: "asc", nulls: "last" } }, { createdAt: "asc" }],
-      skip: (page - 1) * perPage,
-      take: perPage,
     }),
     prisma.recruitmentApplication.findMany({
       where: { removedFromSourceAt: null },
@@ -85,6 +83,18 @@ export async function GET(request: NextRequest) {
   const softwareOptions = Array.from(new Set(softwareRows.flatMap((row) => row.software))).sort((a, b) =>
     a.localeCompare(b),
   );
+  const ordered =
+    status === "all_active" || status === "all"
+      ? [...fetched].sort((a, b) => {
+          const live = Number(a.status !== "live_active") - Number(b.status !== "live_active");
+          if (live !== 0) return live;
+          const aTime = a.submittedAt?.getTime() ?? Number.POSITIVE_INFINITY;
+          const bTime = b.submittedAt?.getTime() ?? Number.POSITIVE_INFINITY;
+          if (aTime !== bTime) return aTime - bTime;
+          return a.createdAt.getTime() - b.createdAt.getTime();
+        })
+      : fetched;
+  const rows = ordered.slice((page - 1) * perPage, page * perPage);
 
   return NextResponse.json({
     total,

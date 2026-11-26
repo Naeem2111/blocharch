@@ -168,7 +168,7 @@ export function TalentProfileClient({ id }: { id: string }) {
   const latestMove = application.activity.find((item) => item.detail?.startsWith("Status") || item.detail?.startsWith("Restored") || item.detail?.startsWith("Archived"));
 
   return (
-    <div className="mx-auto max-w-6xl space-y-5">
+    <div className="w-full min-w-0 space-y-5">
       <p className="text-sm text-slate-500">
         Recruitment / Talent Pool / <span className="text-slate-300">{application.fullName}</span>
       </p>
@@ -341,7 +341,7 @@ export function TalentProfileClient({ id }: { id: string }) {
       ) : null}
 
       {tab === "Documents" ? (
-        <div className="grid gap-4 xl:grid-cols-[16rem_minmax(0,1fr)_18rem]">
+        <div className="grid gap-4 lg:grid-cols-[13rem_minmax(0,1fr)_16rem]">
           <section className="rounded-2xl border border-white/[0.08] bg-[#0c1526] p-4">
             <h2 className="font-semibold text-white">Documents ({application.documents.length})</h2>
             <ul className="mt-3 space-y-2">
@@ -398,8 +398,13 @@ export function TalentProfileClient({ id }: { id: string }) {
                     </a>
                   </div>
                 </div>
-                <div id="talent-file-frame" className="overflow-auto rounded-xl bg-white">
-                  <iframe title={file.label} src={`${previewUrl}#page=${filePage}`} className="h-[70vh] origin-top-left" style={{ transform: `scale(${zoom})`, width: `${100 / zoom}%` }} />
+                <div id="talent-file-frame" className="h-[calc(100dvh-15rem)] min-h-[42rem] overflow-auto rounded-xl bg-white">
+                  <iframe
+                    title={file.label}
+                    src={`${previewUrl}#page=${filePage}`}
+                    className="h-full w-full origin-top-left"
+                    style={zoom === 1 ? undefined : { transform: `scale(${zoom})`, width: `${100 / zoom}%`, height: `${100 / zoom}%` }}
+                  />
                 </div>
               </>
             ) : (
