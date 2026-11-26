@@ -6,6 +6,7 @@ import { canAccessModule } from "@/lib/permissions";
 import { requireRecruitmentSession } from "@/lib/recruitment/access";
 import { ACTIVE_RECRUITMENT_STATUSES } from "@/lib/recruitment/constants";
 import { whatsAppHref } from "@/lib/recruitment/parse";
+import { deleteRecruitmentSourceRow } from "@/lib/recruitment/sync";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -187,6 +188,12 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
   const current = await prisma.recruitmentApplication.findUnique({ where: { id } });
   if (!current) return NextResponse.json({ error: "Application not found" }, { status: 404 });
   const actor = gate.user.username || "Admin";
+  try {
+    await deleteRecruitmentSourceRow(current.sourceApplicationId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "The sheet row could not be deleted.";
+    return NextResponse.json({ error: message }, { status: 502 });
+  }
   await prisma.$transaction([
     prisma.recruitmentSuppression.upsert({
       where: { sourceApplicationId: current.sourceApplicationId },
@@ -197,6 +204,6 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
   ]);
   return NextResponse.json({
     ok: true,
-    message: "Removed from recruitment. The Google Form response and Drive files are unchanged, and this submission will not be imported again.",
+    message: "Removed from recruitment and deleted from the Google Sheet. Drive files are unchanged.",
   });
 }

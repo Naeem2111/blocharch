@@ -72,7 +72,7 @@ export function WhatsAppLink({ href, number }: { href: string | null; number: st
 
 export function Avatar({ name }: { name: string }) {
   return (
-    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-950 text-xs font-semibold text-sky-100 ring-1 ring-sky-400/30">
+    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-500 text-xs font-semibold text-white">
       {initials(name)}
     </span>
   );

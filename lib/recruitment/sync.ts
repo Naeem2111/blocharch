@@ -78,6 +78,49 @@ async function sheetsFetch(token: string, url: string, init?: RequestInit) {
   return response.json() as Promise<Record<string, unknown>>;
 }
 
+async function formSheetId(token: string, config: SheetConfig): Promise<number> {
+  const meta = await sheetsFetch(
+    token,
+    `https://sheets.googleapis.com/v4/spreadsheets/${config.sheetId}?fields=sheets.properties(sheetId,title)`,
+  );
+  const sheets = Array.isArray(meta.sheets) ? meta.sheets : [];
+  const wanted = config.tab.trim();
+  const match =
+    sheets.find((sheet) => {
+      const title = (sheet as { properties?: { title?: string } }).properties?.title ?? "";
+      return wanted ? title === wanted : true;
+    }) ?? sheets[0];
+  const sheetId = (match as { properties?: { sheetId?: number } })?.properties?.sheetId;
+  if (typeof sheetId !== "number") throw new Error("Could not find the recruitment sheet tab.");
+  return sheetId;
+}
+
+/** Removes the form row whose Application ID matches. A missing row is already gone. */
+export async function deleteRecruitmentSourceRow(sourceApplicationId: string): Promise<void> {
+  const config = recruitmentSheetConfig();
+  if (!config) throw new Error("The recruitment sheet is not connected, so the row cannot be deleted.");
+  const token = await accessToken(config);
+  const grid = await readGrid(token, config);
+  const headers = grid[0] ?? [];
+  const idIndex = headers.findIndex((header) => headerKey(header) === "applicationId");
+  if (idIndex < 0) throw new Error("The sheet has no Application ID column, so that row cannot be matched.");
+  const rowIndex = grid.findIndex((row, index) => index > 0 && row[idIndex]?.trim() === sourceApplicationId);
+  if (rowIndex < 0) return;
+  const sheetId = await formSheetId(token, config);
+  await sheetsFetch(token, `https://sheets.googleapis.com/v4/spreadsheets/${config.sheetId}:batchUpdate`, {
+    method: "POST",
+    body: JSON.stringify({
+      requests: [
+        {
+          deleteDimension: {
+            range: { sheetId, dimension: "ROWS", startIndex: rowIndex, endIndex: rowIndex + 1 },
+          },
+        },
+      ],
+    }),
+  });
+}
+
 async function readGrid(token: string, config: SheetConfig): Promise<string[][]> {
   const range = encodeURIComponent(rangeFor(config.tab, "A1:ZZ"));
   const data = await sheetsFetch(

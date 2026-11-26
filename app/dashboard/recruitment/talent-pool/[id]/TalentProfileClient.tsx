@@ -179,7 +179,7 @@ export function TalentProfileClient({ id }: { id: string }) {
 
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-start gap-4">
-          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-sky-950 text-lg font-semibold text-sky-100 ring-1 ring-sky-400/30">
+          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-sky-500 text-lg font-semibold text-white">
             {application.fullName.slice(0, 1)}
             {application.fullName.split(" ")[1]?.[0] ?? ""}
           </span>
@@ -440,11 +440,16 @@ export function TalentProfileClient({ id }: { id: string }) {
           type="button"
           onClick={() => {
             const confirmed = window.confirm(
-              "Permanently remove this profile from recruitment? Comments and review history in the dashboard are deleted. The Google Form response and Drive files stay, and this submission will not be imported again.",
+              "Permanently remove this profile? It is deleted from Talent Pool and that row is deleted from the Google Sheet. Drive files stay.",
             );
             if (!confirmed) return;
-            void fetch(`/api/recruitment/applications/${id}`, { method: "DELETE" }).then((response) => {
-              if (response.ok) window.location.href = back;
+            void fetch(`/api/recruitment/applications/${id}`, { method: "DELETE" }).then(async (response) => {
+              if (response.ok) {
+                window.location.href = back;
+                return;
+              }
+              const payload = await response.json().catch(() => ({}));
+              setError(payload.error || "Could not delete that sheet row.");
             });
           }}
           className="text-xs text-red-300"
