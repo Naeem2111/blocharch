@@ -53,7 +53,7 @@ function serializeOpsProject(
       removedAt: Date | null;
       athlete: { id: string; fullName: string; athleteCode: string };
     }>;
-    projectLeadContact: { id: string; name: string; email: string | null } | null;
+    projectLeadContact: { id: string; name: string; title: string | null; email: string | null } | null;
   },
   hoursLogged: number
 ) {
@@ -65,6 +65,7 @@ function serializeOpsProject(
       ? serializeProjectAssignments(project.athleteAssignments)
       : [],
     projectLeadContactName: project.projectLeadContact?.name ?? null,
+    projectLeadContactTitle: project.projectLeadContact?.title?.trim() || null,
     projectLeadContactEmail: project.projectLeadContact?.email ?? null,
     hoursLogged,
   });
@@ -85,12 +86,12 @@ export async function GET(_request: NextRequest, context: RouteContext) {
           name: true,
           slug: true,
           publicPortalEnabled: true,
-          contacts: { orderBy: { sortOrder: "asc" }, select: { id: true, name: true, email: true } },
+          contacts: { orderBy: { sortOrder: "asc" }, select: { id: true, name: true, title: true, email: true } },
         },
       },
       assignedAthlete: { select: { id: true, fullName: true, athleteCode: true } },
       athleteAssignments: activeAthleteAssignmentsInclude,
-      projectLeadContact: { select: { id: true, name: true, email: true } },
+      projectLeadContact: { select: { id: true, name: true, title: true, email: true } },
       customStage: { select: { id: true, label: true } },
     },
   });
@@ -383,12 +384,12 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
           name: true,
           slug: true,
           publicPortalEnabled: true,
-          contacts: { orderBy: { sortOrder: "asc" }, select: { id: true, name: true, email: true } },
+          contacts: { orderBy: { sortOrder: "asc" }, select: { id: true, name: true, title: true, email: true } },
         },
       },
       assignedAthlete: { select: { id: true, fullName: true, athleteCode: true } },
       athleteAssignments: activeAthleteAssignmentsInclude,
-      projectLeadContact: { select: { id: true, name: true, email: true } },
+      projectLeadContact: { select: { id: true, name: true, title: true, email: true } },
       customStage: { select: { id: true, label: true } },
     } as const;
 

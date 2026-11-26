@@ -11,7 +11,7 @@ import { DEFAULT_AVATAR_BG } from "@/lib/hex-color";
 import { clientPortalPath } from "@/lib/client-slug";
 import { parseClientDeliverables, type ClientPortalDeliverable } from "@/lib/client-portal-deliverables";
 
-type ClientContact = { id?: string; name: string; email: string };
+type ClientContact = { id?: string; name: string; title: string; email: string };
 
 type ClientRow = {
   id: string;
@@ -38,7 +38,7 @@ type ClientRow = {
   } | null;
 };
 
-const emptyContact = (): ClientContact => ({ name: "", email: "" });
+const emptyContact = (): ClientContact => ({ name: "", title: "", email: "" });
 
 function ClientLogoUpload({
   clientId,
@@ -118,13 +118,23 @@ function ContactFields({
       <p className="text-xs font-medium text-slate-400">Office leads</p>
       <p className="text-[10px] text-slate-500">People at this firm who can be assigned as project leads on the client portal.</p>
       {contacts.map((row, i) => (
-        <div key={i} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+        <div key={i} className="grid gap-2 sm:grid-cols-[1fr_1fr_1fr_auto]">
           <input
             placeholder="Office lead name"
             value={row.name}
             onChange={(e) => {
               const next = [...contacts];
               next[i] = { ...next[i], name: e.target.value };
+              onChange(next);
+            }}
+            className="rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+          />
+          <input
+            placeholder="Title"
+            value={row.title}
+            onChange={(e) => {
+              const next = [...contacts];
+              next[i] = { ...next[i], title: e.target.value };
               onChange(next);
             }}
             className="rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
@@ -205,9 +215,10 @@ export function OpsClientsClient() {
 
   function contactsPayload(rows: ClientContact[]) {
     return rows
-      .filter((c) => c.name.trim() || c.email.trim())
+      .filter((c) => c.name.trim() || c.email.trim() || c.title.trim())
       .map((c) => ({
         name: c.name.trim(),
+        title: c.title.trim() || null,
         email: c.email.trim() || null,
       }));
   }
@@ -250,7 +261,7 @@ export function OpsClientsClient() {
       software: c.software ?? "",
       contacts:
         c.contacts.length > 0
-          ? c.contacts.map((ct) => ({ id: ct.id, name: ct.name, email: ct.email ?? "" }))
+          ? c.contacts.map((ct) => ({ id: ct.id, name: ct.name, title: ct.title ?? "", email: ct.email ?? "" }))
           : [emptyContact()],
       phone: c.phone ?? "",
       country: c.country ?? "",
@@ -696,8 +707,9 @@ export function OpsClientsClient() {
                   ) : null}
                   {c.contacts.map((ct) => (
                     <p key={ct.id ?? ct.name} className="text-xs text-slate-500">
-                      {ct.name}
-                      {ct.email ? ` · ${ct.email}` : ""}
+                      <span className="text-slate-300">{ct.name}</span>
+                      {ct.title ? <span className="block text-slate-400">{ct.title}</span> : null}
+                      {ct.email ? <span className="block">{ct.email}</span> : null}
                     </p>
                   ))}
                   {c.publicPortalEnabled && c.slug ? (

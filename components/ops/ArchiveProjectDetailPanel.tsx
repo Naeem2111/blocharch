@@ -18,7 +18,7 @@ import type { OpsProjectPhase } from "@prisma/client";
 import { catalogValueFromId } from "@/lib/ops-catalog-types";
 import { useOpsCatalog } from "@/lib/use-ops-catalog";
 
-type ClientContact = { id: string; name: string; email: string | null };
+type ClientContact = { id: string; name: string; title?: string | null; email: string | null };
 
 type ProjectDetail = {
   id: string;
@@ -266,6 +266,7 @@ export function ArchiveProjectDetailPanel({
                     {project.clientContacts.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name}
+                        {c.title ? ` · ${c.title}` : ""}
                       </option>
                     ))}
                   </select>

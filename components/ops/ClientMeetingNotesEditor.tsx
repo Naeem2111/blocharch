@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { ClientMeetingNote, MeetingNoteProjectOption } from "@/lib/client-meeting-notes";
 import { MeetingNoteProjectChip } from "@/components/client-portal/MeetingNoteProjectChip";
 
-type ContactOption = { name: string };
+type ContactOption = { name: string; title?: string | null };
 
 const emptyDraft = { title: "", body: "", people: [""], projectIds: [] as string[] };
 
@@ -104,7 +104,9 @@ export function ClientMeetingNotesEditor({
     setNotes(payload.notes);
   }
 
-  const names = contacts.map((contact) => contact.name.trim()).filter(Boolean);
+  const peopleOptions = contacts
+    .map((contact) => ({ name: contact.name.trim(), title: contact.title?.trim() || null }))
+    .filter((contact) => contact.name);
 
   return (
     <div className="rounded-lg border border-white/[0.08] bg-white/[0.02] p-3 md:col-span-2">
@@ -170,10 +172,12 @@ export function ClientMeetingNotesEditor({
           >
             Add another person
           </button>
-          {names.length > 0 ? (
+          {peopleOptions.length > 0 ? (
             <datalist id={`meeting-note-people-${clientId}`}>
-              {names.map((name) => (
-                <option key={name} value={name} />
+              {peopleOptions.map((contact) => (
+                <option key={contact.name} value={contact.name}>
+                  {contact.title ? `${contact.name} · ${contact.title}` : contact.name}
+                </option>
               ))}
             </datalist>
           ) : null}
@@ -251,10 +255,17 @@ export function ClientMeetingNotesEditor({
                       ))}
                     </div>
                   ) : null}
-                  <p className="mt-1 text-xs text-slate-500">
-                    {note.people.length > 0 ? `For ${note.people.join(", ")} · ` : ""}
-                    {note.discussedAt ? "Discussed" : "To discuss"}
-                  </p>
+                  {note.people.length > 0 ? (
+                    <div className="mt-1 space-y-1">
+                      {note.people.map((person, index) => (
+                        <p key={`${person.name}-${index}`} className="text-xs text-slate-500">
+                          <span>For {person.name}</span>
+                          {person.title ? <span className="block text-slate-400">{person.title}</span> : null}
+                        </p>
+                      ))}
+                    </div>
+                  ) : null}
+                  <p className="mt-1 text-xs text-slate-500">{note.discussedAt ? "Discussed" : "To discuss"}</p>
                 </div>
                 <div className="flex flex-wrap gap-2 text-xs">
                   <button
@@ -264,7 +275,7 @@ export function ClientMeetingNotesEditor({
                       setDraft({
                         title: note.title,
                         body: note.body,
-                        people: note.people.length ? note.people : [""],
+                        people: note.people.length ? note.people.map((person) => person.name) : [""],
                         projectIds: note.projects.map((project) => project.id),
                       });
                     }}

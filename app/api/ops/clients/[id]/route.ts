@@ -225,6 +225,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 						data: contacts.map((c, i) => ({
 							clientId: id,
 							name: c.name,
+							title: c.title,
 							email: c.email,
 							sortOrder: i,
 						})),

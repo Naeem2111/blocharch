@@ -116,6 +116,7 @@ export async function POST(request: NextRequest) {
 				contacts: {
 					create: contacts.map((c, i) => ({
 						name: c.name,
+						title: c.title,
 						email: c.email,
 						sortOrder: i,
 					})),

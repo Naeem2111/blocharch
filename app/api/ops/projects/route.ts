@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
       },
       assignedAthlete: { select: { id: true, fullName: true, athleteCode: true } },
       athleteAssignments: activeAthleteAssignmentsInclude,
-      projectLeadContact: { select: { id: true, name: true, email: true } },
+      projectLeadContact: { select: { id: true, name: true, title: true, email: true } },
       customStage: { select: { id: true, label: true } },
     },
   });
@@ -79,6 +79,7 @@ export async function GET(request: NextRequest) {
         clientLogoTextTone: p.client.logoTextTone,
         assignedAthleteName: p.assignedAthlete?.fullName ?? null,
         projectLeadContactName: p.projectLeadContact?.name ?? null,
+        projectLeadContactTitle: p.projectLeadContact?.title?.trim() || null,
         projectLeadContactEmail: p.projectLeadContact?.email ?? null,
         athleteCode: p.assignedAthlete?.athleteCode ?? null,
         assignedAthletes: serializeProjectAssignments(p.athleteAssignments),

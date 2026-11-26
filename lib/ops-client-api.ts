@@ -2,11 +2,12 @@
 
 import { parseClientDeliverables } from "@/lib/client-portal-deliverables";
 
-export type ClientContactInput = { name: string; email: string | null };
+export type ClientContactInput = { name: string; title: string | null; email: string | null };
 
 export type ClientContactRow = {
 	id: string;
 	name: string;
+	title: string | null;
 	email: string | null;
 	sortOrder: number;
 };
@@ -22,13 +23,18 @@ export function parseContactsFromBody(
 	for (const row of raw) {
 		if (row == null || typeof row !== "object") continue;
 		const name = String((row as { name?: unknown }).name ?? "").trim();
+		const titleRaw = (row as { title?: unknown }).title;
+		const title =
+			titleRaw != null && String(titleRaw).trim()
+				? String(titleRaw).trim().slice(0, 120)
+				: null;
 		const emailRaw = (row as { email?: unknown }).email;
 		const email =
 			emailRaw != null && String(emailRaw).trim()
 				? String(emailRaw).trim()
 				: null;
-		if (!name && !email) continue;
-		out.push({ name: name || "Office lead", email });
+		if (!name && !email && !title) continue;
+		out.push({ name: name || "Office lead", title, email });
 	}
 	return out;
 }
@@ -37,26 +43,28 @@ export function parseContactsFromBody(
 export function contactsFromLegacy(client: {
 	contactPerson?: string | null;
 	email?: string | null;
-	contacts?: { name: string; email: string | null; sortOrder?: number }[];
+	contacts?: { name: string; title?: string | null; email: string | null; sortOrder?: number }[];
 }): ClientContactInput[] {
 	if (client.contacts?.length) {
 		return [...client.contacts]
 			.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
 			.map((c) => ({
 				name: c.name.trim() || "Office lead",
+				title: c.title?.trim() || null,
 				email: c.email?.trim() || null,
 			}));
 	}
 	const name = client.contactPerson?.trim();
 	const email = client.email?.trim() || null;
 	if (!name && !email) return [];
-	return [{ name: name || "Office lead", email }];
+	return [{ name: name || "Office lead", title: null, email }];
 }
 
 export function serializeContacts(
 	contacts: {
 		id: string;
 		name: string;
+		title?: string | null;
 		email: string | null;
 		sortOrder: number;
 	}[],
@@ -66,6 +74,7 @@ export function serializeContacts(
 		.map((c) => ({
 			id: c.id,
 			name: c.name,
+			title: c.title?.trim() || null,
 			email: c.email,
 			sortOrder: c.sortOrder,
 		}));
@@ -89,6 +98,7 @@ type ClientWithRelations = {
 	contacts: {
 		id: string;
 		name: string;
+		title?: string | null;
 		email: string | null;
 		sortOrder: number;
 	}[];

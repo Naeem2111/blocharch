@@ -28,6 +28,7 @@ export type ArchivedProjectRow = {
   profilePhotoBgColor: string | null;
   profilePhotoTextTone: string | null;
   leadName: string | null;
+  leadTitle: string | null;
   currentStatus: keyof typeof PROJECT_STATUS_LABELS;
   complexity: keyof typeof COMPLEXITY_LABELS;
   progressPercent: number | null;
@@ -51,7 +52,7 @@ function leadInitials(name: string): string {
     .join("");
 }
 
-function LeadAssigned({ name }: { name: string | null }) {
+function LeadAssigned({ name, title }: { name: string | null; title?: string | null }) {
   if (!name) {
     return <span className="text-xs text-slate-500">Lead assigned soon</span>;
   }
@@ -60,7 +61,10 @@ function LeadAssigned({ name }: { name: string | null }) {
       <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.08] text-[11px] font-semibold text-slate-300">
         {leadInitials(name)}
       </span>
-      <span className="min-w-0 text-sm text-slate-200">{name}</span>
+      <span className="min-w-0">
+        <span className="block truncate text-sm text-slate-200">{name}</span>
+        {title ? <span className="block truncate text-[11px] text-slate-400">{title}</span> : null}
+      </span>
     </span>
   );
 }
@@ -139,7 +143,7 @@ export function ArchivedProjectsByClient({
                     <td className="px-4 py-3 text-slate-300">{p.stageLabel ?? "—"}</td>
                     <td className="px-4 py-3 whitespace-nowrap text-slate-300">{formatDate(p.completedAt)}</td>
                     <td className="px-4 py-3">
-                      <LeadAssigned name={p.leadName} />
+                      <LeadAssigned name={p.leadName} title={p.leadTitle} />
                     </td>
                     <td className="px-4 py-3">
                       <ComplexityBadge value={p.complexity} label={COMPLEXITY_LABELS[p.complexity]} />

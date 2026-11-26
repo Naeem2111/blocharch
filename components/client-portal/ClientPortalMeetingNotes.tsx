@@ -64,12 +64,13 @@ function NoteContent({ note }: { note: ClientMeetingNote }) {
       {note.body ? <p className="mt-0.5 text-sm text-slate-400">{note.body}</p> : null}
       {note.people.length > 0 ? (
         <div className="mt-2 flex flex-wrap gap-1.5">
-          {note.people.map((name) => (
+          {note.people.map((person) => (
             <span
-              key={name}
-              className="inline-flex rounded-full bg-white/[0.08] px-2.5 py-0.5 text-[11px] font-medium text-slate-300"
+              key={person.name}
+              className="inline-flex flex-col rounded-full bg-white/[0.08] px-2.5 py-0.5 text-[11px] font-medium leading-tight text-slate-300"
             >
-              For: {name}
+              <span>For: {person.name}</span>
+              {person.title ? <span className="text-[10px] font-normal text-slate-400">{person.title}</span> : null}
             </span>
           ))}
         </div>

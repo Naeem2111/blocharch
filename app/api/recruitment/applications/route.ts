@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
     prisma.recruitmentApplication.count({ where }),
     prisma.recruitmentApplication.findMany({
       where,
-      orderBy: [{ submittedAt: { sort: "asc", nulls: "last" } }, { createdAt: "asc" }],
+      orderBy: [{ submittedAt: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }],
     }),
     prisma.recruitmentApplication.findMany({
       where: { removedFromSourceAt: null },
@@ -88,10 +88,10 @@ export async function GET(request: NextRequest) {
       ? [...fetched].sort((a, b) => {
           const live = Number(a.status !== "live_active") - Number(b.status !== "live_active");
           if (live !== 0) return live;
-          const aTime = a.submittedAt?.getTime() ?? Number.POSITIVE_INFINITY;
-          const bTime = b.submittedAt?.getTime() ?? Number.POSITIVE_INFINITY;
-          if (aTime !== bTime) return aTime - bTime;
-          return a.createdAt.getTime() - b.createdAt.getTime();
+          const aTime = a.submittedAt?.getTime() ?? Number.NEGATIVE_INFINITY;
+          const bTime = b.submittedAt?.getTime() ?? Number.NEGATIVE_INFINITY;
+          if (aTime !== bTime) return bTime - aTime;
+          return b.createdAt.getTime() - a.createdAt.getTime();
         })
       : fetched;
   const rows = ordered.slice((page - 1) * perPage, page * perPage);

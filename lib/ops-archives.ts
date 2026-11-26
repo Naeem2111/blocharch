@@ -62,7 +62,7 @@ export async function buildOpsArchives(filters: OpsArchivesFilters = {}) {
             profilePhotoTextTone: true,
           },
         },
-        projectLeadContact: { select: { name: true } },
+        projectLeadContact: { select: { name: true, title: true } },
         projectLeadAthlete: { select: { fullName: true } },
         customStage: { select: { id: true, label: true } },
       },
@@ -296,6 +296,7 @@ export async function buildOpsArchives(filters: OpsArchivesFilters = {}) {
           ...athleteProfileVisual(p.assignedAthlete),
           leadName:
             p.projectLeadContact?.name ?? p.projectLeadAthlete?.fullName ?? p.projectLead ?? null,
+          leadTitle: p.projectLeadContact?.title?.trim() || null,
           currentStatus: p.currentStatus,
           currentStage: p.currentStage,
           customStageId: p.customStageId ?? null,

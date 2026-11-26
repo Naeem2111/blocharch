@@ -122,9 +122,11 @@ function LanePill({ n }: { n: number }) {
 
 function LeadBlock({
 	name,
+	title,
 	showLabel = true,
 }: {
 	name: string | null;
+	title?: string | null;
 	showLabel?: boolean;
 }) {
 	if (!name) {
@@ -140,6 +142,7 @@ function LeadBlock({
 					<p className="text-[9px] font-semibold uppercase tracking-wider text-slate-500">Your lead</p>
 				) : null}
 				<p className="truncate text-sm text-slate-200">{name}</p>
+				{title ? <p className="truncate text-[11px] text-slate-400">{title}</p> : null}
 			</div>
 		</div>
 	);
@@ -236,7 +239,7 @@ function ProjectCard({
 				</div>
 			) : null}
 			<div className="mt-4 flex flex-wrap items-center justify-between gap-3 pl-1">
-				<LeadBlock name={project.leadName} />
+				<LeadBlock name={project.leadName} title={project.leadTitle} />
 				<AthleteAssigned assigned={!!project.assignedAthleteName} />
 			</div>
 			{project.documents.length > 0 ? (
@@ -373,7 +376,7 @@ function CompletedPreviewCard({ project }: { project: PublicClientPortalProject 
 				</div>
 			</div>
 			<div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-				<LeadBlock name={project.leadName} />
+				<LeadBlock name={project.leadName} title={project.leadTitle} />
 				<ComplexityBadge value={project.complexity} label={project.complexityLabel} />
 			</div>
 		</article>
@@ -1045,9 +1048,9 @@ export function ClientPortalClient({
 													<dt className="text-slate-500">Completed</dt>
 													<dd className="text-right text-slate-200">{formatDateOnly(project.completedAt)}</dd>
 												</div>
-												<div className="flex items-center justify-between gap-3">
+												<div className="flex items-start justify-between gap-3">
 													<dt className="text-slate-500">Lead</dt>
-													<dd><LeadBlock name={project.leadName} showLabel={false} /></dd>
+													<dd><LeadBlock name={project.leadName} title={project.leadTitle} showLabel={false} /></dd>
 												</div>
 												<div className="flex items-center justify-between gap-3">
 													<dt className="text-slate-500">Complexity</dt>
@@ -1078,7 +1081,7 @@ export function ClientPortalClient({
 													<td className="px-4 py-4 text-slate-300">{project.currentStageLabel}</td>
 													<td className="px-4 py-4 whitespace-nowrap text-slate-300">{formatDateOnly(project.completedAt)}</td>
 													<td className="px-4 py-4" style={{ overflow: "visible" }}>
-														<LeadBlock name={project.leadName} showLabel={false} />
+														<LeadBlock name={project.leadName} title={project.leadTitle} showLabel={false} />
 													</td>
 													<td className="px-4 py-4" style={{ overflow: "visible" }}>
 														<ComplexityBadge value={project.complexity} label={project.complexityLabel} />

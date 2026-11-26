@@ -22,7 +22,7 @@ import {
   emptyDualProjectDeadlines,
 } from "@/components/ops/ProjectDueDateTimeFields";
 
-type ClientContactOption = { id: string; name: string; email: string | null };
+type ClientContactOption = { id: string; name: string; title: string | null; email: string | null };
 
 type ClientOption = {
   id: string;
@@ -51,6 +51,7 @@ type ProjectRow = {
   assignedAthletes?: AssignedAthleteRow[];
   projectLeadContactId: string | null;
   projectLeadContactName: string | null;
+  projectLeadContactTitle: string | null;
   projectLeadContactEmail: string | null;
   athleteCode: string | null;
   name: string;
@@ -222,7 +223,7 @@ export function OpsProjectsClient() {
             logoUrl?: string | null;
             logoBgColor?: string | null;
             logoTextTone?: string | null;
-            contacts?: { id: string; name: string; email: string | null }[];
+            contacts?: { id: string; name: string; title?: string | null; email: string | null }[];
           }) => ({
             id: c.id,
             name: c.name,
@@ -232,6 +233,7 @@ export function OpsProjectsClient() {
             contacts: (c.contacts ?? []).map((ct) => ({
               id: ct.id,
               name: ct.name,
+              title: ct.title?.trim() || null,
               email: ct.email ?? null,
             })),
           })
@@ -554,6 +556,7 @@ export function OpsProjectsClient() {
                 {editClientContacts.map((ct) => (
                   <option key={ct.id} value={ct.id}>
                     {ct.name}
+                    {ct.title ? ` · ${ct.title}` : ""}
                     {ct.email ? ` · ${ct.email}` : ""}
                   </option>
                 ))}
@@ -912,6 +915,7 @@ export function OpsProjectsClient() {
               {createClientContacts.map((ct) => (
                 <option key={ct.id} value={ct.id}>
                   {ct.name}
+                  {ct.title ? ` · ${ct.title}` : ""}
                   {ct.email ? ` · ${ct.email}` : ""}
                 </option>
               ))}

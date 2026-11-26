@@ -8,12 +8,18 @@ export type ClientMeetingNoteProject = {
   dueDate: string | null;
 };
 
+export type MeetingNotePerson = {
+  name: string;
+  /** Office-lead job title, matched by name. Null when the person is not an office lead. */
+  title: string | null;
+};
+
 export type ClientMeetingNote = {
   id: string;
   title: string;
   body: string;
   /** Optional. Empty when the point is not assigned to anyone. */
-  people: string[];
+  people: MeetingNotePerson[];
   projects: ClientMeetingNoteProject[];
   sortOrder: number;
   discussedAt: string | null;
@@ -44,9 +50,17 @@ type NoteRow = {
   }[];
 };
 
-export function serializeClientMeetingNote(note: NoteRow): ClientMeetingNote {
+function titleForPerson(name: string, titles: Map<string, string | null>): string | null {
+  return titles.get(name.trim().toLowerCase()) ?? null;
+}
+
+export function serializeClientMeetingNote(
+  note: NoteRow,
+  titles: Map<string, string | null> = new Map(),
+): ClientMeetingNote {
   const stored = note.people.map((name) => name.trim()).filter(Boolean);
-  const people = stored.length > 0 ? stored : note.forName?.trim() ? [note.forName.trim()] : [];
+  const names = stored.length > 0 ? stored : note.forName?.trim() ? [note.forName.trim()] : [];
+  const people = names.map((name) => ({ name, title: titleForPerson(name, titles) }));
   const projects = note.projects
     .map((link) => ({
       id: link.project.id,
@@ -76,12 +90,21 @@ const noteInclude = {
 } as const;
 
 export async function listClientMeetingNotes(clientId: string): Promise<ClientMeetingNote[]> {
-  const rows = await prisma.opsClientMeetingNote.findMany({
-    where: { clientId },
-    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-    include: noteInclude,
-  });
-  return rows.map(serializeClientMeetingNote);
+  const [rows, contacts] = await Promise.all([
+    prisma.opsClientMeetingNote.findMany({
+      where: { clientId },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      include: noteInclude,
+    }),
+    prisma.opsClientContact.findMany({
+      where: { clientId },
+      select: { name: true, title: true },
+    }),
+  ]);
+  const titles = new Map(
+    contacts.map((contact) => [contact.name.trim().toLowerCase(), contact.title?.trim() || null]),
+  );
+  return rows.map((row) => serializeClientMeetingNote(row, titles));
 }
 
 function projectIsCompleted(status: string): boolean {

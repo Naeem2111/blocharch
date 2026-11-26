@@ -38,6 +38,7 @@ export type PublicClientPortalProject = {
   dueAt: string | null;
   progressPercent: number;
   leadName: string | null;
+  leadTitle: string | null;
   leadPhotoUrl: string | null;
   leadPhotoBgColor: string | null;
   leadPhotoTextTone: string | null;
@@ -134,6 +135,7 @@ function mapProject(
     clientDeliverables: unknown;
     projectLeadContact: {
       name: string;
+      title: string | null;
       email: string | null;
     } | null;
     projectLeadAthlete: {
@@ -167,6 +169,7 @@ function mapProject(
     dueAt: p.dueDate?.toISOString() ?? null,
     progressPercent,
     leadName: contact?.name ?? legacyAthlete?.fullName ?? p.projectLead ?? null,
+    leadTitle: contact?.title?.trim() || null,
     leadPhotoUrl: contact ? null : legacyAthlete?.profilePhotoUrl ?? null,
     leadPhotoBgColor: contact ? null : legacyAthlete?.profilePhotoBgColor ?? null,
     leadPhotoTextTone: contact ? null : legacyAthlete?.profilePhotoTextTone ?? null,
@@ -203,7 +206,7 @@ export async function getPublicClientPortal(clientSlug: string): Promise<PublicC
     where: { clientId: client.id },
     orderBy: [{ dueDate: "asc" }, { name: "asc" }],
     include: {
-      projectLeadContact: { select: { name: true, email: true } },
+      projectLeadContact: { select: { name: true, title: true, email: true } },
       projectLeadAthlete: {
         select: {
           fullName: true,

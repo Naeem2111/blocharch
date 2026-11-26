@@ -9,7 +9,7 @@ type ClientOption = {
   name: string;
   slug: string | null;
   publicPortalEnabled: boolean;
-  contacts: { name: string }[];
+  contacts: { name: string; title?: string | null }[];
 };
 
 export function MeetingNotesPageClient({ initialClientId = "" }: { initialClientId?: string }) {
