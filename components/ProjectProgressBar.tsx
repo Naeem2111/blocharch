@@ -53,7 +53,7 @@ export function ProjectProgressBar({
         {live && p < 100 ? (
           <div
             className="client-portal-progress-rest h-full"
-            style={{ width: `${100 - p}%`, backgroundColor: fill }}
+            style={{ width: `${100 - p}%`, ["--progress-fill" as string]: fill }}
           />
         ) : null}
       </div>

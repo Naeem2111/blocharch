@@ -1030,16 +1030,37 @@ html[data-theme="light"] .client-portal-shell .text-slate-600 {
 }
 
 .client-portal-progress-rest {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--progress-fill) 28%, black) 0%,
+    var(--progress-fill) 62%,
+    color-mix(in srgb, var(--progress-fill) 35%, white) 100%
+  );
+}
+
+.client-portal-progress-rest::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    transparent 28%,
+    color-mix(in srgb, var(--progress-fill) 15%, white) 100%
+  );
+  opacity: 0.15;
   animation: client-portal-progress-pulse 2.2s ease-in-out infinite;
 }
 
 @keyframes client-portal-progress-pulse {
   0%,
   100% {
-    opacity: 0.12;
+    opacity: 0.05;
   }
   50% {
-    opacity: 0.9;
+    opacity: 0.95;
   }
 }
 
@@ -1050,9 +1071,9 @@ html[data-theme="light"] .client-portal-shell .text-slate-600 {
   .portal-discussed-toast-check,
   .portal-bell-live,
   .portal-bell-live svg,
-  .client-portal-progress-rest {
+  .client-portal-progress-rest::after {
     animation: none;
-    opacity: 0.35;
+    opacity: 0.4;
   }
   .portal-bell-live {
     box-shadow: 0 0 16px 2px rgb(56 189 248 / 0.55);
