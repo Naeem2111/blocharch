@@ -231,11 +231,8 @@ function ProjectCard({
 				<span className="hidden sm:block" aria-hidden />
 			</div>
 			{!compact ? (
-				<div className="mt-3 flex items-center gap-3 pl-1">
-					<div className="min-w-0 flex-1">
-						<ProjectProgressBar percent={project.progressPercent} showLabel={false} />
-					</div>
-					<span className="shrink-0 text-xs tabular-nums text-slate-400">{project.progressPercent}%</span>
+				<div className="mt-3 pl-1">
+					<ProjectProgressBar percent={project.progressPercent} showLabel={false} live />
 				</div>
 			) : null}
 			<div className="mt-4 flex flex-wrap items-center justify-between gap-3 pl-1">

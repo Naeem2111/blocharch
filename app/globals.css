@@ -1029,13 +1029,61 @@ html[data-theme="light"] .client-portal-shell .text-slate-600 {
   }
 }
 
+.client-portal-progress-fill {
+  position: relative;
+  overflow: hidden;
+  animation: client-portal-progress-pulse 2.2s ease-in-out infinite;
+}
+
+.client-portal-progress-fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    rgb(255 255 255 / 0.15) 40%,
+    rgb(255 255 255 / 0.7) 50%,
+    rgb(255 255 255 / 0.15) 60%,
+    transparent 100%
+  );
+  transform: translateX(-120%);
+  animation: client-portal-progress-sheen 1.8s ease-in-out infinite;
+}
+
+.client-portal-progress-idle {
+  animation: client-portal-progress-pulse 2.2s ease-in-out infinite;
+}
+
+@keyframes client-portal-progress-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes client-portal-progress-sheen {
+  0% {
+    transform: translateX(-130%);
+  }
+  100% {
+    transform: translateX(130%);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .portal-note-leaving,
   .portal-note-arrived,
   .portal-discussed-toast,
   .portal-discussed-toast-check,
   .portal-bell-live,
-  .portal-bell-live svg {
+  .portal-bell-live svg,
+  .client-portal-progress-fill,
+  .client-portal-progress-fill::after,
+  .client-portal-progress-idle {
     animation: none;
   }
   .portal-bell-live {

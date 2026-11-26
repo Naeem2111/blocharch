@@ -14,11 +14,14 @@ export function progressBarColor(percent: number): string {
 export function ProjectProgressBar({
   percent,
   showLabel = true,
+  live = false,
   className = "",
   barClassName = "",
 }: {
   percent: number | null | undefined;
   showLabel?: boolean;
+  /** Soft pulse and a moving highlight. Used on the client portal, where the number is hidden. */
+  live?: boolean;
   className?: string;
   barClassName?: string;
 }) {
@@ -34,14 +37,15 @@ export function ProjectProgressBar({
         </div>
       ) : null}
       <div
-        className="progress-track h-2 w-full overflow-hidden rounded-full bg-white/[0.06]"
+        className={`progress-track h-2 w-full overflow-hidden rounded-full bg-white/[0.06] ${live ? "client-portal-progress-track" : ""} ${live && p === 0 ? "client-portal-progress-idle" : ""}`}
         role="progressbar"
         aria-valuenow={p}
         aria-valuemin={0}
         aria-valuemax={100}
+        aria-label="Project progress"
       >
         <div
-          className={`h-full rounded-full transition-all duration-300 ${barClassName}`}
+          className={`h-full rounded-full transition-all duration-300 ${live && p > 0 ? "client-portal-progress-fill" : ""} ${barClassName}`}
           style={{ width: `${p}%`, backgroundColor: fill }}
         />
       </div>
