@@ -1,5 +1,6 @@
 "use client";
 
+import { LeadBlock } from "@/components/client-portal/LeadBlock";
 import { AthleteAvatar } from "@/components/ops/AthleteAvatar";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
 import { ComplexityBadge } from "@/components/ops/ComplexityBadge";
@@ -41,36 +42,6 @@ function formatDate(iso: string | null): string {
   const d = new Date(`${day}T12:00:00`);
   if (Number.isNaN(d.getTime())) return day;
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-}
-
-function leadInitials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? "")
-    .join("");
-}
-
-function LeadAssigned({ name, title }: { name: string | null; title?: string | null }) {
-  if (!name) {
-    return <span className="text-xs text-slate-500">Lead assigned soon</span>;
-  }
-  return (
-    <span className="inline-flex min-w-0 flex-wrap items-center gap-1.5">
-      <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.08] text-[11px] font-semibold text-slate-300">
-        {leadInitials(name)}
-      </span>
-      <span className="max-w-full truncate rounded-full border border-white/[0.1] bg-white/[0.06] px-2.5 py-1 text-sm text-slate-100">
-        {name}
-      </span>
-      {title ? (
-        <span className="max-w-full truncate rounded-full border border-white/[0.1] bg-white/[0.06] px-2.5 py-1 text-[11px] text-slate-300">
-          {title}
-        </span>
-      ) : null}
-    </span>
-  );
 }
 
 export function ArchivedProjectsByClient({
@@ -147,7 +118,7 @@ export function ArchivedProjectsByClient({
                     <td className="px-4 py-3 text-slate-300">{p.stageLabel ?? "—"}</td>
                     <td className="px-4 py-3 whitespace-nowrap text-slate-300">{formatDate(p.completedAt)}</td>
                     <td className="px-4 py-3">
-                      <LeadAssigned name={p.leadName} title={p.leadTitle} />
+                      <LeadBlock name={p.leadName} title={p.leadTitle} showLabel={false} />
                     </td>
                     <td className="px-4 py-3">
                       <ComplexityBadge value={p.complexity} label={COMPLEXITY_LABELS[p.complexity]} />

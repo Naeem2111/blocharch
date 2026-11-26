@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ClientMeetingNote } from "@/lib/client-meeting-notes";
+import { LeadBlock } from "@/components/client-portal/LeadBlock";
 import { MeetingNoteProjectChip } from "@/components/client-portal/MeetingNoteProjectChip";
 
 function openNotes(notes: ClientMeetingNote[]) {
@@ -63,30 +64,10 @@ function NoteContent({ note }: { note: ClientMeetingNote }) {
       ) : null}
       {note.body ? <p className="mt-0.5 text-sm text-slate-400">{note.body}</p> : null}
       {note.people.length > 0 ? (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {note.people.map((person) => {
-            const letters = person.name
-              .split(/\s+/)
-              .filter(Boolean)
-              .slice(0, 2)
-              .map((word) => word[0]?.toUpperCase() ?? "")
-              .join("");
-            return (
-              <span key={person.name} className="inline-flex items-center gap-1.5">
-                <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/[0.08] text-[10px] font-semibold text-slate-300">
-                  {letters}
-                </span>
-                <span className="rounded-full border border-white/[0.1] bg-white/[0.06] px-2.5 py-0.5 text-[11px] font-medium text-slate-100">
-                  {person.name}
-                </span>
-                {person.title ? (
-                  <span className="rounded-full border border-white/[0.1] bg-white/[0.06] px-2.5 py-0.5 text-[11px] text-slate-300">
-                    {person.title}
-                  </span>
-                ) : null}
-              </span>
-            );
-          })}
+        <div className="mt-2 space-y-2">
+          {note.people.map((person) => (
+            <LeadBlock key={person.name} name={person.name} title={person.title} showLabel={false} />
+          ))}
         </div>
       ) : null}
     </div>
