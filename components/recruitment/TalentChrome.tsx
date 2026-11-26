@@ -70,9 +70,12 @@ export function WhatsAppLink({ href, number }: { href: string | null; number: st
   );
 }
 
-export function Avatar({ name }: { name: string }) {
+export function Avatar({ name, color }: { name: string; color?: string }) {
   return (
-    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-500 text-xs font-semibold text-white">
+    <span
+      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white ${color ? "" : "bg-blue-800"}`}
+      style={color ? { backgroundColor: color } : undefined}
+    >
       {initials(name)}
     </span>
   );

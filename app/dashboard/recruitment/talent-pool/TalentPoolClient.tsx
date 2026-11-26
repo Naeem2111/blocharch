@@ -456,7 +456,7 @@ export function TalentPoolClient() {
                 >
                   <td className="px-4 py-3">
                     <span className="flex items-center gap-3">
-                      <Avatar name={row.fullName} />
+                      <Avatar name={row.fullName} color={row.status === "live_active" ? "#0000FF" : undefined} />
                       <span className="font-medium text-white">{row.fullName}</span>
                     </span>
                   </td>
