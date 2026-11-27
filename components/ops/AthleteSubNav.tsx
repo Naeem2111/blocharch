@@ -12,7 +12,6 @@ export const ATHLETE_NAV: AthleteNavItem[] = [
   { href: "/dashboard/athlete/projects/completed", label: "Completed projects" },
   { href: "/dashboard/athlete/private", label: "Private work" },
   { href: "/dashboard/athlete/notifications", label: "My notifications" },
-  { href: "/dashboard/athlete/book-call", label: "Book a call" },
   { href: "/dashboard/planner?area=team&athlete=me&view=planner", label: "Project planner" },
 ];
 

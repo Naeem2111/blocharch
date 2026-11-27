@@ -6,7 +6,7 @@ export default function OpsAnalyticsPage() {
     <>
       <PageHeader
         title="Analytics"
-        description="Hours breakdown, profitability, and due-date risk across athletes and clients."
+        description="Hours breakdown and profitability across athletes and clients."
         className="mb-8"
       />
       <AnalyticsClient />

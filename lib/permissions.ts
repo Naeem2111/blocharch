@@ -54,6 +54,8 @@ export function canAccessOpsDashboardPath(role: UserRole, path: string): boolean
     return (
       path === "/dashboard/ops" ||
       path.startsWith("/dashboard/ops/pipeline") ||
+      path === "/dashboard/ops/performance" ||
+      path.startsWith("/dashboard/ops/performance/") ||
       path === "/dashboard/ops/archives" ||
       path.startsWith("/dashboard/ops/archives/")
     );
@@ -69,6 +71,7 @@ export function canAccessOpsApiPath(role: UserRole, path: string): boolean {
     if (normalized.startsWith("/api/ops/pipeline")) return true;
     if (normalized === "/api/ops/clients" || normalized === "/api/ops/athletes") return true;
     if (normalized === "/api/ops/archives") return true;
+    if (normalized === "/api/ops/performance") return true;
     if (/^\/api\/ops\/projects\/[^/]+\/reactivate$/.test(normalized)) return true;
     return false;
   }

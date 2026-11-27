@@ -12,8 +12,6 @@ import { OPS_ALERT_THRESHOLDS } from "@/lib/ops-alerts";
 import { countPendingCheckInRequests } from "@/lib/check-in-admin";
 import { buildBeatenDeadlines, type BeatenDeadlinesByAthlete } from "@/lib/analytics-deadlines";
 import { buildAverageHoursByPhase } from "@/lib/phase-average-hours";
-import { formatProjectDueAt } from "@/lib/project-deadline";
-import { projectDisplayFields } from "@/lib/project-display";
 import { listReportingAthletes, monthSubmissionHoursByAthlete } from "@/lib/reporting-athletes";
 
 export { LANE_MONTHLY_HOURS };
@@ -188,10 +186,6 @@ export function filterCommercialLedgerByClient(
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
-}
-
-function dateOnlyUtc(date: Date): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
 
 export async function buildCommercialLedger(reference: Date): Promise<CommercialSummary> {
@@ -636,31 +630,6 @@ export type AnalyticsPayload = {
     profilePhotoTextTone: string | null;
     hours: number;
   }>;
-  dueDateRisk: Array<{
-    id: string;
-    name: string;
-    clientName: string;
-    clientLogoUrl: string | null;
-    clientLogoBgColor: string | null;
-    clientLogoTextTone: string | null;
-    dueDate: string;
-    daysUntilDue: number;
-    progressPercent: number;
-    currentStatus: string;
-    assignedAthleteName: string | null;
-  }>;
-  dueDateCalendar: Array<{
-    id: string;
-    name: string;
-    clientName: string;
-    clientLogoUrl: string | null;
-    clientLogoBgColor: string | null;
-    clientLogoTextTone: string | null;
-    dueDate: string;
-    progressPercent: number;
-    currentStatus: string;
-    assignedAthleteName: string | null;
-  }>;
   profitabilityByClient: Array<{
     clientId: string;
     clientName: string;
@@ -765,42 +734,6 @@ export async function buildAnalytics(
       hours: monthHours,
     });
   }
-
-  const now = dateOnlyUtc(new Date());
-  const projectFilter = {
-    ...(clientId ? { clientId } : {}),
-    ...(athleteId ? { assignedAthleteId: athleteId } : {}),
-  };
-  const riskHorizon = new Date(now.getTime() + 14 * 86400000);
-  const riskProjects = await prisma.opsProject.findMany({
-    where: {
-      currentStatus: { notIn: ["completed", "handed_over"] },
-      OR: [
-        { athleteDueDate: { not: null, lte: riskHorizon } },
-        { athleteDueDate: null, dueDate: { not: null, lte: riskHorizon } },
-      ],
-      ...projectFilter,
-    },
-    include: {
-      client: { select: { name: true, logoUrl: true, logoBgColor: true, logoTextTone: true } },
-      assignedAthlete: { select: { fullName: true } },
-    },
-    orderBy: [{ athleteDueDate: "asc" }, { dueDate: "asc" }],
-    take: 20,
-  });
-
-  const calendarProjects = await prisma.opsProject.findMany({
-    where: {
-      dueDate: allTime ? { not: null } : { gte: from, lte: to },
-      currentStatus: { notIn: ["completed", "handed_over"] },
-      ...projectFilter,
-    },
-    include: {
-      client: { select: { name: true, logoUrl: true, logoBgColor: true, logoTextTone: true } },
-      assignedAthlete: { select: { fullName: true } },
-    },
-    orderBy: { dueDate: "asc" },
-  });
 
   let profitabilityByClient: AnalyticsPayload["profitabilityByClient"];
 
@@ -915,43 +848,6 @@ export async function buildAnalytics(
         hours: round2(v.hours),
       }))
       .sort((a, b) => b.hours - a.hours),
-    dueDateRisk: riskProjects.map((p) => {
-      const due = p.athleteDueDate ?? p.dueDate!;
-      const daysUntilDue = Math.ceil((due.getTime() - now.getTime()) / 86400000);
-      const { displayTitle } = projectDisplayFields(p);
-      return {
-        id: p.id,
-        name: displayTitle,
-        clientName: p.client.name,
-        clientLogoUrl: p.client.logoUrl,
-        clientLogoBgColor: p.client.logoBgColor,
-        clientLogoTextTone: p.client.logoTextTone,
-        dueDate: due.toISOString().slice(0, 10),
-        dueAt: due.toISOString(),
-        dueLabel: formatProjectDueAt(due),
-        daysUntilDue,
-        progressPercent: p.progressPercent ?? 0,
-        currentStatus: p.currentStatus,
-        assignedAthleteName: p.assignedAthlete?.fullName ?? null,
-      };
-    }),
-    dueDateCalendar: calendarProjects.map((p) => {
-      const { displayTitle } = projectDisplayFields(p);
-      return {
-      id: p.id,
-      name: displayTitle,
-      clientName: p.client.name,
-      clientLogoUrl: p.client.logoUrl,
-      clientLogoBgColor: p.client.logoBgColor,
-      clientLogoTextTone: p.client.logoTextTone,
-      dueDate: p.dueDate!.toISOString().slice(0, 10),
-      dueAt: p.dueDate!.toISOString(),
-      dueLabel: formatProjectDueAt(p.dueDate),
-      progressPercent: p.progressPercent ?? 0,
-      currentStatus: p.currentStatus,
-      assignedAthleteName: p.assignedAthlete?.fullName ?? null,
-      };
-    }),
     profitabilityByClient,
     beatenDeadlinesByAthlete,
     clientFilter: clientId,

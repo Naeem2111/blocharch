@@ -1,18 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { DueDateCalendar } from "@/components/ops/DueDateCalendar";
 import { SimpleBarChart } from "@/components/ops/SimpleBarChart";
 import { AthleteAvatar } from "@/components/ops/AthleteAvatar";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
-import { ProjectProgressBar } from "@/components/ProjectProgressBar";
 import { asAvatarTextTone } from "@/lib/avatar-text-tone";
 import type { OpsProjectPhase } from "@prisma/client";
-import {
-  displayProjectStageLabel,
-  PROJECT_STATUS_LABELS,
-} from "@/lib/ops-constants";
-import { projectDueColor } from "@/lib/project-color-scale";
+import { displayProjectStageLabel } from "@/lib/ops-constants";
 
 type ClientOption = {
   id: string;
@@ -67,32 +61,6 @@ type AnalyticsData = {
     profilePhotoTextTone: string | null;
     hours: number;
   }>;
-  dueDateRisk: Array<{
-    id: string;
-    name: string;
-    clientName: string;
-    clientLogoUrl: string | null;
-    clientLogoBgColor: string | null;
-    clientLogoTextTone: string | null;
-    dueDate: string;
-    daysUntilDue: number;
-    progressPercent: number;
-    currentStatus: string;
-    assignedAthleteName: string | null;
-  }>;
-  dueDateCalendar: Array<{
-    id: string;
-    name: string;
-    clientName: string;
-    clientLogoUrl: string | null;
-    clientLogoBgColor: string | null;
-    clientLogoTextTone: string | null;
-    dueDate: string;
-    dueAt?: string | null;
-    progressPercent: number;
-    currentStatus: string;
-    assignedAthleteName: string | null;
-  }>;
   profitabilityByClient: Array<{
     clientId: string;
     clientName: string;
@@ -115,7 +83,6 @@ function currentMonth(): string {
 export function AnalyticsClient() {
   const [period, setPeriod] = useState<"month" | "all">("month");
   const [month, setMonth] = useState(currentMonth());
-  const [calendarMonth, setCalendarMonth] = useState(currentMonth());
   const [clientId, setClientId] = useState("");
   const [athleteId, setAthleteId] = useState("");
   const [clients, setClients] = useState<ClientOption[]>([]);
@@ -152,10 +119,6 @@ export function AnalyticsClient() {
       })
       .catch(() => {});
   }, []);
-
-  useEffect(() => {
-    if (period === "month") setCalendarMonth(month);
-  }, [period, month]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -451,95 +414,6 @@ export function AnalyticsClient() {
               </table>
             </div>
           </>
-        )}
-      </div>
-
-      <div className="card-tool rounded-xl p-5 md:p-6">
-        <h2 className="text-base font-semibold text-white">Due date calendar</h2>
-        <p className="mt-1.5 text-sm text-slate-500">
-          {isAllTime
-            ? "Active projects with due dates — use the calendar to browse by month."
-            : "Active projects due in the selected month — progress bars show completion."}
-        </p>
-        <div className="mt-5">
-          {isAllTime ? (
-            <label className="mb-4 block text-xs text-slate-400">
-              Calendar month
-              <input
-                type="month"
-                value={calendarMonth}
-                onChange={(e) => setCalendarMonth(e.target.value)}
-                className="mt-1 block rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
-              />
-            </label>
-          ) : null}
-          <DueDateCalendar month={calendarMonth} projects={data.dueDateCalendar ?? []} />
-        </div>
-      </div>
-
-      <div className="card-tool rounded-xl p-5">
-        <h2 className="text-sm font-semibold text-white">Due date risk</h2>
-        <p className="mt-1 text-xs text-slate-500">Projects due within 14 days that are not complete.</p>
-        {data.dueDateRisk.length === 0 ? (
-          <p className="mt-4 text-sm text-slate-500">No at-risk projects.</p>
-        ) : (
-          <div className="mt-4 overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-white/[0.06] text-xs uppercase text-slate-500">
-                  <th className="px-3 py-2">Project</th>
-                  <th className="px-3 py-2">Client</th>
-                  <th className="px-3 py-2">Due</th>
-                  <th className="px-3 py-2">Days</th>
-                  <th className="px-3 py-2 min-w-[120px]">Progress</th>
-                  <th className="px-3 py-2">Status</th>
-                  <th className="px-3 py-2">Athlete</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.dueDateRisk.map((p) => {
-                  const accent = projectDueColor(p.daysUntilDue);
-                  return (
-                  <tr key={p.id} className="border-b border-white/[0.04] text-slate-300">
-                    <td className="relative px-3 py-2 pl-4">
-                      <span
-                        className="pointer-events-none absolute bottom-0 left-0 top-0 w-1.5 rounded-l-sm"
-                        style={{ backgroundColor: accent }}
-                        aria-hidden
-                      />
-                      {p.name}
-                    </td>
-                    <td className="px-3 py-2">
-                      <span className="inline-flex items-center gap-2">
-                        <ClientAvatar
-                          name={p.clientName}
-                          logoUrl={p.clientLogoUrl}
-                          backgroundColor={p.clientLogoBgColor}
-                          textTone={asAvatarTextTone(p.clientLogoTextTone)}
-                          size={24}
-                        />
-                        {p.clientName}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2">{p.dueDate}</td>
-                    <td
-                      className={`px-3 py-2 tabular-nums ${p.daysUntilDue < 0 ? "text-red-300" : p.daysUntilDue <= 3 ? "text-amber-300" : ""}`}
-                    >
-                      {p.daysUntilDue < 0 ? `${Math.abs(p.daysUntilDue)}d overdue` : `${p.daysUntilDue}d`}
-                    </td>
-                    <td className="px-3 py-2">
-                      <ProjectProgressBar percent={p.progressPercent} showLabel />
-                    </td>
-                    <td className="px-3 py-2">
-                      {PROJECT_STATUS_LABELS[p.currentStatus as keyof typeof PROJECT_STATUS_LABELS] ?? p.currentStatus}
-                    </td>
-                    <td className="px-3 py-2">{p.assignedAthleteName ?? "—"}</td>
-                  </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
         )}
       </div>
     </div>

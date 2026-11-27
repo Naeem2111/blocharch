@@ -19,7 +19,6 @@ export const OPS_NAV: OpsNavItem[] = [
   { href: "/dashboard/ops/catalog", label: "Phases & work types" },
   { href: "/dashboard/ops/archives", label: "Project archives" },
   { href: "/dashboard/ops/commercial", label: "Commercial" },
-  { href: "/dashboard/ops/check-ins", label: "Check-in requests", badgeKey: "checkIns" },
   { href: "/dashboard/ops/analytics", label: "Analytics" },
 ];
 
