@@ -105,7 +105,7 @@ function StatusBadge({
 						}
 			}
 		>
-			<span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: timeTone ? "currentColor" : color }} />
+			<span className="client-portal-status-spin" aria-hidden />
 			{label}
 		</span>
 	);

@@ -64,12 +64,29 @@ export async function GET(request: NextRequest) {
   });
 
   const projectIds = projects.map((p) => p.id);
-  const [hoursByProject, quotedByProject] = await Promise.all([
+  const [hoursByProject, quotedByProject, history] = await Promise.all([
     hoursLoggedByProjectIds(projectIds),
     quotedHoursByProjectIds(projectIds),
+    prisma.opsProject.findMany({
+      select: { clientId: true, name: true, address: true },
+      orderBy: { createdAt: "desc" },
+    }),
   ]);
 
+  const recentProjects: { clientId: string; name: string; address: string | null }[] = [];
+  const recentCount = new Map<string, number>();
+  for (const row of history) {
+    const count = recentCount.get(row.clientId) ?? 0;
+    if (count >= 5) continue;
+    const name = row.name.trim();
+    const address = row.address?.trim() || null;
+    if (!name && !address) continue;
+    recentCount.set(row.clientId, count + 1);
+    recentProjects.push({ clientId: row.clientId, name, address });
+  }
+
   return NextResponse.json({
+    recentProjects,
     projects: projects.map((p) => {
       const activeLaneCount = p.client.commercial?.activeLaneCount ?? 1;
       return serializeOpsProjectRow(p, {

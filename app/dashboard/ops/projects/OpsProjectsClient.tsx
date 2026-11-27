@@ -27,6 +27,7 @@ type ClientContactOption = { id: string; name: string; title: string | null; ema
 type ClientOption = {
   id: string;
   name: string;
+  createdAt: string;
   logoUrl: string | null;
   logoBgColor: string | null;
   logoTextTone: string | null;
@@ -97,6 +98,63 @@ const emptyCreate = {
 
 const inputClass =
   "mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white";
+
+type RecentProject = { clientId: string; name: string; address: string | null };
+
+function recentForClient(recent: RecentProject[], clientId: string): RecentProject[] {
+  if (!clientId) return [];
+  return recent.filter((item) => item.clientId === clientId);
+}
+
+function applyRecentField(
+  recent: RecentProject[],
+  clientId: string,
+  current: { name: string; address: string },
+  field: "name" | "address",
+  value: string,
+): { name: string; address: string } {
+  const next = { ...current, [field]: value };
+  const list = recentForClient(recent, clientId);
+  if (field === "name") {
+    const match = list.find((item) => item.name === value);
+    if (match) next.address = match.address ?? "";
+  } else {
+    const match = list.find((item) => (item.address ?? "") === value && value !== "");
+    if (match?.name) next.name = match.name;
+  }
+  return next;
+}
+
+function RecentProjectMemory({
+  items,
+  onPick,
+}: {
+  items: RecentProject[];
+  onPick: (item: RecentProject) => void;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <div className="md:col-span-2">
+      <p className="text-[10px] uppercase tracking-wide text-slate-500">Recent for this client</p>
+      <div className="mt-1 flex flex-wrap gap-1.5">
+        {items.map((item, index) => {
+          const label = [item.name, item.address].filter(Boolean).join(" · ");
+          return (
+            <button
+              key={`${label}-${index}`}
+              type="button"
+              onClick={() => onPick(item)}
+              title={label}
+              className="max-w-full truncate rounded-full border border-white/[0.1] bg-white/[0.04] px-2.5 py-1 text-left text-[11px] text-slate-200 hover:bg-white/[0.08]"
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function assignmentPayload(athleteIds: string[], primaryAthleteId: string) {
   const ids = Array.from(new Set(athleteIds.filter(Boolean)));
@@ -174,6 +232,7 @@ function AthleteAssignmentsEditor({
 export function OpsProjectsClient() {
   const { phases } = useOpsCatalog();
   const [projects, setProjects] = useState<ProjectRow[]>([]);
+  const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [athletes, setAthletes] = useState<AthleteOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -213,13 +272,17 @@ export function OpsProjectsClient() {
     const pj = await pr.json();
     const cj = await cr.json();
     const aj = await ar.json();
-    if (pr.ok) setProjects(pj.projects || []);
+    if (pr.ok) {
+      setProjects(pj.projects || []);
+      setRecentProjects(Array.isArray(pj.recentProjects) ? pj.recentProjects : []);
+    }
     if (cr.ok)
       setClients(
         (cj.clients || []).map(
           (c: {
             id: string;
             name: string;
+            createdAt?: string;
             logoUrl?: string | null;
             logoBgColor?: string | null;
             logoTextTone?: string | null;
@@ -227,6 +290,7 @@ export function OpsProjectsClient() {
           }) => ({
             id: c.id,
             name: c.name,
+            createdAt: c.createdAt ?? "",
             logoUrl: c.logoUrl ?? null,
             logoBgColor: c.logoBgColor ?? null,
             logoTextTone: c.logoTextTone ?? null,
@@ -237,7 +301,7 @@ export function OpsProjectsClient() {
               email: ct.email ?? null,
             })),
           })
-        )
+        ).sort((a: ClientOption, b: ClientOption) => a.createdAt.localeCompare(b.createdAt))
       );
     if (ar.ok)
       setAthletes(
@@ -469,8 +533,13 @@ export function OpsProjectsClient() {
         });
       }
     }
-    return Array.from(groups.values()).sort((a, b) => a.clientName.localeCompare(b.clientName));
-  }, [filteredProjects]);
+    const joinedAt = new Map(clients.map((client) => [client.id, client.createdAt]));
+    return Array.from(groups.values()).sort((a, b) => {
+      const byJoin = (joinedAt.get(a.clientId) ?? "").localeCompare(joinedAt.get(b.clientId) ?? "");
+      if (byJoin !== 0) return byJoin;
+      return a.clientName.localeCompare(b.clientName);
+    });
+  }, [filteredProjects, clients]);
 
   if (loading) return <p className="text-sm text-slate-500">Loading projects…</p>;
 
@@ -531,9 +600,22 @@ export function OpsProjectsClient() {
               Project title
               <input
                 value={editForm.name}
-                onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                list="ops-edit-project-titles"
+                onChange={(e) =>
+                  setEditForm((f) => ({
+                    ...f,
+                    ...applyRecentField(recentProjects, f.clientId, f, "name", e.target.value),
+                  }))
+                }
                 className={inputClass}
               />
+              <datalist id="ops-edit-project-titles">
+                {recentForClient(recentProjects, editForm.clientId)
+                  .filter((item) => item.name)
+                  .map((item, index) => (
+                    <option key={`${item.name}-${index}`} value={item.name} />
+                  ))}
+              </datalist>
             </label>
             <AthleteAssignmentsEditor
               className="md:col-span-2"
@@ -600,10 +682,29 @@ export function OpsProjectsClient() {
               Address
               <input
                 value={editForm.address}
-                onChange={(e) => setEditForm((f) => ({ ...f, address: e.target.value }))}
+                list="ops-edit-project-addresses"
+                onChange={(e) =>
+                  setEditForm((f) => ({
+                    ...f,
+                    ...applyRecentField(recentProjects, f.clientId, f, "address", e.target.value),
+                  }))
+                }
                 className={inputClass}
               />
+              <datalist id="ops-edit-project-addresses">
+                {recentForClient(recentProjects, editForm.clientId)
+                  .filter((item) => item.address)
+                  .map((item, index) => (
+                    <option key={`${item.address}-${index}`} value={item.address ?? ""} />
+                  ))}
+              </datalist>
             </label>
+            <RecentProjectMemory
+              items={recentForClient(recentProjects, editForm.clientId)}
+              onPick={(item) =>
+                setEditForm((f) => ({ ...f, name: item.name, address: item.address ?? "" }))
+              }
+            />
             <label className="text-xs text-slate-400">
               Complexity
               <select
@@ -943,7 +1044,29 @@ export function OpsProjectsClient() {
               ))}
             </select>
           </label>
-          <label className="text-xs text-slate-400">Project title<input required value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. 86 Bishops Road" className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
+          <label className="text-xs text-slate-400">
+            Project title
+            <input
+              required
+              value={form.name}
+              list="ops-create-project-titles"
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  ...applyRecentField(recentProjects, f.clientId, f, "name", e.target.value),
+                }))
+              }
+              placeholder="e.g. 86 Bishops Road"
+              className={inputClass}
+            />
+            <datalist id="ops-create-project-titles">
+              {recentForClient(recentProjects, form.clientId)
+                .filter((item) => item.name)
+                .map((item, index) => (
+                  <option key={`${item.name}-${index}`} value={item.name} />
+                ))}
+            </datalist>
+          </label>
           <label className="text-xs text-slate-400">
             Athlete code
             <input
@@ -953,7 +1076,31 @@ export function OpsProjectsClient() {
               className={inputClass}
             />
           </label>
-          <label className="text-xs text-slate-400 md:col-span-2">Address<input value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white" /></label>
+          <label className="text-xs text-slate-400 md:col-span-2">
+            Address
+            <input
+              value={form.address}
+              list="ops-create-project-addresses"
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  ...applyRecentField(recentProjects, f.clientId, f, "address", e.target.value),
+                }))
+              }
+              className={inputClass}
+            />
+            <datalist id="ops-create-project-addresses">
+              {recentForClient(recentProjects, form.clientId)
+                .filter((item) => item.address)
+                .map((item, index) => (
+                  <option key={`${item.address}-${index}`} value={item.address ?? ""} />
+                ))}
+            </datalist>
+          </label>
+          <RecentProjectMemory
+            items={recentForClient(recentProjects, form.clientId)}
+            onPick={(item) => setForm((f) => ({ ...f, name: item.name, address: item.address ?? "" }))}
+          />
           <label className="text-xs text-slate-400">
             Total hours (quoted)
             <input

@@ -1079,6 +1079,22 @@ html[data-theme="light"] .client-portal-shell .text-slate-600 {
   }
 }
 
+.client-portal-status-spin {
+  width: 0.7rem;
+  height: 0.7rem;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  border: 1.5px solid currentColor;
+  border-top-color: transparent;
+  animation: client-portal-status-spin 0.8s linear infinite;
+}
+
+@keyframes client-portal-status-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .client-portal-progress-live {
   position: relative;
   overflow: hidden;
@@ -1117,9 +1133,14 @@ html[data-theme="light"] .client-portal-shell .text-slate-600 {
   .portal-discussed-toast-check,
   .portal-bell-live,
   .portal-bell-live svg,
-  .client-portal-progress-sheen {
+  .client-portal-progress-sheen,
+  .client-portal-status-spin {
     animation: none;
     opacity: 0;
+  }
+  .client-portal-status-spin {
+    opacity: 1;
+    border-top-color: currentColor;
   }
   .portal-bell-live {
     box-shadow: 0 0 16px 2px rgb(56 189 248 / 0.55);

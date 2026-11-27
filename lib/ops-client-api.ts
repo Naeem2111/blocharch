@@ -101,6 +101,7 @@ type ClientWithRelations = {
 	slug: string | null;
 	publicPortalEnabled: boolean;
 	notes: string | null;
+	createdAt: Date;
 	clientLinks?: unknown;
 	contacts: {
 		id: string;
@@ -139,6 +140,7 @@ export function mapClientToJson(c: ClientWithRelations) {
 		slug: c.slug ?? null,
 		publicPortalEnabled: c.publicPortalEnabled ?? false,
 		notes: c.notes,
+		createdAt: c.createdAt.toISOString(),
 		clientLinks: parseClientDeliverables(c.clientLinks),
 		projectCount: c._count.projects,
 		commercial: c.commercial
