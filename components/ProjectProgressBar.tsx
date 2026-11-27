@@ -52,12 +52,6 @@ export function ProjectProgressBar({
             {live ? <span className="client-portal-progress-sheen" aria-hidden /> : null}
           </div>
         ) : null}
-        {live && p < 100 ? (
-          <div
-            className="client-portal-progress-rest h-full"
-            style={{ width: `${100 - p}%`, backgroundColor: fill }}
-          />
-        ) : null}
       </div>
     </div>
   );

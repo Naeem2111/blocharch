@@ -1051,10 +1051,6 @@ html[data-theme="light"] .client-portal-shell .text-slate-600 {
   animation: client-portal-progress-sheen 2.2s ease-in-out infinite;
 }
 
-.client-portal-progress-rest {
-  opacity: 0.28;
-}
-
 @keyframes client-portal-progress-sheen {
   0% {
     left: -35%;
