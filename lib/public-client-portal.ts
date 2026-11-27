@@ -98,7 +98,7 @@ function clientStatusBadge(
     case "zoom_required":
       return { label: "Zoom required", color: "#a855f7" };
     case "in_progress":
-      return { label: "In progress", color: "#3b82f6" };
+      return { label: "In progress", color: "#67e8f9" };
     case "not_started":
       return { label: "On track", color: "#22c55e" };
     case "blocked":

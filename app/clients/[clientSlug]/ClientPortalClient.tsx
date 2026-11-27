@@ -89,16 +89,23 @@ function StatusBadge({
 	label: string;
 	color: string;
 }) {
+	const timeTone = color.toLowerCase() === "#67e8f9";
 	return (
 		<span
-			className="client-portal-status-badge inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide"
-			style={{
-				backgroundColor: `${color}22`,
-				color,
-				borderColor: `${color}44`,
-			}}
+			className={`client-portal-status-badge inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${
+				timeTone ? "client-portal-time-pill" : ""
+			}`}
+			style={
+				timeTone
+					? undefined
+					: {
+							backgroundColor: `${color}22`,
+							color,
+							borderColor: `${color}44`,
+						}
+			}
 		>
-			<span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
+			<span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: timeTone ? "currentColor" : color }} />
 			{label}
 		</span>
 	);
