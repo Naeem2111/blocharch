@@ -45,7 +45,25 @@ type Submission = {
 
 type FilterClient = { id: string; name: string };
 type FilterAthlete = { id: string; fullName: string; athleteCode: string };
-type FilterProject = { id: string; name: string; clientId: string; projectNumber: string };
+type FilterProject = {
+  id: string;
+  name: string;
+  clientId: string;
+  projectNumber: string;
+  completedAt: string | null;
+};
+
+function byLatestCompleted(a: FilterProject, b: FilterProject): number {
+  if (a.completedAt && b.completedAt) {
+    const byDate = b.completedAt.localeCompare(a.completedAt);
+    if (byDate !== 0) return byDate;
+  } else if (a.completedAt) {
+    return -1;
+  } else if (b.completedAt) {
+    return 1;
+  }
+  return a.name.localeCompare(b.name);
+}
 
 const field = "select-console mt-1 block min-w-[12rem] rounded-md px-3 py-2 text-sm";
 
@@ -107,13 +125,14 @@ export function OpsSubmissionsClient() {
       if (projectsRes.ok) {
         setProjects(
           (projectsJson.projects || [])
-            .map((project: { id: string; name: string; clientId: string; projectNumber?: string }) => ({
+            .map((project: { id: string; name: string; clientId: string; projectNumber?: string; completedAt?: string | null }) => ({
               id: project.id,
               name: project.name,
               clientId: project.clientId,
               projectNumber: project.projectNumber || "",
+              completedAt: project.completedAt ?? null,
             }))
-            .sort((a: FilterProject, b: FilterProject) => a.name.localeCompare(b.name)),
+            .sort(byLatestCompleted),
         );
       }
     });

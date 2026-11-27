@@ -5,7 +5,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ClientPortalBrandMark } from "@/components/client-portal/ClientPortalBrandMark";
 import { ClientPortalAthleteMark } from "@/components/client-portal/ClientPortalAthleteMark";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
-import { ComplexityBadge } from "@/components/ops/ComplexityBadge";
 import { MiniMonthCalendar } from "@/components/MiniMonthCalendar";
 import { ProjectProgressBar } from "@/components/ProjectProgressBar";
 import { asAvatarTextTone } from "@/lib/avatar-text-tone";
@@ -124,6 +123,14 @@ function StatusBadge({
 	);
 }
 
+function ComplexityChip({ label }: { label: string }) {
+	return (
+		<span className="inline-flex shrink-0 rounded-full border border-white/[0.1] bg-white/[0.06] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+			{label}
+		</span>
+	);
+}
+
 function LanePill({ n }: { n: number }) {
 	return (
 		<span className="client-portal-lane-pill rounded border border-white/[0.1] bg-white/[0.04] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
@@ -198,7 +205,7 @@ function ProjectCard({
 				</div>
 				<div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
 					<StatusBadge label={project.statusBadge.label} color={project.statusBadge.color} />
-					<ComplexityBadge value={project.complexity} label={project.complexityLabel} />
+					<ComplexityChip label={project.complexityLabel} />
 				</div>
 			</div>
 			<div className="mt-3 flex flex-col gap-2 pl-1 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center">
@@ -361,7 +368,7 @@ function CompletedPreviewCard({ project }: { project: PublicClientPortalProject 
 			</div>
 			<div className="mt-4 flex flex-wrap items-center justify-between gap-3">
 				<LeadBlock name={project.leadName} title={project.leadTitle} />
-				<ComplexityBadge value={project.complexity} label={project.complexityLabel} />
+				<ComplexityChip label={project.complexityLabel} />
 			</div>
 		</article>
 	);
@@ -1038,7 +1045,7 @@ export function ClientPortalClient({
 												</div>
 												<div className="flex items-center justify-between gap-3">
 													<dt className="text-slate-500">Complexity</dt>
-													<dd><ComplexityBadge value={project.complexity} label={project.complexityLabel} /></dd>
+													<dd><ComplexityChip label={project.complexityLabel} /></dd>
 												</div>
 											</dl>
 										</li>
@@ -1068,7 +1075,7 @@ export function ClientPortalClient({
 														<LeadBlock name={project.leadName} title={project.leadTitle} showLabel={false} />
 													</td>
 													<td className="px-4 py-4" style={{ overflow: "visible" }}>
-														<ComplexityBadge value={project.complexity} label={project.complexityLabel} />
+														<ComplexityChip label={project.complexityLabel} />
 													</td>
 												</tr>
 											))}
