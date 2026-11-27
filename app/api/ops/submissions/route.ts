@@ -17,12 +17,34 @@ export async function GET(request: NextRequest) {
   const limit = Math.min(500, Math.max(1, parseInt(request.nextUrl.searchParams.get("limit") || "200", 10)));
   const projectId = request.nextUrl.searchParams.get("projectId")?.trim() || null;
   const athleteId = request.nextUrl.searchParams.get("athleteId")?.trim() || null;
+  const clientId = request.nextUrl.searchParams.get("clientId")?.trim() || null;
+  const q = request.nextUrl.searchParams.get("q")?.trim() || "";
+
+  const filters = [
+    ...(athleteId ? [{ athleteId }] : []),
+    ...(projectId ? [{ lineItems: { some: { projectId } } }] : []),
+    ...(clientId ? [{ lineItems: { some: { clientId } } }] : []),
+    ...(q
+      ? [
+          {
+            OR: [
+              { athlete: { fullName: { contains: q, mode: "insensitive" as const } } },
+              { athlete: { athleteCode: { contains: q, mode: "insensitive" as const } } },
+              { dailyNote: { contains: q, mode: "insensitive" as const } },
+              { lineItems: { some: { client: { name: { contains: q, mode: "insensitive" as const } } } } },
+              { lineItems: { some: { project: { name: { contains: q, mode: "insensitive" as const } } } } },
+              { lineItems: { some: { project: { projectNumber: { contains: q, mode: "insensitive" as const } } } } },
+              { lineItems: { some: { notes: { contains: q, mode: "insensitive" as const } } } },
+              { lineItems: { some: { completedSummary: { contains: q, mode: "insensitive" as const } } } },
+              { lineItems: { some: { blockerNote: { contains: q, mode: "insensitive" as const } } } },
+            ],
+          },
+        ]
+      : []),
+  ];
 
   const submissions = await prisma.opsDailySubmission.findMany({
-    where: {
-      ...(athleteId ? { athleteId } : {}),
-      ...(projectId ? { lineItems: { some: { projectId } } } : {}),
-    },
+    where: filters.length > 0 ? { AND: filters } : {},
     orderBy: [{ submissionDate: "desc" }, { updatedAt: "desc" }],
     take: limit,
     include: {

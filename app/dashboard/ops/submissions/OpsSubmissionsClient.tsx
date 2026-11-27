@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AthleteAvatar } from "@/components/ops/AthleteAvatar";
 import { ClientAvatar } from "@/components/ops/ClientAvatar";
@@ -43,6 +43,12 @@ type Submission = {
   lineItems: LineItem[];
 };
 
+type FilterClient = { id: string; name: string };
+type FilterAthlete = { id: string; fullName: string; athleteCode: string };
+type FilterProject = { id: string; name: string; clientId: string; projectNumber: string };
+
+const field = "select-console mt-1 block min-w-[12rem] rounded-md px-3 py-2 text-sm";
+
 function taskTypeLabel(
   li: LineItem,
   workTypes: { value: string; label: string }[],
@@ -53,14 +59,77 @@ function taskTypeLabel(
 export function OpsSubmissionsClient() {
   const { phases, workTypes } = useOpsCatalog();
   const [rows, setRows] = useState<Submission[]>([]);
+  const [clients, setClients] = useState<FilterClient[]>([]);
+  const [athletes, setAthletes] = useState<FilterAthlete[]>([]);
+  const [projects, setProjects] = useState<FilterProject[]>([]);
+  const [clientId, setClientId] = useState("");
+  const [athleteId, setAthleteId] = useState("");
+  const [projectId, setProjectId] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
   const [pendingCheckIns, setPendingCheckIns] = useState(0);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => setQuery(searchInput.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
+
+  useEffect(() => {
+    void Promise.all([
+      fetch("/api/ops/clients"),
+      fetch("/api/ops/athletes"),
+      fetch("/api/ops/projects?scope=all"),
+    ]).then(async ([clientsRes, athletesRes, projectsRes]) => {
+      const clientsJson = await clientsRes.json().catch(() => ({}));
+      const athletesJson = await athletesRes.json().catch(() => ({}));
+      const projectsJson = await projectsRes.json().catch(() => ({}));
+      if (clientsRes.ok) {
+        setClients(
+          (clientsJson.clients || [])
+            .map((client: { id: string; name: string }) => ({ id: client.id, name: client.name }))
+            .sort((a: FilterClient, b: FilterClient) => a.name.localeCompare(b.name)),
+        );
+      }
+      if (athletesRes.ok) {
+        setAthletes(
+          (athletesJson.athletes || [])
+            .map((athlete: { id: string; fullName: string; athleteCode: string }) => ({
+              id: athlete.id,
+              fullName: athlete.fullName,
+              athleteCode: athlete.athleteCode,
+            }))
+            .sort((a: FilterAthlete, b: FilterAthlete) => a.fullName.localeCompare(b.fullName)),
+        );
+      }
+      if (projectsRes.ok) {
+        setProjects(
+          (projectsJson.projects || [])
+            .map((project: { id: string; name: string; clientId: string; projectNumber?: string }) => ({
+              id: project.id,
+              name: project.name,
+              clientId: project.clientId,
+              projectNumber: project.projectNumber || "",
+            }))
+            .sort((a: FilterProject, b: FilterProject) => a.name.localeCompare(b.name)),
+        );
+      }
+    });
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
+    const params = new URLSearchParams();
+    const filtering = Boolean(clientId || athleteId || projectId || query);
+    params.set("limit", filtering ? "500" : "200");
+    if (clientId) params.set("clientId", clientId);
+    if (athleteId) params.set("athleteId", athleteId);
+    if (projectId) params.set("projectId", projectId);
+    if (query) params.set("q", query);
     const [sr, br] = await Promise.all([
-      fetch("/api/ops/submissions?limit=200"),
+      fetch(`/api/ops/submissions?${params.toString()}`),
       fetch("/api/ops/sidebar-badges"),
     ]);
     const j = await sr.json();
@@ -68,13 +137,15 @@ export function OpsSubmissionsClient() {
     if (!sr.ok) {
       setError(j.error || "Failed to load");
       setLoading(false);
+      setReady(true);
       return;
     }
     setRows(j.submissions || []);
     setPendingCheckIns(bj.checkIns ?? 0);
     setError("");
     setLoading(false);
-  }, []);
+    setReady(true);
+  }, [athleteId, clientId, projectId, query]);
 
   useEffect(() => {
     void load();
@@ -82,8 +153,14 @@ export function OpsSubmissionsClient() {
     return () => clearInterval(t);
   }, [load]);
 
-  if (loading) return <p className="text-sm text-slate-500">Loading submissions…</p>;
-  if (error) return <p className="text-sm text-red-400">{error}</p>;
+  const projectOptions = useMemo(
+    () => projects.filter((project) => !clientId || project.clientId === clientId),
+    [projects, clientId],
+  );
+  const filtering = Boolean(clientId || athleteId || projectId || query);
+
+  if (!ready && loading) return <p className="text-sm text-slate-500">Loading submissions…</p>;
+  if (error && rows.length === 0) return <p className="text-sm text-red-400">{error}</p>;
 
   const actionCount = rows.filter((s) => s.checkInNeedsAction).length;
 
@@ -108,8 +185,89 @@ export function OpsSubmissionsClient() {
         </div>
       ) : null}
 
-      {rows.length === 0 ? (
-        <p className="text-sm text-slate-500">No daily submissions logged yet.</p>
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="min-w-[16rem] flex-1 text-xs text-slate-400">
+          Search
+          <input
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+            placeholder="Athlete, client, project, notes…"
+            className="mt-1 block w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white"
+          />
+        </label>
+        <label className="text-xs text-slate-400">
+          Client
+          <select
+            value={clientId}
+            onChange={(event) => {
+              const next = event.target.value;
+              setClientId(next);
+              setProjectId((current) => {
+                if (!next || !current) return current;
+                const project = projects.find((item) => item.id === current);
+                return project && project.clientId !== next ? "" : current;
+              });
+            }}
+            className={field}
+          >
+            <option value="">All clients</option>
+            {clients.map((client) => (
+              <option key={client.id} value={client.id}>
+                {client.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-xs text-slate-400">
+          Athlete
+          <select value={athleteId} onChange={(event) => setAthleteId(event.target.value)} className={field}>
+            <option value="">All athletes</option>
+            {athletes.map((athlete) => (
+              <option key={athlete.id} value={athlete.id}>
+                {athlete.fullName} ({athlete.athleteCode})
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-xs text-slate-400">
+          Project
+          <select value={projectId} onChange={(event) => setProjectId(event.target.value)} className={field}>
+            <option value="">All projects</option>
+            {projectOptions.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.projectNumber ? `${project.projectNumber} · ` : ""}
+                {project.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        {filtering ? (
+          <button
+            type="button"
+            onClick={() => {
+              setClientId("");
+              setAthleteId("");
+              setProjectId("");
+              setSearchInput("");
+              setQuery("");
+            }}
+            className="rounded-lg border border-white/[0.1] px-3 py-2 text-sm text-slate-300"
+          >
+            Clear
+          </button>
+        ) : null}
+      </div>
+      <p className="text-sm text-slate-400">
+        {loading
+          ? "Loading…"
+          : `${rows.length} submission${rows.length === 1 ? "" : "s"}${filtering ? (rows.length === 1 ? " matches" : " match") : ""}`}
+      </p>
+      {error ? <p className="text-sm text-red-400">{error}</p> : null}
+
+      {rows.length === 0 && !loading ? (
+        <p className="text-sm text-slate-500">
+          {filtering ? "No daily submissions match these filters." : "No daily submissions logged yet."}
+        </p>
       ) : (
         rows.map((s) => (
           <article

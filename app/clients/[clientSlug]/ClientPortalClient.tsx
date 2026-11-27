@@ -90,6 +90,7 @@ function StatusBadge({
 	color: string;
 }) {
 	const timeTone = color.toLowerCase() === "#67e8f9";
+	const done = label.trim().toLowerCase() === "completed";
 	return (
 		<span
 			className={`client-portal-status-badge inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${
@@ -105,7 +106,19 @@ function StatusBadge({
 						}
 			}
 		>
-			<span className="client-portal-status-spin" aria-hidden />
+			{done ? (
+				<svg className="h-3 w-3 shrink-0" viewBox="0 0 16 16" fill="none" aria-hidden>
+					<path
+						d="M3.5 8.5 6.5 11.5 12.5 4.5"
+						stroke="currentColor"
+						strokeWidth="1.8"
+						strokeLinecap="round"
+						strokeLinejoin="round"
+					/>
+				</svg>
+			) : (
+				<span className="client-portal-status-spin" aria-hidden />
+			)}
 			{label}
 		</span>
 	);
@@ -183,7 +196,10 @@ function ProjectCard({
 					<h3 className="font-semibold text-white">{project.name}</h3>
 					{project.address ? <p className="mt-0.5 text-xs text-slate-500">{project.address}</p> : null}
 				</div>
-				<StatusBadge label={project.statusBadge.label} color={project.statusBadge.color} />
+				<div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+					<StatusBadge label={project.statusBadge.label} color={project.statusBadge.color} />
+					<ComplexityBadge value={project.complexity} label={project.complexityLabel} />
+				</div>
 			</div>
 			<div className="mt-3 flex flex-col gap-2 pl-1 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center">
 				<div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-slate-400">
