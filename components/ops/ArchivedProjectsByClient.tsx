@@ -55,7 +55,7 @@ export function ArchivedProjectsByClient({
 }: {
   projects: ArchivedProjectRow[];
   showAssignedAthlete?: boolean;
-  onOpen: (projectId: string) => void;
+  onOpen?: (projectId: string) => void;
   onReactivate?: (project: { id: string; name: string; displayTitle?: string }) => void;
   reactivatingId?: string | null;
   emptyMessage?: string;
@@ -148,13 +148,15 @@ export function ArchivedProjectsByClient({
                     ) : null}
                     <td className="px-4 py-3">
                       <div className="flex flex-col items-start gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => onOpen(p.id)}
-                          className="text-xs text-brand-300 hover:text-brand-200"
-                        >
-                          Open
-                        </button>
+                        {onOpen ? (
+                          <button
+                            type="button"
+                            onClick={() => onOpen(p.id)}
+                            className="text-xs text-brand-300 hover:text-brand-200"
+                          >
+                            Open
+                          </button>
+                        ) : null}
                         {onReactivate ? (
                           <button
                             type="button"

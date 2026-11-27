@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArchiveProjectDetailPanel } from "@/components/ops/ArchiveProjectDetailPanel";
 import {
   ArchivedProjectsByClient,
   type ArchivedProjectRow,
@@ -13,7 +12,6 @@ export function CompletedProjectsClient() {
   const [projects, setProjects] = useState<ArchivedProjectRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [clientFilterId, setClientFilterId] = useState("");
-  const [detailProjectId, setDetailProjectId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
@@ -84,7 +82,6 @@ export function CompletedProjectsClient() {
         return;
       }
       setMsg(`"${label}" is active again at 85%.`);
-      if (detailProjectId === project.id) setDetailProjectId(null);
       await load();
     } finally {
       setBusyId(null);
@@ -143,7 +140,6 @@ export function CompletedProjectsClient() {
       <ArchivedProjectsByClient
         projects={filteredProjects}
         showAssignedAthlete={false}
-        onOpen={setDetailProjectId}
         onReactivate={reactivate}
         reactivatingId={busyId}
         emptyMessage={
@@ -153,20 +149,6 @@ export function CompletedProjectsClient() {
         }
         clientGroupLabel="completed project"
       />
-
-      {detailProjectId ? (
-        <ArchiveProjectDetailPanel
-          projectId={detailProjectId}
-          detailPath="/api/athlete/projects"
-          showOpsEditHint={false}
-          onClose={() => setDetailProjectId(null)}
-          onReactivate={() => {
-            const project = projects.find((p) => p.id === detailProjectId);
-            if (project) void reactivate(project);
-          }}
-          reactivating={busyId === detailProjectId}
-        />
-      ) : null}
     </div>
   );
 }
