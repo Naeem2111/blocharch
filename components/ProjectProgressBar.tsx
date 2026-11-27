@@ -20,7 +20,7 @@ export function ProjectProgressBar({
 }: {
   percent: number | null | undefined;
   showLabel?: boolean;
-  /** Pulse the unfinished part in the bar color. Used on the client portal. */
+  /** A white pulse travels across the filled part only. Used on the client portal. */
   live?: boolean;
   className?: string;
   barClassName?: string;
@@ -46,14 +46,16 @@ export function ProjectProgressBar({
       >
         {p > 0 ? (
           <div
-            className={`h-full transition-[width] duration-300 ${barClassName}`}
+            className={`relative h-full overflow-hidden transition-[width] duration-300 ${live ? "client-portal-progress-live" : ""} ${barClassName}`}
             style={{ width: `${p}%`, backgroundColor: fill }}
-          />
+          >
+            {live ? <span className="client-portal-progress-sheen" aria-hidden /> : null}
+          </div>
         ) : null}
         {live && p < 100 ? (
           <div
             className="client-portal-progress-rest h-full"
-            style={{ width: `${100 - p}%`, ["--progress-fill" as string]: fill }}
+            style={{ width: `${100 - p}%`, backgroundColor: fill }}
           />
         ) : null}
       </div>
