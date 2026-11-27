@@ -86,8 +86,9 @@ export async function GET(request: NextRequest) {
   const ordered =
     status === "all_active" || status === "all"
       ? [...fetched].sort((a, b) => {
-          const live = Number(a.status !== "live_active") - Number(b.status !== "live_active");
-          if (live !== 0) return live;
+          const rank = (status: string) => (status === "live_active" ? 1 : status === "on_bench" ? 2 : 0);
+          const grouped = rank(a.status) - rank(b.status);
+          if (grouped !== 0) return grouped;
           const aTime = a.submittedAt?.getTime() ?? Number.NEGATIVE_INFINITY;
           const bTime = b.submittedAt?.getTime() ?? Number.NEGATIVE_INFINITY;
           if (aTime !== bTime) return bTime - aTime;
