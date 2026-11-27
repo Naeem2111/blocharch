@@ -227,6 +227,56 @@
   border-color: rgb(203 213 225 / 0.95) !important;
 }
 
+/* Talent pool paints its own navy panels. Light mode darkens the text, so those panels have to lift too. */
+[data-theme="light"] .talent-pool .bg-\[\#0b1220\],
+[data-theme="light"] .talent-pool .bg-\[\#0c1424\],
+[data-theme="light"] .talent-pool .bg-\[\#0c1526\],
+[data-theme="light"] .talent-pool .bg-\[\#0d1526\],
+[data-theme="light"] .talent-pool .bg-\[\#10192b\] {
+  background-color: #ffffff !important;
+}
+
+[data-theme="light"] .talent-pool .border-white\/\[0\.05\] {
+  border-color: rgb(226 232 240) !important;
+}
+
+[data-theme="light"] .talent-pool .text-cyan-200,
+[data-theme="light"] .talent-pool .text-cyan-300 {
+  color: #0e7490 !important;
+}
+
+[data-theme="light"] .talent-pool .hover\:text-cyan-200:hover {
+  color: #155e75 !important;
+}
+
+[data-theme="light"] .talent-pool .hover\:text-emerald-200:hover {
+  color: #065f46 !important;
+}
+
+[data-theme="light"] .talent-pool .hover\:bg-white\/\[0\.05\]:hover {
+  background-color: rgb(241 245 249) !important;
+}
+
+[data-theme="light"] .talent-pool tr.bg-emerald-700\/35 {
+  background-color: rgb(16 185 129 / 0.16) !important;
+}
+
+[data-theme="light"] .talent-pool tr.hover\:bg-emerald-700\/45:hover {
+  background-color: rgb(16 185 129 / 0.26) !important;
+}
+
+[data-theme="light"] .talent-pool tr.bg-\[\#fbbf24\]\/25 {
+  background-color: rgb(251 191 36 / 0.28) !important;
+}
+
+[data-theme="light"] .talent-pool tr.hover\:bg-\[\#fbbf24\]\/35:hover {
+  background-color: rgb(251 191 36 / 0.42) !important;
+}
+
+[data-theme="light"] .talent-avatar {
+  color: #ffffff !important;
+}
+
 input[type="date"],
 input[type="month"] {
   color-scheme: dark;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Avatar, SoftwarePills, WhatsAppLink, availabilityDot, experienceText, relativeSync, statusDot } from "@/components/recruitment/TalentChrome";
@@ -46,6 +46,104 @@ type SyncState = {
 
 const field = "rounded-lg border border-white/[0.1] bg-[#0c1526] px-3 py-2 text-sm text-slate-200";
 
+const ROW_STATUSES = [
+  ...RECRUITMENT_STATUSES.filter((item) => item.value !== "archived"),
+  { value: "archived" as const, label: "Archived" },
+];
+
+function StatusColorChip({ status }: { status: string }) {
+  const color = statusDot(status);
+  return (
+    <span
+      className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+      style={{ backgroundColor: color, boxShadow: `0 0 0 3px ${color}33` }}
+      aria-hidden
+    />
+  );
+}
+
+function RowStatusMenu({
+  status,
+  onChange,
+}: {
+  status: string;
+  onChange: (next: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [menuStyle, setMenuStyle] = useState<{ top: number; left: number } | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  const placeMenu = useCallback(() => {
+    const button = buttonRef.current;
+    if (!button) return;
+    const rect = button.getBoundingClientRect();
+    const menuHeight = ROW_STATUSES.length * 32 + 8;
+    const below = window.innerHeight - rect.bottom;
+    const top = below < menuHeight && rect.top > menuHeight ? rect.top - menuHeight - 4 : rect.bottom + 4;
+    setMenuStyle({ top, left: rect.left });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    placeMenu();
+    const close = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const reposition = () => placeMenu();
+    document.addEventListener("mousedown", close);
+    window.addEventListener("resize", reposition);
+    window.addEventListener("scroll", reposition, true);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      window.removeEventListener("resize", reposition);
+      window.removeEventListener("scroll", reposition, true);
+    };
+  }, [open, placeMenu]);
+
+  return (
+    <div ref={rootRef}>
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-transparent px-2 py-1 text-xs text-white"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <StatusColorChip status={status} />
+        {recruitmentStatusLabel(status)}
+        <span className="text-slate-400">▾</span>
+      </button>
+      {open && menuStyle ? (
+        <div
+          className="fixed z-50 w-44 rounded-xl border border-white/[0.1] bg-[#0d1526] p-1 shadow-2xl"
+          style={menuStyle}
+          role="listbox"
+        >
+          {ROW_STATUSES.map((item) => (
+            <button
+              key={item.value}
+              type="button"
+              role="option"
+              aria-selected={item.value === status}
+              onClick={() => {
+                setOpen(false);
+                if (item.value !== status) onChange(item.value);
+              }}
+              className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-white hover:bg-white/[0.05]"
+            >
+              <StatusColorChip status={item.value} />
+              <span>{item.label}</span>
+              {item.value === status ? <span className="ml-auto text-cyan-300">✓</span> : null}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function TalentPoolClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -78,6 +176,7 @@ export function TalentPoolClient() {
   const selectedSoftware = searchParams.getAll("software");
   const archivedView = status === "archived";
   const liveView = status === "live_active";
+  const benchView = status === "on_bench";
 
   const replaceParams = useCallback(
     (mutate: (params: URLSearchParams) => void) => {
@@ -149,7 +248,7 @@ export function TalentPoolClient() {
     sync?.status === "connected" ? "Google Sheets connected" : sync?.status === "syncing" ? "Syncing" : sync?.status === "failed" ? "Sync failed" : "Google Sheets not connected";
 
   return (
-    <div className="space-y-5">
+    <div className="talent-pool space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm text-slate-500">{archivedView ? "Recruitment  ·  Archived talent" : "Recruitment"}</p>
@@ -201,6 +300,18 @@ export function TalentPoolClient() {
           className={`pb-2 text-sm ${liveView ? "border-b-2 border-emerald-400 text-white" : "text-slate-400"}`}
         >
           Live / Active
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            replaceParams((params) => {
+              params.set("status", "on_bench");
+              params.set("page", "1");
+            })
+          }
+          className={`pb-2 text-sm ${benchView ? "border-b-2 border-[#fbbf24] text-white" : "text-slate-400"}`}
+        >
+          Bench
         </button>
       </div>
 
@@ -452,7 +563,13 @@ export function TalentPoolClient() {
                 <tr
                   key={row.id}
                   onClick={() => router.push(profileHref(row.id))}
-                  className={`cursor-pointer border-t border-white/[0.05] hover:bg-white/[0.04] ${row.status === "live_active" ? "bg-emerald-700/35 hover:bg-emerald-700/45" : ""}`}
+                  className={`cursor-pointer border-t border-white/[0.05] hover:bg-white/[0.04] ${
+                    row.status === "live_active"
+                      ? "bg-emerald-700/35 hover:bg-emerald-700/45"
+                      : row.status === "on_bench"
+                        ? "bg-[#fbbf24]/25 hover:bg-[#fbbf24]/35"
+                        : ""
+                  }`}
                 >
                   <td className="px-4 py-3">
                     <span className="flex items-center gap-3">
@@ -485,30 +602,18 @@ export function TalentPoolClient() {
                     </td>
                   ) : (
                     <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
-                      <span className="inline-flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: statusDot(row.status) }} />
-                        <select
-                          value={row.status}
-                          onChange={(event) => {
-                            const next = event.target.value;
-                            if (next === "archived") {
-                              setReason("no_longer_interested");
-                              setComment("");
-                              setArchiveFor(row);
-                              return;
-                            }
-                            void patch(row.id, { status: next });
-                          }}
-                          className="select-console rounded-full border border-white/[0.08] bg-transparent px-2 py-1 text-xs text-white"
-                        >
-                          {RECRUITMENT_STATUSES.filter((item) => item.value !== "archived").map((item) => (
-                            <option key={item.value} value={item.value}>
-                              {item.label}
-                            </option>
-                          ))}
-                          <option value="archived">Archived</option>
-                        </select>
-                      </span>
+                      <RowStatusMenu
+                        status={row.status}
+                        onChange={(next) => {
+                          if (next === "archived") {
+                            setReason("no_longer_interested");
+                            setComment("");
+                            setArchiveFor(row);
+                            return;
+                          }
+                          void patch(row.id, { status: next });
+                        }}
+                      />
                     </td>
                   )}
                   <td className="px-4 py-3">

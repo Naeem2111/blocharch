@@ -168,7 +168,7 @@ export function TalentProfileClient({ id }: { id: string }) {
   const latestMove = application.activity.find((item) => item.detail?.startsWith("Status") || item.detail?.startsWith("Restored") || item.detail?.startsWith("Archived"));
 
   return (
-    <div className="w-full min-w-0 space-y-5">
+    <div className="talent-pool w-full min-w-0 space-y-5">
       <p className="text-sm text-slate-500">
         Recruitment / Talent Pool / <span className="text-slate-300">{application.fullName}</span>
       </p>
@@ -180,7 +180,7 @@ export function TalentProfileClient({ id }: { id: string }) {
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-start gap-4">
           <span
-            className={`flex h-14 w-14 items-center justify-center rounded-full text-lg font-semibold text-white ${application.status === "live_active" ? "" : "bg-slate-600"}`}
+            className={`talent-avatar flex h-14 w-14 items-center justify-center rounded-full text-lg font-semibold text-white ${application.status === "live_active" ? "" : "bg-slate-600"}`}
             style={application.status === "live_active" ? { backgroundColor: "#0000FF" } : undefined}
           >
             {application.fullName.slice(0, 1)}
